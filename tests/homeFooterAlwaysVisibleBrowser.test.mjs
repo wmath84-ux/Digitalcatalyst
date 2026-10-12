@@ -5,14 +5,13 @@
 //   "Home page footer navigation must always be visible by default. Currently
 //    it is minimized and appears only after dragging the line or tapping it."
 //
-// Two fixture pages, both rendering production components with production CSS:
+// Fixture pages render production components with production CSS. The
+// classic-dock coverage explicitly selects the preserved `glass-dock` setting;
+// the default Uiverse capsule gets its own first-load/mobile/tablet coverage.
 //   · homeFooter.html?page=home — `<BottomNav active="home" peek peekAlwaysOpen>`
-//     inside Home's own frame/main structure, plus the real clearance
-//     publisher (src/utils/footerNavSpace.ts);
-//   · shell.html#/home — the REAL DesktopShell + DesktopPeekDock on the Home
-//     route (desktop / tablet-landscape band).
-// Controls: homeFooter.html?page=myday and shell.html (no Home route) keep the
-// previous peek behaviour — the change is Home-only.
+//     inside Home's frame/main structure, plus the real clearance publisher;
+//   · shell.html#/home — DesktopShell + DesktopPeekDock on Home at desktop
+//     and tablet-landscape widths (desktop peek remains unchanged).
 //
 // Needs Chromium (PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH or Playwright's own);
 // without it every test SKIPS with that reason.
@@ -96,8 +95,11 @@ after(async () => {
 const HOME_PAGE = "/tests/fixtures/peekDockHarness/homeFooter.html";
 const SHELL_PAGE = "/tests/fixtures/peekDockHarness/shell.html";
 
-async function open(url, { width = 360, height = 740, touch = true } = {}) {
+async function open(url, { width = 360, height = 740, touch = true, footerStyle } = {}) {
   const context = await browser.newContext({ viewport: { width, height }, hasTouch: touch, isMobile: touch });
+  if (footerStyle) {
+    await context.addInitScript((style) => localStorage.setItem("dc-footer-navigation-style", style), footerStyle);
+  }
   const page = await context.newPage();
   const problems = [];
   page.on("pageerror", (error) => problems.push(`pageerror: ${error.message}`));
@@ -155,8 +157,43 @@ const scrollToEnd = (page) =>
 
 // ── Phone / tablet (the site footer) ───────────────────────────────────────
 
-browserTest("Home, phone: the footer is visible on first load with no tap or drag", async () => {
+browserTest("Home, phone and portrait tablet: the default Uiverse footer is visible and Profile shortcuts work", async () => {
   const { page, context, problems } = await open(`${HOME_PAGE}?page=home`);
+  for (const [width, height] of [[360, 740], [768, 1024]]) {
+    await page.setViewportSize({ width, height });
+    const nav = page.locator('[data-footer-nav-design="uiverse"]');
+    await nav.waitFor();
+    const capsule = await nav.locator("[data-site-footer]").boundingBox();
+    assert.equal(await nav.locator("[data-uiverse-tab]").count(), 4);
+    assert.ok(capsule && capsule.height > 40, `the Uiverse capsule is painted at ${width}px`);
+    assert.ok(capsule.y >= 0 && capsule.y + capsule.height <= height + 1, `the capsule fits inside ${width}×${height}`);
+    const clearance = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--dc-footer-nav-h")));
+    assert.ok(clearance >= capsule.height, `measured clearance ${clearance}px covers the ${capsule.height}px Uiverse capsule`);
+  }
+
+  await page.setViewportSize({ width: 390, height: 800 });
+  const nav = page.locator('[data-footer-nav-design="uiverse"]');
+  const profile = nav.locator('[data-uiverse-tab="profile"]');
+  await profile.tap();
+  const menu = nav.locator(".dc-uiverse-profile-menu");
+  await menu.waitFor();
+  assert.equal(await menu.getAttribute("data-open"), "true");
+  assert.deepEqual(
+    await menu.getByRole("menuitem").allTextContents(),
+    ["My Day", "My Study Library", "Revision", "FlowPath"],
+  );
+  await menu.getByRole("menuitem", { name: "My Day" }).tap();
+  await page.waitForFunction(() => window.location.hash === "#/my-day");
+  assert.equal(await menu.getAttribute("data-open"), "false");
+  await profile.tap();
+  await profile.tap();
+  await page.waitForFunction(() => window.location.hash === "#/profile");
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+browserTest("Home, phone: the preserved classic footer is visible on first load when selected", async () => {
+  const { page, context, problems } = await open(`${HOME_PAGE}?page=home`, { footerStyle: "glass-dock" });
   const state = await footerState(page);
   assertVisible(state, "first load");
   assert.equal(state.alwaysOpen, "true");
@@ -165,8 +202,8 @@ browserTest("Home, phone: the footer is visible on first load with no tap or dra
   await context.close();
 });
 
-browserTest("Home, phone: a tab tap navigates; line taps, outside taps and scrolling never collapse it", async () => {
-  const { page, context, problems } = await open(`${HOME_PAGE}?page=home`);
+browserTest("Home, phone: the selected classic footer stays open after tab, outside taps and scrolling", async () => {
+  const { page, context, problems } = await open(`${HOME_PAGE}?page=home`, { footerStyle: "glass-dock" });
   const state = await footerState(page);
   const store = state.items.find((item) => item.id === "store");
   await page.touchscreen.tap((store.left + store.right) / 2, (store.top + store.bottom) / 2);
@@ -174,16 +211,7 @@ browserTest("Home, phone: a tab tap navigates; line taps, outside taps and scrol
   assert.deepEqual(await page.evaluate(() => window.__selected), ["store"], "one tap on a tab is enough");
   assertVisible(await footerState(page), "after a tab tap");
 
-  const line = await page.evaluate(() => {
-    const box = document.querySelector("[data-site-peek-line]").getBoundingClientRect();
-    return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
-  });
-  await page.touchscreen.tap(line.x, line.y);
-  await page.waitForTimeout(250);
-  assertVisible(await footerState(page), "after a tap on the line");
-  await page.touchscreen.tap(line.x, line.y);
-  await page.waitForTimeout(250);
-  assertVisible(await footerState(page), "after a second tap on the line");
+  assert.equal(await page.locator("[data-site-peek-line]").count(), 0, "the always-open dock has no reveal line");
 
   await page.touchscreen.tap(180, 200); // somewhere in the page
   await page.waitForTimeout(250);
@@ -197,7 +225,7 @@ browserTest("Home, phone: a tab tap navigates; line taps, outside taps and scrol
 });
 
 browserTest("Home, phone: the measured clearance keeps the last content clear of the dock", async () => {
-  const { page, context } = await open(`${HOME_PAGE}?page=home`);
+  const { page, context } = await open(`${HOME_PAGE}?page=home`, { footerStyle: "glass-dock" });
   await scrollToEnd(page);
   await page.waitForTimeout(400);
   const state = await footerState(page);
@@ -209,7 +237,7 @@ browserTest("Home, phone: the measured clearance keeps the last content clear of
 });
 
 browserTest("Home: rotation, tablet widths and a keyboard-sized viewport never collapse the footer", async () => {
-  const { page, context, problems } = await open(`${HOME_PAGE}?page=home`);
+  const { page, context, problems } = await open(`${HOME_PAGE}?page=home`, { footerStyle: "glass-dock" });
   for (const [width, height, label] of [
     // (Phone landscape is portrait-locked outside the Course Player, and the
     // 640–1023 px landscape band hands navigation to the desktop shell —
@@ -232,25 +260,26 @@ browserTest("Home: rotation, tablet widths and a keyboard-sized viewport never c
   await context.close();
 });
 
-browserTest("Home: the hold-drag along the line still works (optional, never required)", async () => {
-  const { page, context } = await open(`${HOME_PAGE}?page=home`, { touch: false, width: 420, height: 800 });
-  const state = await footerState(page);
-  const target = state.items.find((item) => item.id === "purchases");
-  const line = await page.evaluate(() => {
-    const box = document.querySelector("[data-site-peek-line]").getBoundingClientRect();
-    return { x: box.left + 8, y: box.top + box.height / 2 };
-  });
-  await page.mouse.move(line.x, line.y);
+browserTest("Home: optional drag across the selected classic dock still picks the released tab", async () => {
+  const { page, context } = await open(`${HOME_PAGE}?page=home`, { touch: false, width: 420, height: 800, footerStyle: "glass-dock" });
+  const initial = await footerState(page);
+  const source = initial.items.find((item) => item.id === "home");
+  const target = initial.items.find((item) => item.id === "purchases");
+  const start = { x: (source.left + source.right) / 2, y: (source.top + source.bottom) / 2 };
+  await page.mouse.move(start.x, start.y);
   await page.mouse.down();
-  await page.mouse.move((target.left + target.right) / 2, line.y, { steps: 8 });
+  await page.mouse.move((target.left + target.right) / 2, start.y, { steps: 8 });
   await page.mouse.up();
   await page.waitForTimeout(300);
   assert.deepEqual(await page.evaluate(() => window.__selected), ["purchases"], "drag-to-select picks the tab under the release");
+
   // Hash-routed tabs (Revision / FlowPath / Study Library) go through the URL.
   const revision = (await footerState(page)).items.find((item) => item.id === "revision");
-  await page.mouse.move(line.x, line.y);
+  const current = (await footerState(page)).items.find((item) => item.id === "home");
+  const nextStart = { x: (current.left + current.right) / 2, y: (current.top + current.bottom) / 2 };
+  await page.mouse.move(nextStart.x, nextStart.y);
   await page.mouse.down();
-  await page.mouse.move((revision.left + revision.right) / 2, line.y, { steps: 8 });
+  await page.mouse.move((revision.left + revision.right) / 2, nextStart.y, { steps: 8 });
   await page.mouse.up();
   await page.waitForTimeout(300);
   assert.equal(await page.evaluate(() => window.location.hash), "#/revision");
@@ -259,7 +288,7 @@ browserTest("Home: the hold-drag along the line still works (optional, never req
 });
 
 browserTest("My Day keeps its peek footer (the change is Home-only)", async () => {
-  const { page, context } = await open(`${HOME_PAGE}?page=myday`);
+  const { page, context } = await open(`${HOME_PAGE}?page=myday`, { footerStyle: "glass-dock" });
   const state = await footerState(page);
   assert.equal(state.open, "false");
   assert.equal(state.alwaysOpen, null);
@@ -284,36 +313,21 @@ const desktopState = (page) =>
     };
   });
 
-browserTest("Home, desktop: the shell's dock is open on load and stays open when the pointer is elsewhere", async () => {
+browserTest("Home, desktop: the shell preserves its existing hover-to-reveal dock", async () => {
   const { page, context, problems } = await open(`${SHELL_PAGE}#/home`, { width: 1440, height: 900, touch: false });
   let state = await desktopState(page);
-  assert.equal(state.open, "true");
-  assert.equal(state.alwaysOpen, "true");
-  assert.ok(state.opacity > 0.99 && state.panelHeight > 40, "the dock is really painted");
-  await page.mouse.move(700, 300);
-  await page.mouse.move(5, 5);
-  await page.waitForTimeout(400);
-  state = await desktopState(page);
-  assert.equal(state.open, "true", "moving away never hides it on Home");
-  for (const [width, height] of [[1024, 700], [900, 600], [1920, 1080], [1440, 900]]) {
-    await page.setViewportSize({ width, height });
-    await page.waitForTimeout(300);
-    assert.equal((await desktopState(page)).open, "true", `still open at ${width}×${height}`);
-  }
+  assert.equal(state.open, "false", "the desktop dock remains a peek line on Home");
+  assert.equal(state.alwaysOpen, null);
+  assert.equal(state.clearanceAttr, null, "the closed peek dock reserves no content band");
 
-  // The page column reserves the dock's height: its end scrolls clear of it.
-  assert.equal(state.clearanceAttr, "true");
-  await page.evaluate(() => {
-    const scroller = document.querySelector("[data-desktop-content]");
-    scroller.scrollTop = scroller.scrollHeight;
-  });
-  await page.waitForTimeout(300);
-  const lastRow = await page.evaluate(() => {
-    const rows = Array.from(document.querySelectorAll("[data-desktop-content] p"));
-    return rows.at(-1).getBoundingClientRect().bottom;
-  });
-  const after = await desktopState(page);
-  assert.ok(lastRow <= after.panelTop, `the last row (bottom ${lastRow}) ends above the dock (top ${after.panelTop})`);
+  await page.locator("[data-desktop-peek-line]").hover();
+  await page.waitForFunction(() => document.querySelector("[data-desktop-peek-dock]")?.getAttribute("data-open") === "true");
+  await page.waitForTimeout(250);
+  state = await desktopState(page);
+  assert.ok(state.opacity > 0.99 && state.panelHeight > 40, "the hover reveals the real dock");
+  await page.mouse.move(700, 300);
+  await page.waitForTimeout(400);
+  assert.equal((await desktopState(page)).open, "false", "leaving the interaction area returns to the peek line");
   assert.deepEqual(problems, []);
   await context.close();
 });

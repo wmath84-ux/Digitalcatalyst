@@ -5,6 +5,20 @@ import type { Product } from "../data/products";
 export const storeMoney = (value: number) =>
   `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 
+type StoreProductCardProps = {
+  product: Product;
+  wishlisted: boolean;
+  inCart: boolean;
+  purchased: boolean;
+  onToggleWishlist: (id: string) => void;
+  onAddToCart: (id: string) => void;
+  onView: (product: Product) => void;
+  list?: boolean;
+  /** Large, editorial card used by the single-column Grid and Mixed views. */
+  large?: boolean;
+  brandName?: string;
+};
+
 export default function StoreProductCard({
   product,
   wishlisted,
@@ -14,18 +28,9 @@ export default function StoreProductCard({
   onAddToCart,
   onView,
   list = false,
+  large = false,
   brandName = "Digital Catalyst",
-}: {
-  product: Product;
-  wishlisted: boolean;
-  inCart: boolean;
-  purchased: boolean;
-  onToggleWishlist: (id: string) => void;
-  onAddToCart: (id: string) => void;
-  onView: (product: Product) => void;
-  list?: boolean;
-  brandName?: string;
-}) {
+}: StoreProductCardProps) {
   const [failedImage, setFailedImage] = useState("");
   const free = product.isFree === true || product.price === 0;
   const finalPrice = free ? 0 : product.price;
@@ -35,6 +40,9 @@ export default function StoreProductCard({
     Number.isFinite(product.originalPrice) &&
     product.originalPrice > finalPrice &&
     product.originalPrice > 0;
+  const discountPercent = hasOriginal
+    ? Math.round((1 - finalPrice / product.originalPrice) * 100)
+    : 0;
   const hasRating =
     Number.isFinite(product.rating) &&
     product.rating > 0 &&
@@ -52,18 +60,22 @@ export default function StoreProductCard({
         !["lifetime access", "digital learning"].includes(value.toLowerCase()),
     )
     .join(" · ");
+  const status = purchased
+    ? { kind: "purchased", label: "Purchased" }
+    : unavailable
+      ? { kind: "unavailable", label: "Coming soon" }
+      : free
+        ? { kind: "free", label: "Free access" }
+        : hasOriginal
+          ? { kind: "sale", label: `${discountPercent}% off` }
+          : product.tags?.includes("SALE")
+            ? { kind: "sale", label: "Sale" }
+            : null;
 
+  // Artwork is intentionally image-only. Product status, savings, rating,
+  // favorite controls and every other decoration live in the content below it.
   const renderCover = () => (
     <div className="dc-marketplace-cover">
-      {!list ? (
-        hasOriginal ? (
-          <span className="dc-marketplace-discount">
-            {Math.round((1 - finalPrice / product.originalPrice) * 100)}% off
-          </span>
-        ) : free ? (
-          <span className="dc-marketplace-discount">Free access</span>
-        ) : null
-      ) : null}
       {product.image && failedImage !== product.image ? (
         <img
           src={product.image}
@@ -85,7 +97,17 @@ export default function StoreProductCard({
 
   const renderCopy = () => (
     <div className={`dc-marketplace-copy ${list ? "dc-purchases-copy" : ""}`}>
-      <p className="dc-marketplace-kind">{product.category}</p>
+      <div className="dc-marketplace-card-eyebrows">
+        <p className="dc-marketplace-kind">{product.category}</p>
+        {status ? (
+          <span
+            className="dc-marketplace-status"
+            data-status={status.kind}
+          >
+            {status.label}
+          </span>
+        ) : null}
+      </div>
       <h3 className={list ? "dc-purchases-title" : undefined} title={product.title}>
         {product.title}
       </h3>
@@ -156,8 +178,11 @@ export default function StoreProductCard({
 
   return (
     <article
-      className={`dc-marketplace-card ${list ? "is-list dc-purchases-row" : ""}`}
+      className={`dc-marketplace-card ${
+        list ? "is-list dc-purchases-row" : large ? "is-large" : ""
+      }`}
       data-store-product={product.id}
+      data-store-card-variant={list ? "list" : large ? "large" : "grid"}
     >
       <button
         type="button"
@@ -174,10 +199,10 @@ export default function StoreProductCard({
           {renderSaveButton()}
         </div>
       ) : (
-        <>
-          {renderSaveButton()}
+        <div className="dc-marketplace-card-actions" data-store-product-actions>
           {renderFooter()}
-        </>
+          {renderSaveButton()}
+        </div>
       )}
     </article>
   );

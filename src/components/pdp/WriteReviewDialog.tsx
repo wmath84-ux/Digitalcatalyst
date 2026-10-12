@@ -1,35 +1,25 @@
 // src/components/pdp/WriteReviewDialog.tsx
 //
-// "Write a review" on the product page opens this card — adapted from
-// catraco's MIT-licensed Uiverse "dry-bulldog-95" Tailwind card
-// (https://uiverse.io/catraco/dry-bulldog-95):
+// "Write a review" opens catraco's MIT-licensed Uiverse "dry-bulldog-95"
+// feedback card (https://uiverse.io/catraco/dry-bulldog-95), adapted to submit
+// the PDP's real 1–5 rating and review text. Keep its six-column paper card,
+// one-column face buttons, textarea, and centered paper-plane action together.
 //
-//   <div class="bg-white border border-slate-200 grid grid-cols-6 gap-2 rounded-xl p-2 text-sm">
-//     <h1 class="text-center text-xl font-bold col-span-6">…</h1>
-//     <textarea class="bg-slate-100 … h-28 … col-span-6 resize-none outline-none rounded-lg p-2
-//                      duration-300 focus:border-slate-600"></textarea>
-//     <button class="fill-slate-600 col-span-1 … rounded-lg p-2 duration-300 bg-slate-100
-//                    hover:border-slate-600 focus:fill-blue-200 focus:bg-blue-400 border border-slate-200">
-//     … one icon button per choice …
-//     <span class="col-span-2"></span>
-//     <button class="bg-slate-100 stroke-slate-600 border border-slate-200 col-span-2 flex justify-center
-//                    rounded-lg p-2 duration-300 hover:border-slate-600 hover:text-white
-//                    focus:stroke-blue-200 focus:bg-blue-400"> … send …</button>
-//
-// The reference's feedback faces become the five star choices (same button
-// material, same 1-column rhythm) and its paper-plane send button becomes the
-// submit action. The two departures are deliberate: the title is slate-800
-// instead of the reference's slate-200 (which paints white-on-white), and the
-// dialog carries a real close control, Escape handling and a scroll lock —
-// this is a modal, so it has to behave like one.
-//
-// It renders INSIDE the reviews section (no portal) so the review list, its
-// status line and this composer stay one region for screen readers — and so
-// the "Write a review" → "Submit review" journey stays inside `[data-pdp-reviews]`.
+// The card is a real modal rather than a decorative preview: it traps keyboard
+// focus, restores focus to the opener, closes on Escape/backdrop, and locks the
+// document scroll while open.
 
 import { useEffect, useId, useRef } from "react";
-import { Star, X } from "lucide-react";
+import { X } from "lucide-react";
 import { lockBodyScroll, unlockBodyScroll } from "../ui/overlayBounds";
+
+const RATING_OPTIONS = [
+  { value: 1, label: "Very unhappy", mouth: "M8 17c1-2 2.3-3 4-3s3 1 4 3" },
+  { value: 2, label: "Unhappy", mouth: "M8 16c1-1.4 2.3-2.1 4-2.1s3 .7 4 2.1" },
+  { value: 3, label: "Neutral", mouth: "M8.5 15h7" },
+  { value: 4, label: "Happy", mouth: "M8 14.5c1 1.5 2.3 2.2 4 2.2s3-.7 4-2.2" },
+  { value: 5, label: "Very happy", mouth: "M8 13.5c1 2 2.3 3 4 3s3-1 4-3" },
+] as const;
 
 export interface WriteReviewDialogProps {
   /** Visible product title the review is about. */
@@ -37,6 +27,7 @@ export interface WriteReviewDialogProps {
   rating: number;
   comment: string;
   submitting: boolean;
+  notice: string;
   onRating: (rating: number) => void;
   onComment: (comment: string) => void;
   onSubmit: () => void;
@@ -48,13 +39,20 @@ export default function WriteReviewDialog({
   rating,
   comment,
   submitting,
+  notice,
   onRating,
   onComment,
   onSubmit,
   onClose,
 }: WriteReviewDialogProps) {
   const headingId = useId();
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const latestOnClose = useRef(onClose);
+
+  useEffect(() => {
+    latestOnClose.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     lockBodyScroll();
@@ -62,39 +60,63 @@ export default function WriteReviewDialog({
   }, []);
 
   useEffect(() => {
-    // Land the caret in the field the buyer came here to fill.
-    textareaRef.current?.focus({ preventScroll: true });
-  }, []);
-
-  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        latestOnClose.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
       }
     };
+
+    textareaRef.current?.focus({ preventScroll: true });
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      if (previousFocus?.isConnected) {
+        window.requestAnimationFrame(() => previousFocus.focus({ preventScroll: true }));
+      }
+    };
+  }, []);
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-900/40 p-4 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-sm"
       data-pdp-review-dialog-backdrop
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
       <div
+        ref={dialogRef}
         id="pdp-review-composer"
         data-pdp-review-dialog
         role="dialog"
         aria-modal="true"
         aria-labelledby={headingId}
-        className="relative w-full max-w-sm"
+        className="relative max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto"
       >
-        {/* The reference's own dismiss control (Uiverse "nasty-firefox-13"
-            .dismiss): white plate, 2px slate border, red on hover. */}
         <button
           type="button"
           onClick={onClose}
@@ -109,7 +131,7 @@ export default function WriteReviewDialog({
             id={headingId}
             className="col-span-6 text-center text-xl font-bold text-slate-800"
           >
-            Write a Review
+            Send feedback
           </h1>
           <p className="col-span-6 px-1 text-center text-xs font-medium text-slate-500">
             {productTitle}
@@ -126,38 +148,47 @@ export default function WriteReviewDialog({
             className="col-span-6 h-28 resize-none rounded-lg border border-slate-200 bg-slate-100 p-2 text-slate-600 outline-none duration-300 placeholder:text-slate-600 placeholder:opacity-50 focus:border-slate-600"
           />
 
-          <p className="col-span-6 text-[11px] font-semibold text-slate-500">Your rating</p>
-
-          {[1, 2, 3, 4, 5].map((value) => (
+          {RATING_OPTIONS.map(({ value, label, mouth }) => (
             <button
               key={value}
               type="button"
               onClick={() => onRating(value)}
-              aria-label={`${value} star${value === 1 ? "" : "s"}`}
+              aria-label={`${value} star${value === 1 ? "" : "s"} — ${label}`}
               aria-pressed={value === rating}
-              className="col-span-1 flex items-center justify-center rounded-lg border border-slate-200 bg-slate-100 p-2 fill-slate-600 duration-300 hover:border-slate-600 focus:border-blue-400 focus:bg-blue-400"
+              title={label}
+              data-pdp-review-rating={value}
+              className={`col-span-1 flex items-center justify-center rounded-lg border p-2 duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 ${
+                value === rating
+                  ? "border-blue-400 bg-blue-100 text-blue-600"
+                  : "border-slate-200 bg-slate-100 text-slate-600 hover:border-slate-600 hover:bg-white"
+              }`}
             >
-              <Star
+              <svg
+                viewBox="0 0 24 24"
+                width="22"
+                height="22"
+                fill="none"
                 aria-hidden="true"
-                size={20}
-                className={
-                  value <= rating
-                    ? "fill-amber-400 text-amber-400"
-                    : "fill-slate-300 text-slate-300"
-                }
-              />
+              >
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+                <circle cx="9" cy="9.5" r="0.9" fill="currentColor" />
+                <circle cx="15" cy="9.5" r="0.9" fill="currentColor" />
+                <path d={mouth} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
             </button>
           ))}
           <span className="col-span-1" aria-hidden="true" />
 
+          <span className="col-span-2" aria-hidden="true" />
           <button
             type="button"
             disabled={submitting}
             onClick={onSubmit}
-            className="col-span-6 flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-100 p-2 stroke-slate-600 duration-300 hover:border-slate-600 hover:text-white focus:stroke-blue-200 focus:bg-blue-400 focus:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label={submitting ? "Submitting review" : "Submit review"}
+            title={submitting ? "Submitting review" : "Submit review"}
+            className="col-span-2 flex items-center justify-center rounded-lg border border-slate-200 bg-slate-100 p-2 stroke-slate-600 duration-300 hover:border-slate-600 hover:bg-slate-600 hover:text-white focus-visible:border-blue-400 focus-visible:bg-blue-400 focus-visible:text-white disabled:cursor-not-allowed disabled:opacity-60"
             data-pdp-review-submit-btn
           >
-            {/* The reference's paper-plane glyph. */}
             <svg
               fill="none"
               viewBox="0 0 24 24"
@@ -179,11 +210,14 @@ export default function WriteReviewDialog({
                 d="M10.11 13.6501L13.69 10.0601"
               />
             </svg>
-            <span className="text-sm font-semibold text-slate-700">
-              {submitting ? "Submitting…" : "Submit review"}
-            </span>
           </button>
+          <span className="col-span-2" aria-hidden="true" />
 
+          {notice ? (
+            <p className="col-span-6 text-center text-xs font-medium text-rose-600" role="status" aria-live="polite">
+              {notice}
+            </p>
+          ) : null}
           <p className="col-span-6 text-center text-[11px] leading-4 text-slate-500">
             Reviews are published after moderation and show the same star rating other learners see.
           </p>

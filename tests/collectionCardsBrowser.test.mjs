@@ -43,10 +43,13 @@ const check = (name, fn) => test(name, { timeout: 180000 }, async t => {
   if (!enabled) return t.skip("Install Chromium or set PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH");
   await fn();
 });
-async function open(pageName, width = 820, height = 1180) {
+async function open(pageName, width = 820, height = 1180, theme = "dark") {
   const page = await browser.newPage({ viewport: { width, height } });
   await page.goto(`${origin}/tests/fixtures/collectionCardsHarness/index.html?page=${pageName}`);
   await page.locator(pageName === "library" ? "[data-purchase-entry]" : ".dc-collection-card").first().waitFor();
+  if (theme === "light") {
+    await page.evaluate(() => { document.documentElement.dataset.theme = "light"; });
+  }
   await page.evaluate(() => document.fonts.ready);
   return page;
 }
@@ -107,6 +110,90 @@ check("cards stay compact, readable and contained across tablet widths and rotat
     assert.equal(await page.locator(pageName === "library" ? ".dc-purchases-title" : ".dc-collection-title").first().evaluate(el => getComputedStyle(el).textShadow), "none");
     await page.close();
   }
+});
+
+check("cart checkout clears the mobile footer at every width and desktop uses a two-column order summary", async () => {
+  const mobile = await open("cart-shell", 320, 568);
+  await mobile.waitForFunction(() => {
+    const nav = document.querySelector("[data-site-footer-nav]");
+    const content = document.querySelector("[data-cart-wishlist-content]");
+    return Boolean(nav && content && nav.getBoundingClientRect().height > 0 && parseFloat(getComputedStyle(content).paddingBottom) >= 88);
+  });
+
+  for (const [width, height] of [[320, 568], [360, 640], [390, 844], [430, 932], [640, 960], [768, 1024], [834, 1112], [959, 1200]]) {
+    await mobile.setViewportSize({ width, height });
+    await mobile.waitForTimeout(70);
+    const geometry = await mobile.evaluate(() => {
+      const bar = document.querySelector("[data-cart-checkout-bar]").getBoundingClientRect();
+      const nav = document.querySelector("[data-site-footer-nav]").getBoundingClientRect();
+      const button = document.querySelector("[data-cart-checkout]").getBoundingClientRect();
+      const frame = document.querySelector("[data-app-frame]").getBoundingClientRect();
+      return { barBottom: bar.bottom, navTop: nav.top, buttonLeft: button.left, buttonRight: button.right, frameLeft: frame.left, frameRight: frame.right };
+    });
+    assert.ok(geometry.barBottom <= geometry.navTop + 1, `checkout bar clears footer at ${width}×${height}: ${JSON.stringify(geometry)}`);
+    assert.ok(geometry.buttonLeft >= geometry.frameLeft - 1 && geometry.buttonRight <= geometry.frameRight + 1, `checkout action fits at ${width}×${height}: ${JSON.stringify(geometry)}`);
+  }
+
+  // API 35 edge-to-edge WebViews can report a zero CSS inset. The native
+  // response marks that band so the nav capsule is still lifted clear of the
+  // 3-button system bar, and the cart follows the re-measured height.
+  await mobile.setViewportSize({ width: 390, height: 844 });
+  const beforeEdgeInset = await mobile.locator("[data-site-footer-nav]").evaluate((nav) => nav.getBoundingClientRect().height);
+  await mobile.evaluate(() => { document.documentElement.dataset.androidEdgeToEdge = "true"; });
+  await mobile.waitForTimeout(150);
+  const edgeGeometry = await mobile.evaluate(() => {
+    const nav = document.querySelector("[data-site-footer-nav]");
+    const content = document.querySelector("[data-cart-wishlist-content]");
+    return {
+      navHeight: nav.getBoundingClientRect().height,
+      navTop: nav.getBoundingClientRect().top,
+      navPadding: parseFloat(getComputedStyle(nav).paddingBottom),
+      contentPadding: parseFloat(getComputedStyle(content).paddingBottom),
+      checkoutBottom: document.querySelector("[data-cart-checkout-bar]").getBoundingClientRect().bottom,
+    };
+  });
+  assert.ok(edgeGeometry.navPadding >= 24, `edge-to-edge CSS reserves the system navigation strip: ${JSON.stringify(edgeGeometry)}`);
+  assert.ok(edgeGeometry.navHeight >= beforeEdgeInset + 13, `edge-to-edge fallback reserves nav height if env() is zero: ${JSON.stringify(edgeGeometry)}`);
+  assert.ok(edgeGeometry.contentPadding >= edgeGeometry.navHeight - 1, `Cart receives the re-measured footer height: ${JSON.stringify(edgeGeometry)}`);
+  assert.ok(edgeGeometry.checkoutBottom <= edgeGeometry.navTop + 1, `checkout stays above the lifted system navigation: ${JSON.stringify(edgeGeometry)}`);
+  await mobile.close();
+
+  const desktop = await open("cart-desktop", 1280, 900);
+  for (const [width, height] of [[900, 600], [959, 600], [960, 720], [1024, 768], [1280, 800], [1600, 1000]]) {
+    await desktop.setViewportSize({ width, height });
+    const layout = await desktop.evaluate(() => {
+      const row = document.querySelector("[data-cart-row]");
+      const items = document.querySelector("[data-cart-items]").getBoundingClientRect();
+      const summary = document.querySelector("[data-cart-summary]").getBoundingClientRect();
+      const desktopCheckout = document.querySelector("[data-cart-checkout-desktop]");
+      const mobileBar = document.querySelector("[data-cart-checkout-bar]");
+      return {
+        display: getComputedStyle(row).display,
+        columns: getComputedStyle(row).gridTemplateColumns.split(" ").length,
+        itemsRight: items.right,
+        summaryLeft: summary.left,
+        desktopCheckoutDisplay: getComputedStyle(desktopCheckout).display,
+        desktopCheckoutWidth: desktopCheckout.getBoundingClientRect().width,
+        mobileBarDisplay: getComputedStyle(mobileBar).display,
+      };
+    });
+    assert.equal(layout.display, "grid", `desktop order layout at ${width}×${height}`);
+    assert.ok(layout.columns >= 2, `desktop shows item and summary columns at ${width}×${height}`);
+    assert.ok(layout.summaryLeft >= layout.itemsRight - 1, `summary sits beside items at ${width}×${height}`);
+    assert.notEqual(layout.desktopCheckoutDisplay, "none", `desktop checkout is available at ${width}×${height}`);
+    assert.ok(layout.desktopCheckoutWidth > 0, `desktop checkout is visible at ${width}×${height}`);
+    assert.equal(layout.mobileBarDisplay, "none", `mobile-only bar is removed on desktop at ${width}×${height}`);
+  }
+  await desktop.close();
+
+  const light = await open("cart", 390, 844, "light");
+  const footnoteStyle = await light.locator("[data-cart-price-note]").evaluate((note) => ({
+    color: getComputedStyle(note).color,
+    theme: document.documentElement.dataset.theme,
+  }));
+  assert.equal(footnoteStyle.theme, "light", "the light-mode fixture is active");
+  assert.equal(footnoteStyle.color, "rgb(91, 102, 121)", "the lowest cart price note uses readable light-mode tertiary ink");
+  await light.close();
 });
 
 check("library access, favourites, cart and study actions keep their behaviour", async () => {

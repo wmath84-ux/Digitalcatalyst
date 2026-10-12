@@ -323,7 +323,7 @@ check(
   "Marketplace search, server-managed category filters, sorts and all three layouts work without fake featured products",
   async () => {
     const { page, errors } = await open("page=store&adminFilters&shell", 1440);
-    await page.getByRole("button", { name: "Biology", exact: true }).click();
+    await page.getByText("Biology", { exact: true }).click();
     assert.equal(await page.locator("[data-store-product]").count(), 1);
     await page.getByRole("button", { name: "Search products" }).click();
     const productSearch = page.getByRole("searchbox", { name: "Search Store products" });
@@ -367,9 +367,44 @@ check(
       }
       if (layout === "mixed") {
         assert.ok(await page.locator("[data-store-mixed-feature] .dc-marketplace-card.is-list").count() > 0);
+        assert.deepEqual(
+          await page.locator("[data-store-product]").evaluateAll((cards) =>
+            cards.map((card) => card.getAttribute("data-store-card-variant")),
+          ),
+          Array.from({ length: 9 }, (_, index) => index % 3 === 0 ? "large" : "list"),
+        );
+      }
+      if (layout === "grid" || layout === "mixed") {
+        const selector = layout === "grid" ? "[data-store-grid]" : "[data-store-mixed]";
+        assert.equal(
+          await page.locator(selector).evaluate((grid) =>
+            getComputedStyle(grid).gridTemplateColumns.trim().split(/\s+/).length,
+          ),
+          1,
+          `${layout} must retain one full-width column on desktop`,
+        );
+        assert.equal(
+          await page.locator(".dc-marketplace-cover .dc-marketplace-status, .dc-marketplace-cover button").count(),
+          0,
+          "product badges and controls stay outside the artwork",
+        );
       }
       await bounds(page, layout);
       await page.setViewportSize({ width: 390, height: 900 });
+      if (layout === "grid" || layout === "mixed") {
+        // Switching between the desktop and mobile shell can remount the
+        // Store route, so select the same layout again at the target width.
+        await page.getByLabel("Product layout").click();
+        await page.getByRole("option", { name: layoutLabel, exact: true }).click();
+        const selector = layout === "grid" ? "[data-store-grid]" : "[data-store-mixed]";
+        assert.equal(
+          await page.locator(selector).evaluate((grid) =>
+            getComputedStyle(grid).gridTemplateColumns.trim().split(/\s+/).length,
+          ),
+          1,
+          `${layout} must retain one full-width column on phones`,
+        );
+      }
       await bounds(page, layout + " phone");
       await page.setViewportSize({ width: 1440, height: 900 });
     }

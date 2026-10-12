@@ -1,9 +1,8 @@
-import { Fragment, useMemo, useState, useEffect, useId, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useMemo, useState, useEffect, useId, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Product } from "../data/products";
 import { useCatalog } from "../context/CatalogContext";
 import { Check, ChevronDown, Search } from "lucide-react";
 import StoreProductCard from "./StoreProductCard";
-import { buildStoreShelves } from "../utils/storeShelves";
 import ContentDialog from "./ui/ContentDialog";
 import { useBranding } from "../context/BrandingContext";
 import {
@@ -275,12 +274,13 @@ export default function StorePage({
     setActiveFilterId(ALL_STORE_FILTER.id);
     setAdvancedFilters(DEFAULT_ADVANCED_FILTERS);
   };
-  const card = (product: Product, list = false) => (
+  const card = (product: Product, list = false, large = false) => (
     <StoreProductCard
       key={product.id}
       product={product}
       brandName={appName}
       list={list}
+      large={large}
       wishlisted={wishlist.has(product.id)}
       inCart={cartIds.has(product.id)}
       purchased={purchased.has(product.id)}
@@ -431,29 +431,15 @@ export default function StorePage({
               viewMode === "mixed" ? "is-mixed" : ""
             }`}
           >
-            {buildStoreShelves(filtered).map(({ offset, gridProducts, railProducts }, group) => {
-              const renderGridCard = (product: Product, index: number) =>
-                viewMode === "mixed" && index % 3 === 0 ? (
+            {filtered.map((product, index) => {
+              if (viewMode === "mixed" && index % 3 !== 0) {
+                return (
                   <div key={product.id} className="dc-marketplace-feature" data-store-mixed-feature>
                     {card(product, true)}
                   </div>
-                ) : card(product);
-              return (
-                <Fragment key={gridProducts[0].id}>
-                  {gridProducts.map((product, index) => renderGridCard(product, offset + index))}
-                  {railProducts.length > 0 ? (
-                    <section className="dc-marketplace-shelf" aria-label={`Explore more resources ${group + 1}`}>
-                      <header className="dc-marketplace-shelf-heading">
-                        <div><p>KEEP EXPLORING</p><h2>More to learn, your way</h2></div>
-                        <span>{railProducts.length > 1 ? "Swipe to explore →" : "Explore next →"}</span>
-                      </header>
-                      <div className="dc-marketplace-shelf-track" tabIndex={0} aria-label="Scrollable products">
-                        {railProducts.map((product, index) => renderGridCard(product, offset + 4 + index))}
-                      </div>
-                    </section>
-                  ) : null}
-                </Fragment>
-              );
+                );
+              }
+              return card(product, false, true);
             })}
           </div>
         )}

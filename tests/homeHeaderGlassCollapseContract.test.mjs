@@ -43,7 +43,8 @@ test("Home header collapses on scroll to brand + action buttons", () => {
   // The action cluster is data-driven (ExpandingTabs items); the labels
   // render as aria-label via the component.
   assert.match(homeHeader, /ariaLabel: "Leaderboard"/);
-  assert.match(homeHeader, /ariaLabel: "Notifications"/);
+  assert.match(homeHeader, /<HeaderNotificationsButton/);
+  assert.match(homeHeader, /count=\{unreadNotificationCount\}/);
   assert.match(homeHeader, /ariaLabel: "Favorites"/);
   assert.match(css, /\[data-home-header\] \[data-home-search-slot\]/);
   assert.match(css, /\[data-home-header\] \[data-home-welcome\]/);

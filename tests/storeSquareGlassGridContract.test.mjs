@@ -20,9 +20,10 @@
 //      background (nothing floats on the scene any more);
 //   2. "Top rated" is heading-sized, and every product card carries a heading
 //      that is the biggest type on that card;
-//   3. every product card uses Home's 4:3 artwork + copy stack (not a square);
-//   4. the grid auto-fills like Home: 2-up on phones, minmax(180px) on tablet,
-//      minmax(220px) on desktop;
+//   3. product cards use image-only Home-ratio artwork with their copy beside it
+//      on wider screens (not an image overlay or square crop);
+//   4. Store Grid stays one large-card column, and Mixed inserts two list rows
+//      between each large card at every breakpoint;
 //   5. the store glass is the owner's material — blur 42–50% of the 40px
 //      ceiling, light blue rgb(173,216,255) at 22–30%;
 //   6. the footer navigation (the main app dock AND FlowPath's dock, which is
@@ -266,71 +267,52 @@ test("the price is on the card at every breakpoint, not only from sm:", () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* 4. Auto-fill like Home on phone / tablet / desktop                  */
+/* 4. One roomy Store track on phone / tablet / desktop                 */
 /* ------------------------------------------------------------------ */
 
-test("the store grid is two-up on phones and auto-fills like Home on tablet", () => {
-  // Base (phones): two equal tracks, Home's 12px gap-3.
+test("Grid view stays one full-width column on phones, tablets and desktop", () => {
   const base = /\n\[data-store-grid\] \{([^}]*)\}/.exec(indexCss)?.[1];
   assert.ok(base, "expected the base [data-store-grid] rule");
   assert.match(base, /display: grid/);
-  assert.match(base, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(base, /gap: 12px/);
+  assert.match(base, /grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(base, /gap: clamp\(14px, 1\.6vw, 24px\)/);
 
-  // Tablets: the same 180px auto-fill Home uses, restated later so an older
-  // 2-up override cannot pin the store to a different column count.
   const tabletBlock =
-    /@media \(min-width: 640px\) and \(max-width: 959px\) \{\s*\n\s*\[data-store-grid\] \{([^}]*)\}/.exec(
-      indexCss
-    )?.[1];
-  assert.ok(tabletBlock, "expected the 640–959 [data-store-grid] rule");
-  assert.match(
-    tabletBlock,
-    /grid-template-columns: repeat\(auto-fill, minmax\(180px, 1fr\)\) !important/
-  );
-  assert.match(tabletBlock, /gap: 12px !important/);
+    /@media \(min-width: 640px\) and \(max-width: 959px\) \{\s*\n\s*\[data-store-grid\] \{([^}]*)\}/.exec(indexCss)?.[1];
+  assert.ok(tabletBlock, "expected the 640–959 Store grid rule");
+  assert.match(tabletBlock, /grid-template-columns: minmax\(0, 1fr\) !important/);
 
-  // Store cards are not transform-scaled inside their track on tablets.
-  const scale =
-    /\[data-home-grid\] > \*,\n\s*\[data-pdp-grid\] > \* \{\s*\n\s*transform: scale\(var\(--tablet-scale\)\)/.exec(
-      indexCss
-    );
-  assert.ok(
-    scale,
-    "expected the tablet card-scale rule without [data-store-grid]"
-  );
+  const desktopBlock =
+    /@media \(min-width: 960px\) \{\s*\n\s*\[data-store-grid\] \{([^}]*)\}/.exec(indexCss)?.[1];
+  assert.ok(desktopBlock, "expected the desktop Store grid rule");
+  assert.match(desktopBlock, /grid-template-columns: minmax\(0, 1fr\) !important/);
+
+  const css = read("src/components/store-marketplace.css");
+  assert.match(css, /\.dc-marketplace-grid\[data-store-grid\][\s\S]*?grid-template-columns: minmax\(0, 1fr\) !important/);
 });
 
-test("the store grid auto-fills the same 220px track Home uses on desktop", () => {
-  const desktop =
-    /@media \(min-width: 960px\) \{\s*\n\s*\[data-store-grid\] \{([^}]*)\}/.exec(
-      indexCss
-    )?.[1];
-  assert.ok(desktop, "expected the desktop [data-store-grid] rule");
-  assert.match(
-    desktop,
-    /grid-template-columns: repeat\(auto-fill, minmax\(220px, 1fr\)\) !important/
-  );
-  assert.match(desktop, /gap: 16px !important/);
-
-  // Home's desktop grid uses the same 220px floor.
-  assert.match(
-    indexCss,
-    /\[data-home-grid\],\s*\n\s*\[data-store-grid\],\s*\n\s*\[data-pdp-grid\],\s*\n\s*\[data-search-grid\] \{\s*\n\s*grid-template-columns: repeat\(auto-fill, minmax\(220px, 1fr\)\) !important;/
-  );
+test("Mixed view places two full-width list rows between each large card", () => {
+  const css = read("src/components/store-marketplace.css");
+  assert.match(storePage, /viewMode === "mixed" && index % 3 !== 0[\s\S]*?card\(product, true\)/);
+  assert.match(storePage, /return card\(product, false, true\)/);
+  assert.match(css, /\.dc-marketplace-card\.is-large \.dc-marketplace-open\s*\{[\s\S]*?grid-template-columns: minmax\(0, 0\.88fr\) minmax\(0, 1\.12fr\)/);
+  assert.match(css, /\[data-store-marketplace\] \[data-store-mixed\] > \[data-store-mixed-feature\][\s\S]*?grid-column: 1 \/ -1 !important/);
 });
 
-test("native grids adapt to the actual content width rather than overflowing beside the rail", () => {
+test("native Store grids remain bounded beside the desktop rail and image controls stay out of the artwork", () => {
   const css = read("src/components/store-marketplace.css");
   assert.match(storePage, /data-store-grid-loading/);
   assert.match(storePage, /data-store-grid/);
-  assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(css, /grid-template-columns: minmax\(0, 1fr\)/);
   assert.match(css, /@container dc-marketplace \(max-width: 339px\)/);
-  assert.match(css, /repeat\(auto-fill, minmax\(230px, 1fr\)\)/);
   assert.match(css, /\.dc-marketplace-list \{/);
+  const storeProductCard = read("src/components/StoreProductCard.tsx");
+  assert.doesNotMatch(storeProductCard, /dc-marketplace-discount|absolute left-2 top-2|absolute right-2 top-2/);
+  assert.match(storeProductCard, /dc-marketplace-card-actions/);
+  assert.match(storeProductCard, /dc-marketplace-status/);
 });
 
-test("the store opens on the Home-ratio grid, and the skeleton matches it", () => {
+test("the Store opens on its large single-column grid, with a matching skeleton", () => {
   assert.match(storePage, /useState<ViewMode>\("grid"\)/);
   assert.match(storePage, /data-store-grid-loading/);
   assert.match(

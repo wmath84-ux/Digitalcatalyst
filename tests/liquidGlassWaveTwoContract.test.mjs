@@ -17,6 +17,7 @@ import fs from "node:fs";
 const read = (p) => fs.readFileSync(p, "utf8");
 
 const header = read("src/components/Header.tsx");
+const headerNotifications = read("src/components/HeaderNotificationsButton.tsx");
 const shell = read("src/components/DesktopShell.tsx");
 const searchBar = read("src/components/SearchBar.tsx");
 const css = read("src/glass.css");
@@ -65,11 +66,12 @@ test("the header still exposes its badges and its aria labels", () => {
   // The frozen `Help & FAQ` name must stay a literal in the file: a call site
   // that hides it behind a variable breaks tests/subscriptionDowngradeGuard.
   assert.match(header, /ariaLabel: "Help & FAQ"/);
-  assert.match(header, /ariaLabel: "Notifications"/);
+  assert.match(headerNotifications, /"Notifications"/);
+  assert.match(headerNotifications, /aria-label=\{label\}/);
   assert.match(expandingTabs, /aria-label=\{item\.ariaLabel \?\? item\.label\}/);
   assert.match(expandingTabs, /aria-label=\{item\.badgeAriaLabel\}/, "the count gets its own accessible name");
-  assert.match(header, /"99\+"/, "big counts stay capped, as they were before the swap");
-  assert.match(header, /badge:/, "badges are still passed in from the live counters");
+  assert.match(headerNotifications, /unreadCount > 99 \? "99\+"/, "big notification counts stay capped");
+  assert.match(header, /badge:/, "other contextual badges are still passed in from live counters");
 });
 
 // ── desktop rail ─────────────────────────────────────────────────────────────
@@ -132,10 +134,12 @@ test("top-bar actions keep their data hook and gain the expanding-tabs rail", ()
   assert.match(shell, /data-desktop-topbar-actions/);
   const actions = shell.slice(shell.indexOf("data-desktop-topbar-actions"));
   assert.match(actions, /<ExpandingTabs/);
-  for (const name of ["Notifications", "Favorites", "Cart", "Subscription"]) {
-    assert.ok(actions.includes(`ariaLabel: "${name}"`), `top bar keeps the ${name} action`);
+  for (const name of ["Favorites", "Cart", "Subscription"]) {
+    assert.ok(actions.includes(`ariaLabel: "${name}"`), `Expanding Tabs keeps the ${name} action`);
   }
-  assert.match(actions, /notifications > 99 \? "99\+"/);
+  assert.match(shell, /<HeaderNotificationsButton/);
+  assert.match(shell, /count=\{notifications\}/, "Notifications now occupies the former profile-avatar slot");
+  assert.match(headerNotifications, /unreadCount > 99 \? "99\+"/);
 });
 
 test("⌘K is owned by exactly one component — the registry palette", () => {

@@ -1,8 +1,8 @@
 // tests/systemThemeStatusBarContract.test.mjs
 //
 // Contract test for system-theme based status bar styling across PWA and APK:
-// - Light mode -> White status bar (#ffffff) with dark icons.
-// - Dark mode -> Dark status bar (#000000) with light icons.
+// - Light mode -> White status + navigation bars (#ffffff) with dark icons.
+// - Dark mode -> Dark status + navigation bars (#000000) with light icons.
 // - No blue status bar (#2563eb, #303F9F, #3F51B5).
 // - Dynamic system-theme listener at runtime.
 // - Native Android styles, night mode config changes, and Capacitor bridge.
@@ -45,28 +45,34 @@ test("src/utils/themeColor.ts synchronizes with system theme and notifies native
   assert.match(systemBars, /setSystemBars/);
 });
 
-test("Android color resources define light and night status bar colors without blue fallback", () => {
+test("Android color resources define light and night system bar colors without blue fallback", () => {
   const colorsLight = read("android/app/src/main/res/values/colors.xml");
   const colorsNight = read("android/app/src/main/res/values-night/colors.xml");
 
   assert.match(colorsLight, /<color name="statusBarColor">#FFFFFF<\/color>/);
+  assert.match(colorsLight, /<color name="navigationBarColor">#FFFFFF<\/color>/);
   assert.match(colorsLight, /<color name="colorPrimary">#FFFFFF<\/color>/);
   assert.doesNotMatch(colorsLight, /#303F9F/);
   assert.doesNotMatch(colorsLight, /#3F51B5/);
 
   assert.match(colorsNight, /<color name="statusBarColor">#000000<\/color>/);
+  assert.match(colorsNight, /<color name="navigationBarColor">#000000<\/color>/);
   assert.match(colorsNight, /<color name="colorPrimary">#000000<\/color>/);
 });
 
-test("Android style resources configure light and dark status bar with icon contrast", () => {
+test("Android style resources configure matching status and navigation bars with icon contrast", () => {
   const stylesLight = read("android/app/src/main/res/values/styles.xml");
   const stylesNight = read("android/app/src/main/res/values-night/styles.xml");
 
   assert.match(stylesLight, /<item name="android:statusBarColor">@color\/statusBarColor<\/item>/);
+  assert.match(stylesLight, /<item name="android:navigationBarColor">@color\/navigationBarColor<\/item>/);
   assert.match(stylesLight, /<item name="android:windowLightStatusBar">true<\/item>/);
+  assert.match(stylesLight, /<item name="android:windowLightNavigationBar">true<\/item>/);
 
   assert.match(stylesNight, /<item name="android:statusBarColor">@color\/statusBarColor<\/item>/);
+  assert.match(stylesNight, /<item name="android:navigationBarColor">@color\/navigationBarColor<\/item>/);
   assert.match(stylesNight, /<item name="android:windowLightStatusBar">false<\/item>/);
+  assert.match(stylesNight, /<item name="android:windowLightNavigationBar">false<\/item>/);
 });
 
 test("Android native code includes AppStatusBarPlugin and handles configuration changes", () => {
@@ -82,5 +88,17 @@ test("Android native code includes AppStatusBarPlugin and handles configuration 
 
   assert.match(plugin, /@CapacitorPlugin\(name = "AppStatusBar"\)/);
   assert.match(plugin, /setAppearanceLightStatusBars/);
+  assert.match(plugin, /setAppearanceLightNavigationBars/);
   assert.match(plugin, /setStatusBarColor/);
+  assert.match(plugin, /setNavigationBarColor/);
+  assert.match(plugin, /res\.put\("edgeToEdge", Build\.VERSION\.SDK_INT >= 35\)/);
+
+  const systemBars = read("src/utils/systemBars.ts");
+  const indexCss = read("src/index.css");
+  assert.match(systemBars, /bottom = top;/, "the two Android system bars share one sampled colour");
+  assert.match(systemBars, /--dc-system-navigation-color/);
+  assert.match(indexCss, /html\[data-android-edge-to-edge="true"\]::after/);
+  assert.match(indexCss, /--dc-system-navigation-inset:\s*max\(env\(safe-area-inset-bottom, 0px\), 24px\)/);
+  assert.match(indexCss, /\[data-site-footer-nav\][\s\S]*?padding-bottom: max\(var\(--dc-system-navigation-inset\), 10px\) !important/);
+  assert.match(indexCss, /var\(--dc-system-navigation-color, #ffffff\)/);
 });

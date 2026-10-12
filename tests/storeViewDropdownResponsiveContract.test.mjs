@@ -47,7 +47,8 @@ test("sort gets a readable list variant without changing the shared glass materi
   assert.match(sort, /width:\s*min\(15rem,\s*calc\(100vw - 2rem\)\)/);
   assert.match(sort, /height:\s*auto/);
   assert.match(storePage, /className=\{`dc-compact-glass-window/);
-  assert.match(glassCss, /\.dc-compact-glass-window\s*\{[\s\S]*?background:[\s\S]*?backdrop-filter:\s*blur\(clamp\(1px,\s*0\.125em,\s*4px\)\)/);
+  assert.match(glassCss, /\.dc-compact-glass-window\s*\{[\s\S]*?background:[\s\S]*?backdrop-filter:\s*blur\(5px\)\s*saturate\(1\.2\)/);
+  assert.match(fs.readFileSync("src/PdpApp.tsx", "utf8"), /className="dc-compact-glass-window dc-pdp-share-menu"/);
 });
 
 test("both Store windows use the PDP opening placement and exact stretch animation", () => {

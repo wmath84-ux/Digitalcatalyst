@@ -1,0 +1,102 @@
+/* Cart page layout. Mobile keeps the compact phone flow; the measured footer
+   clearance lifts the complete cart (including its checkout action) above the
+   floating navigation. */
+[data-cart-page] {
+  width: 100%;
+  min-width: 0;
+}
+
+[data-cart-page-header] {
+  flex: none;
+}
+
+[data-cart-summary] {
+  min-width: 0;
+}
+
+[data-cart-desktop-checkout] {
+  display: none;
+}
+
+[data-cart-checkout-bar] {
+  flex: none;
+}
+
+[data-cart-checkout-bar] .dc-cart-payment-action {
+  min-height: 44px;
+  flex: none;
+}
+
+@media (max-width: 959px) {
+  html:not([data-tablet-landscape-desktop="true"])
+    body:not(:has(.dc-desktop-shell))
+    [data-cart-wishlist-content][data-active-tab="cart"] {
+    /* The footer is measured after mount; keep a conservative first-frame
+       reserve so the checkout button never flashes underneath the capsule. */
+    padding-bottom: max(
+      var(--dc-footer-nav-h, 0px),
+      calc(5.5rem + max(0px, var(--dc-system-navigation-inset, 0px) - 10px))
+    );
+  }
+}
+
+/* Desktop turns the price summary into a true order sidebar instead of
+   appending it under the product list. The shared desktop rail and peek dock
+   remain owned by DesktopShell and are untouched. */
+@media (min-width: 900px) {
+  .dc-desktop-shell [data-cart-page] {
+    min-height: 100%;
+  }
+
+  .dc-desktop-shell [data-cart-page-header] {
+    width: 100%;
+    max-width: 1480px;
+    margin-inline: auto;
+    padding: 20px clamp(22px, 3vw, 48px);
+  }
+
+  .dc-desktop-shell [data-cart-row] {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(260px, 0.8fr);
+    align-items: start;
+    gap: clamp(20px, 2.4vw, 36px);
+    width: 100%;
+    max-width: 1480px;
+    margin-inline: auto;
+    padding: clamp(20px, 2.6vw, 40px) clamp(22px, 3vw, 48px);
+    overflow: visible;
+  }
+
+  .dc-desktop-shell [data-cart-items] {
+    gap: 16px;
+  }
+
+  .dc-desktop-shell [data-cart-summary] {
+    position: sticky;
+    top: calc(var(--desktop-topbar-height, 64px) + 24px);
+  }
+
+  .dc-desktop-shell [data-cart-summary] > .mt-4 {
+    margin-top: 0;
+  }
+
+  .dc-desktop-shell [data-cart-desktop-checkout] {
+    display: flex;
+    margin-top: 18px;
+  }
+
+  .dc-desktop-shell [data-cart-checkout-desktop] {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .dc-desktop-shell [data-cart-checkout-bar] {
+    display: none;
+  }
+}
+
+@media (min-width: 1200px) {
+  .dc-desktop-shell [data-cart-row] {
+    grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.78fr);
+  }
+}

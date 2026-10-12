@@ -805,6 +805,81 @@ html[data-theme="light"] .dc-marketplace-state {
   background: rgba(37, 99, 235, 0.035);
 }
 
+/* Mixed-view rows share My Purchases' compact geometry, but their theme must
+   follow the Store. Keep paper surfaces and ink copy in every pointer/focus
+   state so a row cannot flash from a dark plate to white on hover. */
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card.is-list.dc-purchases-row,
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card.is-list.dc-purchases-row:hover,
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card.is-list.dc-purchases-row:focus-within,
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card.is-list.dc-purchases-row:active {
+  border-color: var(--dc-line);
+  background: var(--dc-bg-secondary);
+  color: var(--dc-ink);
+  box-shadow: var(--dc-shadow-sm);
+}
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card.is-large,
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card.is-large:hover,
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card.is-large:focus-within,
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card.is-large:active {
+  border-color: var(--dc-line);
+  background: var(--dc-bg-secondary);
+  color: var(--dc-ink);
+  box-shadow: var(--dc-shadow-sm);
+}
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card.is-large .dc-marketplace-cover {
+  border-color: var(--dc-line);
+  background: var(--dc-bg-muted-2);
+}
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card.is-list .dc-marketplace-kind,
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card.is-list .dc-marketplace-copy h3 {
+  color: var(--dc-ink);
+}
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card.is-list .dc-marketplace-details,
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card.is-list .dc-marketplace-instructor {
+  color: var(--dc-ink-3);
+}
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card.is-list .dc-marketplace-cover {
+  border-color: var(--dc-line);
+  background: var(--dc-bg-muted-2);
+}
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card.is-list .dc-marketplace-cover-fallback {
+  background: var(--dc-bg-muted-2);
+  color: var(--dc-accent-ink);
+}
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card.is-list .dc-marketplace-list-actions {
+  border-color: var(--dc-line);
+}
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card.is-list .dc-marketplace-save,
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card-actions .dc-marketplace-save {
+  border-color: var(--dc-line);
+  background: var(--dc-bg-muted);
+  color: var(--dc-accent-ink);
+}
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-status {
+  border-color: rgba(0, 74, 198, 0.18);
+  background: rgba(0, 74, 198, 0.07);
+  color: #003ea8;
+}
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-status[data-status="purchased"],
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-status[data-status="free"] {
+  border-color: rgba(0, 98, 67, 0.2);
+  background: rgba(0, 98, 67, 0.08);
+  color: #006243;
+}
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-status[data-status="unavailable"] {
+  border-color: rgba(133, 83, 0, 0.2);
+  background: rgba(133, 83, 0, 0.08);
+  color: #855300;
+}
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-status[data-status="sale"] {
+  border-color: rgba(15, 118, 110, 0.2);
+  background: rgba(15, 118, 110, 0.08);
+  color: #0f766e;
+}
+html[data-theme="light"] [data-store-marketplace] .dc-marketplace-card-actions {
+  border-color: var(--dc-line);
+}
+
 /* My Purchases keeps the cool-blue outline while its panels become paper. */
 html[data-theme="light"] .dc-purchases-search {
   border-color: rgba(37, 99, 235, 0.28);
@@ -980,6 +1055,18 @@ html[data-theme="light"] .dc-collection-card .dc-collection-watch {
 html[data-theme="light"] .dc-collection-card .dc-collection-watch:hover { background: #003ea8; }
 html[data-theme="light"] .dc-collection-card .dc-collection-watch[data-uzw-press="true"] { background: #002d76; }
 html[data-theme="light"] .dc-cart-remove { color: #ba1a1a; }
+html[data-theme="light"] .dc-cart-page-subtitle,
+html[data-theme="light"] .dc-cart-summary-muted,
+html[data-theme="light"] [data-cart-price-note],
+html[data-theme="light"] [data-cart-checkout-caption] {
+  color: var(--dc-ink-3) !important;
+}
+html[data-theme="light"] [data-cart-page-header] {
+  border-bottom-color: var(--dc-line) !important;
+}
+html[data-theme="light"] [data-cart-checkout-bar] {
+  border-top-color: var(--dc-line) !important;
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    16. CHECKOUT (checkout-minimal.css + PaymentGateway)
@@ -2020,4 +2107,29 @@ html[data-theme="light"] [data-dc-toast] [data-dc-toast-dismiss] * {
 html[data-theme="light"] [data-dc-toast] button:focus-visible {
   outline: 2px solid #000;
   outline-offset: 2px;
+}
+
+/* Navigation refresh · the mobile/desktop header may keep its glass tint and
+   inset highlights, but no cast shadow, blur glow or detached frosted strip
+   may sit behind or below it. This is intentionally theme-independent. */
+html body [data-site-header].dc-scene-plate--bar,
+html body [data-revision-app-header].dc-scene-plate--bar,
+html body [data-rev-bank-header].dc-scene-plate--bar,
+html body [data-desktop-topbar].dc-scene-plate--bar,
+html body [data-admin-topbar],
+html body [data-admin-shell] > header {
+  /* Keep the inset glass hairline; remove only the exterior cast shadow. */
+  box-shadow: var(--dc-chrome-glass-rim, inset 0 1px 1px rgba(255, 255, 255, 0.28)) !important;
+}
+
+html body [data-site-header].dc-scene-plate--bar::before,
+html body [data-site-header].dc-scene-plate--bar::after,
+html body .mobile-header-glow::before,
+html body .mobile-header-glow::after {
+  display: none !important;
+  content: none !important;
+  background: none !important;
+  filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }

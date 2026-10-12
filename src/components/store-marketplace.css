@@ -125,8 +125,8 @@
 }
 [data-store-marketplace] .dc-marketplace-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.5rem 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem;
   padding: 0;
 }
 .dc-marketplace-card {
@@ -174,11 +174,53 @@
 .dc-marketplace-copy {
   padding: 1rem 1rem 0.625rem;
 }
+.dc-marketplace-card-eyebrows {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  margin-bottom: 0.375rem;
+}
 .dc-marketplace-kind {
   color: #c2b8ff;
   font-size: 0.75rem;
-  font-weight: 650;
-  margin-bottom: 0.375rem;
+  font-weight: 700;
+  margin: 0;
+}
+.dc-marketplace-status {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  padding: 0.28rem 0.58rem;
+  border: 1px solid rgba(191, 219, 254, 0.24);
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.13);
+  color: #dbeafe;
+  font-size: 0.68rem;
+  font-weight: 750;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.dc-marketplace-status[data-status="purchased"] {
+  border-color: rgba(52, 211, 153, 0.3);
+  background: rgba(16, 185, 129, 0.13);
+  color: #a7f3d0;
+}
+.dc-marketplace-status[data-status="unavailable"] {
+  border-color: rgba(251, 191, 36, 0.32);
+  background: rgba(245, 158, 11, 0.13);
+  color: #fde68a;
+}
+.dc-marketplace-status[data-status="free"] {
+  border-color: rgba(52, 211, 153, 0.3);
+  background: rgba(16, 185, 129, 0.13);
+  color: #a7f3d0;
+}
+.dc-marketplace-status[data-status="sale"] {
+  border-color: rgba(45, 212, 191, 0.3);
+  background: rgba(20, 184, 166, 0.13);
+  color: #99f6e4;
 }
 .dc-marketplace-copy h3 {
   font-size: 1rem;
@@ -210,8 +252,28 @@
   color: #c2b8ff;
   border-radius: 50%;
 }
+.dc-marketplace-card-actions .dc-marketplace-save {
+  position: static;
+  inset: auto;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  min-height: 40px;
+  justify-self: end;
+  background: rgba(22, 30, 45, 0.92);
+}
+.dc-marketplace-card-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem 1rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
 .dc-marketplace-card-footer {
-  padding: 0.5rem 1rem 1rem;
+  min-width: 0;
+  padding: 0;
+  border: 0;
 }
 .dc-marketplace-rating {
   display: flex;
@@ -370,8 +432,8 @@
 }
 @container dc-marketplace (min-width: 700px) {
   [data-store-marketplace] .dc-marketplace-grid {
-    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
   }
 }
 @container dc-marketplace (max-width: 339px) {
@@ -507,7 +569,7 @@
 }
 
 .dc-marketplace-card-footer {
-  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  border-top: 0;
 }
 
 .dc-marketplace-buy {
@@ -556,7 +618,6 @@
 }
 
 /* Marketplace finishing details; price/review information stays catalog-backed. */
-.dc-marketplace-discount { position: absolute; left: 10px; bottom: 10px; z-index: 1; padding: 5px 9px; border: 1px solid #ffffff50; border-radius: 8px; background: #fff; color: #14532d; box-shadow: 0 2px 8px #0002; font-size: 11px; font-weight: 750; }
 .dc-marketplace-rating svg { fill: #facc15; stroke: #ca8a04; }
 .dc-marketplace-cover img { transition: transform 250ms ease; }
 .dc-marketplace-kind { letter-spacing: .09em; font-size: 10px; text-transform: uppercase; }
@@ -997,4 +1058,98 @@ html[data-theme="light"] .dc-marketplace-save[aria-pressed="true"] { color: #be1
 @media (prefers-reduced-motion: reduce) {
   .dc-marketplace-popup-trigger,
   .dc-marketplace-popup-option { transition-duration: 1ms; }
+}
+
+/* Grid is an intentionally roomy, one-column experience: each item has space
+   for an image-only art panel and readable copy. Mixed places two compact list
+   rows between each of these larger cards. */
+[data-store-marketplace] .dc-marketplace-grid[data-store-grid],
+[data-store-marketplace] .dc-marketplace-grid[data-store-mixed] {
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: clamp(0.875rem, 2vw, 1.5rem) !important;
+}
+
+[data-store-marketplace] [data-store-mixed] > [data-store-mixed-feature] {
+  grid-column: 1 / -1 !important;
+  min-width: 0;
+}
+
+.dc-marketplace-card.is-large {
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(17, 23, 36, 0.98), rgba(12, 17, 27, 0.98));
+  box-shadow: 0 18px 44px -30px rgba(2, 6, 16, 0.82);
+}
+
+.dc-marketplace-card.is-large .dc-marketplace-open {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
+  align-items: stretch;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.dc-marketplace-card.is-large .dc-marketplace-cover {
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 4 / 3;
+  align-self: stretch;
+  border-right: 1px solid rgba(148, 163, 184, 0.15);
+  border-bottom: 0;
+  background: #161e2d;
+}
+
+.dc-marketplace-card.is-large .dc-marketplace-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+}
+
+.dc-marketplace-card.is-large .dc-marketplace-card-eyebrows { margin-bottom: 0; }
+.dc-marketplace-card.is-large .dc-marketplace-kind { font-size: 0.75rem; }
+.dc-marketplace-card.is-large .dc-marketplace-copy h3 {
+  font-size: clamp(1.2rem, 1rem + 1.15vw, 1.85rem);
+  line-height: 1.2;
+  -webkit-line-clamp: 3;
+}
+.dc-marketplace-card.is-large .dc-marketplace-details,
+.dc-marketplace-card.is-large .dc-marketplace-instructor {
+  font-size: clamp(0.8rem, 0.76rem + 0.25vw, 0.95rem);
+}
+
+.dc-marketplace-card.is-large .dc-marketplace-card-actions {
+  gap: 1rem;
+  padding: 1rem clamp(1rem, 2.5vw, 1.75rem) 1.125rem;
+}
+.dc-marketplace-card.is-large .dc-marketplace-rating { margin-bottom: 0.4rem; }
+.dc-marketplace-card.is-large .dc-marketplace-buy { max-width: 25rem; }
+
+@container dc-marketplace (max-width: 600px) {
+  [data-store-marketplace] .dc-marketplace-grid[data-store-grid],
+  [data-store-marketplace] .dc-marketplace-grid[data-store-mixed] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .dc-marketplace-card.is-large .dc-marketplace-open {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dc-marketplace-card.is-large .dc-marketplace-cover {
+    aspect-ratio: 16 / 10;
+    border-right: 0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  }
+
+  .dc-marketplace-card.is-large .dc-marketplace-copy {
+    gap: 0.4rem;
+    padding: 1rem 1.125rem 0.875rem;
+  }
+
+  .dc-marketplace-card.is-large .dc-marketplace-card-actions {
+    padding: 0.875rem 1.125rem 1rem;
+  }
 }

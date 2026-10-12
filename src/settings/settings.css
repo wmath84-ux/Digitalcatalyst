@@ -631,3 +631,442 @@
     transition: none;
   }
 }
+
+/* Settings uses the app's paper palette in light mode. Keep these scoped to
+   the private Settings route so Public Profile keeps its own presentation. */
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) {
+  --settings-line: #d8e1ec;
+  --settings-muted: #475569;
+  --settings-accent: #004ac6;
+  --settings-surface: #f8fafc;
+  --settings-surface-raised: #eef4ff;
+  color-scheme: light;
+  color: #191c1e;
+  background:
+    radial-gradient(ellipse at 9% 0%, rgba(0, 74, 198, 0.09), transparent 36%),
+    radial-gradient(ellipse at 96% 16%, rgba(37, 99, 235, 0.07), transparent 32%),
+    linear-gradient(180deg, #f8fbff 0%, #f3f6fa 56%, #edf1f6 100%);
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-frame,
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-main {
+  background: transparent;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-breadcrumb,
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-back {
+  color: #475569;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-breadcrumb a:hover,
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-back:hover {
+  color: #003ea8;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-heading {
+  border-color: #cfdbec;
+  background: linear-gradient(135deg, #ffffff 0%, #f4f8ff 60%, #eaf1ff 100%);
+  box-shadow: 0 18px 44px -34px rgba(27, 54, 96, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-heading::before {
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.15), rgba(37, 99, 235, 0) 68%);
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-heading::after {
+  background: linear-gradient(180deg, #2563eb, #004ac6);
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-eyebrow {
+  color: #004ac6;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-heading h1,
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-signed-out h1 {
+  color: #172033;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-heading > .settings-heading-copy > p:last-child {
+  color: #475569;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-heading-art {
+  border-color: #d8e2f1;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 8px 20px -16px rgba(23, 43, 77, 0.35);
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-heading-icon {
+  border-color: #c9d9f2;
+  background: linear-gradient(145deg, #e8f0ff, #dbeafe);
+  color: #004ac6;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-heading-art-copy small {
+  color: #5b6679;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-heading-art-copy strong {
+  color: #1f2937;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-save-state {
+  border-color: #cbdcf4;
+  background: #edf4ff;
+  color: #003ea8;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-section {
+  border-color: #d8e1ec;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 12px 30px -24px rgba(31, 49, 77, 0.36), inset 0 1px 0 #ffffff;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-section + .settings-section {
+  border-color: #d8e1ec;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-section-icon {
+  border-color: #c9daf3;
+  background: #eaf2ff;
+  color: #004ac6;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-section-icon--privacy {
+  border-color: #b9dfce;
+  background: #e8f7ef;
+  color: #006243;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-section-heading h2 {
+  color: #172033;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-section-count {
+  border-color: #cbdcf4;
+  background: #edf4ff;
+  color: #003ea8;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-section-heading p,
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-row-copy p,
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-device p {
+  color: #475569;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-row {
+  border-color: #dce3ec;
+  background: #f8fafc;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-row[data-saving="true"] {
+  border-color: #8db5ef;
+  background: #eff6ff;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-row-copy > label,
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-device .settings-device-label {
+  color: #1f2937;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-row-note {
+  color: #5b6679;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-switch > span {
+  border-color: #9aa8ba;
+  background: #d9e0e9;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-switch input:checked + span {
+  border-color: #004ac6;
+  background: #004ac6;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-switch input:focus-visible + span {
+  outline-color: #004ac6;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-switch-state {
+  border-color: #d6dee8;
+  background: #ffffff;
+  color: #475569;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-switch-state[data-switch-state="on"] {
+  border-color: #b9dfce;
+  background: #e8f7ef;
+  color: #006243;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-switch-state[data-switch-state="saving"] {
+  border-color: #cbdcf4;
+  background: #edf4ff;
+  color: #003ea8;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-device {
+  border-color: #ccdcf1;
+  background: linear-gradient(120deg, #f0f6ff, #f1f8ff);
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-device-icon {
+  border-color: #c9daf3;
+  background: #e4efff;
+  color: #004ac6;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-device-label > span {
+  border-color: #cbdcf4;
+  background: #edf4ff;
+  color: #003ea8;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-device[data-device-state="connected"] .settings-device-label > span {
+  border-color: #b9dfce;
+  background: #e8f7ef;
+  color: #006243;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-device > .settings-device-message {
+  color: #003ea8;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-secondary {
+  border-color: #a8c3e8;
+  background: #edf4ff;
+  color: #003ea8;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-primary {
+  border-color: #004ac6;
+  background: linear-gradient(135deg, #2563eb, #004ac6);
+  box-shadow: 0 8px 18px -12px rgba(0, 74, 198, 0.55);
+  color: #ffffff;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-public-link {
+  color: #004ac6;
+  text-decoration-color: rgba(0, 74, 198, 0.36);
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-footnote {
+  border-color: #dce4ef;
+  background: rgba(255, 255, 255, 0.76);
+  color: #475569;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-footnote::before {
+  border-color: #bfd2ee;
+  color: #004ac6;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-alert {
+  border-color: #f4b8c0;
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-alert button {
+  color: #9f1239;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-signed-out {
+  border-color: #d8e1ec;
+  background: linear-gradient(145deg, #ffffff, #f1f6ff);
+  box-shadow: 0 18px 44px -34px rgba(27, 54, 96, 0.34);
+  color: #191c1e;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-signed-out > p:not(.settings-eyebrow) {
+  color: #475569;
+}
+
+@media (hover: hover) {
+  html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-row:hover {
+    border-color: #a8c3e8;
+    background: #f0f6ff;
+  }
+
+  html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-secondary:not(:disabled):hover {
+    border-color: #7fa7dd;
+    background: #e0edff;
+  }
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) :is(a, button):focus-visible {
+  outline-color: #004ac6;
+}
+
+/* The footer-style preference is a small preview switch, kept inside the same
+   readable Settings palette in both themes. */
+.settings-navigation-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.settings-navigation-choice {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.72rem;
+  padding: 0.85rem;
+  border: 1px solid var(--settings-line);
+  border-radius: 0.9rem;
+  color: #f3f5fa;
+  background: rgba(255, 255, 255, 0.035);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.settings-navigation-choice:hover {
+  border-color: rgba(193, 186, 255, 0.48);
+  background: rgba(255, 255, 255, 0.07);
+  transform: translateY(-1px);
+}
+
+.settings-navigation-choice[data-selected="true"] {
+  border-color: #a99cff;
+  background: rgba(137, 120, 237, 0.13);
+}
+
+.settings-navigation-choice-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+
+.settings-navigation-choice-copy strong {
+  color: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.settings-navigation-choice-copy small {
+  color: var(--settings-muted);
+  font-size: 0.7rem;
+  line-height: 1.55;
+}
+
+.settings-navigation-choice-check {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  color: #c1baff;
+}
+
+.settings-navigation-preview {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  padding: 0.28rem 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(35, 53, 86, 0.72);
+}
+
+.settings-navigation-preview > span {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-around;
+  gap: 0.18rem;
+}
+
+.settings-navigation-preview i {
+  display: block;
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.settings-navigation-preview--uiverse {
+  border-color: rgba(255, 255, 255, 0.38);
+  background: linear-gradient(110deg, rgba(0, 122, 255, 0.72), rgba(30, 111, 231, 0.45));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.36);
+}
+
+.settings-navigation-preview--uiverse i:first-child {
+  width: 26px;
+  height: 24px;
+  flex-basis: 26px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.settings-navigation-preview--dock {
+  min-height: 40px;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.settings-navigation-preview--dock i {
+  width: 13px;
+  height: 13px;
+  flex-basis: 13px;
+  border-radius: 0.35rem;
+}
+
+.settings-navigation-preview--dock i:nth-child(4) {
+  width: 17px;
+  height: 17px;
+  flex-basis: 17px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-navigation-choice {
+  border-color: #d6dfeb;
+  color: #172033;
+  background: #f8fafc;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-navigation-choice:hover {
+  border-color: #93b7ea;
+  background: #f1f6ff;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-navigation-choice[data-selected="true"] {
+  border-color: #004ac6;
+  background: #edf4ff;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-navigation-choice-copy small {
+  color: #475569;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-navigation-choice-check {
+  color: #004ac6;
+}
+
+@media (max-width: 520px) {
+  .settings-navigation-options {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.6rem;
+  }
+  .settings-navigation-choice {
+    display: grid;
+    grid-template-columns: minmax(5.4rem, 0.38fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.72rem;
+  }
+  .settings-navigation-choice-check {
+    top: 0.55rem;
+    right: 0.55rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-navigation-choice {
+    transition: none;
+  }
+}

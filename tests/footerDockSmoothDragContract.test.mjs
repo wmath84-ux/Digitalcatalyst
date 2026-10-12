@@ -301,13 +301,15 @@ test("footerNavSpace watches footers, not every style write in the app", () => {
   assert.match(footerSpace, /mo\.observe\(document\.body, \{ childList: true, subtree: true \}\)/);
   assert.match(footerSpace, /ro\.observe\(nav\)/);
   // Mid-gesture the capsule is mid-spring: nothing is published until the
-  // dock settles, and the gesture flag flipping off is the cue.
+  // dock settles. The Android edge-to-edge attribute also triggers a fresh
+  // measure because it changes the footer's safe-area padding.
   assert.match(footerSpace, /if \(gestureActive\(\)\) return/);
   assert.match(footerSpace, /dataset\.dcDockGesture === "true"/);
-  assert.match(footerSpace, /attributeFilter: \["data-dc-dock-gesture"\]/);
+  assert.match(footerSpace, /attributeFilter: \["data-dc-dock-gesture", "data-android-edge-to-edge"\]/);
   // The published variable, and the pages that consume it, are unchanged.
   assert.match(footerSpace, /setProperty\("--dc-footer-nav-h", `\$\{next\}px`\)/);
-  assert.match(footerSpace, /Math\.max\(\.\.\.navs\.map\(\(nav\) => nav\.getBoundingClientRect\(\)\.height\)\) \+ 12/);
+  assert.match(footerSpace, /const hasMagnifyingDock = navs\.some\(\(nav\) => nav\.querySelector\("\[data-glass-dock\]"\) !== null\)/);
+  assert.match(footerSpace, /navHeight \+ \(hasMagnifyingDock \? 12 : 0\)/);
 });
 
 test("every footer still renders the ONE shared capsule (so the fix reaches all of them)", () => {

@@ -18,11 +18,12 @@
 //     portrait had no footer there while Home / Store / Cart kept theirs;
 //   • Cart matched My Day by luck, not by construction.
 //
-// Now one component (src/components/SiteFooterNav.tsx) renders the capsule on
-// every screen, and the MATERIAL — the light-blue frost and its transparency —
-// is the single `html[data-glass="on"] :where([data-glass-dock])` rule in
-// src/glass.css that the product store's footer already wore. These assertions
-// are what stops the four copies from coming back.
+// Now one component (src/components/SiteFooterNav.tsx) renders the selected
+// capsule on every screen. The Uiverse pill is the default; the original
+// magnifying dock remains selectable and retains its canonical neutral-glass
+// treatment in neutral-footer-glass.css. Its base glass token remains the
+// single `html[data-glass="on"] :where([data-glass-dock])` rule in src/glass.css.
+// These assertions prevent screen-specific copies while allowing both designs.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -82,9 +83,9 @@ test("no screen hides its footer at a breakpoint of its own", () => {
   assert.match(css, /\.dc-desktop-shell \[data-site-footer-nav\]/);
 });
 
-test("the blur + transparency are single-sourced from the store's own tokens", () => {
-  // One definition of the material, and it is the footer the product store
-  // page already wore: 40% of the blur ceiling, 18% light-blue tint.
+test("the classic glass-dock option retains the store's single-sourced base tokens", () => {
+  // One definition of the base glass material: 40% of the blur ceiling and an
+  // 18% light-blue tint. The optional neutral dock skin remains component CSS.
   assert.match(glass, /--dc-footer-nav-blur: 16px;/);
   assert.match(glass, /--dc-footer-nav-tint: rgba\(173, 216, 255, 0\.18\);/);
   assert.equal(glass.match(/--dc-footer-nav-tint:/g)?.length, 1, "the tint token must be defined once");
@@ -96,7 +97,7 @@ test("the blur + transparency are single-sourced from the store's own tokens", (
   assert.match(glass, /backdrop-filter: blur\(var\(--dc-footer-nav-blur\)\) saturate\(1\.25\) !important;/);
 });
 
-test("no page repaints the footer dock (the course player tray is the documented exception)", () => {
+test("page CSS cannot repaint the dock outside canonical shared materials or the course-player tray", () => {
   const files = [];
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -118,6 +119,11 @@ test("no page repaints the footer dock (the course player tray is the documented
       const selector = rule.slice(0, rule.indexOf("{"));
       const body = rule.slice(rule.indexOf("{") + 1, rule.lastIndexOf("}"));
       const isMaterialRule = file.endsWith("src/glass.css");
+      // This component-owned stylesheet is the retained classic-dock option,
+      // not a page-level repaint of the shared footer.
+      const isNeutralClassicMaterial =
+        file.endsWith("src/components/glass-dock/neutral-footer-glass.css") &&
+        selector.includes(".dc-neutral-footer[data-glass-dock][data-neutral-glass]");
       const isPlayerTray =
         selector.includes(".course-player-shell") ||
         selector.includes("[data-course-dock]") ||
@@ -130,7 +136,7 @@ test("no page repaints the footer dock (the course player tray is the documented
         !/backdrop-filter/.test(body) &&
         (body.match(/background/g) || []).length === 1;
       assert.ok(
-        isMaterialRule || isPlayerTray || isTransparentFallback,
+        isMaterialRule || isNeutralClassicMaterial || isPlayerTray || isTransparentFallback,
         `${file} repaints the footer dock outside the shared material: ${selector.trim()}`,
       );
     }

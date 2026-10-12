@@ -1,13 +1,14 @@
 import { useEffect, useState, type ReactNode } from "react";
 import GlassDock, { type GlassDockItem } from "./glass-dock/GlassDock";
 import SitePeekFooter from "./SitePeekFooter";
+import UiverseFooterNav from "./UiverseFooterNav";
+import { useFooterNavigationStyle } from "../utils/footerNavigationStyle";
 
 /**
- * The ONE site footer navigation. Every page shares the same floating capsule,
- * materials, safe-area padding, visibility rules, magnification, and tooltips.
- *
- * The shell is rendered on phones and tablets; desktop and tablet-landscape
- * navigation is provided by the left rail instead.
+ * The ONE site footer navigation. The saved display preference chooses
+ * between the four-tab Uiverse pill and the preserved magnifying GlassDock.
+ * Both share the real footer measurement hook, safe-area clearance and route
+ * behavior. Peek-mode remains available whenever the classic dock is selected.
  */
 
 /** Narrow phones use 38px plates so the seven-tab dock fits without clipping. */
@@ -84,6 +85,19 @@ export default function SiteFooterNav({
   peekAlwaysOpen = false,
 }: SiteFooterNavProps) {
   const compact = useCompactFit();
+  const navigationStyle = useFooterNavigationStyle();
+
+  if (navigationStyle === "uiverse") {
+    const purchasesBadge = items.find((item) => item.id === "purchases")?.badge ?? 0;
+    return (
+      <UiverseFooterNav
+        label="Primary navigation"
+        purchasesBadge={purchasesBadge}
+        position={position}
+        dataAttrs={dataAttrs}
+      />
+    );
+  }
 
   if (peek) {
     return (

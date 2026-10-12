@@ -53,7 +53,11 @@ export default function CartWishlistApp({
           onNavigateToNotifications={onNavigateToNotifications}
         />
 
-        <div className="relative flex flex-1 flex-col overflow-hidden bg-transparent">
+        <div
+          data-cart-wishlist-content
+          data-active-tab={activeTab}
+          className="relative flex flex-1 flex-col overflow-hidden bg-transparent"
+        >
           {/* Wave 14: toasts render through the pack GlassToaster (src/main.tsx). */}
           {toast ? <span className="sr-only" role="status">{toast}</span> : null}
 

@@ -13,34 +13,6 @@
   --dc-purchase-accent: #4f46e5;
 }
 
-/* The ring stays inside the existing 40px header tap target. A neutral gap
-   separates it from photos and initials, in both themes. */
-[data-mobile-header-menu-button] {
-  border: 2px solid var(--dc-purchase-accent, #4f46e5);
-  padding: 2px;
-  background: #111827;
-  box-shadow: none;
-}
-html[data-theme="light"] [data-mobile-header-menu-button] {
-  background: #fff;
-}
-[data-mobile-header-avatar-surface] {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #8b5cf6, var(--dc-purchase-accent, #4f46e5));
-  color: #fff;
-}
-[data-mobile-header-menu-button]:focus-visible {
-  outline: 2px solid var(--dc-purchase-accent, #4f46e5);
-  outline-offset: 3px;
-}
-
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
     display: none;
@@ -536,15 +508,13 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
      whole area instead of leaving a fixed-width column floating
      in the middle. */
   [data-home-grid],
-  [data-store-grid],
   [data-pdp-grid],
   [data-search-grid] {
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) !important;
   }
 
-  /* Store's rectangular-card view and My Library rows also tile
-     across the full tablet width instead of becoming one huge
-     stretched card with empty space on the right. */
+  /* Store's compact List view and My Library rows tile across
+     the full tablet width instead of becoming one huge stretched row. */
   [data-store-list],
   [data-library-list] {
     display: grid;
@@ -715,7 +685,6 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
 
   /* Tablet landscape grid adjustments - fluid scaling */
   [data-home-grid],
-  [data-store-grid],
   [data-pdp-grid],
   [data-search-grid] {
     grid-template-columns: repeat(auto-fill, minmax(clamp(160px, 18vw, 220px), 1fr)) !important;
@@ -791,10 +760,9 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   }
 
   /* Cards scale.
-     `[data-store-grid]` is deliberately NOT in this list any more (owner brief
-     2026-09-10): the store's cards are exact squares that fill their track, so
-     shrinking each card to `--tablet-scale` with `transform-origin: top left`
-     left a dead band under and beside every card and broke the square grid. */
+     `[data-store-grid]` stays out of this list: its editorial cards use one
+     full-width track, so applying `--tablet-scale` would shrink the artwork and
+     copy together and leave unused space beside the card. */
   [data-home-grid] > *,
   [data-pdp-grid] > * {
     transform: scale(var(--tablet-scale));
@@ -1013,18 +981,16 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
      Home trending tile share width (and the 4:3 art ratio) at every
      desktop size. */
   [data-home-grid],
-  [data-store-grid],
   [data-pdp-grid],
   [data-search-grid] {
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
   }
 
-  /* Store "Mixed" view: the flat grid auto-fits like the grid view; the
-     featured (full-row) card is kept full-width by the unlayered
-     `[data-store-mixed-feature]` rule below. */
+  /* Store Mixed view places two compact product rows between each large
+     card, all on one readable column. */
   [data-store-mixed] {
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
-    gap: 16px !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 20px !important;
   }
 
   /* Store's rectangular-card view and My Library rows fill the
@@ -1080,16 +1046,11 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   flex: 0 0 auto;
 }
 
-/* ── Store "Mixed" view: featured rows ─────────────────────────────────
-   The mixed view is one flat grid at every breakpoint (grid-cols-2 on
-   mobile/tablet, auto-fill from 960 px — see the desktop block above).
-   Every 3rd item is the featured card. `span 2` is full-row on the
-   2-column mobile/tablet layout (the original pair behaviour) and a
-   deliberate wide lead card on the desktop auto-fill grid, where a
-   full-row card would strand the two cards of each group on half-empty
-   rows. */
+/* ── Store Mixed view: list-style product rows ─────────────────────────
+   The layout is one column: one large card, then two compact list rows, then
+   another large card at every breakpoint. */
 [data-store-mixed] > [data-store-mixed-feature] {
-  grid-column: span 2;
+  grid-column: 1 / -1;
 }
 
 /* ── Revision "test submit" confirm dialog ─────────────────────────────
@@ -5310,6 +5271,27 @@ html[data-course-player-active="true"] {
    overlap a tappable element. */
 :root {
   --dc-footer-nav-h: 0px;
+  --dc-system-navigation-inset: env(safe-area-inset-bottom, 0px);
+}
+
+/* Android 15+ ignores navigationBarColor and draws edge-to-edge. Reserve at
+   least the 3-button / gesture navigation inset even on WebViews that report
+   a zero CSS safe-area value, lifting both the footer pill and its clearance. */
+html[data-android-edge-to-edge="true"] {
+  --dc-system-navigation-inset: max(env(safe-area-inset-bottom, 0px), 24px);
+}
+html[data-android-edge-to-edge="true"] [data-site-footer-nav] {
+  padding-bottom: max(var(--dc-system-navigation-inset), 10px) !important;
+}
+html[data-android-edge-to-edge="true"]::after {
+  content: "";
+  position: fixed;
+  z-index: 2147483647;
+  inset-inline: 0;
+  bottom: 0;
+  height: var(--dc-system-navigation-inset, 24px);
+  background-color: var(--dc-system-navigation-color, #ffffff);
+  pointer-events: none;
 }
 
 @media (max-width: 959px) {
@@ -6890,52 +6872,30 @@ html[data-course-player-active="true"] {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
- * STORE PRODUCT GRID · Home trending-card ratio + auto-fill tracks
+ * STORE PRODUCT GRID · large single-column product cards
  * ──────────────────────────────────────────────────────────────────────────
- * "product ka by default mobile, tablet aur desktop ke liye grid square card
- *  ratio set karo … card ka ratio exact square hona chahiye aur ek row mein do
- *  card mobile aur tablet mein, desktop mein 4-5-6 jitna adjust ho jaaye, aur
- *  spacing bahut kam rakhni hai."
- *
- * The square itself is the card's own `aspect-square` + `min-h-0`
- * (src/components/ProductCard.tsx); this block owns the TRACKS, because three
- * earlier rules in this file fight for them:
- *
- *   · 640–1023 portrait      `auto-fill minmax(180px, 1fr) !important`
- *   · 640–1023 landscape     `auto-fill minmax(clamp(160px,18vw,220px),1fr) !important`
- *   · 960+                   `auto-fill minmax(240px, 1fr) !important`
- *
- * All three would tile the store into 3–8 columns on a tablet, so the counts
- * below are restated LATER in the file with the same importance — the last
- * matching rule wins. The band split follows the app's own: below 960px is
- * phone/tablet chrome (two cards a row), from 960px the desktop shell is up
- * and the grid auto-fills 4–6 across.
- *
- * Gaps are the tightest that still leave two thumb targets side by side:
- * 6px on a phone, 8px from `sm:` up. The page gutter comes from the card
- * container's own px-3/px-4 (zeroed inside the desktop shell by
- * `[data-store-gutter]`).
+ * Store Grid is deliberately one roomy column on phone, tablet and desktop.
+ * The product cards use the same full-width track at every breakpoint; card
+ * geometry and the responsive image/copy split live in store-marketplace.css.
  * ══════════════════════════════════════════════════════════════════════════ */
 [data-store-grid] {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(14px, 1.6vw, 24px);
   align-items: stretch;
 }
 
-/* Tablets: same auto-fill floor Home uses in the 640–1023 portrait band. */
 @media (min-width: 640px) and (max-width: 959px) {
   [data-store-grid] {
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) !important;
-    gap: 12px !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 18px !important;
   }
 }
 
-/* Desktop shell: same 220 px track Home trending cards use. */
 @media (min-width: 960px) {
   [data-store-grid] {
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
-    gap: 16px !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 24px !important;
   }
 }
 

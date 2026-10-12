@@ -95,9 +95,10 @@ test("CheckoutApp derives the quoteId from the canonical CheckoutContext", () =>
 
 test("CheckoutSuccessStep renders a real orderId from the verify-payment response", () => {
   assert.match(checkoutSuccess, /orderId\?:\s*string\s*\|\s*null/);
+  assert.match(checkoutSuccess, /label=\{isFreeOrder \? "Access reference" : "Order ID"\}/);
   assert.match(
     checkoutSuccess,
-    /<ReceiptRow\s+label="Order ID"\s+value=\{orderId \|\| quote\.quoteId\}/
+    /value=\{isFreeOrder \? quote\.quoteId : orderId \|\| quote\.quoteId\}/
   );
 });
 
