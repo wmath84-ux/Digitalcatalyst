@@ -198,3 +198,11 @@ test("the quick stats ride along in the plan column", () => {
     cursor = at;
   }
 });
+
+
+test("short Revision phones compact the streak card so its title clears the floating footer", () => {
+  const recallTheme = fs.readFileSync("src/revision/recall-theme.css", "utf8");
+  assert.match(recallTheme, /\[data-recall-root\]\[data-revision-app\] \[data-revision-streak\]\s*\{[^}]*min-height: 132px/);
+  assert.match(recallTheme, /\[data-recall-root\]\[data-revision-app\] \[data-revision-streak\] h3\s*\{[^}]*font-size: 1\.25rem/);
+  assert.match(recallTheme, /@media \(max-width: 480px\)[\s\S]*?\[data-revision-daily-goal\]/);
+});

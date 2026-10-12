@@ -52,3 +52,11 @@ test("Store sort/view popovers and PDP sharing share one gentle glass blur", () 
   assert.match(pdp, /className="dc-compact-glass-window dc-pdp-share-menu"/);
   assert.match(storePage, /className=\{`dc-compact-glass-window/);
 });
+
+
+test("purchased list cards do not repeat Purchased or sale savings in the action row", () => {
+  assert.match(storeCard, /const renderPurchaseAction = \(\) =>\s+purchased \? null : inCart \|\| unavailable/);
+  assert.match(storeCard, /hasOriginal && !purchased/);
+  assert.match(storeCss, /A list card is a compact two-row product summary on phones/);
+  assert.match(storeCss, /grid-template-columns: minmax\(0, 1fr\) auto/);
+});

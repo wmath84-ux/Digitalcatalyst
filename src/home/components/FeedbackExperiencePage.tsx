@@ -30,7 +30,10 @@ export default function FeedbackExperiencePage({ onBack }: FeedbackExperiencePag
       </div>
 
       <section data-home-sticker-wall className="dc-home-feedback-wall-section">
-        <div className="dc-home-feedback-wall-frame h-[520px] w-full overflow-hidden rounded-[2rem] border border-white/10 bg-[#0F0F12] sm:h-[640px] md:h-[740px]">
+        <div
+          className="dc-home-feedback-wall-frame h-[420px] w-full overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#0F0F12] sm:h-[560px] sm:rounded-[2rem] md:h-[640px]"
+          style={{ backgroundColor: "#0f0f12" }}
+        >
           <DeferredVisible className="h-full w-full">
             <Suspense fallback={<div className="h-full w-full" aria-label="Loading feedback wall" />}>
               <StickerWall

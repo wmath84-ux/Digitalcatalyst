@@ -523,7 +523,7 @@ export default function StickerWall({
         // `pan-y`, not `none`: a finger on empty wall scrolls the page. A
         // finger that lands on a sticker cancels its own touchstart in JS,
         // which is what stops the pan for THAT gesture only.
-        style={{ touchAction: 'pan-y' }}
+        style={{ touchAction: 'pan-y', backgroundColor: '#0f0f12' }}
       >
         <style>{`
           .sticker-wall-pill {
@@ -554,8 +554,13 @@ export default function StickerWall({
 
         <form
           onSubmit={handleSubmit}
-          className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-4 sm:gap-5"
-          style={{ paddingLeft: 16, paddingRight: 16, paddingBottom: isPhone ? '12%' : '18vh' }}
+          className="pointer-events-none absolute inset-0 flex flex-col items-center justify-between gap-3 sm:gap-5"
+          style={{
+            paddingLeft: 16,
+            paddingRight: 16,
+            paddingTop: isPhone ? 20 : 28,
+            paddingBottom: isPhone ? 74 : 92,
+          }}
         >
           <div className="pointer-events-none flex flex-col items-center gap-2 text-center">
             <h2

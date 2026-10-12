@@ -328,3 +328,13 @@ test("static, preview, reduced-motion and data-hook contracts survive", () => {
     assert.match(cardSource, new RegExp(hook));
   }
 });
+
+
+test("feedback wall keeps dark contrast and clears its compose controls from the card bottom", () => {
+  const stickerWall = fs.readFileSync(path.join(ROOT, "src/components/StickerWall.tsx"), "utf8");
+  assert.match(homeApp, /h-\[420px\][\s\S]*?sm:h-\[560px\][\s\S]*?md:h-\[640px\]/);
+  assert.match(homeApp, /style=\{\{ backgroundColor: "#0f0f12" \}\}/);
+  assert.match(stickerWall, /backgroundColor: '#0f0f12'/);
+  assert.match(stickerWall, /justify-between/);
+  assert.match(stickerWall, /paddingBottom: isPhone \? 74 : 92/);
+});

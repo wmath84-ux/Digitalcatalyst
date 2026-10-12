@@ -135,9 +135,9 @@ export default function StoreProductCard({
   );
 
   const renderPurchaseAction = () =>
-    purchased || inCart || unavailable ? (
+    purchased ? null : inCart || unavailable ? (
       <p className="dc-marketplace-purchase-state">
-        {purchased ? "Purchased" : unavailable ? "Not for sale" : "In cart"}
+        {unavailable ? "Not for sale" : "In cart"}
       </p>
     ) : (
       <button
@@ -167,7 +167,7 @@ export default function StoreProductCard({
           <span>Price unavailable</span>
         )}
       </div>
-      {hasOriginal ? (
+      {hasOriginal && !purchased ? (
         <p className="dc-marketplace-saving">
           Save {storeMoney(product.originalPrice - finalPrice)}
         </p>
