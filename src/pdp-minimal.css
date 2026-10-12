@@ -932,3 +932,92 @@ html[data-theme="light"] .dc-pdp-like-button[aria-pressed="false"] .dc-pdp-like-
     transition-duration: 1ms !important;
   }
 }
+
+
+/* Mobile Paid tab and floating-dock repair.
+   Use a real minimum scroll reserve as a fallback when Android WebView has not
+   published the measured dock height yet; the last owned rows stay reachable. */
+@media (max-width: 959px) {
+  [data-pdp-root] {
+    padding-bottom: calc(
+      1rem + max(var(--dc-footer-nav-h, 0px), 112px) + env(safe-area-inset-bottom, 0px)
+    ) !important;
+  }
+
+  [data-pdp-scroll] {
+    scroll-padding-bottom: calc(
+      max(var(--dc-footer-nav-h, 0px), 112px) + env(safe-area-inset-bottom, 0px) + 1rem
+    );
+  }
+
+  [data-pdp-root] [data-pdp-paid-group="available"] .dc-pdp-selection-note {
+    margin-top: 0.35rem;
+    line-height: 1.48;
+  }
+
+  [data-pdp-root] [data-pdp-paid-group="available"] .dc-pdp-paid-list {
+    margin-top: 0.45rem;
+  }
+
+  [data-pdp-root] [data-pdp-paid-group="available"] .dc-pdp-paid-list > li {
+    gap: 0.65rem;
+    padding: 0.8rem 0;
+  }
+
+  [data-pdp-root] [data-pdp-paid-group="available"] .dc-pdp-paid-choice {
+    gap: 0.6rem;
+  }
+
+  [data-pdp-root] [data-pdp-paid-group="available"] .dc-pdp-paid-choice > input {
+    margin-top: 0.55rem;
+  }
+
+  [data-pdp-root] [data-pdp-paid-group="available"] .dc-pdp-paid-copy > label {
+    margin-top: 0.1rem;
+  }
+
+  [data-pdp-root] .dc-pdp-paid-divider {
+    margin: 1.25rem 0 1rem;
+  }
+
+  [data-pdp-root] [data-pdp-paid-group="owned"] .dc-pdp-selection-note {
+    margin-top: 0.4rem;
+    line-height: 1.5;
+  }
+
+  [data-pdp-root] .dc-pdp-owned-list {
+    margin-top: 0.55rem;
+    gap: 0.4rem;
+  }
+}
+
+/* At phone widths, the Share menu joins the action's flow instead of floating
+   over the paid-content status banner or the About/Content/Paid tabs. */
+@media (max-width: 639px) {
+  [data-pdp-root] [data-product-share][data-open="true"] {
+    position: relative !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    display: flex;
+    width: min(190px, calc(100vw - 2rem));
+    min-width: min(190px, calc(100vw - 2rem));
+    max-width: 100%;
+    margin-top: 0.45rem;
+    transform-origin: top left;
+    z-index: 20;
+  }
+
+  [data-pdp-root] [data-product-share][data-open="true"]::after {
+    top: -0.48rem;
+    right: auto;
+    bottom: auto;
+    left: 1.1rem;
+    transform: rotate(225deg);
+  }
+
+  [data-pdp-root] .dc-pdp-secondary-actions:has([data-product-share][data-open="true"]) {
+    align-items: flex-start;
+  }
+}
