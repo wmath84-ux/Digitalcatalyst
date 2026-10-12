@@ -179,6 +179,7 @@ export function Toaster({ position = "top-right", closeButton = true, className 
       {items.map((entry) => (
         <div
           key={entry.id}
+          data-dc-toast
           className={cn(
             "pointer-events-auto flex w-full items-start gap-3 rounded-2xl border px-4 py-3 shadow-lg",
             KIND_STYLES[entry.kind],
@@ -187,7 +188,7 @@ export function Toaster({ position = "top-right", closeButton = true, className 
           <span aria-hidden className="mt-0.5 text-sm font-bold">
             {KIND_ICON[entry.kind]}
           </span>
-          <div className="min-w-0 flex-1">
+          <div data-dc-toast-copy className="min-w-0 flex-1">
             <p className="text-sm font-semibold leading-5">{entry.message}</p>
             {entry.description ? (
               <p className="mt-0.5 text-xs leading-5 opacity-80">{entry.description}</p>
@@ -208,6 +209,7 @@ export function Toaster({ position = "top-right", closeButton = true, className 
           {closeButton ? (
             <button
               type="button"
+              data-dc-toast-dismiss
               aria-label="Dismiss"
               className="shrink-0 rounded-full px-1 text-sm opacity-60 hover:opacity-100"
               onClick={() => dismiss(entry.id)}

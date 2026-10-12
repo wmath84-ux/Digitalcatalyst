@@ -392,3 +392,23 @@ html[data-theme="light"] [data-pdp-root] {
   --pdp-t-f9dfa8: #92400e;
   --pdp-t-fff: #191c1e;
 }
+
+/* Compact tablet rail and portalled phone drawer share this component.
+   Override inline label accents too: light-mode navigation copy stays black,
+   while coloured icon tiles, notification badges and avatars keep their colours. */
+html[data-theme="light"] [data-glass-sidebar] {
+  color: #000;
+  background: var(--dc-bg-secondary) !important;
+}
+
+html[data-theme="light"] [data-glass-sidebar] [data-glass-sidebar-label],
+html[data-theme="light"] [data-glass-sidebar] [data-glass-sidebar-tooltip],
+html[data-theme="light"] [data-glass-sidebar] p,
+html[data-theme="light"] [data-glass-sidebar] button {
+  color: #000 !important;
+}
+
+html[data-theme="light"] [data-glass-sidebar] [data-glass-sidebar-tooltip] {
+  background: var(--dc-bg-elevated) !important;
+  border-color: var(--dc-line-strong) !important;
+}

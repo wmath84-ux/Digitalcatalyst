@@ -120,10 +120,8 @@ function ToastCard({ data, fromRight }: { data: ToastData; fromRight: boolean })
   const reduceMotion = useReducedMotion();
   const { color, Icon } = variantOf(data.variant);
 
-  // The AI Canvas card is designed for dark surfaces. The app is dark only,
-  // so the ONE remaining light surface is the admin shell
-  // (html[data-glass="off"]), where the same layout/motion rides a darker
-  // glass pane so the white ink stays legible.
+  // Preserve the glass-off fallback in dark mode. Light mode overrides both
+  // shell tokens via CSS, including when the theme changes mid-toast.
   const [onLightSurface] = useState(() => {
     if (typeof document === "undefined") return false;
     return document.documentElement.dataset.glass === "off";
@@ -189,6 +187,7 @@ function ToastCard({ data, fromRight }: { data: ToastData; fromRight: boolean })
         border: "1px solid var(--gt-shell-line)",
         boxShadow: "var(--gt-shell-shadow)",
       }}
+      data-dc-toast
       role="status"
     >
       {/* Separate non-animating blur layer, so the frosted backdrop never
@@ -210,7 +209,7 @@ function ToastCard({ data, fromRight }: { data: ToastData; fromRight: boolean })
         >
           <Icon size={18} style={{ color }} aria-hidden />
         </div>
-        <div className="min-w-0 flex-1">
+        <div data-dc-toast-copy className="min-w-0 flex-1">
           {data.title && (
             <p className="truncate text-sm font-semibold text-white/90">{data.title}</p>
           )}
@@ -224,6 +223,7 @@ function ToastCard({ data, fromRight }: { data: ToastData; fromRight: boolean })
       <div className="absolute right-0 top-1/2 z-10 -translate-y-1/2">
         <motion.button
           type="button"
+          data-dc-toast-dismiss
           aria-label="Dismiss"
           onClick={() => dismissToast(data.id)}
           className="flex h-11 w-11 cursor-pointer items-center justify-center outline-none"

@@ -554,3 +554,36 @@
     transform: none;
   }
 }
+
+/* Marketplace finishing details; price/review information stays catalog-backed. */
+.dc-marketplace-discount { position: absolute; left: 10px; bottom: 10px; z-index: 1; padding: 5px 9px; border: 1px solid #ffffff50; border-radius: 8px; background: #fff; color: #14532d; box-shadow: 0 2px 8px #0002; font-size: 11px; font-weight: 750; }
+.dc-marketplace-rating svg { fill: #facc15; stroke: #ca8a04; }
+.dc-marketplace-cover img { transition: transform 250ms ease; }
+.dc-marketplace-kind { letter-spacing: .09em; font-size: 10px; text-transform: uppercase; }
+.dc-marketplace-cover-fallback { background: radial-gradient(ellipse at top right, #6366f130, transparent 70%); }
+.dc-marketplace-save { min-width: 40px; min-height: 40px; }
+.dc-marketplace-save[aria-pressed="true"] { color: #e11d48; background: #fff1f2; }
+.dc-marketplace-shelf, .dc-marketplace-shelf-track { display: contents; }
+.dc-marketplace-shelf-heading { display: none; }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .dc-marketplace-open:hover .dc-marketplace-cover img { transform: scale(1.035); }
+}
+@media (max-width: 639px) {
+  .dc-marketplace-shelf { display: block; grid-column: 1 / -1; min-width: 0; padding: 18px 0 4px; border-top: 1px solid #94a3b830; }
+  .dc-marketplace-shelf-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .dc-marketplace-shelf-heading p { font-size: 9px; letter-spacing: .14em; font-weight: 750; color: #a5b4fc; }
+  .dc-marketplace-shelf-heading h2 { margin-top: 4px; font-size: 16px; font-weight: 750; letter-spacing: -.025em; }
+  .dc-marketplace-shelf-heading > span { font-size: 10px; color: #94a3b8; }
+  .dc-marketplace-shelf-track { display: grid; grid-auto-flow: column; grid-auto-columns: min(76vw, 280px); gap: 14px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; padding: 2px 2px 16px; scrollbar-width: thin; scrollbar-color: #94a3b860 transparent; }
+  .dc-marketplace-shelf-track > * { scroll-snap-align: start; min-width: 0; }
+  .dc-marketplace-shelf-track .dc-marketplace-feature { grid-column: auto; display: flex; }
+  .dc-marketplace-shelf-track .dc-marketplace-card.is-list { flex-direction: column; width: 100%; }
+  .dc-marketplace-shelf-track .dc-marketplace-card.is-list .dc-marketplace-open { flex-direction: column; align-items: stretch; }
+  .dc-marketplace-shelf-track .dc-marketplace-card.is-list .dc-marketplace-cover { flex: none; width: 100%; }
+  .dc-marketplace-shelf-track .dc-marketplace-card.is-list .dc-marketplace-card-footer { flex: none; }
+  .dc-marketplace-shelf-track .dc-marketplace-card.is-list .dc-marketplace-save { left: auto; right: 10px; }
+  .dc-marketplace-shelf-track:focus-visible { outline: 2px solid #818cf8; outline-offset: 2px; }
+}
+html[data-theme="light"] .dc-marketplace-shelf-heading p { color: #4338ca; }
+html[data-theme="light"] .dc-marketplace-shelf-heading > span { color: #475569; }
+html[data-theme="light"] .dc-marketplace-save[aria-pressed="true"] { color: #be123c; background: #fff1f2; }

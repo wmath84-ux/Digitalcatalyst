@@ -1,8 +1,9 @@
-import { useMemo, useState, useEffect } from "react";
+import { Fragment, useMemo, useState, useEffect } from "react";
 import type { Product } from "../data/products";
 import { useCatalog } from "../context/CatalogContext";
 import { Search } from "lucide-react";
 import StoreProductCard from "./StoreProductCard";
+import { buildStoreShelves } from "../utils/storeShelves";
 import ContentDialog from "./ui/ContentDialog";
 import { useBranding } from "../context/BrandingContext";
 import {
@@ -342,19 +343,30 @@ export default function StorePage({
               viewMode === "mixed" ? "is-mixed" : ""
             }`}
           >
-            {filtered.map((product, index) =>
-              viewMode === "mixed" && index % 3 === 0 ? (
-                <div
-                  key={product.id}
-                  className="dc-marketplace-feature"
-                  data-store-mixed-feature
-                >
-                  {card(product, true)}
-                </div>
-              ) : (
-                card(product)
-              )
-            )}
+            {buildStoreShelves(filtered).map(({ offset, gridProducts, railProducts }, group) => {
+              const renderGridCard = (product: Product, index: number) =>
+                viewMode === "mixed" && index % 3 === 0 ? (
+                  <div key={product.id} className="dc-marketplace-feature" data-store-mixed-feature>
+                    {card(product, true)}
+                  </div>
+                ) : card(product);
+              return (
+                <Fragment key={gridProducts[0].id}>
+                  {gridProducts.map((product, index) => renderGridCard(product, offset + index))}
+                  {railProducts.length > 0 ? (
+                    <section className="dc-marketplace-shelf" aria-label={`Explore more resources ${group + 1}`}>
+                      <header className="dc-marketplace-shelf-heading">
+                        <div><p>KEEP EXPLORING</p><h2>More to learn, your way</h2></div>
+                        <span>{railProducts.length > 1 ? "Swipe to explore →" : "Explore next →"}</span>
+                      </header>
+                      <div className="dc-marketplace-shelf-track" tabIndex={0} aria-label="Scrollable products">
+                        {railProducts.map((product, index) => renderGridCard(product, offset + 4 + index))}
+                      </div>
+                    </section>
+                  ) : null}
+                </Fragment>
+              );
+            })}
           </div>
         )}
       </div>

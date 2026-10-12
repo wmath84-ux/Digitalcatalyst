@@ -156,6 +156,7 @@ function SidebarRow({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, transition: { duration: 0.08 } }}
             transition={{ duration: 0.18, delay: 0.18 + index * 0.03 }}
+            data-glass-sidebar-label
             className="truncate text-sm font-semibold"
             style={{ color: active ? color : 'rgba(255,255,255,0.75)' }}
           >
@@ -169,6 +170,7 @@ function SidebarRow({
         {!isOpen && hovered && (
           <motion.span
             key="tip"
+            data-glass-sidebar-tooltip
             initial={{ opacity: 0, x: -6 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -6 }}

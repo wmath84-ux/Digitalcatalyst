@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Expand,
+  Heart,
   Star,
   X,
 } from "lucide-react";
@@ -763,7 +764,14 @@ function PremiumProductContent({
               <button type="button" disabled={inCart} onClick={() => onAddToCart(product.id)} className="dc-pdp-text-action">{inCart ? "In cart" : "Add to cart"}</button>
             ) : null}
             {onToggleFavorite ? (
-              <button type="button" data-pdp-save aria-label={favorite ? "Remove from saved products" : "Save product"} aria-pressed={favorite} onClick={() => onToggleFavorite(product.id)} className="dc-pdp-text-action">{favorite ? "Saved" : "Save"}</button>
+              <button type="button" data-pdp-save aria-label={favorite ? "Remove from saved products" : "Save product"} aria-pressed={favorite} onClick={() => onToggleFavorite(product.id)} className="dc-pdp-like-button">
+                <Heart className="dc-pdp-like-heart" size={24} aria-hidden="true" />
+                <span className="dc-pdp-like-label">{favorite ? "Saved" : "Save"}</span>
+                <span className="dc-pdp-like-state" aria-hidden="true">
+                  <span className="dc-pdp-like-off">+</span>
+                  <span className="dc-pdp-like-on">✓</span>
+                </span>
+              </button>
             ) : null}
             <div ref={shareRef}>
               <button type="button" onClick={() => setShareOpen((value) => !value)} aria-label="Share product" aria-expanded={shareOpen} aria-controls="product-share-menu" aria-haspopup="menu" className="dc-pdp-text-action">Share</button>
