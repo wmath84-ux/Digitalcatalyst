@@ -153,19 +153,6 @@ export default function AuthApp() {
             {/* Right Auth Card Column */}
             <div className="col-span-12 flex flex-col items-center justify-center lg:col-span-6 xl:col-span-5">
               <AuthForm />
-
-              {/* Mobile / Tablet Trust badges */}
-              <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-[11px] font-medium text-white/50 lg:hidden">
-                <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
-                  ⚡ Instant Access
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
-                  🔒 Firebase Secured
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
-                  📱 Multi-Device Sync
-                </span>
-              </div>
             </div>
           </div>
         </div>

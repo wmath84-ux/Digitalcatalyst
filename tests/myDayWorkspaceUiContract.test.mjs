@@ -26,3 +26,14 @@ test("My Day uses a polished responsive workspace theme in both color modes", ()
   assert.match(css, /@media \(max-width: 767px\)/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
 });
+
+test("My Day subtext uses the requested light ink without changing dark mode", () => {
+  const rootTheme = css.match(/:root\s*\{[^}]*\}/)?.[0] || "";
+  const lightTheme = css.match(/html\[data-theme="light"\]\s*\{[^}]*\}/)?.[0] || "";
+  const systemDarkTheme = css.match(/@media \(prefers-color-scheme: dark\)\s*\{\s*html:not\(\[data-theme\]\)\s*\{([^}]*?)\s*\}\s*\}/)?.[1] || "";
+  const explicitDarkTheme = css.match(/html\[data-theme="dark"\]\s*\{[^}]*\}/)?.[0] || "";
+  assert.match(rootTheme, /--jp-subtext: #6b7085;/);
+  assert.match(lightTheme, /--jp-subtext: #6b7085;/);
+  assert.match(systemDarkTheme, /--jp-subtext: #a0a7bc;/);
+  assert.match(explicitDarkTheme, /--jp-subtext: #a0a7bc;/);
+});
