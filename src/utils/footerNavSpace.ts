@@ -119,11 +119,12 @@ export function initFooterNavSpace(): () => void {
   const mo = new MutationObserver(sync);
   mo.observe(document.body, { childList: true, subtree: true });
 
-  // The gesture flag flipping off is the cue to publish the settled height.
-  const gestureMo = new MutationObserver(schedule);
-  gestureMo.observe(document.documentElement, {
+  // A gesture ending settles the dock; Android's edge-to-edge flag changes the
+  // footer's safe-area padding. Both root attributes can change its measured box.
+  const rootStateMo = new MutationObserver(schedule);
+  rootStateMo.observe(document.documentElement, {
     attributes: true,
-    attributeFilter: ["data-dc-dock-gesture"],
+    attributeFilter: ["data-dc-dock-gesture", "data-android-edge-to-edge"],
   });
 
   // The viewport itself (rotate, split-screen, desktop shell resize).
@@ -135,7 +136,7 @@ export function initFooterNavSpace(): () => void {
 
   return () => {
     mo.disconnect();
-    gestureMo.disconnect();
+    rootStateMo.disconnect();
     ro.disconnect();
     observed.clear();
     window.removeEventListener("resize", schedule);

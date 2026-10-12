@@ -100,5 +100,6 @@ test("Android native code includes AppStatusBarPlugin and handles configuration 
   assert.match(indexCss, /html\[data-android-edge-to-edge="true"\]::after/);
   assert.match(indexCss, /--dc-system-navigation-inset:\s*max\(env\(safe-area-inset-bottom, 0px\), 24px\)/);
   assert.match(indexCss, /\[data-site-footer-nav\][\s\S]*?padding-bottom: max\(var\(--dc-system-navigation-inset\), 10px\) !important/);
+  assert.match(indexCss, /\[data-footer-nav-design="uiverse"\][\s\S]*?padding-bottom: calc\(12px \+ var\(--dc-system-navigation-inset, 24px\)\) !important/);
   assert.match(indexCss, /var\(--dc-system-navigation-color, #ffffff\)/);
 });

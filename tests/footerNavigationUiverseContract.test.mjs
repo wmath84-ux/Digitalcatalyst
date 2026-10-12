@@ -42,9 +42,16 @@ test("the four-tab pill keeps the measured footer hook and the required destinat
   for (const route of ["#/home", "#/store", "#/store/purchases", "#/profile"]) {
     assert.ok(uiverseFooter.includes(route), `the footer retains ${route}`);
   }
-  assert.match(uiverseCss, /backdrop-filter:\s*blur\(12px\) saturate\(1\.25\)/);
-  assert.match(uiverseCss, /inset 0 1px 0/);
-  assert.match(uiverseCss, /aria-current="page"|\[aria-current="page"\]/);
+  assert.match(uiverseCss, /width:\s*calc\(100% - 20px\);[\s\S]*?max-width:\s*520px/);
+  assert.match(uiverseCss, /background:\s*rgba\(0, 122, 255, 0\.404\)/);
+  assert.match(uiverseCss, /backdrop-filter:\s*blur\(12px\) saturate\(180%\) contrast\(200%\)/);
+  assert.match(uiverseCss, /box-shadow:\s*0 10px 30px rgba\(0, 0, 0, 0\.06\)/);
+  assert.match(uiverseCss, /\.dc-uiverse-footer::after[\s\S]*?inset 2px 2px 5px -2px rgba\(255, 255, 255, 0\.4\)/);
+  assert.match(uiverseCss, /\.dc-uiverse-footer-tab\s*\{[\s\S]*?flex-direction:\s*column/);
+  assert.match(uiverseCss, /font-size:\s*0\.8rem;[\s\S]*?font-weight:\s*600;[\s\S]*?line-height:\s*1/);
+  assert.match(uiverseCss, /\.dc-uiverse-footer-tab\[aria-current="page"\][\s\S]*?background:\s*rgba\(237, 237, 237, 0\.6\)[\s\S]*?color:\s*rgba\(0, 122, 255, 0\.9\)/);
+  assert.doesNotMatch(uiverseCss, /html\[data-theme="light"\] \.dc-uiverse-footer(?:\s|\{|\-tab)/, "the reference pill does not get recolored by app theme overrides");
+  assert.doesNotMatch(uiverseCss, /@media\s*\(min-width:\s*440px\)/, "tabs remain stacked at every width like the reference");
 });
 
 test("Profile opens the four animated learning shortcuts once and Profile on a double click/tap", () => {
@@ -59,7 +66,7 @@ test("Profile opens the four animated learning shortcuts once and Profile on a d
   assert.match(uiverseFooter, /navigate\(`#\/\$\{id\}`\)/, "shortcut selection routes to the matching page");
   assert.match(uiverseFooter, /className="dc-compact-glass-window dc-uiverse-profile-menu"/);
   assert.match(uiverseFooter, /data-open=\{profileMenuOpen \? "true" : "false"\}/);
-  assert.match(uiverseFooter, /now - previous <= 340/);
+  assert.match(uiverseFooter, /now - previous <= 500/);
   assert.match(uiverseFooter, /navigate\("#\/profile"\)/);
   assert.match(uiverseFooter, /onDoubleClick=\{/);
   assert.match(uiverseFooter, /keyboardMenuOpenRef\.current = true/);

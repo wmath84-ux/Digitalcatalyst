@@ -130,7 +130,7 @@ export default function UiverseFooterNav({
   const handleProfileClick = () => {
     const now = Date.now();
     const previous = clickTimeRef.current;
-    if (previous !== null && now - previous <= 340) {
+    if (previous !== null && now - previous <= 500) {
       openProfile();
       return;
     }
@@ -141,7 +141,7 @@ export default function UiverseFooterNav({
     clickExpiryRef.current = window.setTimeout(() => {
       clickTimeRef.current = null;
       clickExpiryRef.current = null;
-    }, 340);
+    }, 500);
   };
 
   const active = activeTabForHash(currentHash);
