@@ -128,3 +128,412 @@
   .dc-purchases-row:hover { transform: none; }
   .dc-purchases-loading { animation: none; }
 }
+
+
+/* ── My Purchases · refined responsive surfaces ────────────────────────────
+   Presentation-only refinement. Preserve ownership resolution, access scope,
+   search behaviour, product artwork, empty/error/loading states and routing.
+   ───────────────────────────────────────────────────────────────────────── */
+[data-purchases-page] {
+  --purchase-edge: rgba(100, 116, 139, 0.2);
+  --purchase-edge-strong: rgba(37, 99, 235, 0.56);
+  --purchase-surface: rgba(255, 255, 255, 0.92);
+  width: 100%;
+  max-width: 1040px;
+  min-width: 0;
+  margin-inline: auto;
+  padding: clamp(1.25rem, 3.5vw, 2rem) clamp(1rem, 3vw, 1.75rem)
+    calc(7.75rem + var(--dc-footer-nav-h, 0px) + env(safe-area-inset-bottom, 0px));
+}
+
+[data-purchases-page] .dc-account-header {
+  margin-bottom: 1.5rem;
+}
+
+[data-purchases-page] .dc-account-header h1 {
+  color: #171d2a;
+  font-size: clamp(1.85rem, 5.8vw, 2.35rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1.12;
+}
+
+[data-purchases-page] .dc-account-header h1::after {
+  width: 3.6rem;
+  height: 4px;
+  margin-top: 0.8rem;
+  background: linear-gradient(90deg, #60a5fa 0%, #8b82f6 100%);
+  box-shadow: none;
+}
+
+[data-purchases-page] .dc-account-note {
+  color: #657084;
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+.dc-purchases-search {
+  min-height: 3.5rem;
+  gap: 0.8rem;
+  margin-block: 0.5rem 1.25rem;
+  padding-inline: 1rem;
+  border: 1px solid rgba(100, 116, 139, 0.22);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 20px -18px rgba(15, 23, 42, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.dc-purchases-search > svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+  color: #64748b;
+}
+
+.dc-purchases-search input {
+  min-height: 3.5rem;
+  color: #1e293b;
+  font-size: 1rem;
+}
+
+.dc-purchases-search input::placeholder {
+  color: #7a8597;
+  opacity: 1;
+}
+
+.dc-purchases-search:focus-within {
+  border-color: rgba(37, 99, 235, 0.58);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1), 0 8px 20px -18px rgba(15, 23, 42, 0.34);
+}
+
+.dc-purchases-search button {
+  border-radius: 10px;
+  color: #64748b;
+}
+
+.dc-purchases-list {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dc-purchases-row {
+  overflow: hidden;
+  border: 1px solid rgba(100, 116, 139, 0.19);
+  border-radius: 19px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 22px -19px rgba(15, 23, 42, 0.3), 0 1px 3px rgba(15, 23, 42, 0.045);
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.dc-purchases-row > button {
+  min-height: 6.8rem;
+  gap: 0.95rem;
+  padding: 1rem;
+}
+
+[data-purchases-page] .dc-purchases-row img,
+[data-purchases-page] .dc-purchases-image-fallback {
+  width: 5.25rem;
+  height: 5.25rem;
+  flex: 0 0 5.25rem;
+  border: 1px solid rgba(100, 116, 139, 0.12);
+  border-radius: 13px;
+  background: #eef2f7;
+  object-fit: cover;
+}
+
+.dc-purchases-copy {
+  gap: 0.3rem;
+}
+
+.dc-purchases-title {
+  color: #182133;
+  font-size: 1rem;
+  font-weight: 780;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+}
+
+.dc-purchases-copy small {
+  color: #687589;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.dc-purchases-scope {
+  color: #5e6d83;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.dc-purchases-open-icon {
+  width: 1.2rem;
+  height: 1.2rem;
+  color: #64748b;
+}
+
+.dc-purchases-row > button:hover .dc-purchases-title {
+  color: #1d4ed8;
+}
+
+.dc-purchases-row > button:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.8);
+  outline-offset: -4px;
+  border-radius: inherit;
+}
+
+.dc-purchases-empty {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding: clamp(1.35rem, 5vw, 2rem);
+  border: 1px solid rgba(100, 116, 139, 0.18);
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(241, 246, 255, 0.94));
+  box-shadow: 0 16px 36px -30px rgba(30, 64, 175, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  color: #1e293b;
+}
+
+.dc-purchases-empty h2 {
+  margin: 0;
+  color: #172033;
+  font-size: clamp(1.2rem, 4.5vw, 1.5rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+
+.dc-purchases-empty > p {
+  margin: 0;
+  color: #647084;
+  font-size: 0.98rem;
+  line-height: 1.6;
+}
+
+.dc-purchases-empty .dc-account-primary {
+  display: inline-flex;
+  width: min(100%, 20rem);
+  min-height: 3.35rem;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.35rem;
+  padding: 0.85rem 1.25rem;
+  border: 1px solid rgba(29, 78, 216, 0.25);
+  border-radius: 14px;
+  background: linear-gradient(135deg, #2563eb, #3979ed);
+  box-shadow: 0 10px 20px -12px rgba(37, 99, 235, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font-size: 0.98rem;
+  font-weight: 750;
+  transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+}
+
+.dc-purchases-empty .dc-account-primary:hover {
+  filter: brightness(1.04);
+  box-shadow: 0 13px 24px -12px rgba(37, 99, 235, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  transform: translateY(-1px);
+}
+
+.dc-purchases-empty .dc-account-primary:active {
+  transform: translateY(0);
+}
+
+.dc-purchases-empty .dc-account-text-action {
+  min-height: 2.75rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 11px;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.dc-purchases-loading {
+  height: 3.5rem;
+  border: 1px solid rgba(100, 116, 139, 0.1);
+  border-radius: 13px;
+  background: linear-gradient(90deg, #edf1f7, #f8faff, #edf1f7);
+  background-size: 200% 100%;
+}
+
+.dc-purchases-empty:has(.dc-purchases-loading) {
+  width: 100%;
+}
+
+.dc-purchases-empty [role="alert"],
+[data-purchases-page] .dc-account-error {
+  overflow-wrap: anywhere;
+}
+
+@media (hover: hover) {
+  .dc-purchases-row:hover {
+    transform: translateY(-1px);
+    border-color: rgba(37, 99, 235, 0.28);
+    box-shadow: 0 13px 28px -22px rgba(37, 99, 235, 0.2), 0 3px 8px -7px rgba(15, 23, 42, 0.2);
+  }
+}
+
+@media (max-width: 639px) {
+  [data-purchases-page] {
+    padding: 1.25rem 1rem calc(8rem + var(--dc-footer-nav-h, 0px) + env(safe-area-inset-bottom, 0px));
+  }
+
+  [data-purchases-page] .dc-account-header {
+    margin-bottom: 1.4rem;
+  }
+
+  [data-purchases-page] .dc-account-header h1 {
+    font-size: clamp(1.8rem, 7vw, 2.15rem);
+  }
+
+  [data-purchases-page] .dc-account-note {
+    font-size: 0.95rem;
+  }
+
+  .dc-purchases-search {
+    min-height: 3.4rem;
+    margin-bottom: 1.1rem;
+    border-radius: 15px;
+  }
+
+  .dc-purchases-search input {
+    min-height: 3.4rem;
+  }
+
+  .dc-purchases-row {
+    border-radius: 18px;
+  }
+
+  .dc-purchases-row > button {
+    min-height: 6.6rem;
+    gap: 0.8rem;
+    padding: 0.9rem;
+  }
+
+  [data-purchases-page] .dc-purchases-row img,
+  [data-purchases-page] .dc-purchases-image-fallback {
+    width: 5rem;
+    height: 5rem;
+    flex-basis: 5rem;
+    border-radius: 12px;
+  }
+
+  .dc-purchases-title {
+    font-size: 0.96rem;
+  }
+
+  .dc-purchases-copy small,
+  .dc-purchases-scope {
+    font-size: 0.78rem;
+  }
+
+  .dc-purchases-empty {
+    gap: 0.8rem;
+    margin-top: 1.25rem;
+    padding: 1.4rem;
+    border-radius: 20px;
+  }
+
+  .dc-purchases-empty .dc-account-primary {
+    width: 100%;
+    max-width: 22rem;
+    min-height: 3.35rem;
+  }
+}
+
+@media (max-width: 359px) {
+  .dc-purchases-row > button {
+    gap: 0.7rem;
+    padding: 0.75rem;
+  }
+
+  [data-purchases-page] .dc-purchases-row img,
+  [data-purchases-page] .dc-purchases-image-fallback {
+    width: 4.25rem;
+    height: 4.25rem;
+    flex-basis: 4.25rem;
+  }
+
+  .dc-purchases-title {
+    font-size: 0.9rem;
+  }
+
+  .dc-purchases-open-icon {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .dc-purchases-empty {
+    padding: 1.1rem;
+  }
+}
+
+html[data-theme="dark"] [data-purchases-page] .dc-account-header h1 {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] [data-purchases-page] .dc-account-note {
+  color: #a8b4c6;
+}
+
+html[data-theme="dark"] .dc-purchases-search {
+  border-color: rgba(148, 163, 184, 0.22);
+  background: rgba(17, 23, 36, 0.88);
+}
+
+html[data-theme="dark"] .dc-purchases-search input {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .dc-purchases-search input::placeholder {
+  color: #9eabba;
+}
+
+html[data-theme="dark"] .dc-purchases-row {
+  border-color: rgba(148, 163, 184, 0.17);
+  background: linear-gradient(180deg, rgba(17, 23, 36, 0.96), rgba(12, 17, 27, 0.96));
+}
+
+html[data-theme="dark"] .dc-purchases-title {
+  color: #f2f5fb;
+}
+
+html[data-theme="dark"] .dc-purchases-copy small,
+html[data-theme="dark"] .dc-purchases-scope {
+  color: #aab8cc;
+}
+
+html[data-theme="dark"] .dc-purchases-empty {
+  border-color: rgba(96, 165, 250, 0.28);
+  background: linear-gradient(145deg, rgba(17, 23, 36, 0.96), rgba(20, 30, 48, 0.94));
+  color: #e7edf7;
+}
+
+html[data-theme="dark"] .dc-purchases-empty h2 {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .dc-purchases-empty > p {
+  color: #b4c0d2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-purchases-search,
+  .dc-purchases-row,
+  .dc-purchases-empty .dc-account-primary {
+    transition-duration: 1ms !important;
+  }
+  .dc-purchases-row:hover,
+  .dc-purchases-empty .dc-account-primary:hover {
+    transform: none;
+  }
+  .dc-purchases-loading {
+    animation: none;
+  }
+}
