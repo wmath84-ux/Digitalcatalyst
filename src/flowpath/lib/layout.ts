@@ -106,6 +106,9 @@ export function buildRows(
   let index = 0;
 
   if (items.length === 0) {
+    // Reserve a clean hero zone for EmptyState before showing the first + node.
+    // Without this offset the second node/ribbon crosses the onboarding copy.
+    y += config.isMobile ? 290 : 260;
     for (let i = 0; i < 3; i++) {
       rows.push({
         id: `empty-plus-${i}`,
