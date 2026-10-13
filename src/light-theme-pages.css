@@ -2113,7 +2113,7 @@ html[data-theme="light"] [data-dc-toast] button:focus-visible {
    Keep the existing glass/colour surfaces; only the elevation shadow is removed.
    Home's branded mobile header and Home's active desktop top bar are intentionally
    excluded so their existing elevation remains unchanged. */
-html body [data-site-header]:not([data-home-header]).dc-scene-plate--bar,
+html body [data-site-header]:not([data-home-header]),
 html body [data-revision-app-header],
 html body [data-rev-bank-header],
 html body [data-admin-topbar],
