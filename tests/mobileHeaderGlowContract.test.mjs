@@ -6,7 +6,6 @@ import fs from "node:fs";
 
 const header = fs.readFileSync("src/components/Header.tsx", "utf8");
 const homeHeader = fs.readFileSync("src/home/components/Header.tsx", "utf8");
-const desktopShell = fs.readFileSync("src/components/DesktopShell.tsx", "utf8");
 const indexCss = fs.readFileSync("src/index.css", "utf8");
 const finalChromeCss = fs.readFileSync("src/light-theme-pages.css", "utf8");
 
@@ -55,4 +54,15 @@ test("Home mobile header and Home's desktop top bar are explicitly excluded from
   assert.match(desktopShell, /data-desktop-rail-item=\{entry\.key\}/);
   assert.match(reset, /\.dc-desktop-shell:not\(:has\(\[data-desktop-rail-item="home"\]\[data-active="true"\]\)\) \[data-desktop-topbar\]/);
   assert.match(reset, /\[data-site-header\]:not\(\[data-home-header\]\)/);
+});
+
+
+test("mobile headers have no cast shadow outside Home, while Home remains excluded", () => {
+  const mobileReset = finalChromeCss.slice(finalChromeCss.lastIndexOf("Mobile header shadow reset"));
+  assert.match(mobileReset, /@media \(max-width: 767px\)/);
+  assert.match(mobileReset, /\[data-site-header\]\.dc-scene-plate--bar:not\(\[data-home-header\]\)/);
+  assert.match(mobileReset, /\[data-revision-app-header\]\.dc-scene-plate--bar/);
+  assert.match(mobileReset, /box-shadow: none !important/);
+  assert.doesNotMatch(mobileReset, /\[data-site-header\]\.dc-scene-plate--bar\s*,/);
+  assert.match(homeHeader, /data-home-header/);
 });
