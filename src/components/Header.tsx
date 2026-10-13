@@ -142,7 +142,7 @@ export default function Header({
           id: "search",
           label: "Search",
           ariaLabel: "Search",
-          icon: <SearchIcon className="h-10 w-10" />,
+          icon: <SearchIcon className="h-[30px] w-[30px]" />,
         }]
       : []),
     onDownloadReport
@@ -150,13 +150,13 @@ export default function Header({
           id: "download",
           label: "Report",
           ariaLabel: "Download report",
-          icon: <DownloadIcon className="h-10 w-10" />,
+          icon: <DownloadIcon className="h-[30px] w-[30px]" />,
         }
       : {
           id: "cart",
           label: "Cart",
           ariaLabel: "Cart",
-          icon: <CartIcon className="h-10 w-10" />,
+          icon: <CartIcon className="h-[30px] w-[30px]" />,
           badge: cartCount > 0 ? String(cartCount) : undefined,
           badgeTone: "rose" as const,
         },
@@ -164,14 +164,14 @@ export default function Header({
       id: "subscription",
       label: "Plans",
       ariaLabel: "Subscription",
-      icon: <CrownIcon className="h-10 w-10" />,
+      icon: <CrownIcon className="h-[30px] w-[30px]" />,
     },
     ...(onHelpClick
       ? [{
           id: "help",
           label: "Help",
           ariaLabel: "Help & FAQ",
-          icon: <HelpCircle className="h-10 w-10" />,
+          icon: <HelpCircle className="h-[30px] w-[30px]" />,
         }]
       : []),
   ];
@@ -217,7 +217,7 @@ export default function Header({
       id: "usage-limits",
       label: "Usage Limits",
       ariaLabel: "Usage Limits",
-      icon: <Gauge className="h-10 w-10" />,
+      icon: <Gauge className="h-[30px] w-[30px]" />,
       color: "#8B7CF6",
     },
   ];
@@ -236,24 +236,24 @@ export default function Header({
          shadow and glow. `bg-white/75` and `backdrop-blur-xl` stay in the class list — they are the published
          material that `?glass=off` restores, and the gate means this rule only
          ever applies while glass is on. */
-      className={`dc-scene-plate dc-scene-plate--bar sticky top-0 z-30 bg-white/75 px-4 py-3 sm:px-5 md:px-8 md:py-4 backdrop-blur-xl transition-all duration-300 ${
+      className={`dc-scene-plate dc-scene-plate--bar sticky top-0 z-30 bg-white/75 px-4 py-[7px] sm:px-5 md:px-8 md:py-[11px] backdrop-blur-xl transition-all duration-300 ${
         hideFrameBorders || seamless ? "" : "mobile-header-glow"
       }`}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/30">
-            {customLogo ? <BrandMark className="h-10 w-10" /> : <LogoIcon className="h-10 w-10" />}
+          <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/30">
+            {customLogo ? <BrandMark className="h-[30px] w-[30px]" /> : <LogoIcon className="h-[30px] w-[30px]" />}
           </div>
           <div className="flex min-w-0 flex-col justify-center leading-tight">
-            <h1 className="truncate text-[40px] font-bold leading-[40px] tracking-tight text-white">{headerTitle}</h1>
+            <h1 className="truncate text-[30px] font-bold leading-[30px] tracking-tight text-white">{headerTitle}</h1>
           </div>
         </div>
 
         {centerSearch && (
           <div className="hidden min-w-0 flex-1 justify-center px-2 lg:flex">
-            <label className="myrem-hsearch [&_input]:text-[40px] [&_input]:leading-[40px]" htmlFor={centerSearch.inputId ?? "dc-header-search"}>
-              <SearchIcon className="h-10 w-10 shrink-0" aria-hidden="true" />
+            <label className="myrem-hsearch [&_input]:text-[30px] [&_input]:leading-[30px]" htmlFor={centerSearch.inputId ?? "dc-header-search"}>
+              <SearchIcon className="h-[30px] w-[30px] shrink-0" aria-hidden="true" />
               <span className="sr-only">Search</span>
               <input
                 id={centerSearch.inputId ?? "dc-header-search"}
@@ -271,7 +271,7 @@ export default function Header({
         <div className="flex shrink-0 items-center gap-2" data-header-action-cluster>
           <HeaderNotificationsButton
             count={displayedNotificationCount}
-            size={40}
+            size={30}
             onClick={onNavigateToNotifications}
           />
           {isPhoneLayout ? (
