@@ -734,7 +734,7 @@ export default function DesktopShell({
                   <button
                     type="button"
                     onClick={() => { window.location.hash = "#/revision/study"; }}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-full border border-indigo-400/40 bg-gradient-to-r from-indigo-500/25 to-violet-500/25 px-3 text-xs font-black text-white shadow-sm transition hover:brightness-110 active:scale-95"
+                    className="inline-flex h-12 items-center gap-1.5 rounded-full border border-indigo-400/40 bg-gradient-to-r from-indigo-500/25 to-violet-500/25 px-3 text-[40px] leading-[40px] font-black text-white shadow-sm transition hover:brightness-110 active:scale-95"
                     title="Quick Study / Review"
                   >
                     <Play size={40} className="fill-current text-indigo-300" />
@@ -743,7 +743,7 @@ export default function DesktopShell({
                   <button
                     type="button"
                     onClick={() => { window.dispatchEvent(new CustomEvent("dc-revision-quick-add")); }}
-                    className="inline-flex h-9 items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 text-xs font-semibold text-white transition hover:bg-white/20 active:scale-95"
+                    className="inline-flex h-12 items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 text-[40px] leading-[40px] font-semibold text-white transition hover:bg-white/20 active:scale-95"
                     title="Add Card / Deck"
                   >
                     <Plus size={40} />
@@ -756,14 +756,14 @@ export default function DesktopShell({
                 onClick={() => handleNavigate("#/subscription")}
                 aria-label="Upgrade to Premium"
                 title="Upgrade"
-                className="mr-1 hidden h-9 shrink-0 items-center gap-1.5 rounded-full border border-violet-300/40 bg-gradient-to-br from-violet-500 to-indigo-600 px-3.5 text-xs font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_8px_20px_-8px_rgba(124,92,255,0.8)] transition hover:brightness-110 active:scale-95 sm:inline-flex"
+                className="mr-1 hidden h-12 shrink-0 items-center gap-1.5 rounded-full border border-violet-300/40 bg-gradient-to-br from-violet-500 to-indigo-600 px-3.5 text-[40px] leading-[40px] font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_8px_20px_-8px_rgba(124,92,255,0.8)] transition hover:brightness-110 active:scale-95 sm:inline-flex"
               >
                 <Crown size={40} aria-hidden="true" />
                 Upgrade
               </button>
               <ExpandingTabs
                 ariaLabel="Quick actions"
-                itemSize={36}
+                itemSize={40}
                 activeId={
                   window.location.hash.startsWith("#/favorites")
                     ? "favorites"
