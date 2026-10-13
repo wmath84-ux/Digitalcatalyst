@@ -32,3 +32,34 @@ test("desktop signed-out Settings uses a compact centered panel", () => {
   assert.match(settings, /\.settings-signed-out[\s\S]*?flex: 0 1 auto/);
   assert.match(settings, /\.settings-signed-out[\s\S]*?align-self: center/);
 });
+
+
+const studyCard = fs.readFileSync("src/personal-library/MyCourseCard.tsx", "utf8");
+const studyCss = fs.readFileSync("src/personal-library/study-library-minimal.css", "utf8");
+const homeCss = fs.readFileSync("src/home/home.css", "utf8");
+const experimentCss = fs.readFileSync("src/personal-library/course-editor-minimal.css", "utf8");
+const experimentEditor = fs.readFileSync("src/personal-library/MyCourseExperimentEditor.tsx", "utf8");
+
+test("Study Library gets full-width horizontal course rows only above the mobile breakpoint", () => {
+  assert.match(studyCard, /data-my-course-open=\{course\.id\}/);
+  assert.match(studyCard, /<span>Open<\/span>/);
+  assert.match(studyCss, /\.dc-study-open-action\s*\{\s*display:\s*none;/);
+  assert.match(studyCss, /@media \(min-width: 768px\)\s*\{[\s\S]*?\.dc-study-course-row\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) auto/);
+  assert.match(studyCss, /@media \(min-width: 768px\) and \(max-width: 920px\)/);
+  assert.match(studyCss, /\.dc-study-course-actions\s*\{[\s\S]*?justify-content:\s*flex-end/);
+});
+
+test("Home product cards use a restrained shadow and readable light-theme ownership badges", () => {
+  assert.match(homeCss, /\[data-home-content\] \[data-home-grid\] \.dc-marketplace-card,\s*\[data-home-content\] \[data-home-grid\] \.dc-marketplace-card:hover/);
+  assert.match(homeCss, /box-shadow:\s*0 2px 5px -4px rgba\(15, 23, 42, 0\.2\) !important/);
+  assert.match(homeCss, /\.dc-marketplace-status\[data-status="purchased"\],[\s\S]*?color:\s*#176b50 !important/);
+  assert.match(homeCss, /\.dc-marketplace-status\[data-status="free"\][\s\S]*?color:\s*#176b50 !important/);
+});
+
+test("Light experiment templates, helper copy and run status retain readable contrast", () => {
+  assert.match(experimentEditor, /data-my-experiment-health=\{errors\.length \? "blocked" : warnings\.length \? "warning" : "ready"\}/);
+  assert.match(experimentCss, /\[data-my-experiment-template\][\s\S]*?color:\s*#16467f !important/);
+  assert.match(experimentCss, /\[data-my-experiment-health="ready"\][\s\S]*?color:\s*#14532d !important/);
+  assert.match(experimentCss, /\[data-my-experiment-health="warning"\][\s\S]*?color:\s*#854d0e !important/);
+  assert.match(experimentCss, /\[data-my-experiment-health="blocked"\][\s\S]*?color:\s*#9f1239 !important/);
+});
