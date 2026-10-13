@@ -509,7 +509,7 @@ export default function App({
                       title="No products in this category yet."
                     />
                   ) : (
-                    <div data-home-grid className="dc-home-product-grid mt-1 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
+                    <div data-home-grid className="dc-home-product-grid dc-home-marketplace-grid mt-1 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
                       {categoryFiltered.map(renderCatalogProductCard)}
                     </div>
                   )}
