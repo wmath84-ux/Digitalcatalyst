@@ -56,7 +56,7 @@ test("Android color resources define light and night system bar colors without b
   assert.doesNotMatch(colorsLight, /#3F51B5/);
 
   assert.match(colorsNight, /<color name="statusBarColor">#000000<\/color>/);
-  assert.match(colorsNight, /<color name="navigationBarColor">#000000<\/color>/);
+  assert.match(colorsNight, /<color name="navigationBarColor">#FFFFFF<\/color>/);
   assert.match(colorsNight, /<color name="colorPrimary">#000000<\/color>/);
 });
 
@@ -72,7 +72,7 @@ test("Android style resources configure matching status and navigation bars with
   assert.match(stylesNight, /<item name="android:statusBarColor">@color\/statusBarColor<\/item>/);
   assert.match(stylesNight, /<item name="android:navigationBarColor">@color\/navigationBarColor<\/item>/);
   assert.match(stylesNight, /<item name="android:windowLightStatusBar">false<\/item>/);
-  assert.match(stylesNight, /<item name="android:windowLightNavigationBar">false<\/item>/);
+  assert.match(stylesNight, /<item name="android:windowLightNavigationBar">true<\/item>/);
 });
 
 test("Android native code includes AppStatusBarPlugin and handles configuration changes", () => {
@@ -95,7 +95,7 @@ test("Android native code includes AppStatusBarPlugin and handles configuration 
 
   const systemBars = read("src/utils/systemBars.ts");
   const indexCss = read("src/index.css");
-  assert.match(systemBars, /bottom = top;/, "the two Android system bars share one sampled colour");
+  assert.match(systemBars, /bottom = OPAQUE_WHITE;/, "the app navigation bar stays white in light mode");
   assert.match(systemBars, /--dc-system-navigation-color/);
   assert.match(indexCss, /html\[data-android-edge-to-edge="true"\]::after/);
   assert.match(indexCss, /--dc-system-navigation-inset:\s*max\(env\(safe-area-inset-bottom, 0px\), 24px\)/);
