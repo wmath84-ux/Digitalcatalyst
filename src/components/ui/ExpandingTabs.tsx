@@ -82,10 +82,10 @@ export default function ExpandingTabs({
             whileHover={isActive ? undefined : { scale: 1.045 }}
             whileTap={{ scale: 0.94 }}
             {...(item.dataAttrs ?? {})}
-            className={`relative flex shrink-0 cursor-pointer items-center justify-start rounded-full pl-2.5 outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
+            className={`relative flex shrink-0 cursor-pointer items-center justify-start rounded-full outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
               isActive
-                ? "gap-2 bg-white/90 pr-4 text-slate-900 shadow-[0_7px_18px_rgba(0,0,0,0.34),inset_0_2px_0_rgba(255,255,255,0.98)]"
-                : "text-white/85 hover:text-white"
+                ? "gap-2 bg-white/90 pl-2.5 pr-4 text-slate-900 shadow-[0_7px_18px_rgba(0,0,0,0.34),inset_0_2px_0_rgba(255,255,255,0.98)]"
+                : "justify-center p-0 text-white/85 hover:text-white"
             }`}
             style={{ height: itemSize, width: isActive ? undefined : itemSize }}
             data-expanding-tab={item.id}
