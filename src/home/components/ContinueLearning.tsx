@@ -43,6 +43,8 @@ export default function ContinueLearning({ items }: ContinueLearningProps) {
 function ContinueLearningCard({ item }: { item: ContinueLearningItem }) {
   const progress = clampProgress(item.progress);
   const open = item.onOpen || item.onResume;
+  const author = item.author.trim().toLocaleLowerCase() === "digital catalyst" ? "" : item.author.trim();
+  const supportingDetails = item.details?.trim() || author;
 
   return (
     <GlassCard
@@ -58,7 +60,7 @@ function ContinueLearningCard({ item }: { item: ContinueLearningItem }) {
         className="dc-home-continue-action"
         aria-label={`Resume ${item.title}`}
       >
-        <span className="dc-home-continue-image h-16 w-16">
+        <span className="dc-home-continue-image">
           <img src={item.image} alt="" loading="lazy" decoding="async" />
         </span>
         <span className="dc-home-continue-copy">
@@ -66,20 +68,25 @@ function ContinueLearningCard({ item }: { item: ContinueLearningItem }) {
             <span className="dc-home-continue-title" title={item.title}>{item.title}</span>
             <span className="dc-home-continue-percent">{progress}%</span>
           </span>
-          {item.details || item.author ? <span className="dc-home-continue-details">{item.details || item.author}</span> : null}
+          {supportingDetails ? <span className="dc-home-continue-details">{supportingDetails}</span> : null}
           {item.currentLesson ? (
             <span className="dc-home-continue-lesson">
-              <BookOpen size={14} aria-hidden="true" />
-              <span><span className="dc-home-continue-lesson-label">Last opened</span>{item.currentLesson}</span>
+              <BookOpen size={17} aria-hidden="true" />
+              <span className="dc-home-continue-lesson-copy">
+                <span className="dc-home-continue-lesson-label">Last opened</span>
+                <span className="dc-home-continue-lesson-text">{item.currentLesson}</span>
+              </span>
             </span>
           ) : null}
           <span className="dc-home-continue-progress-row">
-            <span className="dc-home-progress-track h-1.5" role="progressbar" aria-label={`Progress in ${item.title}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
+            <span className="dc-home-progress-track" role="progressbar" aria-label={`Progress in ${item.title}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
               <span className="dc-home-progress-fill" style={{ width: `${progress}%` }} />
             </span>
-            <span className="dc-home-continue-progress-label">{progress}% complete</span>
           </span>
-          <span className="dc-home-continue-cta">Resume <ArrowRight size={15} aria-hidden="true" /></span>
+          <span className="dc-home-continue-footer">
+            <span className="dc-home-continue-progress-label">{progress}% complete</span>
+            <span className="dc-home-continue-cta">Resume <ArrowRight size={17} aria-hidden="true" /></span>
+          </span>
         </span>
       </button>
     </GlassCard>
