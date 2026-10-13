@@ -246,26 +246,22 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
       <div data-home-chrome className="relative flex min-w-0 items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5 min-[390px]:gap-3">
           <span data-home-brand className="shrink-0">
-            <BrandMark className="h-10 w-10 rounded-2xl ring-1 ring-white/25 min-[390px]:h-11 min-[390px]:w-11" />
+            <BrandMark className="h-10 w-10 rounded-xl ring-1 ring-white/25" />
           </span>
           <div className="min-w-0 flex-1 overflow-hidden">
-            {headerVariant === "flow" ? (
-              <p data-home-welcome className="truncate whitespace-nowrap text-[10px] font-medium uppercase tracking-wide text-white/70 min-[390px]:text-xs">
-                Your day · tasks & plans
-              </p>
-            ) : null}
+            
             <h1
               data-home-greeting
               className={headerVariant === "flow"
-                ? "mt-0.5 truncate whitespace-nowrap text-[clamp(0.875rem,4.8vw,1.25rem)] font-bold tracking-tight"
-                : "flex min-w-0 items-center gap-2 text-[clamp(1.25rem,5.6vw,1.75rem)] font-bold tracking-tight"}
+                ? "min-w-0 truncate whitespace-nowrap text-xl font-bold leading-tight tracking-tight"
+                : "flex min-w-0 items-center gap-2 text-xl font-bold leading-tight tracking-tight"}
             >
               {headerVariant === "flow" ? "FlowPath" : (
                 <>
                   <span className="min-w-0 truncate whitespace-nowrap" title={`Hello, ${firstName}`}>
                     Hello, <strong data-home-user-name className="font-extrabold">{firstName}</strong>
                   </span>
-                  <PiHandWavingDuotone data-home-wave className="h-6 w-6 shrink-0 text-amber-200 min-[390px]:h-7 min-[390px]:w-7" aria-hidden="true" />
+                  <PiHandWavingDuotone data-home-wave className="h-5 w-5 shrink-0 text-amber-200" aria-hidden="true" />
                 </>
               )}
             </h1>
