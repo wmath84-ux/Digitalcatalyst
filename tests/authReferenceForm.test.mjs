@@ -50,13 +50,14 @@ test('minimal form preserves login, signup, reset, Google, remember and password
   await React.act(async()=>root.unmount());dom.window.close();
 });
 
-test('auth alone automatically follows OS theme and keeps the same blue submit colour',()=>{
+test('authentication pages remain white regardless of the operating-system theme',()=>{
   const css=read('src/components/auth/auth-reference.css');postcss.parse(css);
-  assert.match(css,/@media \(prefers-color-scheme: dark\)/);
+  assert.doesNotMatch(css,/@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)/);
+  assert.match(css,/--auth-page:\s*#f5f5f5/);
+  assert.match(css,/--auth-card:\s*#ffffff/);
+  assert.match(css,/color-scheme:\s*light/);
   assert.match(css,/width: 450px; max-width: 100%; border-radius: 20px/);
   assert.match(css,/\.dc-auth-submit \{[\s\S]*?background: #2d79f3/);
-  const dark=css.slice(css.indexOf('@media (prefers-color-scheme: dark)'),css.indexOf('@media (max-width:'));
-  assert.doesNotMatch(dark,/dc-auth-submit|--auth-blue/);
   const app=read('src/AuthApp.tsx');assert.doesNotMatch(app,/Firebase|SSL|Star|Sparkles|ThemeModeToggle/);
   assert.match(app,/resolveBackDestination/);
 });
