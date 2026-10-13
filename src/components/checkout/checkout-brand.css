@@ -176,7 +176,7 @@ html[data-theme="light"] [data-payment-gateway] :is(button, summary):focus-visib
 
   [data-checkout-app] [data-checkout-buyer-details] {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     align-items: center;
     gap: 10px clamp(14px, 1.8vw, 24px);
     min-width: 0;
@@ -209,8 +209,8 @@ html[data-theme="light"] [data-payment-gateway] :is(button, summary):focus-visib
     padding: 9px 12px;
     border: 1px solid #dbe5f3;
     border-radius: 10px;
-    background: #f8fafc;
-    color: #334155;
+    background: var(--checkout-surface-raised, #f8fafc);
+    color: inherit;
     line-height: 1.35;
   }
 
@@ -291,6 +291,11 @@ html[data-theme="light"] [data-payment-gateway] :is(button, summary):focus-visib
   [data-checkout-app] .cu-stamp {
     padding: 10px 24px 14px;
     font-size: 12px;
+  }
+
+  [data-checkout-app] .cu-note {
+    font-size: 13px;
+    line-height: 1.55;
   }
 
   [data-checkout-app] .dc-checkout-note,
