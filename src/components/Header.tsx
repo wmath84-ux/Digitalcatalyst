@@ -122,7 +122,7 @@ export default function Header({
           id: "search",
           label: "Search",
           ariaLabel: "Search",
-          icon: <SearchIcon className="h-5 w-5" />,
+          icon: <SearchIcon className="h-10 w-10" />,
         }]
       : []),
     onDownloadReport
@@ -130,13 +130,13 @@ export default function Header({
           id: "download",
           label: "Report",
           ariaLabel: "Download report",
-          icon: <DownloadIcon className="h-5 w-5" />,
+          icon: <DownloadIcon className="h-10 w-10" />,
         }
       : {
           id: "cart",
           label: "Cart",
           ariaLabel: "Cart",
-          icon: <CartIcon className="h-5 w-5" />,
+          icon: <CartIcon className="h-10 w-10" />,
           badge: cartCount > 0 ? String(cartCount) : undefined,
           badgeTone: "rose" as const,
         },
@@ -144,14 +144,14 @@ export default function Header({
       id: "subscription",
       label: "Plans",
       ariaLabel: "Subscription",
-      icon: <CrownIcon className="h-5 w-5" />,
+      icon: <CrownIcon className="h-10 w-10" />,
     },
     ...(onHelpClick
       ? [{
           id: "help",
           label: "Help",
           ariaLabel: "Help & FAQ",
-          icon: <HelpCircle className="h-5 w-5" />,
+          icon: <HelpCircle className="h-10 w-10" />,
         }]
       : []),
   ];
@@ -197,7 +197,7 @@ export default function Header({
       id: "usage-limits",
       label: "Usage Limits",
       ariaLabel: "Usage Limits",
-      icon: <Gauge className="h-5 w-5" />,
+      icon: <Gauge className="h-10 w-10" />,
       color: "#8B7CF6",
     },
   ];
@@ -232,7 +232,7 @@ export default function Header({
 
         {centerSearch && (
           <div className="hidden min-w-0 flex-1 justify-center px-2 lg:flex">
-            <label className="myrem-hsearch" htmlFor={centerSearch.inputId ?? "dc-header-search"}>
+            <label className="myrem-hsearch [&_input]:text-[40px] [&_input]:leading-[40px]" htmlFor={centerSearch.inputId ?? "dc-header-search"}>
               <SearchIcon className="h-10 w-10 shrink-0" aria-hidden="true" />
               <span className="sr-only">Search</span>
               <input
