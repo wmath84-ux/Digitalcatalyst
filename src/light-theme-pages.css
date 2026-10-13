@@ -2273,3 +2273,15 @@ html[data-theme="light"] [data-pdp-root] .dc-pdp-secondary-actions .dc-pdp-text-
   color: #ffffff !important;
   box-shadow: 0 6px 16px -8px rgba(0, 74, 198, 0.55);
 }
+
+
+/* Product detail desktop canvas: the content wrapper's cool-grey surface was
+   visible in the top/side padding while the PDP itself painted white, creating
+   a mismatched band around the page. Keep the PDP and its surrounding canvas
+   on one continuous white surface in light appearance. Scope to PDP routes so
+   other desktop pages retain their existing canvas color. */
+@media (min-width: 1024px) {
+  html[data-theme="light"] body .dc-desktop-shell [data-desktop-content]:has([data-pdp-root]) {
+    background-color: #ffffff;
+  }
+}
