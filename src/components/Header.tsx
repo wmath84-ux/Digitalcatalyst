@@ -246,13 +246,13 @@ export default function Header({
             {customLogo ? <BrandMark className="h-[30px] w-[30px]" /> : <LogoIcon className="h-[30px] w-[30px]" />}
           </div>
           <div className="flex min-w-0 flex-col justify-center leading-tight">
-            <h1 className="truncate text-[30px] font-bold leading-[30px] tracking-tight text-white">{headerTitle}</h1>
+            <h1 className="truncate text-[20px] font-bold leading-[24px] tracking-tight text-white">{headerTitle}</h1>
           </div>
         </div>
 
         {centerSearch && (
           <div className="hidden min-w-0 flex-1 justify-center px-2 lg:flex">
-            <label className="myrem-hsearch [&_input]:text-[30px] [&_input]:leading-[30px]" htmlFor={centerSearch.inputId ?? "dc-header-search"}>
+            <label className="myrem-hsearch [&_input]:text-[16px] [&_input]:leading-[20px]" htmlFor={centerSearch.inputId ?? "dc-header-search"}>
               <SearchIcon className="h-[30px] w-[30px] shrink-0" aria-hidden="true" />
               <span className="sr-only">Search</span>
               <input
