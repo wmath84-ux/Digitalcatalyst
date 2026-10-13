@@ -161,11 +161,13 @@ export function computeSystemBarsPayload(): SystemBarsPayload {
     bottom = override;
   } else {
     top = sampleEdgeColor("top");
-    // Keep the native system bars paired. On Android 15+ edge-to-edge means
-    // the navigation bar's own colour is transparent and reveals the WebView;
-    // sampling a dark footer there while the status bar is white produced the
-    // black/white mismatch reported on some devices.
-    bottom = top;
+    // Eduvora currently forces the app appearance to light regardless of
+    // the Android system theme. Keep the bottom system navigation area white
+    // with dark gesture/button icons, even when the page header at the top is
+    // dark glass. This also paints Android 15+ edge-to-edge navigation inset.
+    // Explicit fullscreen/course-player overrides above can still request a
+    // matched custom colour when that surface needs it.
+    bottom = OPAQUE_WHITE;
   }
   return {
     status: toHex(top),
