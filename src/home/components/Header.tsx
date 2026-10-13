@@ -170,18 +170,18 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
   }, []);
 
   const allHomeActionItems: ExpandingTabItem[] = [
-    { id: "leaderboard", label: "Leaderboard", ariaLabel: "Leaderboard", icon: <Trophy size={40} strokeWidth={2.4} /> },
-    { id: "profile", label: "Profile", ariaLabel: "Open profile", icon: <UserRound size={40} strokeWidth={2.4} /> },
+    { id: "leaderboard", label: "Leaderboard", ariaLabel: "Leaderboard", icon: <Trophy size={30} strokeWidth={2.4} /> },
+    { id: "profile", label: "Profile", ariaLabel: "Open profile", icon: <UserRound size={30} strokeWidth={2.4} /> },
     {
       id: "favorites",
       label: "Favorites",
       ariaLabel: "Favorites",
-      icon: <Heart size={40} strokeWidth={2.4} fill="currentColor" />,
+      icon: <Heart size={30} strokeWidth={2.4} fill="currentColor" />,
       badge: favoritesCount > 0 ? String(favoritesCount) : undefined,
       badgeTone: "rose",
     },
     ...(onOpenSettings
-      ? [{ id: "settings", label: "Settings", ariaLabel: "Open Flow settings", icon: <Settings size={40} strokeWidth={2.4} /> }]
+      ? [{ id: "settings", label: "Settings", ariaLabel: "Open Flow settings", icon: <Settings size={30} strokeWidth={2.4} /> }]
       : []),
   ];
   const homeActionItems = headerVariant === "flow"
@@ -193,7 +193,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
   const phoneMenuItems = [
     ...homeActionItems,
     ...allHomeActionItems.filter((item) => item.id === "profile"),
-    { id: "usage-limits", label: "Usage Limits", ariaLabel: "Usage Limits", icon: <Gauge size={40} strokeWidth={2.4} /> },
+    { id: "usage-limits", label: "Usage Limits", ariaLabel: "Usage Limits", icon: <Gauge size={30} strokeWidth={2.4} /> },
   ];
 
   const handleHomeAction = (id: string) => {
@@ -246,15 +246,15 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
       <div data-home-chrome className="relative flex min-w-0 items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5 min-[390px]:gap-3">
           <span data-home-brand className="shrink-0">
-            <BrandMark className="h-10 w-10 rounded-xl ring-1 ring-white/25" />
+            <BrandMark className="h-[30px] w-[30px] rounded-xl ring-1 ring-white/25" />
           </span>
           <div className="min-w-0 flex-1 overflow-hidden">
             
             <h1
               data-home-greeting
               className={headerVariant === "flow"
-                ? "min-w-0 truncate whitespace-nowrap text-[40px] font-bold leading-[40px] tracking-tight"
-                : "flex min-w-0 items-center gap-2 text-[40px] font-bold leading-[40px] tracking-tight"}
+                ? "min-w-0 truncate whitespace-nowrap text-[30px] font-bold leading-[30px] tracking-tight"
+                : "flex min-w-0 items-center gap-2 text-[30px] font-bold leading-[30px] tracking-tight"}
             >
               {headerVariant === "flow" ? "FlowPath" : (
                 <>
@@ -262,7 +262,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
                     <strong className="font-extrabold">Hello</strong>
                     <span className="sr-only" data-home-user-name>, {firstName}</span>
                   </span>
-                  <PiHandWavingDuotone data-home-wave className="h-10 w-10 shrink-0 text-amber-200" aria-hidden="true" />
+                  <PiHandWavingDuotone data-home-wave className="h-[30px] w-[30px] shrink-0 text-amber-200" aria-hidden="true" />
                 </>
               )}
             </h1>
@@ -271,7 +271,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
         <div data-home-actions className="flex shrink-0 items-center gap-1 min-[390px]:gap-2">
           <HeaderNotificationsButton
             count={unreadNotificationCount}
-            size={40}
+            size={30}
             onClick={() => {
               if (onOpenNotifications) onOpenNotifications();
               else window.location.hash = "#/notifications";
@@ -316,7 +316,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
         >
           <GlassInput
             ref={ref}
-            icon={<Search size={40} strokeWidth={2.4} />}
+            icon={<Search size={30} strokeWidth={2.4} />}
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             onFocus={openSearch}
@@ -336,7 +336,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
               aria-label="Clear search"
               className="absolute right-2 top-1/2 -translate-y-1/2 [&_.size-12]:size-6"
             >
-              <X size={40} strokeWidth={2.6} />
+              <X size={30} strokeWidth={2.6} />
             </GlassButton>
           ) : null}
         </div>
