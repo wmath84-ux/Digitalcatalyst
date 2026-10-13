@@ -10,6 +10,26 @@ import { useViewportBand } from "../utils/responsive";
 import ExpandingTabs, { type ExpandingTabItem } from "./ui/ExpandingTabs";
 import MobileHeaderMenu from "./MobileHeaderMenu";
 
+/** Keep the visible app-shell header title to one short word. */
+export function singleWordHeaderTitle(value: string): string {
+  const trimmed = value.trim();
+  const normalized = trimmed.toLocaleLowerCase().replace(/[’']/g, "").replace(/\s+/g, " ");
+  const aliases: Record<string, string> = {
+    "my day": "Today",
+    "usage limits": "Usage",
+    "sign in to open my day": "Sign-in",
+    "eduvora tasker": "Today",
+    "help & faq": "Help",
+    "help and faq": "Help",
+    "quick study / review": "Study",
+    "add card or deck": "Add",
+    "store & purchases": "Store",
+    "store and purchases": "Store",
+  };
+  if (aliases[normalized]) return aliases[normalized];
+  return trimmed.split(/\s+/)[0]?.replace(/[,:;!?]+$/, "") || "Home";
+}
+
 type HeaderProps = {
   cartCount: number;
   notifCount: number;
@@ -114,7 +134,7 @@ export default function Header({
   const LogoIcon = icon ?? BookIcon;
   const { logoUrl, appName, hideFrameBorders } = useBranding();
   const customLogo = logoUrl && logoUrl !== DEFAULT_LOGO_URL;
-  const headerTitle = title ?? appName;
+  const headerTitle = singleWordHeaderTitle(title ?? appName);
 
   const tabItems: ExpandingTabItem[] = [
     ...(onToggleSearch
