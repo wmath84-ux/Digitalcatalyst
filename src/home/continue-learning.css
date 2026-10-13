@@ -8,7 +8,7 @@
 
 [data-home-content] .dc-home-continue-card {
   width: 100%;
-  max-width: 1080px;
+  max-width: 100%;
   border: 1px solid var(--dc-line, #e0e3e5);
   border-radius: 22px;
   background: var(--dc-bg-secondary, #fff);
