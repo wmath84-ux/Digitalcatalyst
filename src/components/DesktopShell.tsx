@@ -688,7 +688,7 @@ export default function DesktopShell({
                     white-on-glass for dark pages. */}
                 <GlassInput
                   type="search"
-                  className="dc-glass-input w-full [&_input]:text-[30px] [&_input]:leading-[30px]"
+                  className="dc-glass-input w-full [&_input]:text-[16px] [&_input]:leading-[20px]"
                   icon={<Search className="h-[30px] w-[30px]" aria-hidden="true" />}
                   value={query}
                   data-desktop-search
@@ -735,7 +735,7 @@ export default function DesktopShell({
                   <button
                     type="button"
                     onClick={() => { window.location.hash = "#/revision/study"; }}
-                    className="inline-flex h-[38px] items-center gap-1.5 rounded-full border border-indigo-400/40 bg-gradient-to-r from-indigo-500/25 to-violet-500/25 px-3 text-[30px] leading-[30px] font-black text-white shadow-sm transition hover:brightness-110 active:scale-95"
+                    className="inline-flex h-[38px] items-center gap-1.5 rounded-full border border-indigo-400/40 bg-gradient-to-r from-indigo-500/25 to-violet-500/25 px-3 text-[13px] leading-[16px] font-black text-white shadow-sm transition hover:brightness-110 active:scale-95"
                     title="Quick Study / Review"
                   >
                     <Play size={30} className="fill-current text-indigo-300" />
@@ -744,7 +744,7 @@ export default function DesktopShell({
                   <button
                     type="button"
                     onClick={() => { window.dispatchEvent(new CustomEvent("dc-revision-quick-add")); }}
-                    className="inline-flex h-[38px] items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 text-[30px] leading-[30px] font-semibold text-white transition hover:bg-white/20 active:scale-95"
+                    className="inline-flex h-[38px] items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 text-[13px] leading-[16px] font-semibold text-white transition hover:bg-white/20 active:scale-95"
                     title="Add Card / Deck"
                   >
                     <Plus size={30} />
@@ -757,7 +757,7 @@ export default function DesktopShell({
                 onClick={() => handleNavigate("#/subscription")}
                 aria-label="Upgrade to Premium"
                 title="Upgrade"
-                className="mr-1 hidden h-[38px] shrink-0 items-center gap-1.5 rounded-full border border-violet-300/40 bg-gradient-to-br from-violet-500 to-indigo-600 px-3.5 text-[30px] leading-[30px] font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_8px_20px_-8px_rgba(124,92,255,0.8)] transition hover:brightness-110 active:scale-95 sm:inline-flex"
+                className="mr-1 hidden h-[38px] shrink-0 items-center gap-1.5 rounded-full border border-violet-300/40 bg-gradient-to-br from-violet-500 to-indigo-600 px-3.5 text-[13px] leading-[16px] font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_8px_20px_-8px_rgba(124,92,255,0.8)] transition hover:brightness-110 active:scale-95 sm:inline-flex"
               >
                 <Crown size={30} aria-hidden="true" />
                 Upgrade
