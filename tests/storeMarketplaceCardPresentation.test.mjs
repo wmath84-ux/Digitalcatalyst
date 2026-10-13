@@ -168,3 +168,19 @@ test("Image fallback and favorites keep an honest identity and accessible action
     "true"
   );
 });
+
+
+const storeCss = fs.readFileSync("src/components/store-marketplace.css", "utf8");
+const favoriteCardSource = fs.readFileSync("src/cartWishlist/components/FavoriteCard.tsx", "utf8");
+
+test("Desktop Store grid uses compact catalogue cards instead of full-width editorial cards", () => {
+  assert.match(storeCss, /@media \(min-width: 1024px\)\s*\{[\s\S]*?\.dc-desktop-shell \[data-store-marketplace\] \[data-store-grid\]\s*\{[\s\S]*?grid-template-columns:\s*repeat\(auto-fill, minmax\(min\(100%, 270px\), 1fr\)\)/);
+  assert.match(storeCss, /\.dc-desktop-shell \[data-store-marketplace\] \[data-store-grid\] > \.dc-marketplace-card\.is-large \.dc-marketplace-open\s*\{[\s\S]*?flex-direction:\s*column/);
+  assert.match(storeCss, /\.dc-desktop-shell \[data-store-marketplace\] \[data-store-grid\] > \.dc-marketplace-card\.is-large:hover[\s\S]*?box-shadow:\s*0 1px 3px rgba\(15, 23, 42, 0\.055\)/);
+  assert.match(storeCss, /html\[data-theme="dark"\] \.dc-desktop-shell \[data-store-marketplace\] \[data-store-grid\] > \.dc-marketplace-card\.is-large/);
+});
+
+test("Favorite cover images do not show unverified duration or lesson-count overlays", () => {
+  assert.doesNotMatch(favoriteCardSource, /product\.hours\s*[•·]\s*\{?product\.lessons/);
+  assert.doesNotMatch(favoriteCardSource, /\{product\.hours\}\s*[•·]\s*\{product\.lessons\}\s+lessons/);
+});
