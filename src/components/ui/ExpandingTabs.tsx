@@ -46,7 +46,7 @@ export default function ExpandingTabs({
   onSelect,
   ariaLabel,
   className = "",
-  itemSize = 40,
+  itemSize = 30,
 }: {
   items: ExpandingTabItem[];
   /** The expanded item. `null` renders every item as an icon circle. */
@@ -54,7 +54,7 @@ export default function ExpandingTabs({
   onSelect: (id: string) => void;
   ariaLabel: string;
   className?: string;
-  /** Circle diameter in px (default 40 — the reference size). */
+  /** Circle diameter in px (default 30 — reduced header size). */
   itemSize?: number;
 }) {
   return (
@@ -109,7 +109,7 @@ export default function ExpandingTabs({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -7 }}
                   transition={spring}
-                  className="whitespace-nowrap text-[40px] font-semibold leading-[40px] tracking-[0.01em]"
+                  className="whitespace-nowrap text-[30px] font-semibold leading-[30px] tracking-[0.01em]"
                 >
                   {item.label}
                 </motion.span>
@@ -118,7 +118,7 @@ export default function ExpandingTabs({
             {item.badge ? (
               <span
                 aria-label={item.badgeAriaLabel}
-                className={`absolute -right-0.5 -top-0.5 z-10 flex h-10 min-w-[40px] items-center justify-center rounded-full px-1 text-[40px] leading-[40px] font-bold text-white ring-2 ring-[#0a0c12] ${
+                className={`absolute -right-0.5 -top-0.5 z-10 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] leading-none font-bold text-white ring-2 ring-[#0a0c12] ${
                   item.badgeTone === "rose" ? "bg-rose-500" : "bg-indigo-600"
                 }`}
               >
