@@ -237,7 +237,6 @@ export default function MyDayApp() {
             cartCount={cartIds.size}
             notifCount={0}
             title="My Day"
-            subtitle="Tasks & notes"
             onNavigateToSubscription={() => {
               window.location.hash = "#/subscription";
             }}
