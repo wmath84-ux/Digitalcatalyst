@@ -687,7 +687,7 @@ export default function DesktopShell({
                     white-on-glass for dark pages. */}
                 <GlassInput
                   type="search"
-                  className="dc-glass-input w-full"
+                  className="dc-glass-input w-full [&_input]:text-[40px] [&_input]:leading-[40px]"
                   icon={<Search className="h-10 w-10" aria-hidden="true" />}
                   value={query}
                   data-desktop-search
@@ -716,7 +716,7 @@ export default function DesktopShell({
                     type="button"
                     onClick={() => setQuery("")}
                     aria-label="Clear search"
-                    className="absolute right-2 grid h-6 w-6 place-items-center rounded-full text-white/55 transition hover:bg-white/[0.1] hover:text-white/85"
+                    className="absolute right-2 grid h-10 w-10 place-items-center rounded-full text-white/55 transition hover:bg-white/[0.1] hover:text-white/85"
                   >
                     <X size={40} />
                   </button>
