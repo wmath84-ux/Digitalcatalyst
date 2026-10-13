@@ -64,6 +64,7 @@ import { useDragScroll } from "../hooks/useDragScroll";
 import { useFeatureVisibilityMap } from "../context/FeatureVisibilityContext";
 import BrandMark from "./BrandMark";
 import HeaderNotificationsButton from "./HeaderNotificationsButton";
+import { singleWordHeaderTitle } from "./Header";
 import DesktopPeekDock from "./glass-dock/DesktopPeekDock";
 import { DEFAULT_LOGO_URL } from "@/utils/branding";
 import { cn } from "../utils/cn";
@@ -383,7 +384,7 @@ export default function DesktopShell({
   }, [user?.name]);
 
   const activeEntry = ALL_RAIL.find((entry) => entry.key === active) ?? PRIMARY_RAIL[0];
-  const resolvedTitle = pageTitle ?? activeEntry.label;
+  const resolvedTitle = singleWordHeaderTitle(pageTitle ?? activeEntry.label);
 
   // The cart / favorites / notifications badges come from the live
   // commerce / catalog / notification streams. The pill counter
