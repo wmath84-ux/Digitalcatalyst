@@ -96,7 +96,7 @@ export default function Header({
   onNavigateToCart,
   onNavigateToNotifications,
   title,
-  subtitle = "Premium learning store",
+  subtitle = "",
   subtitleWrap = false,
   seamless = false,
   icon,
@@ -227,9 +227,9 @@ export default function Header({
           <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/30">
             {customLogo ? <BrandMark className="h-11 w-11" /> : <LogoIcon className="h-6 w-6" />}
           </div>
-          <div className="min-w-0 leading-tight pt-0.5">
-            <h1 className="truncate text-[1.125rem] font-black tracking-tight text-white">{headerTitle}</h1>
-            <p className={`mt-0.5 text-white/55 ${subtitleWrap ? "line-clamp-2 whitespace-normal text-[10px] font-semibold leading-[1.15] tracking-normal" : "truncate text-[10px] font-bold uppercase tracking-widest"}`}>{subtitle}</p>
+          <div className="flex min-w-0 flex-col justify-center leading-tight">
+            <h1 className="truncate text-xl font-bold leading-tight tracking-tight text-white">{headerTitle}</h1>
+            {subtitle ? <p className={`mt-0.5 text-xs font-medium leading-tight text-white/60 ${subtitleWrap ? "line-clamp-2 whitespace-normal" : "truncate"}`}>{subtitle}</p> : null}
           </div>
         </div>
 
