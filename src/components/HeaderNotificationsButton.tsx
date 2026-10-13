@@ -4,13 +4,13 @@ import "./header-navigation.css";
 export default function HeaderNotificationsButton({
   count = 0,
   onClick,
-  size = 40,
+  size = 30,
   className = "",
 }: {
   count?: number;
   onClick: () => void;
   /** Keep the hit target identical to the replaced header control. */
-  size?: 36 | 40;
+  size?: number;
   className?: string;
 }) {
   const unreadCount = Math.max(0, Math.floor(count));
@@ -29,7 +29,7 @@ export default function HeaderNotificationsButton({
       title={unreadCount > 0 ? `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}` : "Notifications"}
       onClick={onClick}
     >
-      <Bell aria-hidden="true" size={40} strokeWidth={2.1} />
+      <Bell aria-hidden="true" size={30} strokeWidth={2.1} />
       {unreadCount > 0 ? (
         <span className="dc-header-notifications-badge" aria-hidden="true">
           {badge}
