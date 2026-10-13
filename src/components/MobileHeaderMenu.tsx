@@ -206,7 +206,7 @@ export default function MobileHeaderMenu({
         data-mobile-header-menu-button
         data-button-size="40"
       >
-        <Menu aria-hidden="true" size={22} strokeWidth={2.2} />
+        <Menu aria-hidden="true" size={40} strokeWidth={2.2} />
       </button>
       {typeof document !== "undefined" && open ? createPortal(drawer, document.body) : null}
     </>
