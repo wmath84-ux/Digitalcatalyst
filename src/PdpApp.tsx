@@ -1003,9 +1003,9 @@ function ProductImageThumb({ product, source }: { product: Product; source: stri
 }
 
 function shortProductSummary(value: string): string {
-  const plain = String(value || "").replace(/\\s+/g, " ").trim();
+  const plain = String(value || "").replace(/\s+/g, " ").trim();
   if (!plain) return "";
-  if (plain.length <= 170 && plain.split(/\\s+/).length <= 28) return plain;
+  if (plain.length <= 170 && plain.split(/\s+/).length <= 28) return plain;
   const sentenceParts = plain.match(/[^.!?]+[.!?]?/g)?.map((part) => part.trim()).filter(Boolean) || [];
   const firstSentence = sentenceParts.find((part) => part.split(/\s+/).filter(Boolean).length >= 5);
   if (firstSentence && firstSentence.length <= 170) return firstSentence;
