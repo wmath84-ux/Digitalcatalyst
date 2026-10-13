@@ -318,6 +318,7 @@ export default function ProfileApp() {
     <div data-profile-page className="min-h-screen text-white sm:py-0 lg:py-0">
       <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-screen sm:max-w-none sm:overflow-hidden sm:rounded-none sm:border-0">
         <Header
+          title="Profile"
           cartCount={cartIds.size}
           notifCount={0}
           onNavigateToSubscription={openPlans}
