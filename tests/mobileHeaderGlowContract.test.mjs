@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const header = fs.readFileSync("src/components/Header.tsx", "utf8");
+const homeHeader = fs.readFileSync("src/home/components/Header.tsx", "utf8");
 const indexCss = fs.readFileSync("src/index.css", "utf8");
 const finalChromeCss = fs.readFileSync("src/light-theme-pages.css", "utf8");
 
@@ -42,5 +43,5 @@ test("mobile headers have no cast shadow outside Home, while Home remains exclud
   assert.match(mobileReset, /\[data-revision-app-header\]\.dc-scene-plate--bar/);
   assert.match(mobileReset, /box-shadow: none !important/);
   assert.doesNotMatch(mobileReset, /\[data-site-header\]\.dc-scene-plate--bar\s*,/);
-  assert.match(header, /data-home-header/);
+  assert.match(homeHeader, /data-home-header/);
 });
