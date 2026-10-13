@@ -2127,3 +2127,102 @@ html[data-theme="dark"] [data-home-content] .dc-home-hero-metadata span {
   font-size: clamp(20px, 2.5vw, 24px);
   font-weight: 800;
 }
+
+
+/* Homepage marketplace cards:
+   Store styles were originally scoped to [data-store-marketplace], but Home
+   reuses StoreProductCard outside that wrapper. These scoped rules restore
+   the intended light-theme ink/status contrast and flatten the oversized card
+   shadows without changing the Store page's approved styling. */
+[data-home-content] [data-home-grid] .dc-marketplace-card,
+[data-home-content] [data-home-grid] .dc-marketplace-card:hover,
+[data-home-content] [data-home-grid] .dc-marketplace-card:focus-within,
+[data-home-content] [data-home-grid] .dc-marketplace-card:active {
+  box-shadow: 0 2px 5px -4px rgba(15, 23, 42, 0.2) !important;
+  transform: none !important;
+  transition: border-color 160ms ease, background-color 160ms ease !important;
+}
+
+@media (hover: hover) {
+  [data-home-content] [data-home-grid] .dc-marketplace-card:hover {
+    border-color: rgba(37, 99, 235, 0.34);
+    box-shadow: 0 2px 5px -4px rgba(15, 23, 42, 0.2) !important;
+    transform: none !important;
+  }
+}
+
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card,
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card:hover,
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card:focus-within,
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card:active {
+  border-color: #dce4ee !important;
+  background: #ffffff !important;
+  color: #172033 !important;
+  box-shadow: 0 2px 5px -4px rgba(15, 23, 42, 0.2) !important;
+  transform: none !important;
+}
+
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card .dc-marketplace-kind {
+  color: #315ea8 !important;
+}
+
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card .dc-marketplace-copy h3,
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card .dc-marketplace-price strong,
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card .dc-marketplace-rating strong {
+  color: #172033 !important;
+}
+
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card .dc-marketplace-details,
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card .dc-marketplace-instructor,
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card .dc-marketplace-rating,
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card .dc-marketplace-price del,
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card .dc-marketplace-saving {
+  color: #58677c !important;
+}
+
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card .dc-marketplace-status {
+  border-color: #cddcf0 !important;
+  background: #edf4ff !important;
+  color: #003ea8 !important;
+}
+
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card .dc-marketplace-status[data-status="purchased"],
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card .dc-marketplace-status[data-status="free"] {
+  border-color: #b9e4d0 !important;
+  background: #eaf7f1 !important;
+  color: #176b50 !important;
+}
+
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card .dc-marketplace-status[data-status="unavailable"] {
+  border-color: #f0d9a9 !important;
+  background: #fff7e5 !important;
+  color: #855300 !important;
+}
+
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card .dc-marketplace-status[data-status="sale"] {
+  border-color: #b9e7e0 !important;
+  background: #eaf8f5 !important;
+  color: #0f766e !important;
+}
+
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card .dc-marketplace-cover {
+  border-bottom-color: #e3eaf3;
+  background: #f4f7fb;
+}
+
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card .dc-marketplace-card-actions {
+  border-top-color: #e5eaf1 !important;
+}
+
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card .dc-marketplace-card-actions .dc-marketplace-save {
+  border-color: #dce4ee !important;
+  background: #ffffff !important;
+  color: #334155 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="light"] [data-home-content] [data-home-grid] .dc-marketplace-card .dc-marketplace-card-actions .dc-marketplace-save[aria-pressed="true"] {
+  border-color: #f2c9d2 !important;
+  background: #fff1f4 !important;
+  color: #be123c !important;
+}
