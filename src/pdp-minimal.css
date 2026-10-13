@@ -1021,3 +1021,192 @@ html[data-theme="light"] .dc-pdp-like-button[aria-pressed="false"] .dc-pdp-like-
     align-items: flex-start;
   }
 }
+
+
+/* Product detail readability pass: stronger hierarchy, readable secondary
+   labels and a clear distinction between headings, values and supporting copy. */
+[data-pdp-root] .dc-pdp-type-label {
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  letter-spacing: 0.1em;
+}
+
+[data-pdp-root] .dc-pdp-title {
+  font-weight: 850;
+  line-height: 1.22;
+  letter-spacing: -0.03em;
+}
+
+[data-pdp-root] .dc-pdp-byline {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+[data-pdp-root] .dc-pdp-identity-rating,
+[data-pdp-root] .dc-pdp-review-summary,
+[data-pdp-root] .dc-pdp-related-rating {
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+[data-pdp-root] .dc-pdp-rating {
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+[data-pdp-root] [data-pdp-meta-item] dt {
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+[data-pdp-root] [data-pdp-meta-item] dd {
+  font-size: 0.9375rem;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+[data-pdp-root] .dc-pdp-selection-note,
+[data-pdp-root] .dc-pdp-text-action {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  font-weight: 700;
+}
+
+[data-pdp-root] .dc-pdp-current-price {
+  font-size: clamp(2rem, 7vw, 2.35rem);
+  font-weight: 850;
+  letter-spacing: -0.035em;
+}
+
+[data-pdp-root] .dc-pdp-original-price {
+  font-size: 0.9375rem;
+}
+
+[data-pdp-root] .dc-pdp-primary,
+[data-pdp-root] .dc-pdp-library-cta,
+[data-pdp-root] .dc-pdp-review-submit {
+  font-size: 1rem;
+  font-weight: 850;
+  line-height: 1.3;
+}
+
+[data-pdp-root] .dc-pdp-share-action-label {
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+
+[data-pdp-root] .dc-pdp-coupon summary,
+[data-pdp-root] .dc-pdp-tabs button {
+  font-size: 0.9rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+[data-pdp-root] .dc-pdp-description {
+  font-size: 1rem;
+  line-height: 1.65;
+  font-weight: 450;
+}
+
+[data-pdp-root] .dc-pdp-more-highlights summary {
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+[data-pdp-root] .dc-pdp-section-heading {
+  font-size: 1.2rem;
+  line-height: 1.35;
+  font-weight: 850;
+}
+
+[data-pdp-root] .dc-pdp-included-list,
+[data-pdp-root] .dc-pdp-highlight-list {
+  font-size: 0.9375rem;
+  line-height: 1.65;
+}
+
+[data-pdp-root] .dc-pdp-module-index,
+[data-pdp-root] .dc-pdp-module-count,
+[data-pdp-root] .dc-pdp-paid-note {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+[data-pdp-root] .dc-pdp-module-name {
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+[data-pdp-root] .dc-pdp-resource {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+[data-pdp-root] .dc-pdp-resource > span:last-child {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+[data-pdp-root] .dc-pdp-review-name {
+  font-size: 0.9375rem;
+  font-weight: 800;
+}
+
+[data-pdp-root] .dc-pdp-review-date,
+[data-pdp-root] .dc-pdp-related-type {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+[data-pdp-root] .dc-pdp-review-comment {
+  font-size: 0.9375rem;
+  line-height: 1.65;
+}
+
+[data-pdp-root] .dc-pdp-related-title {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+[data-pdp-root] .dc-pdp-related-price {
+  font-size: 1.125rem;
+  font-weight: 850;
+}
+
+@media (max-width: 639px) {
+  [data-pdp-root] .dc-pdp-title {
+    font-size: clamp(1.75rem, 7vw, 2.125rem);
+  }
+
+  [data-pdp-root] .dc-pdp-selection-note,
+  [data-pdp-root] .dc-pdp-description,
+  [data-pdp-root] .dc-pdp-highlight-list,
+  [data-pdp-root] .dc-pdp-included-list,
+  [data-pdp-root] .dc-pdp-review-comment {
+    font-size: 0.9375rem;
+  }
+
+  [data-pdp-root] .dc-pdp-option-row {
+    font-size: 0.9375rem;
+    line-height: 1.5;
+  }
+
+  [data-pdp-root] .dc-pdp-option-copy small,
+  [data-pdp-root] .dc-pdp-module-index,
+  [data-pdp-root] .dc-pdp-module-count,
+  [data-pdp-root] .dc-pdp-paid-note,
+  [data-pdp-root] .dc-pdp-review-date,
+  [data-pdp-root] .dc-pdp-related-type {
+    font-size: 0.8125rem;
+    line-height: 1.4;
+  }
+
+  [data-pdp-root] .dc-pdp-primary,
+  [data-pdp-root] .dc-pdp-library-cta,
+  [data-pdp-root] .dc-pdp-review-submit {
+    min-height: 3.1rem;
+    font-size: 1rem;
+  }
+}
