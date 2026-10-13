@@ -2109,21 +2109,28 @@ html[data-theme="light"] [data-dc-toast] button:focus-visible {
   outline-offset: 2px;
 }
 
-/* Navigation refresh · the mobile/desktop header may keep its glass tint and
-   inset highlights, but no cast shadow, blur glow or detached frosted strip
-   may sit behind or below it. This is intentionally theme-independent. */
-html body [data-site-header].dc-scene-plate--bar,
-html body [data-revision-app-header].dc-scene-plate--bar,
-html body [data-rev-bank-header].dc-scene-plate--bar,
-html body [data-desktop-topbar].dc-scene-plate--bar,
+/* Navigation refresh · remove header drop-shadows everywhere except Home.
+   Keep the existing glass/colour surfaces; only the elevation shadow is removed.
+   Home's branded mobile header and Home's active desktop top bar are intentionally
+   excluded so their existing elevation remains unchanged. */
+html body [data-site-header]:not([data-home-header]).dc-scene-plate--bar,
+html body [data-revision-app-header],
+html body [data-rev-bank-header],
 html body [data-admin-topbar],
-html body [data-admin-shell] > header {
-  /* Keep the inset glass hairline; remove only the exterior cast shadow. */
-  box-shadow: var(--dc-chrome-glass-rim, inset 0 1px 1px rgba(255, 255, 255, 0.28)) !important;
+html body [data-admin-shell] > header,
+html body [data-search-bar],
+html body [data-store-filter-bar],
+html body .dc-page-tabs,
+html body [data-revision-page-main] > .dc-glass-toolbar.sticky,
+html body [data-revision-app] .dc-glass-toolbar:not([data-revision-app-header]),
+html body .dc-desktop-shell:not(:has([data-desktop-rail-item="home"][data-active="true"])) [data-desktop-topbar].dc-scene-plate--bar {
+  box-shadow: none !important;
 }
 
-html body [data-site-header].dc-scene-plate--bar::before,
-html body [data-site-header].dc-scene-plate--bar::after,
+/* Disable the detached glow/frost strips under non-Home headers as well.
+   Home's data-home-header is deliberately not selected. */
+html body [data-site-header]:not([data-home-header]).dc-scene-plate--bar::before,
+html body [data-site-header]:not([data-home-header]).dc-scene-plate--bar::after,
 html body .mobile-header-glow::before,
 html body .mobile-header-glow::after {
   display: none !important;
