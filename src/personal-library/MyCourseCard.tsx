@@ -94,6 +94,17 @@ export default function MyCourseCard({
         <div className="dc-study-course-actions">
           <button
             type="button"
+            data-my-course-open={course.id}
+            aria-label={`Open ${course.title || "course"}`}
+            title="Open in the Course Player"
+            onClick={() => onPlay(course)}
+            className="dc-study-open-action"
+          >
+            <BookOpen size={15} aria-hidden="true" />
+            <span>Open</span>
+          </button>
+          <button
+            type="button"
             data-my-course-edit={course.id}
             aria-label={`Edit ${course.title || "course"}`}
             onClick={() => onEdit(course)}
