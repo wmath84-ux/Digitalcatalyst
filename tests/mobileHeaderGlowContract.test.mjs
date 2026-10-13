@@ -6,6 +6,7 @@ import fs from "node:fs";
 
 const header = fs.readFileSync("src/components/Header.tsx", "utf8");
 const homeHeader = fs.readFileSync("src/home/components/Header.tsx", "utf8");
+const desktopShell = fs.readFileSync("src/components/DesktopShell.tsx", "utf8");
 const indexCss = fs.readFileSync("src/index.css", "utf8");
 const finalChromeCss = fs.readFileSync("src/light-theme-pages.css", "utf8");
 
