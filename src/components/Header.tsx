@@ -96,8 +96,6 @@ export default function Header({
   onNavigateToCart,
   onNavigateToNotifications,
   title,
-  subtitle = "",
-  subtitleWrap = false,
   seamless = false,
   icon,
   action,
