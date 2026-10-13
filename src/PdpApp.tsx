@@ -1006,10 +1006,11 @@ function shortProductSummary(value: string): string {
   const plain = String(value || "").replace(/\\s+/g, " ").trim();
   if (!plain) return "";
   if (plain.length <= 170 && plain.split(/\\s+/).length <= 28) return plain;
-  const firstSentence = plain.match(/^[\\s\\S]*?[.!?](?=\\s|$)/)?.[0]?.trim();
+  const sentenceParts = plain.match(/[^.!?]+[.!?]?/g)?.map((part) => part.trim()).filter(Boolean) || [];
+  const firstSentence = sentenceParts.find((part) => part.split(/\s+/).filter(Boolean).length >= 5);
   if (firstSentence && firstSentence.length <= 170) return firstSentence;
-  const words = plain.split(/\\s+/).filter(Boolean);
-  return `${words.slice(0, 25).join(" ").replace(/[,:;]+$/, "")}…`;
+  const words = (firstSentence || plain).split(/\s+/).filter(Boolean);
+  return \`\${words.slice(0, 25).join(" ").replace(/[,:;]+$/, "")}…\`;
 }
 
 function ProductDescription({ text }: { text: string }) {
