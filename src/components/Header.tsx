@@ -224,12 +224,11 @@ export default function Header({
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/30">
-            {customLogo ? <BrandMark className="h-11 w-11" /> : <LogoIcon className="h-6 w-6" />}
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/30">
+            {customLogo ? <BrandMark className="h-10 w-10" /> : <LogoIcon className="h-6 w-6" />}
           </div>
           <div className="flex min-w-0 flex-col justify-center leading-tight">
             <h1 className="truncate text-xl font-bold leading-tight tracking-tight text-white">{headerTitle}</h1>
-            {subtitle ? <p className={`mt-0.5 text-xs font-medium leading-tight text-white/60 ${subtitleWrap ? "line-clamp-2 whitespace-normal" : "truncate"}`}>{subtitle}</p> : null}
           </div>
         </div>
 
