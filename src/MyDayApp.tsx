@@ -190,8 +190,8 @@ export default function MyDayApp() {
           <Header
             cartCount={cartIds.size}
             notifCount={0}
-            title={`${appName} Tasker`}
-            subtitle="My Day Activities"
+            title="My Day"
+            subtitle="Tasks & notes"
             onNavigateToSubscription={() => {
               window.location.hash = "#/subscription";
             }}
@@ -239,8 +239,8 @@ export default function MyDayApp() {
           <Header
             cartCount={cartIds.size}
             notifCount={0}
-            title={`${appName} Tasker`}
-            subtitle="My Day Activities"
+            title="My Day"
+            subtitle="Tasks & notes"
             onNavigateToSubscription={() => {
               window.location.hash = "#/subscription";
             }}
