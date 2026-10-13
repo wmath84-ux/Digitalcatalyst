@@ -385,7 +385,7 @@ export default function DesktopShell({
 
   const activeEntry = ALL_RAIL.find((entry) => entry.key === active) ?? PRIMARY_RAIL[0];
   const resolvedTitle = pageTitle ?? activeEntry.label;
-  const resolvedSubtitle = pageSubtitle ?? activeEntry.description;
+  const resolvedSubtitle = pageSubtitle ?? "";
 
   // The cart / favorites / notifications badges come from the live
   // commerce / catalog / notification streams. The pill counter
@@ -670,12 +670,10 @@ export default function DesktopShell({
         >
           <div data-desktop-topbar-row className="flex h-16 items-center gap-4">
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-base font-black tracking-tight text-white" data-desktop-page-title>
+              <h1 className="truncate text-xl font-bold leading-tight tracking-tight text-white" data-desktop-page-title>
                 {resolvedTitle}
               </h1>
-              <p className="truncate text-[11px] font-semibold text-white/55" data-desktop-page-subtitle>
-                {resolvedSubtitle}
-              </p>
+              {resolvedSubtitle ? <p className="truncate text-xs font-medium leading-tight text-white/60" data-desktop-page-subtitle>{resolvedSubtitle}</p> : null}
             </div>
 
             {/* Search input — appears on every page that provides an
