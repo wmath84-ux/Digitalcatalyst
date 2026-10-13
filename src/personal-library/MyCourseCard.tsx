@@ -13,7 +13,7 @@
 // instead of an empty placeholder (the client also persists one at save time).
 
 import { useState } from "react";
-import { ChevronRight, Layers3, PencilLine, Play, Trash2 } from "lucide-react";
+import { BookOpen, ChevronRight, Layers3, PencilLine, Play, Trash2 } from "lucide-react";
 import { GlassSurface } from "../components/ui/glass";
 import { countModules, countResources } from "../lib/myCourseClient";
 import { fallbackCoverImage } from "../lib/myCourseCovers";
