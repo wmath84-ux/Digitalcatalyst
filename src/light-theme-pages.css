@@ -2282,33 +2282,13 @@ html[data-theme="light"] [data-pdp-root] .dc-pdp-secondary-actions .dc-pdp-text-
 }
 
 
-/* Mobile header shadow reset: non-Home pages use a flat edge on compact
-   screens. Home intentionally keeps its own header treatment. This late,
-   theme-independent override also covers non-glass/admin/revision header bars
-   that can receive shadows from component styles. */
-@media (max-width: 767px) {
-  html body [data-site-header].dc-scene-plate--bar:not([data-home-header]),
-  html body [data-revision-app-header].dc-scene-plate--bar,
-  html body [data-rev-bank-header].dc-scene-plate--bar,
-  html body [data-desktop-topbar].dc-scene-plate--bar,
-  html body [data-admin-topbar],
-  html body [data-admin-shell] > header:not([data-home-header]) {
-    box-shadow: none !important;
-  }
-
-  html body [data-site-header]:not([data-home-header])::before,
-  html body [data-site-header]:not([data-home-header])::after,
-  html body [data-revision-app-header]::before,
-  html body [data-revision-app-header]::after,
-  html body [data-rev-bank-header]::before,
-  html body [data-rev-bank-header]::after,
-  html body [data-desktop-topbar]::before,
-  html body [data-desktop-topbar]::after,
-  html body [data-admin-topbar]::before,
-  html body [data-admin-topbar]::after,
-  html body [data-admin-shell] > header::before,
-  html body [data-admin-shell] > header::after {
-    box-shadow: none !important;
-    filter: none !important;
+/* Product detail desktop canvas: the content wrapper's cool-grey surface was
+   visible in the top/side padding while the PDP itself painted white, creating
+   a mismatched band around the page. Keep the PDP and its surrounding canvas
+   on one continuous white surface in light appearance. Scope to PDP routes so
+   other desktop pages retain their existing canvas color. */
+@media (min-width: 1024px) {
+  html[data-theme="light"] body .dc-desktop-shell [data-desktop-content]:has([data-pdp-root]) {
+    background-color: #ffffff;
   }
 }
