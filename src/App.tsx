@@ -55,7 +55,6 @@ export default function App({
       <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:overflow-hidden sm:rounded-[2rem] md:max-w-none md:rounded-none">
         <Header
           title={activeTab === "store" ? "Store" : "Purchases"}
-          subtitle={activeTab === "store" ? "Courses & resources" : ""}
           seamless={activeTab === "store"}
           cartCount={cartCount}
           notifCount={1}
