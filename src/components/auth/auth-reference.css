@@ -1,7 +1,7 @@
 /* MIT reference: micaelgomestavares, variation of JohnnyCSilva.
    https://uiverse.io/micaelgomestavares/dull-walrus-66
-   Auth-only OS theme; the rest of the website keeps its own light theme.
-   The reference's blue #2d79f3 is the submit fill in BOTH appearances. */
+   Authentication pages are intentionally light-only, regardless of OS theme.
+   The reference's blue #2d79f3 is the submit fill. */
 .dc-auth-page {
   --auth-page: #f5f5f5;
   --auth-card: #ffffff;
@@ -76,14 +76,6 @@
 .dc-auth-page .dc-auth-message { font-size: 13px; line-height: 1.5; margin: 0; overflow-wrap: anywhere; }
 .dc-auth-page .dc-auth-error { color: var(--auth-error); }
 .dc-auth-page .dc-auth-success { color: var(--auth-success); }
-@media (prefers-color-scheme: dark) {
-  .dc-auth-page {
-    --auth-page: #212121; --auth-card: #171717; --auth-ink: #f5f5f5;
-    --auth-muted: #a3a3a3; --auth-border: #363636;
-    --auth-error: #ffb4ab; --auth-success: #8cdeb0;
-    color-scheme: dark;
-  }
-}
 @media (max-width: 359px) { .dc-auth-page .dc-auth-form { padding: 24px 20px; } }
 @media (prefers-reduced-motion: reduce) {
   .dc-auth-page .dc-auth-input-form, .dc-auth-page .dc-auth-social { transition: none; }

@@ -359,6 +359,7 @@ export default function MyCourseExperimentEditor({ resource, onChange }: Experim
               : "border-emerald-400/25 bg-emerald-500/[0.07] text-emerald-100"
         }`}
         data-my-experiment-status={ready ? "ready" : "blocked"}
+        data-my-experiment-health={errors.length ? "blocked" : warnings.length ? "warning" : "ready"}
       >
         <p className="flex items-center gap-1.5 font-black">
           {errors.length ? <AlertTriangle size={13} /> : <CheckCircle2 size={13} />} {statusLine}

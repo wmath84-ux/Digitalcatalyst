@@ -13,7 +13,7 @@
 // instead of an empty placeholder (the client also persists one at save time).
 
 import { useState } from "react";
-import { ChevronRight, Layers3, PencilLine, Play, Trash2 } from "lucide-react";
+import { BookOpen, ChevronRight, Layers3, PencilLine, Play, Trash2 } from "lucide-react";
 import { GlassSurface } from "../components/ui/glass";
 import { countModules, countResources } from "../lib/myCourseClient";
 import { fallbackCoverImage } from "../lib/myCourseCovers";
@@ -92,6 +92,17 @@ export default function MyCourseCard({
           <ChevronRight aria-hidden="true" />
         </button>
         <div className="dc-study-course-actions">
+          <button
+            type="button"
+            data-my-course-open={course.id}
+            aria-label={`Open ${course.title || "course"}`}
+            title="Open in the Course Player"
+            onClick={() => onPlay(course)}
+            className="dc-study-open-action"
+          >
+            <BookOpen size={15} aria-hidden="true" />
+            <span>Open</span>
+          </button>
           <button
             type="button"
             data-my-course-edit={course.id}

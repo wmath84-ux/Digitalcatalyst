@@ -1783,3 +1783,239 @@ html[data-theme="light"] [data-store-popover-portal] .dc-marketplace-popup-optio
     padding-inline: 0.65rem;
   }
 }
+
+
+/* Desktop Store refresh: the previous "large" grid variant was intended for
+   editorial feature cards, but every Grid result was rendered with that
+   variant. On desktop this stretched a single result across the entire rail
+   and left a huge empty panel. Use a proper catalogue grid only in the
+   desktop shell; touch/mobile and Mixed/List layouts keep their own behavior. */
+@media (min-width: 1024px) {
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr));
+    align-items: stretch;
+    gap: 20px;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    flex-direction: column;
+    align-self: stretch;
+    border: 1px solid #dce4ee;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.055);
+    transform: none;
+    transition: border-color 160ms ease, background-color 160ms ease;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large:hover,
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large:focus-within {
+    border-color: #b8c9df;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.055);
+    transform: none;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-open {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 0;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-cover {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    flex: 0 0 auto;
+    border: 0;
+    border-bottom: 1px solid #e5ebf3;
+    border-radius: 0;
+    background: #f3f6fa;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-copy {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    padding: 15px 16px 12px;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-card-eyebrows {
+    align-items: center;
+    gap: 6px 8px;
+    margin: 0 0 2px;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-kind {
+    color: #315ea8;
+    font-size: 11px;
+    letter-spacing: 0.045em;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-status {
+    min-height: 25px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    line-height: 1.25;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-copy h3 {
+    min-height: 2.5em;
+    margin: 0;
+    color: #172033;
+    font-size: 17px;
+    font-weight: 760;
+    line-height: 1.35;
+    letter-spacing: -0.02em;
+    -webkit-line-clamp: 2;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-details,
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-instructor {
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-card-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 40px;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 15px 15px;
+    border-top: 1px solid #e7edf4;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-card-footer {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-rating {
+    margin: 0 0 2px;
+    color: #64748b;
+    font-size: 13px;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-price strong {
+    color: #172033;
+    font-size: 22px;
+    line-height: 1.25;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-price del,
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-saving {
+    color: #64748b;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-save {
+    position: static;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    min-height: 40px;
+    border: 1px solid #dce4ee;
+    background: #f8fafc;
+    color: #334155;
+    box-shadow: none;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-save[aria-pressed="true"] {
+    border-color: #f2c9d2;
+    background: #fff1f4;
+    color: #be123c;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-buy {
+    margin-top: 8px;
+    border: 1px solid #064ac2;
+    border-radius: 10px;
+    background: #0758d5;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 750;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-buy:hover {
+    background: #004ac6;
+  }
+
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-purchase-state {
+    color: #176b50;
+    font-size: 12px;
+  }
+
+  html[data-theme="dark"] .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large {
+    border-color: #2a3547;
+    background: #111827;
+  }
+
+  html[data-theme="dark"] .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large:hover,
+  html[data-theme="dark"] .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large:focus-within {
+    border-color: #435574;
+    background: #141e2f;
+  }
+
+  html[data-theme="dark"] .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-cover {
+    border-bottom-color: #2a3547;
+    background: #1b2637;
+  }
+
+  html[data-theme="dark"] .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-kind {
+    color: #9fc5ff;
+  }
+
+  html[data-theme="dark"] .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-copy h3,
+  html[data-theme="dark"] .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-price strong {
+    color: #f2f5fb;
+  }
+
+  html[data-theme="dark"] .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-details,
+  html[data-theme="dark"] .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-instructor,
+  html[data-theme="dark"] .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-rating,
+  html[data-theme="dark"] .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-price del,
+  html[data-theme="dark"] .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-saving {
+    color: #b1bed1;
+  }
+
+  html[data-theme="dark"] .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-card-actions {
+    border-top-color: #2a3547;
+  }
+
+  html[data-theme="dark"] .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-save {
+    border-color: #3b4d69;
+    background: #1a2940;
+    color: #d7e6ff;
+  }
+
+  html[data-theme="dark"] .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-save[aria-pressed="true"] {
+    border-color: #633448;
+    background: #311b2a;
+    color: #fecdd3;
+  }
+
+  html[data-theme="dark"] .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large .dc-marketplace-buy {
+    border-color: #3675df;
+    background: #1b5cc6;
+    color: #ffffff;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-desktop-shell [data-store-marketplace] [data-store-grid] > .dc-marketplace-card.is-large {
+    transition: none;
+  }
+}

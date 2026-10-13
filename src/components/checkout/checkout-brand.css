@@ -76,3 +76,240 @@ html[data-theme="light"] [data-payment-gateway] :is(button, summary):focus-visib
   html[data-theme="light"] [data-checkout-app] .dc-checkout-step-indicator ol { gap: 4px; }
   html[data-theme="light"] [data-checkout-app] .dc-checkout-step-indicator li { gap: 4px; font-size: 11px; }
 }
+
+
+/* ── Desktop checkout layout: balanced width, buyer row and readable totals ──
+   Desktop users get one shared content rail. Buyer identity no longer shrinks
+   to its text width, and the commitment button has enough room for its label.
+   All selectors stay inside checkout; mobile layout and payment logic are
+   deliberately unchanged. */
+@media (min-width: 1024px) {
+  [data-checkout-app] {
+    min-height: 100dvh;
+  }
+
+  [data-checkout-app] [data-checkout-shell] {
+    width: min(100%, 1280px);
+    max-width: 1280px;
+    min-height: calc(100dvh - 3rem);
+    border-radius: 24px;
+    overflow: hidden;
+  }
+
+  [data-checkout-app] [data-checkout-toolbar] {
+    width: min(100%, 1280px);
+    max-width: 1280px;
+    padding-inline: clamp(24px, 3vw, 44px);
+  }
+
+  [data-checkout-app] [data-checkout-toolbar] > div:first-child {
+    padding-top: 1rem;
+    padding-bottom: 0.5rem;
+  }
+
+  [data-checkout-app] [data-checkout-toolbar] h1 {
+    font-size: 1.75rem;
+  }
+
+  [data-checkout-app] [data-checkout-stepbar] {
+    width: min(100%, 1120px);
+    max-width: 1120px;
+    padding-inline: clamp(16px, 2vw, 28px);
+    padding-bottom: 0.75rem;
+  }
+
+  [data-checkout-app] [data-footer-nav-space] {
+    padding-inline: clamp(24px, 3vw, 44px);
+    padding-top: 1.5rem;
+    padding-bottom: 3rem;
+  }
+
+  [data-checkout-app] [data-checkout-content] {
+    width: 100%;
+    max-width: 1120px;
+    gap: 1.25rem;
+    padding-top: 0.5rem;
+    padding-bottom: 2rem;
+  }
+
+  [data-checkout-app] [data-checkout-review-step] {
+    width: 100%;
+    align-items: stretch;
+    gap: 1.125rem;
+  }
+
+  [data-checkout-app] [data-checkout-review-step] > .dc-checkout-section {
+    width: 100%;
+    max-width: none;
+    align-self: stretch;
+  }
+
+  [data-checkout-app] [data-checkout-review-step] > [data-checkout-buyer-profile] {
+    display: grid;
+    grid-template-columns: minmax(170px, 0.42fr) minmax(0, 1.58fr);
+    align-items: center;
+    gap: 12px clamp(24px, 3vw, 42px);
+    padding: 18px clamp(20px, 2.4vw, 30px);
+  }
+
+  [data-checkout-app] [data-checkout-buyer-header] {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px 12px;
+    min-width: 0;
+    margin: 0 !important;
+  }
+
+  [data-checkout-app] [data-checkout-buyer-header] h2 {
+    margin: 0;
+    font-size: 0.95rem;
+    letter-spacing: -0.01em;
+  }
+
+  [data-checkout-app] [data-checkout-buyer-profile] [data-firebase-verified] {
+    font-size: 0.8rem;
+    line-height: 1.35;
+    white-space: normal;
+  }
+
+  [data-checkout-app] [data-checkout-buyer-details] {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    align-items: center;
+    gap: 10px clamp(14px, 1.8vw, 24px);
+    min-width: 0;
+  }
+
+  [data-checkout-app] [data-checkout-buyer-details] > * {
+    min-width: 0;
+    margin: 0 !important;
+    overflow-wrap: anywhere;
+  }
+
+  [data-checkout-app] [data-checkout-buyer-details] .dc-checkout-buyer-name {
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  [data-checkout-app] [data-checkout-buyer-details] .dc-checkout-note {
+    font-size: 0.875rem;
+    line-height: 1.45;
+  }
+
+  [data-checkout-app] [data-checkout-buyer-details] .dc-checkout-reference {
+    min-width: 0;
+    margin: 0;
+    font-size: 0.8rem;
+  }
+
+  [data-checkout-app] [data-checkout-buyer-details] .dc-checkout-reference summary {
+    min-height: 40px;
+    padding: 9px 12px;
+    border: 1px solid var(--checkout-edge, #dbe5f3);
+    border-radius: 10px;
+    background: var(--checkout-surface-raised, #f8fafc);
+    color: inherit;
+    line-height: 1.35;
+  }
+
+  [data-checkout-app] .cu-title {
+    min-height: 46px;
+    padding-inline: 24px;
+    font-size: 12px;
+  }
+
+  [data-checkout-app] .cu-title > span {
+    font-size: 12px;
+  }
+
+  [data-checkout-app] .cu-items {
+    padding: 14px;
+  }
+
+  [data-checkout-app] .cu-details {
+    gap: 8px 16px;
+    padding: 16px 24px;
+  }
+
+  [data-checkout-app] .cu-details dt {
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  [data-checkout-app] .cu-details dd {
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  [data-checkout-app] .cu-footer {
+    gap: 22px;
+    padding: 18px 24px;
+  }
+
+  [data-checkout-app] .cu-total-label {
+    font-size: 12px;
+  }
+
+  [data-checkout-app] .cu-price {
+    font-size: 30px;
+  }
+
+  [data-checkout-app] .cu-price > .cu-price-free {
+    font-size: 24px;
+  }
+
+  [data-checkout-app] .cu-price-note {
+    font-size: 12px;
+  }
+
+  [data-checkout-app] .cu-pay.uzp-pay {
+    width: 220px;
+    min-width: 220px;
+    max-width: 100%;
+    flex: 0 0 220px;
+    min-height: 52px;
+    border-radius: 14px;
+  }
+
+  [data-checkout-app] .cu-pay .uzp-pay__content {
+    width: 100%;
+    min-height: 52px;
+    justify-content: center;
+  }
+
+  [data-checkout-app] .cu-pay .uzp-pay__text {
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+    padding: 0.75rem 1rem;
+    font-size: 14px;
+  }
+
+  [data-checkout-app] .cu-stamp {
+    padding: 10px 24px 14px;
+    font-size: 12px;
+  }
+
+  [data-checkout-app] .cu-note {
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  [data-checkout-app] .dc-checkout-note,
+  [data-checkout-app] .dc-checkout-reference {
+    font-size: 0.875rem;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1200px) {
+  [data-checkout-app] [data-checkout-buyer-details] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  [data-checkout-app] [data-checkout-buyer-details] .dc-checkout-reference {
+    align-self: stretch;
+  }
+}

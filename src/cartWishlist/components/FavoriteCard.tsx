@@ -45,9 +45,6 @@ export default function FavoriteCard({
             className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           />
         </button>
-        <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-[var(--dc-chrome-glass)] px-2 py-0.5 text-[11px] font-semibold text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
-          {product.hours} • {product.lessons} lessons
-        </span>
       </div>
       <div className="dc-collection-body">
         <button type="button" onClick={() => onOpen?.(product.id)} className="dc-collection-link">

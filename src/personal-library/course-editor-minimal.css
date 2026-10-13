@@ -246,3 +246,169 @@
 [data-editor-minimal] label:has(input[type="file"]) {
   min-height: 44px;
 }
+
+
+/* Light-appearance contrast fixes for the HTML experiment authoring step.
+   The embedded ExperimentStage remains dark by design; only the surrounding
+   editor controls and status copy are remapped to the light app canvas. */
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-prompt],
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-source] {
+  border: 1px solid #dce5f0 !important;
+  border-radius: 16px !important;
+  background: #ffffff !important;
+  padding: 16px !important;
+  color: #172033 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-prompt-toggle] > span,
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-source] > p:first-child {
+  color: #172033 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-prompt-toggle] > span:last-child {
+  color: #526176 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-template] {
+  min-height: 36px;
+  border: 1px solid #c8d9ef !important;
+  background: #f0f6ff !important;
+  color: #16467f !important;
+  font-size: 12px !important;
+  line-height: 1.25;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-template]:hover {
+  border-color: #8eb3e8 !important;
+  background: #e0edff !important;
+  color: #003ea8 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-template] svg {
+  color: #315ea8 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-template-copy] {
+  min-width: 34px;
+  min-height: 34px;
+  border: 1px solid #dce5f0 !important;
+  background: #ffffff !important;
+  color: #526176 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-template-copy]:hover {
+  background: #edf4ff !important;
+  color: #003ea8 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-file] {
+  color: #334155;
+}
+
+html[data-theme="light"] [data-editor-minimal] label:has([data-my-experiment-file]) {
+  min-height: 38px;
+  border-color: #afc2dc !important;
+  background: #f8fafc !important;
+  color: #334155 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-source-toggle] {
+  border: 1px solid #d6e2f2;
+  background: #ffffff;
+  color: #334155 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-source-toggle]:hover {
+  background: #edf4ff;
+  color: #003ea8 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-clear] {
+  border-color: #f0cbd3 !important;
+  background: #fff7f8;
+  color: #a21d45 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-clear]:hover {
+  background: #fff0f4;
+  color: #881337 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-html] {
+  border-color: #cbd5e1 !important;
+  background: #ffffff !important;
+  color: #1f2937 !important;
+  caret-color: #004ac6;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-html]::placeholder {
+  color: #758196 !important;
+  opacity: 1;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-preview] {
+  border-color: #d6e0ed !important;
+  background: #f8fafc !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-preview] > div:first-child > span {
+  color: #526176 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-preview-restart] {
+  color: #334155 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-preview-restart]:hover {
+  background: #eaf2ff;
+  color: #003ea8 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-source] > p.mt-2 {
+  color: #526176 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-source] > p.mt-2 span {
+  color: #003ea8 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-status] {
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-radius: 12px !important;
+  padding: 12px 14px !important;
+  font-size: 13px !important;
+  line-height: 1.55;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-health="ready"] {
+  border-color: #b9e4d0 !important;
+  background: #edf9f2 !important;
+  color: #14532d !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-health="warning"] {
+  border-color: #f1d69e !important;
+  background: #fff9e9 !important;
+  color: #854d0e !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-health="blocked"] {
+  border-color: #f1c3c8 !important;
+  background: #fff1f2 !important;
+  color: #9f1239 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-status] > p,
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-status] > ul,
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-status] > ul > li {
+  color: inherit !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-health="warning"] > p:last-child {
+  color: #7c4a13 !important;
+}
+
+html[data-theme="light"] [data-editor-minimal] [data-my-experiment-health="blocked"] > p:last-child {
+  color: #9f1239 !important;
+}

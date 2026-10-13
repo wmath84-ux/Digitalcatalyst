@@ -935,8 +935,8 @@ function BuyerCard({
   }
   const verified = buyer.tokenVerified && (!authUid || authUid === buyer.uid);
   return (
-    <CheckoutSection data-checkout-buyer>
-      <header className="mb-2 flex items-center justify-between">
+    <CheckoutSection data-checkout-buyer data-checkout-buyer-profile>
+      <header className="mb-2 flex items-center justify-between" data-checkout-buyer-header>
         <h2 className="text-xs font-black uppercase tracking-wider text-white/55">Buyer</h2>
         <span
           data-firebase-verified={verified ? "true" : "false"}
@@ -949,7 +949,7 @@ function BuyerCard({
           {verified ? "Verified buyer" : "Verification pending"}
         </span>
       </header>
-      <div className="space-y-1 text-sm">
+      <div className="dc-checkout-buyer-details text-sm" data-checkout-buyer-details>
         <p className="dc-checkout-buyer-name">{buyer.name || "Buyer"}</p>
         <p className="dc-checkout-note">{buyer.email || "No email on file"}</p>
         {buyer.mobile ? <p className="dc-checkout-note">{buyer.mobile}</p> : null}

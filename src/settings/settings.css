@@ -1070,3 +1070,30 @@ html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settin
     transition: none;
   }
 }
+
+
+/* Desktop signed-out state: keep the account prompt intentional and compact
+   instead of stretching a mostly-empty card across the whole content column. */
+@media (min-width: 1024px) {
+  [data-settings-page]:not([data-public-profile]) .settings-signed-out {
+    width: min(calc(100% - 4rem), 52rem);
+    max-width: 52rem;
+    min-height: 15rem;
+    flex: 0 1 auto;
+    align-self: center;
+    justify-content: center;
+    margin: clamp(2.5rem, 7vh, 5rem) auto;
+    padding: clamp(2rem, 3vw, 3rem);
+    border-radius: 1.5rem;
+  }
+
+  [data-settings-page]:not([data-public-profile]) .settings-signed-out h1 {
+    font-size: clamp(2.2rem, 3vw, 2.75rem);
+  }
+
+  [data-settings-page]:not([data-public-profile]) .settings-signed-out > p:not(.settings-eyebrow) {
+    max-width: 38rem;
+    font-size: 1rem;
+    line-height: 1.65;
+  }
+}
