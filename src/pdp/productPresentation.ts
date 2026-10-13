@@ -103,7 +103,7 @@ export function getProductPresentation(product: Product): ProductPresentation {
     pluralNoun,
     isCourse,
     aboutHeading,
-    libraryAction: isCourse ? "Open course in library" : "Open in library",
+    libraryAction: isCourse ? "Open course" : "Open resource",
   };
 }
 

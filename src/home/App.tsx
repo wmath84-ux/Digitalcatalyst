@@ -5,7 +5,10 @@ import Header from "./components/Header";
 import HeroCarousel from "./components/HeroCarousel";
 import HeroSkeleton from "./components/HeroSkeleton";
 import CategoryNav from "./components/CategoryNav";
-import ProductCard from "./components/ProductCard";
+import StoreProductCard from "../components/StoreProductCard";
+import { useCommerce } from "../context/CommerceContext";
+import { useBranding } from "../context/BrandingContext";
+import "../components/store-marketplace.css";
 import ProductCardSkeleton from "./components/ProductCardSkeleton";
 import ContinueLearning from "./components/ContinueLearning";
 import ContinueLearningSkeleton from "./components/ContinueLearningSkeleton";
@@ -64,6 +67,18 @@ function usefulCatalogValue(value?: string): string | undefined {
   return normalized;
 }
 
+/** Keep promo copy focused without modifying the saved product description. */
+function shortFocusedCopy(value: string, maxWords = 18, maxChars = 132): string {
+  const plain = String(value || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  if (!plain) return "";
+  const sentenceParts = plain.match(/[^.!?]+[.!?]?/g)?.map((part) => part.trim()).filter(Boolean) || [];
+  const firstSentence = sentenceParts.find((part) => part.split(/\s+/).filter(Boolean).length >= 4) || sentenceParts[0] || plain;
+  const words = firstSentence.split(/\s+/).filter(Boolean);
+  let result = words.length > maxWords ? `${words.slice(0, maxWords).join(" ").replace(/[,:;]+$/, "")}…` : firstSentence;
+  if (result.length > maxChars) result = `${result.slice(0, maxChars - 1).trimEnd().replace(/[,:;.!?]+$/, "")}…`;
+  return result;
+}
+
 function productRatingScore(product: Product): number {
   return product.ratingCount > 0 && Number.isFinite(product.rating) ? product.rating : 0;
 }
@@ -96,6 +111,8 @@ export default function App({
   onToggleFavorite,
 }: AppProps) {
   const { user } = useAuth();
+  const { cartIds, addToCart } = useCommerce();
+  const { appName } = useBranding();
   const { products: catalogProducts, purchasedIds, loading: catalogLoading, error: catalogError } = useCatalog();
   // Admin-managed banners remain the source when configured. Otherwise the
   // featured slide is built from a real catalog product below, so the Home
@@ -156,7 +173,7 @@ export default function App({
       image: featured.image,
       eyebrow: "FEATURED",
       title: featured.title,
-      subtitle: description || `Explore this ${categoryLabel.toLowerCase()}.`,
+      subtitle: shortFocusedCopy(description || `Explore this ${categoryLabel.toLowerCase()}.`),
       cta: featured.category === "Course" ? "Explore course" : "Explore resource",
       metadata,
       gradient: "bg-indigo-500/20",
@@ -196,6 +213,28 @@ export default function App({
       setProgressLoading(false);
     }, () => { setProgressRecords([]); setProgressLoading(false); });
   }, [user]);
+
+  const renderCatalogProductCard = (homeProduct: Product) => {
+    const catalogProduct = catalogProducts.find((candidate) => candidate.id === homeProduct.id);
+    if (!catalogProduct) return null;
+    return (
+      <StoreProductCard
+        key={homeProduct.id}
+        product={catalogProduct}
+        brandName={appName}
+        large
+        wishlisted={favoriteIds.has(homeProduct.id)}
+        inCart={cartIds.has(homeProduct.id)}
+        purchased={purchasedIds.has(homeProduct.id)}
+        onToggleWishlist={onToggleFavorite}
+        onAddToCart={(id) => { void addToCart(id); }}
+        onView={(item) => {
+          const mapped = products.find((candidate) => candidate.id === item.id);
+          if (mapped) onNavigateToProduct(mapped);
+        }}
+      />
+    );
+  };
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const contentTopRef = useRef<HTMLDivElement>(null);
@@ -393,16 +432,8 @@ export default function App({
                     <span>Try a different title, subject or keyword.</span>
                   </div>
                 ) : (
-                  <div data-home-grid className="dc-home-product-grid mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
-                    {searchResults.map((product) => (
-                      <ProductCard
-                        key={product.id}
-                        product={product}
-                        isFavorite={favoriteIds.has(product.id)}
-                        onToggleFavorite={onToggleFavorite}
-                        onOpen={onNavigateToProduct}
-                      />
-                    ))}
+                  <div data-home-grid className="dc-home-product-grid dc-home-marketplace-grid mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
+                    {searchResults.map(renderCatalogProductCard)}
                   </div>
                 )}
               </section>
@@ -424,7 +455,7 @@ export default function App({
                       items={continueLearningEntries.map(({ item, progress, currentLesson }) => ({
                         id: item.id,
                         title: item.title,
-                        author: item.author,
+                        author: /^digital catalyst$/i.test(item.author.trim()) ? "" : item.author,
                         image: item.image,
                         details: [usefulCatalogValue(item.classLevel), usefulCatalogValue(item.subject)].filter(Boolean).join(" · ") || undefined,
                         currentLesson,
@@ -452,7 +483,7 @@ export default function App({
 
                 <section data-home-trending className="dc-home-section">
                   <HomeSectionHeader
-                    title="Trending Now"
+                    title="Trending"
                     trailing={(
                       <button type="button" onClick={onNavigateToStore} className="dc-home-section-action dc-scene-ink">
                         View all
@@ -466,7 +497,7 @@ export default function App({
                       data-home-grid-loading
                       aria-busy="true"
                       aria-label="Loading products"
-                      className="dc-home-product-grid mt-1 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4"
+                      className="dc-home-product-grid dc-home-marketplace-grid mt-1 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4"
                     >
                       {Array.from({ length: HOME_PRODUCT_LIMIT }).map((_, index) => <ProductCardSkeleton key={index} />)}
                     </div>
@@ -479,16 +510,8 @@ export default function App({
                       title="No products in this category yet."
                     />
                   ) : (
-                    <div data-home-grid className="dc-home-product-grid mt-1 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
-                      {categoryFiltered.map((product) => (
-                        <ProductCard
-                          key={product.id}
-                          product={product}
-                          isFavorite={favoriteIds.has(product.id)}
-                          onToggleFavorite={onToggleFavorite}
-                          onOpen={onNavigateToProduct}
-                        />
-                      ))}
+                    <div data-home-grid className="dc-home-product-grid dc-home-marketplace-grid mt-1 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
+                      {categoryFiltered.map(renderCatalogProductCard)}
                     </div>
                   )}
                 </section>
@@ -497,7 +520,7 @@ export default function App({
                   <section className="dc-home-section dc-home-recommendations" aria-labelledby="home-recommendations-title">
                     <HomeSectionHeader
                       id="home-recommendations-title"
-                      title="Recommended for You"
+                      title="For You"
                       trailing={(
                         <button type="button" onClick={onNavigateToStore} className="dc-home-section-action dc-scene-ink">
                           View all
@@ -505,15 +528,7 @@ export default function App({
                       )}
                     />
                     <div data-home-grid className="dc-home-product-grid mt-1 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
-                      {recommendedProducts.map((product) => (
-                        <ProductCard
-                          key={product.id}
-                          product={product}
-                          isFavorite={favoriteIds.has(product.id)}
-                          onToggleFavorite={onToggleFavorite}
-                          onOpen={onNavigateToProduct}
-                        />
-                      ))}
+                      {recommendedProducts.map(renderCatalogProductCard)}
                     </div>
                   </section>
                 ) : null}

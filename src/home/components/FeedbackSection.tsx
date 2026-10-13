@@ -19,11 +19,11 @@ export default function FeedbackSection({ onOpen }: FeedbackSectionProps) {
         <div className="dc-home-feedback-content">
           <span className="dc-home-feedback-icon" aria-hidden="true"><MessageSquare size={19} /></span>
           <div className="dc-home-feedback-copy">
-            <h2 id="home-feedback-title">Have something to share?</h2>
-            <p>Visit the feedback wall or connect with us.</p>
+            <h2 id="home-feedback-title">Share feedback</h2>
+            <p>Help us improve your learning experience.</p>
           </div>
           <button type="button" onClick={onOpen} className="dc-home-feedback-button">
-            Open feedback <ArrowRight size={16} aria-hidden="true" />
+            Send feedback <ArrowRight size={16} aria-hidden="true" />
           </button>
         </div>
       </GlassCard>

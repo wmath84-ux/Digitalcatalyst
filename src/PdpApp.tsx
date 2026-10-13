@@ -503,7 +503,7 @@ function PremiumProductContent({
     const url = productShareUrl || window.location.href;
     if (typeof navigator.share === "function") {
       try {
-        await navigator.share({ title: identity.title, text: product.description?.trim() || identity.title, url });
+        await navigator.share({ title: identity.title, text: shortProductSummary(product.description?.trim() || identity.title), url });
         setShareOpen(false);
         return;
       } catch (error) {
@@ -515,7 +515,7 @@ function PremiumProductContent({
 
   const shareTo = (target: "whatsapp" | "telegram") => {
     const url = encodeURIComponent(productShareUrl || window.location.href);
-    const text = encodeURIComponent(`${identity.title} — ${product.description?.trim() || `Learn on ${appName}`}`);
+    const text = encodeURIComponent(`${identity.title} — ${shortProductSummary(product.description?.trim() || `Learn on ${appName}`)}`);
     const href = target === "whatsapp"
       ? `https://wa.me/?text=${text}%20${url}`
       : `https://t.me/share/url?url=${url}&text=${text}`;
@@ -759,7 +759,7 @@ function PremiumProductContent({
           {isProductOwned && !hasScopedSelection ? (
             <section data-pdp-owned-access>
               {onOpenCourse ? <button type="button" data-pdp-library-primary onClick={() => onOpenCourse(product)} className="dc-pdp-library-cta">{identity.libraryAction}</button> : null}
-              {paidContent.available.length ? <button type="button" data-pdp-remaining-paid className="dc-pdp-text-action" onClick={() => { setActiveTab("Paid"); document.querySelector("[data-pdp-details]")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>{paidContent.available.length} paid item{paidContent.available.length === 1 ? "" : "s"} not yet owned · View Paid</button> : null}
+              {paidContent.available.length ? <button type="button" data-pdp-remaining-paid className="dc-pdp-text-action" onClick={() => { setActiveTab("Paid"); document.querySelector("[data-pdp-details]")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>{paidContent.available.length} paid item{paidContent.available.length === 1 ? "" : "s"} left · View paid</button> : null}
               {accessErrorNotice}
             </section>
           ) : (
@@ -778,7 +778,7 @@ function PremiumProductContent({
                 <PaymentButton block className="dc-pdp-primary" icon={null} disabled={unavailable || pricingBlocked} onClick={primaryAction} data-pdp-checkout="" label={unavailable ? "Coming soon" : pricingBusy ? "Verifying price" : (pricing.quote ? pricing.quote.cashPayable === 0 : productIsFree) ? "Get free access" : "Get access"} />
               </>}
               {accessErrorNotice}
-              {unavailable ? <p data-pdp-unavailable className="dc-pdp-selection-note">Not available for purchase yet.</p> : null}
+              {unavailable ? <p data-pdp-unavailable className="dc-pdp-selection-note">Not for sale yet.</p> : null}
             </section>
           )}
 
@@ -1002,32 +1002,29 @@ function ProductImageThumb({ product, source }: { product: Product; source: stri
   return <img src={source} alt={identity.title} loading="lazy" decoding="async" width={112} height={96} onError={() => setFailed(true)} className="h-24 w-28 shrink-0 object-contain" />;
 }
 
+function shortProductSummary(value: string): string {
+  const plain = String(value || "").replace(/\s+/g, " ").trim();
+  if (!plain) return "";
+  if (plain.length <= 170 && plain.split(/\s+/).length <= 28) return plain;
+  const sentenceParts = plain.match(/[^.!?]+[.!?]?/g)?.map((part) => part.trim()).filter(Boolean) || [];
+  const firstSentence = sentenceParts.find((part) => part.split(/\s+/).filter(Boolean).length >= 5);
+  if (firstSentence && firstSentence.length <= 170) return firstSentence;
+  const words = (firstSentence || plain).split(/\s+/).filter(Boolean);
+  return `${words.slice(0, 25).join(" ").replace(/[,:;]+$/, "")}…`;
+}
+
 function ProductDescription({ text }: { text: string }) {
   const id = useId();
-  const ref = useRef<HTMLParagraphElement>(null);
+  const preview = shortProductSummary(text);
   const [expanded, setExpanded] = useState(false);
-  const [canExpand, setCanExpand] = useState(false);
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-    let active = true;
-    const measure = () => {
-      if (active) setCanExpand(element.scrollHeight > parseFloat(getComputedStyle(element).lineHeight) * 4 + 1);
-    };
-    measure();
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-    observer?.observe(element);
-    void document.fonts?.ready.then(measure);
-    return () => { active = false; observer?.disconnect(); };
-  }, [text]);
+  const canExpand = preview !== text.trim();
   return (
     <div>
-      <p ref={ref} id={id} className="dc-pdp-description" data-expanded={expanded}>{text}</p>
+      <p id={id} className="dc-pdp-description" data-expanded={expanded}>{expanded ? text : preview}</p>
       {canExpand ? <button type="button" aria-controls={id} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)} className="dc-pdp-text-action">{expanded ? "Show less" : "Read more"}</button> : null}
     </div>
   );
 }
-
 function DetailsCard({ product, modules, curriculumMode, includedItems, highlights, tab, onTab, expandedModule, onExpandModule, paidContent }: { product: Product; modules: CurriculumModule[]; curriculumMode: CurriculumViewMode; includedItems: string[]; highlights: string[]; tab: DetailTab; onTab: (tab: DetailTab) => void; expandedModule: string | null; onExpandModule: (id: string | null) => void; paidContent: import("react").ReactNode }) {
   const tabs: { value: DetailTab; label: string }[] = [
     { value: "Description", label: "About" },
@@ -1058,7 +1055,7 @@ function DetailsCard({ product, modules, curriculumMode, includedItems, highligh
                 {highlights.length > 4 ? <details className="dc-pdp-more-highlights"><summary>More highlights</summary><ul className="dc-pdp-highlight-list">{highlights.slice(4).map((highlight) => <li key={highlight}>{highlight}</li>)}</ul></details> : null}
               </section>
             )}
-            {!product.description?.trim() && includedItems.length === 0 && highlights.length === 0 ? <EmptyDetail text="Details will be available soon." /> : null}
+            {!product.description?.trim() && includedItems.length === 0 && highlights.length === 0 ? <EmptyDetail text="Details coming soon." /> : null}
           </div>
         )}
         {tab === "Curriculum" && (
@@ -1195,7 +1192,7 @@ function ReviewsCard({ mode, product, reviews, canReview, composerOpen, rating, 
           ))}
           {remaining > 0 ? <button type="button" data-load-more-reviews onClick={() => setVisibleCount((count) => count + REVIEW_PAGE_SIZE)} className="dc-pdp-text-action">Load more reviews</button> : null}
         </div>
-      ) : <p className="dc-pdp-selection-note">No written reviews yet.</p>}
+      ) : <p className="dc-pdp-selection-note">No reviews yet.</p>}
       {mode === "preview" && reviews.length > 0 ? (
         <button type="button" data-see-all-reviews onClick={onSeeAllReviews} className="dc-pdp-text-action">See all reviews</button>
       ) : null}
@@ -1378,7 +1375,7 @@ function MissingProduct({ onBack }: { onBack: () => void }) {
     <div data-pdp-root data-pdp-not-found className="grid min-h-[50vh] place-items-center px-6 py-10 text-center">
       <div>
         <h1 className="mt-4 text-2xl font-bold text-white">Product not found</h1>
-        <p className="mt-2 text-sm text-white/60">This product is no longer available in the live catalog.</p>
+        <p className="mt-2 text-sm text-white/60">This product is unavailable.</p>
         <button type="button" onClick={onBack} className="dc-pdp-library-cta mt-5">Back to store</button>
       </div>
     </div>
