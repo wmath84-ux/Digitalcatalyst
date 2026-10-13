@@ -1010,7 +1010,7 @@ function shortProductSummary(value: string): string {
   const firstSentence = sentenceParts.find((part) => part.split(/\s+/).filter(Boolean).length >= 5);
   if (firstSentence && firstSentence.length <= 170) return firstSentence;
   const words = (firstSentence || plain).split(/\s+/).filter(Boolean);
-  return \`\${words.slice(0, 25).join(" ").replace(/[,:;]+$/, "")}…\`;
+  return `${words.slice(0, 25).join(" ").replace(/[,:;]+$/, "")}…`;
 }
 
 function ProductDescription({ text }: { text: string }) {
