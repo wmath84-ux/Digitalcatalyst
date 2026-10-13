@@ -71,7 +71,8 @@ function usefulCatalogValue(value?: string): string | undefined {
 function shortFocusedCopy(value: string, maxWords = 18, maxChars = 132): string {
   const plain = String(value || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
   if (!plain) return "";
-  const firstSentence = plain.match(/^[^.!?]+[.!?]?/)?.[0]?.trim() || plain;
+  const sentenceParts = plain.match(/[^.!?]+[.!?]?/g)?.map((part) => part.trim()).filter(Boolean) || [];
+  const firstSentence = sentenceParts.find((part) => part.split(/\s+/).filter(Boolean).length >= 4) || sentenceParts[0] || plain;
   const words = firstSentence.split(/\s+/).filter(Boolean);
   let result = words.length > maxWords ? `${words.slice(0, maxWords).join(" ").replace(/[,:;]+$/, "")}…` : firstSentence;
   if (result.length > maxChars) result = `${result.slice(0, maxChars - 1).trimEnd().replace(/[,:;.!?]+$/, "")}…`;
