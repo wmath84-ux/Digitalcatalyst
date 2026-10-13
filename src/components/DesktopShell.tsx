@@ -668,7 +668,7 @@ export default function DesktopShell({
         >
           <div data-desktop-topbar-row className="flex h-16 items-center gap-4">
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-xl font-bold leading-tight tracking-tight text-white" data-desktop-page-title>
+              <h1 className="truncate text-[40px] font-bold leading-[40px] tracking-tight text-white" data-desktop-page-title>
                 {resolvedTitle}
               </h1>
             </div>
@@ -688,7 +688,7 @@ export default function DesktopShell({
                 <GlassInput
                   type="search"
                   className="dc-glass-input w-full"
-                  icon={<Search className="h-4 w-4" aria-hidden="true" />}
+                  icon={<Search className="h-10 w-10" aria-hidden="true" />}
                   value={query}
                   data-desktop-search
                   onChange={(e) => setQuery(e.target.value)}
@@ -718,7 +718,7 @@ export default function DesktopShell({
                     aria-label="Clear search"
                     className="absolute right-2 grid h-6 w-6 place-items-center rounded-full text-white/55 transition hover:bg-white/[0.1] hover:text-white/85"
                   >
-                    <X size={12} />
+                    <X size={40} />
                   </button>
                 ) : null}
               </div>
@@ -737,7 +737,7 @@ export default function DesktopShell({
                     className="inline-flex h-9 items-center gap-1.5 rounded-full border border-indigo-400/40 bg-gradient-to-r from-indigo-500/25 to-violet-500/25 px-3 text-xs font-black text-white shadow-sm transition hover:brightness-110 active:scale-95"
                     title="Quick Study / Review"
                   >
-                    <Play size={13} className="fill-current text-indigo-300" />
+                    <Play size={40} className="fill-current text-indigo-300" />
                     <span>Review</span>
                   </button>
                   <button
@@ -746,7 +746,7 @@ export default function DesktopShell({
                     className="inline-flex h-9 items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 text-xs font-semibold text-white transition hover:bg-white/20 active:scale-95"
                     title="Add Card / Deck"
                   >
-                    <Plus size={14} />
+                    <Plus size={40} />
                     <span className="hidden sm:inline">Add</span>
                   </button>
                 </div>
@@ -758,7 +758,7 @@ export default function DesktopShell({
                 title="Upgrade"
                 className="mr-1 hidden h-9 shrink-0 items-center gap-1.5 rounded-full border border-violet-300/40 bg-gradient-to-br from-violet-500 to-indigo-600 px-3.5 text-xs font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_8px_20px_-8px_rgba(124,92,255,0.8)] transition hover:brightness-110 active:scale-95 sm:inline-flex"
               >
-                <Crown size={14} aria-hidden="true" />
+                <Crown size={40} aria-hidden="true" />
                 Upgrade
               </button>
               <ExpandingTabs
@@ -783,7 +783,7 @@ export default function DesktopShell({
                     id: "favorites",
                     label: "Favorites",
                     ariaLabel: "Favorites",
-                    icon: <Heart size={16} />,
+                    icon: <Heart size={40} />,
                     badge: favoritesCount > 0 ? String(favoritesCount) : undefined,
                     badgeTone: "rose",
                   },
@@ -791,7 +791,7 @@ export default function DesktopShell({
                     id: "cart",
                     label: "Cart",
                     ariaLabel: "Cart",
-                    icon: <ShoppingBag size={16} />,
+                    icon: <ShoppingBag size={40} />,
                     badge: cartCount > 0 ? String(cartCount) : undefined,
                     badgeTone: "rose",
                   },
@@ -799,13 +799,13 @@ export default function DesktopShell({
                     id: "subscription",
                     label: "Plans",
                     ariaLabel: "Subscription",
-                    icon: <Crown size={16} />,
+                    icon: <Crown size={40} />,
                   },
                 ]}
               />
               <HeaderNotificationsButton
                 count={notifications}
-                size={36}
+                size={40}
                 onClick={() => handleNavigate("#/notifications")}
               />
             </div>
