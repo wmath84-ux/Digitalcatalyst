@@ -109,7 +109,7 @@ export default function ExpandingTabs({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -7 }}
                   transition={spring}
-                  className="whitespace-nowrap text-[30px] font-semibold leading-[30px] tracking-[0.01em]"
+                  className="whitespace-nowrap text-[13px] font-semibold leading-[16px] tracking-[0.01em]"
                 >
                   {item.label}
                 </motion.span>
