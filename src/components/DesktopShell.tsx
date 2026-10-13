@@ -757,7 +757,7 @@ export default function DesktopShell({
                 onClick={() => handleNavigate("#/subscription")}
                 aria-label="Upgrade to Premium"
                 title="Upgrade"
-                className="mr-1 hidden h-12 shrink-0 items-center gap-1.5 rounded-full border border-violet-300/40 bg-gradient-to-br from-violet-500 to-indigo-600 px-3.5 text-[30px] leading-[30px] font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_8px_20px_-8px_rgba(124,92,255,0.8)] transition hover:brightness-110 active:scale-95 sm:inline-flex"
+                className="mr-1 hidden h-[38px] shrink-0 items-center gap-1.5 rounded-full border border-violet-300/40 bg-gradient-to-br from-violet-500 to-indigo-600 px-3.5 text-[30px] leading-[30px] font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_8px_20px_-8px_rgba(124,92,255,0.8)] transition hover:brightness-110 active:scale-95 sm:inline-flex"
               >
                 <Crown size={30} aria-hidden="true" />
                 Upgrade
