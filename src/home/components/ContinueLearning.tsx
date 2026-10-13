@@ -1,4 +1,5 @@
 import { ArrowRight, BookOpen } from "lucide-react";
+import "../continue-learning.css";
 import { GlassCard } from "../../components/ui/GlassCard";
 import HomeSectionHeader from "./HomeSectionHeader";
 import { clampProgress } from "../data/homeDashboardData";
