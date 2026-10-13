@@ -36,7 +36,6 @@ import { isMigrationComplete, loadMigrationMarker, runMyDayMigrationV1, skipLega
 import BottomNav, { type TabKey } from "./components/BottomNav";
 import Header from "./components/Header";
 import { useCommerce } from "./context/CommerceContext";
-import { useBranding } from "./context/BrandingContext";
 
 /**
  * The workspace host is its own chunk.
@@ -53,7 +52,6 @@ export default function MyDayApp() {
   const { user } = useAuth();
   // The mobile header shows the real cart badge, exactly like every other route.
   const { cartIds } = useCommerce();
-  const { appName } = useBranding();
   const myDay = useMyDayAccess();
   const [gateOpen, setGateOpen] = useState(false);
   const startedForUser = useRef<string | null>(null);
@@ -190,8 +188,7 @@ export default function MyDayApp() {
           <Header
             cartCount={cartIds.size}
             notifCount={0}
-            title={`${appName} Tasker`}
-            subtitle="My Day Activities"
+            title="My Day"
             onNavigateToSubscription={() => {
               window.location.hash = "#/subscription";
             }}
@@ -239,8 +236,7 @@ export default function MyDayApp() {
           <Header
             cartCount={cartIds.size}
             notifCount={0}
-            title={`${appName} Tasker`}
-            subtitle="My Day Activities"
+            title="My Day"
             onNavigateToSubscription={() => {
               window.location.hash = "#/subscription";
             }}

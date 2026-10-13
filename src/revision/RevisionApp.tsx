@@ -526,7 +526,6 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
               {!isDesktopHost && !isFocused && (
                 <Header
                   title="Revision"
-                  subtitle="Tests, smart recall & mastery"
                   cartCount={cartIds.size}
                   notifCount={1}
                   onNavigateToSubscription={() => {

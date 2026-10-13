@@ -176,7 +176,7 @@ export default function MobileHeaderMenu({
                     className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.07] text-white/75 transition hover:bg-white/[0.12] hover:text-white"
                     data-mobile-header-drawer-close
                   >
-                    <X size={17} />
+                    <X size={40} />
                   </button>
                 </div>
               )}
@@ -206,7 +206,7 @@ export default function MobileHeaderMenu({
         data-mobile-header-menu-button
         data-button-size="40"
       >
-        <Menu aria-hidden="true" size={22} strokeWidth={2.2} />
+        <Menu aria-hidden="true" size={40} strokeWidth={2.2} />
       </button>
       {typeof document !== "undefined" && open ? createPortal(drawer, document.body) : null}
     </>

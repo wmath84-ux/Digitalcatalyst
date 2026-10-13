@@ -10,6 +10,26 @@ import { useViewportBand } from "../utils/responsive";
 import ExpandingTabs, { type ExpandingTabItem } from "./ui/ExpandingTabs";
 import MobileHeaderMenu from "./MobileHeaderMenu";
 
+/** Keep the visible app-shell header title to one short word. */
+export function singleWordHeaderTitle(value: string): string {
+  const trimmed = value.trim();
+  const normalized = trimmed.toLocaleLowerCase().replace(/[’']/g, "").replace(/\s+/g, " ");
+  const aliases: Record<string, string> = {
+    "my day": "Today",
+    "usage limits": "Usage",
+    "sign in to open my day": "Sign-in",
+    "eduvora tasker": "Today",
+    "help & faq": "Help",
+    "help and faq": "Help",
+    "quick study / review": "Study",
+    "add card or deck": "Add",
+    "store & purchases": "Store",
+    "store and purchases": "Store",
+  };
+  if (aliases[normalized]) return aliases[normalized];
+  return trimmed.split(/\s+/)[0]?.replace(/[,:;!?]+$/, "") || "Home";
+}
+
 type HeaderProps = {
   cartCount: number;
   notifCount: number;
@@ -96,8 +116,6 @@ export default function Header({
   onNavigateToCart,
   onNavigateToNotifications,
   title,
-  subtitle = "Premium learning store",
-  subtitleWrap = false,
   seamless = false,
   icon,
   action,
@@ -116,7 +134,7 @@ export default function Header({
   const LogoIcon = icon ?? BookIcon;
   const { logoUrl, appName, hideFrameBorders } = useBranding();
   const customLogo = logoUrl && logoUrl !== DEFAULT_LOGO_URL;
-  const headerTitle = title ?? appName;
+  const headerTitle = singleWordHeaderTitle(title ?? appName);
 
   const tabItems: ExpandingTabItem[] = [
     ...(onToggleSearch
@@ -124,7 +142,7 @@ export default function Header({
           id: "search",
           label: "Search",
           ariaLabel: "Search",
-          icon: <SearchIcon className="h-5 w-5" />,
+          icon: <SearchIcon className="h-10 w-10" />,
         }]
       : []),
     onDownloadReport
@@ -132,13 +150,13 @@ export default function Header({
           id: "download",
           label: "Report",
           ariaLabel: "Download report",
-          icon: <DownloadIcon className="h-5 w-5" />,
+          icon: <DownloadIcon className="h-10 w-10" />,
         }
       : {
           id: "cart",
           label: "Cart",
           ariaLabel: "Cart",
-          icon: <CartIcon className="h-5 w-5" />,
+          icon: <CartIcon className="h-10 w-10" />,
           badge: cartCount > 0 ? String(cartCount) : undefined,
           badgeTone: "rose" as const,
         },
@@ -146,14 +164,14 @@ export default function Header({
       id: "subscription",
       label: "Plans",
       ariaLabel: "Subscription",
-      icon: <CrownIcon className="h-5 w-5" />,
+      icon: <CrownIcon className="h-10 w-10" />,
     },
     ...(onHelpClick
       ? [{
           id: "help",
           label: "Help",
           ariaLabel: "Help & FAQ",
-          icon: <HelpCircle className="h-5 w-5" />,
+          icon: <HelpCircle className="h-10 w-10" />,
         }]
       : []),
   ];
@@ -199,7 +217,7 @@ export default function Header({
       id: "usage-limits",
       label: "Usage Limits",
       ariaLabel: "Usage Limits",
-      icon: <Gauge className="h-5 w-5" />,
+      icon: <Gauge className="h-10 w-10" />,
       color: "#8B7CF6",
     },
   ];
@@ -224,19 +242,18 @@ export default function Header({
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/30">
-            {customLogo ? <BrandMark className="h-11 w-11" /> : <LogoIcon className="h-6 w-6" />}
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/30">
+            {customLogo ? <BrandMark className="h-10 w-10" /> : <LogoIcon className="h-10 w-10" />}
           </div>
-          <div className="min-w-0 leading-tight pt-0.5">
-            <h1 className="truncate text-[1.125rem] font-black tracking-tight text-white">{headerTitle}</h1>
-            <p className={`mt-0.5 text-white/55 ${subtitleWrap ? "line-clamp-2 whitespace-normal text-[10px] font-semibold leading-[1.15] tracking-normal" : "truncate text-[10px] font-bold uppercase tracking-widest"}`}>{subtitle}</p>
+          <div className="flex min-w-0 flex-col justify-center leading-tight">
+            <h1 className="truncate text-[40px] font-bold leading-[40px] tracking-tight text-white">{headerTitle}</h1>
           </div>
         </div>
 
         {centerSearch && (
           <div className="hidden min-w-0 flex-1 justify-center px-2 lg:flex">
-            <label className="myrem-hsearch" htmlFor={centerSearch.inputId ?? "dc-header-search"}>
-              <SearchIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <label className="myrem-hsearch [&_input]:text-[40px] [&_input]:leading-[40px]" htmlFor={centerSearch.inputId ?? "dc-header-search"}>
+              <SearchIcon className="h-10 w-10 shrink-0" aria-hidden="true" />
               <span className="sr-only">Search</span>
               <input
                 id={centerSearch.inputId ?? "dc-header-search"}
@@ -254,7 +271,7 @@ export default function Header({
         <div className="flex shrink-0 items-center gap-2" data-header-action-cluster>
           <HeaderNotificationsButton
             count={displayedNotificationCount}
-            size={isPhoneLayout ? 40 : 36}
+            size={40}
             onClick={onNavigateToNotifications}
           />
           {isPhoneLayout ? (

@@ -175,7 +175,7 @@ export default function SettingsPage() {
   return (
     <div data-settings-page className="settings-page">
       <div data-app-frame className="settings-frame">
-        <Header title="Settings" subtitle="Your preferences" cartCount={cartIds.size} notifCount={0}
+        <Header title="Settings" cartCount={cartIds.size} notifCount={0}
           onNavigateToSubscription={() => { window.location.hash = "#/subscription"; }}
           onNavigateToCart={() => { window.location.hash = "#/cart"; }}
           onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }} />
