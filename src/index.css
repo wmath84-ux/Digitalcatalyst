@@ -618,7 +618,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   .dc-desktop-shell {
     display: flex !important;
     --desktop-rail-width: clamp(200px, 22vw, 260px);
-    --desktop-topbar-height: clamp(56px, 7vh, 64px);
+    --desktop-topbar-height: clamp(46px, 7vh, 54px);
   }
 
   /* Hide mobile chrome, show desktop chrome.
@@ -813,7 +813,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   .dc-desktop-shell {
     display: flex !important;
     --desktop-rail-width: 240px;
-    --desktop-topbar-height: 60px;
+    --desktop-topbar-height: 50px;
   }
   [data-site-header],
   [data-site-footer].dc-footer-shell,
@@ -1082,7 +1082,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   /* The shell's content area: a single column that hosts the rail
      (sticky to the left edge) and the main area (top bar + body). */
   --desktop-rail-width: 260px;
-  --desktop-topbar-height: 64px;
+  --desktop-topbar-height: 54px;
 }
 
 /* Desktop shell visibility rules:
@@ -1185,7 +1185,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
 }
 .dc-desktop-shell [data-store-page],
 .dc-desktop-shell [data-leaderboard-page] {
-  padding-top: calc(var(--desktop-topbar-height, 64px) + 1.5rem);
+  padding-top: calc(var(--desktop-topbar-height, 54px) + 1.5rem);
 }
 .dc-desktop-shell [data-store-filter-bar] {
   top: var(--desktop-topbar-height);
@@ -1197,7 +1197,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
 @media (min-width: 640px) and (max-width: 1023px) and (orientation: landscape), (min-width: 960px) and (max-width: 1023px) {
   .dc-desktop-shell {
     --desktop-rail-width: 220px;
-    --desktop-topbar-height: 56px;
+    --desktop-topbar-height: 46px;
   }
   .dc-desktop-shell [data-desktop-rail]:not([data-desktop-rail-variant="glass-sidebar"]) {
     width: 220px !important;
@@ -5623,7 +5623,7 @@ html[data-android-edge-to-edge="true"]::after {
 [data-home-header] {
   --home-collapse: 0;
   isolation: isolate;
-  padding-bottom: calc(2rem * (1 - var(--home-collapse) * 0.68));
+  padding-bottom: calc(1.375rem * (1 - var(--home-collapse) * 0.68));
   border-bottom-left-radius: calc(32px * (1 - var(--home-collapse) * 0.55));
   border-bottom-right-radius: calc(32px * (1 - var(--home-collapse) * 0.55));
 }
@@ -6472,7 +6472,7 @@ html[data-android-edge-to-edge="true"]::after {
     /* Short laptop viewports: the rail scrolls inside itself instead of
        pushing the coupon out of reach. `overscroll-behavior` keeps the
        wheel from chaining into the page while the rail still has range. */
-    max-height: calc(100dvh - var(--desktop-topbar-height, 64px) - 3rem);
+    max-height: calc(100dvh - var(--desktop-topbar-height, 54px) - 3rem);
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;
@@ -7094,7 +7094,7 @@ html[data-android-edge-to-edge="true"]::after {
   flex: none !important;
   min-height: 0 !important;
   overflow: visible !important;
-  padding-top: calc(var(--desktop-topbar-height, 64px) + 2.75rem + clamp(12px, 1.2vw, 20px)) !important;
+  padding-top: calc(var(--desktop-topbar-height, 54px) + 2.75rem + clamp(12px, 1.2vw, 20px)) !important;
 }
 .dc-desktop-shell [data-recall-root][data-revision-app] #main-content {
   background: var(--rc-background);
