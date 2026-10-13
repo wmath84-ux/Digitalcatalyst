@@ -24,27 +24,82 @@ import {
   OPENING_MOBILE_MAX_WIDTH,
   PERSISTED_OPENING_OVERRIDES,
   openingClipForWidth,
+  openingClipSrcFor,
   readStickyOpeningOverride,
   parseOpeningOverride,
   readOpeningOverride,
   resolveOpeningDecision,
 } from "../src/utils/openingSplash.ts";
 
+// The launch playback is OPT-IN (`openingPlayOnLaunch`, off by default), so
+// every test about what plays while the app opens asks for it explicitly; the
+// tap-only default has its own block below.
 const base = {
   width: 1440,
   brandingEnabled: true,
+  playOnLaunch: true,
   reducedMotion: false,
   offline: false,
   override: null,
 };
 
-test("the opening plays by default, on every band", () => {
+test("with the launch playback on, the opening plays on every band", () => {
   for (const width of [320, 430, 767, 768, 1024, 1440]) {
     const decision = resolveOpeningDecision({ ...base, width });
     assert.equal(decision.show, true, `width ${width} must show the opening`);
     assert.equal(decision.mode, "video", `width ${width} must play the clip`);
     assert.match(decision.reason, /playing the opening animation/);
   }
+});
+
+test("the opening is TAP-ONLY by default — the header ad control plays it", () => {
+  // The reported requirement: "bye default user ko app open hote samay dikhana
+  // ho to main vahan se on kar sakun". Absent or false both mean tap-only, so
+  // an old branding document (which has no such field) opens the app straight
+  // away, downloads nothing, and shows the faded `ad` control instead.
+  for (const playOnLaunch of [undefined, false]) {
+    const decision = resolveOpeningDecision({ ...base, playOnLaunch });
+    assert.equal(decision.show, false, "nothing plays while the app opens");
+    assert.equal(decision.mode, "video", "…but the clip is still what the control plays");
+    assert.match(decision.reason, /tap/);
+    assert.match(decision.reason, /ad control/);
+    // The reason names the switch AND the per-device override, like every other
+    // branch, so a report can be answered from the debug badge alone.
+    assert.match(decision.reason, /App behaviour/);
+    assert.match(decision.reason, /\?opening=on/);
+  }
+  // The two escapes: an explicit device override, and the admin switch.
+  assert.equal(resolveOpeningDecision({ ...base, playOnLaunch: false, override: "on" }).show, true);
+  assert.equal(resolveOpeningDecision({ ...base, playOnLaunch: false, override: "force" }).show, true);
+  assert.equal(resolveOpeningDecision({ ...base, playOnLaunch: true }).show, true);
+  // Turning the animation off entirely wins over the launch playback.
+  assert.equal(resolveOpeningDecision({ ...base, brandingEnabled: false, playOnLaunch: true }).show, false);
+});
+
+test("admin release-URL clips replace the bundled MP4s, per band, safely", () => {
+  const shared = "https://github.com/o/r/releases/download/v2/open.mp4";
+  const phone = "https://github.com/o/r/releases/download/v2/phone.mp4";
+  const wide = "https://github.com/o/r/releases/download/v2/wide.mp4";
+  // Both bands, then per-band overrides.
+  assert.equal(resolveOpeningDecision({ ...base, clips: { any: shared } }).src, shared);
+  assert.equal(resolveOpeningDecision({ ...base, width: 390, clips: { any: shared } }).src, shared);
+  assert.equal(resolveOpeningDecision({ ...base, width: 390, clips: { any: shared, mobile: phone } }).src, phone);
+  assert.equal(resolveOpeningDecision({ ...base, clips: { any: shared, desktop: wide } }).src, wide);
+  // A band override does not leak into the other band.
+  assert.equal(resolveOpeningDecision({ ...base, width: 1440, clips: { any: shared, mobile: phone } }).src, shared);
+  // Anything that is not an absolute https URL falls back to the shipped clip.
+  for (const broken of ["/local.mp4", "http://insecure/x.mp4", "javascript:void 0", "", "   ", null, undefined]) {
+    assert.equal(resolveOpeningDecision({ ...base, clips: { any: broken } }).src, APP_OPENING_VIDEO_DESKTOP_SRC);
+    assert.equal(
+      resolveOpeningDecision({ ...base, width: 390, clips: { mobile: broken } }).src,
+      APP_OPENING_VIDEO_MOBILE_SRC,
+    );
+  }
+  // The pure helper agrees with the decision (the admin preview and the ad
+  // control use it directly).
+  assert.equal(openingClipSrcFor({ any: shared }, "mobile"), shared);
+  assert.equal(openingClipSrcFor(null, "desktop"), APP_OPENING_VIDEO_DESKTOP_SRC);
+  assert.equal(openingClipSrcFor({ mobile: phone }, "desktop"), APP_OPENING_VIDEO_DESKTOP_SRC);
 });
 
 test("phones get the portrait clip, tablet + desktop get the wide one", () => {
@@ -189,4 +244,10 @@ test("index.html's pre-React mirror agrees with the module", () => {
   // …and the mirror refuses a remembered override that would change what plays.
   assert.match(html, /stored !== "debug" && stored !== "off"/);
   assert.match(html, /eduvora\.opening\.override\.at\.v1/);
+  // …and the pre-React script must honour the tap-only default too: it stops
+  // before assigning a `src` when the launch playback is off, so a tap-only
+  // boot downloads nothing (the clip is opened on demand instead).
+  assert.match(html, /var auto = show && \(playOnLaunch \|\| override === "on" \|\| override === "force"\)/);
+  assert.match(html, /playOnLaunch = data\.openingPlayOnLaunch === true/);
+  assert.match(html, /openingAnimationUrlMobile/);
 });

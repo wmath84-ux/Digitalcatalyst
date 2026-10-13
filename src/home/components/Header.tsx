@@ -15,6 +15,7 @@ import BrandMark from "../../components/BrandMark";
 import { useBranding } from "../../context/BrandingContext";
 import { DEFAULT_HOME_GRADIENT_FROM, DEFAULT_HOME_GRADIENT_TO } from "../../utils/branding";
 import { useViewportBand } from "../../utils/responsive";
+import OpeningAdControl from "../../components/ad/OpeningAdControl";
 
 interface HeaderProps {
   userName: string;
@@ -267,6 +268,8 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
               )}
             </h1>
           </div>
+          {/* Faded `ad` control — see src/components/ad/OpeningAdControl.tsx. */}
+          <OpeningAdControl />
         </div>
         <div data-home-actions className="flex shrink-0 items-center gap-1 min-[390px]:gap-2">
           <HeaderNotificationsButton

@@ -37,7 +37,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * back helpers, including `attach()` which runs the controller's takeover — so
  * a test can assert what the user sees BEFORE and AFTER JavaScript takes over.
  */
-async function boot({ width = 390, search = "", branding = null, reducedMotion = false, onLine = true, storedOverride = null, preferFull = false, rejectPlay = null, capacitor = false } = {}) {
+async function boot({ width = 390, search = "", branding = null, launch = true, reducedMotion = false, onLine = true, storedOverride = null, preferFull = false, rejectPlay = null, capacitor = false } = {}) {
   const playCalls = { value: 0 };
   const didSetMutedAttribute = { value: false };
   const dom = new JSDOM(HTML, {
@@ -75,7 +75,11 @@ async function boot({ width = 390, search = "", branding = null, reducedMotion =
         }
         return origSetAttribute.call(this, name, value);
       };
-      if (branding) window.localStorage.setItem("eduvora.branding.v2", JSON.stringify(branding));
+      // The launch playback is OPT-IN (Branding → App behaviour
+      // "openingPlayOnLaunch"). Every launch test asks for it by seeding the
+      // branding cache; `launch: false` boots the tap-only default instead.
+      const cached = branding ?? (launch ? { appName: "Eduvora", openingPlayOnLaunch: true } : null);
+      if (cached) window.localStorage.setItem("eduvora.branding.v2", JSON.stringify(cached));
       if (storedOverride) window.localStorage.setItem("eduvora.opening.override.v1", storedOverride);
       if (preferFull) window.localStorage.setItem("eduvora.opening.preferFull.v1", "1");
       if (rejectPlay) {
@@ -150,6 +154,83 @@ async function boot({ width = 390, search = "", branding = null, reducedMotion =
     },
   };
 }
+
+test("tap-only by default: nothing plays and nothing is downloaded at boot", async () => {
+  // The reported requirement: "bye default user ko app open hote samay dikhana
+  // ho to main vahan se on kar sakun" — with the switch off, a cold boot must
+  // not fetch the 5 MB clip, must not paint the overlay, and must leave the app
+  // to open immediately. The header's faded `ad` control opens the clip on tap
+  // (see tests/openingAdControl.test.mjs for the React half).
+  const t = await boot({ width: 390, launch: false });
+  try {
+    assert.equal(t.splash.dataset.opening, "skipped", "the overlay is skipped before React runs");
+    assert.equal(t.video.getAttribute("src"), null, "no clip is pointed at, so none is downloaded");
+    assert.equal(t.playCalls.value, 0, "nothing is played at boot");
+    const controller = t.attach();
+    assert.equal(controller.state, "skipped");
+    assert.equal(controller.decision.show, false);
+    assert.match(controller.decision.reason, /tap/);
+    assert.match(controller.decision.reason, /ad control/);
+  } finally {
+    t.restore();
+  }
+
+  // …and `?opening=on` still arms the launch playback on one device, so the
+  // animation can always be reproduced and previewed.
+  const armed = await boot({ width: 390, launch: false, search: "?opening=on" });
+  try {
+    assert.notEqual(armed.splash.dataset.opening, "skipped", "?opening=on shows the opening pre-React");
+    assert.match(armed.video.getAttribute("src"), new RegExp(MOBILE));
+    assert.equal(armed.attach().state, "pending");
+  } finally {
+    armed.restore();
+  }
+});
+
+test("Branding can point the opening at a release-asset URL, per band", async () => {
+  const shared = "https://github.com/example/app/releases/download/anim-1/opening.mp4";
+  const phone = "https://github.com/example/app/releases/download/anim-1/opening-portrait.mp4";
+
+  const both = await boot({ width: 390, branding: { appName: "Learnbook", openingPlayOnLaunch: true, openingAnimationUrl: shared } });
+  try {
+    assert.equal(both.video.getAttribute("src"), shared, "a phone follows the shared release URL");
+    assert.equal(both.attach().decision.src, shared);
+  } finally {
+    both.restore();
+  }
+
+  const desktop = await boot({ width: 1280, branding: { appName: "Learnbook", openingPlayOnLaunch: true, openingAnimationUrl: shared } });
+  try {
+    assert.equal(desktop.video.getAttribute("src"), shared, "…and so does a desktop");
+  } finally {
+    desktop.restore();
+  }
+
+  const perBand = await boot({
+    width: 390,
+    branding: { appName: "Learnbook", openingPlayOnLaunch: true, openingAnimationUrl: shared, openingAnimationUrlMobile: phone },
+  });
+  try {
+    assert.equal(perBand.video.getAttribute("src"), phone, "the band-specific URL wins on a phone");
+  } finally {
+    perBand.restore();
+  }
+
+  // A value that is not an absolute https URL (a repo path, javascript:, blank)
+  // must fall back to the bundled clip — never a black launch screen. A GitHub
+  // release PAGE (`/releases/tag/...`) is a separate, softer case: it is a
+  // valid https URL that cannot decode as video, so the admin panel warns
+  // about it (tests/adminOpeningAnimationContract.test.mjs) and the runtime
+  // degrades to the brand card through the media-error path.
+  for (const broken of ["javascript:alert(1)", "/assets/animations/x.mp4", "http://insecure.example/x.mp4", "  "]) {
+    const t = await boot({ width: 390, branding: { appName: "Learnbook", openingPlayOnLaunch: true, openingAnimationUrl: broken } });
+    try {
+      assert.match(t.video.getAttribute("src"), new RegExp(MOBILE), `"${broken}" must fall back to the shipped clip`);
+    } finally {
+      t.restore();
+    }
+  }
+});
 
 test("a phone boots the portrait EduOS clip over the brand card", async () => {
   const t = await boot({ width: 390 });

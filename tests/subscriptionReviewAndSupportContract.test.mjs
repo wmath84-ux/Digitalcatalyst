@@ -41,8 +41,9 @@ test("admin branding page exposes support contact fields", () => {
   assert.match(brandingPage, /data-branding-support-phone/);
   assert.match(brandingPage, /update\("supportEmail"/);
   assert.match(brandingPage, /update\("supportPhone"/);
-  // Persisted into the branding doc + cache.
-  assert.match(brandingPage, /supportEmail, supportPhone, updatedAt: serverTimestamp\(\)/);
+  // Persisted into the branding doc + cache (multi-line literal, so the fields
+  // are matched in order).
+  assert.match(brandingPage, /supportEmail,\s*\n\s*supportPhone,\s*\n\s*updatedAt: serverTimestamp\(\),/);
   assert.match(branding, /supportEmail: string;/);
   assert.match(branding, /supportPhone: string;/);
   assert.match(branding, /DEFAULT_SUPPORT_EMAIL/);

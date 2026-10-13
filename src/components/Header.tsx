@@ -9,6 +9,7 @@ import { useBranding } from "@/context/BrandingContext";
 import { useViewportBand } from "../utils/responsive";
 import ExpandingTabs, { type ExpandingTabItem } from "./ui/ExpandingTabs";
 import MobileHeaderMenu from "./MobileHeaderMenu";
+import OpeningAdControl from "./ad/OpeningAdControl";
 
 /** Keep the visible app-shell header title to one short word. */
 export function singleWordHeaderTitle(value: string): string {
@@ -248,6 +249,11 @@ export default function Header({
           <div className="flex min-w-0 flex-col justify-center leading-tight">
             <h1 className="truncate text-[40px] font-bold leading-[40px] tracking-tight text-white">{headerTitle}</h1>
           </div>
+          {/* The faded `ad` label (src/components/ad/OpeningAdControl.tsx):
+              the app no longer plays the EduOS opening by itself, so this is
+              where a learner can watch it on tap. Renders nothing while the
+              admin has the launch playback on (or the animation off). */}
+          <OpeningAdControl />
         </div>
 
         {centerSearch && (

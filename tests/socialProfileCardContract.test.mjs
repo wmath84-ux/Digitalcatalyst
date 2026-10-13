@@ -336,8 +336,10 @@ test("the branding editor can add, edit and remove social accounts", () => {
   // The preview is the real card, at the real Home size.
   assert.match(brandingPage, /<SocialProfileCard[\s\S]*?preview/);
   assert.match(brandingPage, /h-\[520px\] w-full sm:h-\[640px\] md:h-\[740px\]/);
-  // Saving persists the list (plus the legacy mirror).
-  assert.match(brandingPage, /socialUrl, socialLinks, supportEmail/);
+  // Saving persists the list (plus the legacy mirror). The written object is a
+  // multi-line literal, so the three fields are matched in order rather than on
+  // one line.
+  assert.match(brandingPage, /socialUrl,\s*\n\s*socialLinks,\s*\n\s*supportEmail,/);
   assert.match(brandingPage, /const socialUrl = socialLinks\[0\]\?\.url \|\| "";/);
 });
 

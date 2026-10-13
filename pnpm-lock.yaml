@@ -185,6 +185,9 @@ importers:
       remark-math:
         specifier: ^6.0.0
         version: 6.0.0
+      sharp:
+        specifier: ^0.34.5
+        version: 0.34.5
       tailwind-merge:
         specifier: ^3.4.0
         version: 3.4.0
@@ -258,9 +261,6 @@ importers:
       playwright:
         specifier: ^1.63.0
         version: 1.63.0
-      sharp:
-        specifier: ^0.34.5
-        version: 0.34.5
       tailwindcss:
         specifier: 4.1.17
         version: 4.1.17
