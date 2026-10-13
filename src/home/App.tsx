@@ -482,7 +482,7 @@ export default function App({
 
                 <section data-home-trending className="dc-home-section">
                   <HomeSectionHeader
-                    title="Trending Now"
+                    title="Trending"
                     trailing={(
                       <button type="button" onClick={onNavigateToStore} className="dc-home-section-action dc-scene-ink">
                         View all
@@ -519,7 +519,7 @@ export default function App({
                   <section className="dc-home-section dc-home-recommendations" aria-labelledby="home-recommendations-title">
                     <HomeSectionHeader
                       id="home-recommendations-title"
-                      title="Recommended for You"
+                      title="For You"
                       trailing={(
                         <button type="button" onClick={onNavigateToStore} className="dc-home-section-action dc-scene-ink">
                           View all
