@@ -905,3 +905,124 @@ html[data-theme="dark"] [data-account-profile] .dc-account-logout {
 html[data-theme="dark"] [data-account-profile] .dc-account-legal > * {
   color: #aab7ca;
 }
+
+
+/* Profile readability pass. Preserve the existing light/dark surfaces while
+   keeping labels, helper text and account controls legible on phones. */
+[data-account-profile] .dc-account-header h1 {
+  font-weight: 850;
+  line-height: 1.16;
+}
+
+[data-account-profile] .dc-account-section-header h2,
+[data-account-profile] .dc-account-layout > h2,
+[data-account-profile] [data-profile-membership-card] .dc-account-section-header h2 {
+  font-weight: 850;
+  line-height: 1.3;
+}
+
+[data-account-profile] .dc-account-email,
+[data-account-profile] .dc-account-bio,
+[data-account-profile] .dc-account-facts dd,
+[data-account-profile] .dc-account-link-list button > span {
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+[data-account-profile] .dc-account-note,
+[data-account-profile] .dc-account-error,
+[data-account-profile] .dc-account-notice,
+[data-account-profile] .dc-account-plan-name,
+[data-account-profile] .dc-account-disclosure summary,
+[data-account-profile] .dc-account-text-action,
+[data-account-profile] .dc-account-primary,
+[data-account-profile] .dc-account-logout {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+[data-account-profile] .dc-account-stats strong {
+  font-weight: 850;
+  line-height: 1.15;
+}
+
+[data-account-profile] .dc-account-stats span,
+[data-account-profile] .dc-account-facts dt,
+[data-account-profile] .dc-account-disclosure summary > span,
+[data-account-profile] .dc-account-link-list small,
+[data-account-profile] .dc-account-legal > * {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+[data-account-profile] .dc-account-status {
+  font-size: 0.875rem;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+[data-account-profile] .dc-account-modal label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+[data-account-profile] .dc-account-modal input,
+[data-account-profile] .dc-account-modal textarea {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 639px) {
+  [data-account-profile] .dc-account-layout {
+    padding-top: 1rem;
+  }
+
+  [data-account-profile] .dc-account-header {
+    margin-bottom: 1.1rem;
+  }
+
+  [data-account-profile] .dc-account-header h1 {
+    font-size: clamp(1.85rem, 7vw, 2.25rem);
+  }
+
+  [data-account-profile] .dc-account-section-header h2,
+  [data-account-profile] [data-profile-membership-card] .dc-account-section-header h2 {
+    font-size: 1.2rem;
+  }
+
+  [data-account-profile] .dc-account-photo-action {
+    font-size: 0.8125rem;
+    font-weight: 750;
+    line-height: 1.35;
+  }
+
+  [data-account-profile] .dc-account-email,
+  [data-account-profile] .dc-account-bio,
+  [data-account-profile] .dc-account-facts dd,
+  [data-account-profile] .dc-account-link-list button > span {
+    font-size: 0.9375rem;
+  }
+
+  [data-account-profile] .dc-account-note,
+  [data-account-profile] .dc-account-error,
+  [data-account-profile] .dc-account-notice,
+  [data-account-profile] .dc-account-facts dt,
+  [data-account-profile] .dc-account-link-list small,
+  [data-account-profile] .dc-account-legal > * {
+    font-size: 0.8125rem;
+  }
+
+  [data-account-profile] .dc-account-text-action,
+  [data-account-profile] .dc-account-primary,
+  [data-account-profile] .dc-account-logout,
+  [data-account-profile] .dc-account-disclosure summary {
+    font-size: 0.9375rem;
+    font-weight: 750;
+  }
+
+  [data-account-profile] .dc-account-stats span {
+    font-size: 0.8125rem;
+    font-weight: 650;
+  }
+}
