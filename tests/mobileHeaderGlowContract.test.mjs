@@ -33,3 +33,14 @@ test("all shared and desktop header bars retain only their inset rim, never an e
   assert.match(reset, /box-shadow:\s*var\(--dc-chrome-glass-rim/);
   assert.match(reset, /Keep the inset glass hairline; remove only the exterior cast shadow/);
 });
+
+
+test("mobile headers have no cast shadow outside Home, while Home remains excluded", () => {
+  const mobileReset = finalChromeCss.slice(finalChromeCss.lastIndexOf("Mobile header shadow reset"));
+  assert.match(mobileReset, /@media \(max-width: 767px\)/);
+  assert.match(mobileReset, /\[data-site-header\]\.dc-scene-plate--bar:not\(\[data-home-header\]\)/);
+  assert.match(mobileReset, /\[data-revision-app-header\]\.dc-scene-plate--bar/);
+  assert.match(mobileReset, /box-shadow: none !important/);
+  assert.doesNotMatch(mobileReset, /\[data-site-header\]\.dc-scene-plate--bar\s*,/);
+  assert.match(header, /data-home-header/);
+});
