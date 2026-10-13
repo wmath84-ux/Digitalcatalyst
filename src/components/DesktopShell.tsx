@@ -249,7 +249,6 @@ export default function DesktopShell({
   initialSearchQuery = "",
   sidePanel,
   pageTitle,
-  pageSubtitle,
 }: DesktopShellProps) {
   const { user, logout } = useAuth();
   const screenSize = useScreenSize();
@@ -385,7 +384,6 @@ export default function DesktopShell({
 
   const activeEntry = ALL_RAIL.find((entry) => entry.key === active) ?? PRIMARY_RAIL[0];
   const resolvedTitle = pageTitle ?? activeEntry.label;
-  const resolvedSubtitle = pageSubtitle ?? "";
 
   // The cart / favorites / notifications badges come from the live
   // commerce / catalog / notification streams. The pill counter
@@ -673,7 +671,6 @@ export default function DesktopShell({
               <h1 className="truncate text-xl font-bold leading-tight tracking-tight text-white" data-desktop-page-title>
                 {resolvedTitle}
               </h1>
-              {resolvedSubtitle ? <p className="truncate text-xs font-medium leading-tight text-white/60" data-desktop-page-subtitle>{resolvedSubtitle}</p> : null}
             </div>
 
             {/* Search input — appears on every page that provides an
