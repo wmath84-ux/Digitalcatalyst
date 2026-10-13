@@ -1807,237 +1807,6 @@ html[data-theme="dark"] [data-home-content] .dc-home-hero-metadata span {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  [data-home-content] .dc-home-card,
-  [data-home-content] .dc-home-product-card,
-  [data-home-content] .dc-home-hero-cta,
-  [data-home-content] .dc-home-radio-tile {
-    transition-duration: 1ms !important;
-    transform: none !important;
-  }
-}
-
-
-/* ── Home mobile typography system · October 2026 ───────────────────────────
-   Use a predictable type scale across the feed. Supporting copy and metadata
-   stay readable at phone widths instead of falling below a practical size.
-   All rules are scoped to Home content; the shared app chrome is unchanged.
-   ─────────────────────────────────────────────────────────────────────────── */
-@media (max-width: 639px) {
-  [data-home-content] {
-    --dc-home-space: clamp(22px, 4.8vw, 28px);
-    --dc-home-gutter: clamp(16px, 4.2vw, 20px);
-    --dc-home-type-section: 19px;
-    --dc-home-type-card-title: 15px;
-    --dc-home-type-body: 13px;
-    --dc-home-type-secondary: 12.5px;
-    --dc-home-type-meta: 12px;
-  }
-
-  [data-home-content] .dc-home-section {
-    gap: 12px;
-  }
-
-  [data-home-content] .dc-home-section-heading {
-    min-height: 38px;
-    gap: 10px;
-  }
-
-  [data-home-content] .dc-home-section-heading h2 {
-    font-size: var(--dc-home-type-section);
-    font-weight: 750;
-    letter-spacing: -0.025em;
-    line-height: 1.24;
-  }
-
-  [data-home-content] .dc-home-section-action {
-    min-height: 40px;
-    font-size: 13px;
-    line-height: 1.2;
-  }
-
-  [data-home-content] .dc-home-progress-summary {
-    min-height: 32px;
-    font-size: 12.5px;
-    line-height: 1.2;
-  }
-
-  [data-home-content] .dc-home-hero-eyebrow {
-    min-height: 24px;
-    font-size: 11px;
-    letter-spacing: 0.09em;
-  }
-
-  [data-home-content] .dc-home-hero-title {
-    font-size: clamp(23px, 7vw, 29px) !important;
-    font-weight: 780;
-    letter-spacing: -0.035em;
-    line-height: 1.08;
-  }
-
-  [data-home-content] .dc-home-hero-description {
-    font-size: 13px;
-    line-height: 1.45;
-  }
-
-  [data-home-content] .dc-home-hero-metadata {
-    gap: 5px;
-    margin-top: 9px;
-  }
-
-  [data-home-content] .dc-home-hero-metadata span {
-    min-height: 24px;
-    padding-inline: 8px;
-    font-size: 11px;
-    font-weight: 650;
-    line-height: 1.15;
-  }
-
-  [data-home-content] .dc-home-hero-cta {
-    min-height: 40px;
-    font-size: 13px;
-    line-height: 1.2;
-  }
-
-  [data-home-content] .dc-home-continue-action {
-    gap: 12px;
-    padding: 13px;
-  }
-
-  [data-home-content] .dc-home-continue-copy {
-    gap: 6px;
-  }
-
-  [data-home-content] .dc-home-continue-title {
-    font-size: var(--dc-home-type-card-title);
-    line-height: 1.32;
-  }
-
-  [data-home-content] .dc-home-continue-percent {
-    font-size: 12.5px;
-    line-height: 1.25;
-  }
-
-  [data-home-content] .dc-home-continue-details,
-  [data-home-content] .dc-home-continue-lesson {
-    font-size: var(--dc-home-type-secondary);
-    line-height: 1.42;
-  }
-
-  [data-home-content] .dc-home-continue-lesson-label {
-    font-size: 12px;
-  }
-
-  [data-home-content] .dc-home-continue-progress-label {
-    font-size: 11px;
-    line-height: 1.2;
-  }
-
-  [data-home-content] .dc-home-continue-cta {
-    min-height: 36px;
-    font-size: 13px;
-    line-height: 1.2;
-  }
-
-  [data-home-content] .dc-home-category-item {
-    font-size: 13.5px !important;
-    line-height: 1.2;
-  }
-
-  [data-home-content] .dc-home-product-type {
-    min-height: 25px;
-    font-size: 11px;
-    line-height: 1.15;
-  }
-
-  [data-home-content] .dc-home-product-copy {
-    gap: 7px;
-    padding: 12px;
-  }
-
-  [data-home-content] .dc-home-product-title {
-    min-height: 2.6em;
-    font-size: var(--dc-home-type-card-title);
-    font-weight: 720;
-    line-height: 1.3;
-  }
-
-  [data-home-content] .dc-home-product-details,
-  [data-home-content] .dc-home-product-details-spacer {
-    font-size: var(--dc-home-type-secondary);
-    line-height: 1.42;
-  }
-
-  [data-home-content] .dc-home-product-rating {
-    font-size: 12px;
-    line-height: 1.25;
-  }
-
-  [data-home-content] .dc-home-product-rating-count {
-    font-size: 12px;
-  }
-
-  [data-home-content] .dc-home-product-price {
-    font-size: 18px;
-    line-height: 1.3;
-  }
-
-  [data-home-content] .dc-home-product-price del {
-    font-size: 13px;
-  }
-
-  [data-home-content] .dc-home-review-name {
-    font-size: 13.5px;
-    line-height: 1.35;
-  }
-
-  [data-home-content] .dc-home-review-byline {
-    font-size: 12px;
-    line-height: 1.4;
-  }
-
-  [data-home-content] .dc-home-review-stars {
-    font-size: 14px;
-  }
-
-  [data-home-content] .dc-home-review-comment {
-    font-size: 13.5px;
-    line-height: 1.52;
-  }
-
-  [data-home-content] .dc-home-review-course {
-    font-size: 12px;
-    line-height: 1.4;
-  }
-
-  [data-home-content] .dc-home-feedback-copy h2 {
-    font-size: 16px;
-    line-height: 1.35;
-  }
-
-  [data-home-content] .dc-home-feedback-copy p {
-    font-size: 13px;
-    line-height: 1.45;
-  }
-
-  [data-home-content] .dc-home-feedback-button {
-    font-size: 13px;
-    line-height: 1.2;
-  }
-
-  [data-home-content] .dc-home-results-count,
-  [data-home-content] .dc-home-search-empty span {
-    font-size: 12.5px;
-    line-height: 1.45;
-  }
-
-  [data-home-content] .dc-home-search-empty p {
-    font-size: 14px;
-    line-height: 1.4;
-  }
-}
-
-
 /* ── Continue Learning: clear hierarchy + responsive action footer ─────── */
 [data-home-content] .dc-home-continue-grid {
   grid-template-columns: minmax(0, 1fr) !important;
@@ -2354,5 +2123,236 @@ html[data-theme="dark"] [data-home-content] .dc-home-hero-metadata span {
 
   [data-home-content] .dc-home-continue-cta {
     margin-left: auto;
+  }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  [data-home-content] .dc-home-card,
+  [data-home-content] .dc-home-product-card,
+  [data-home-content] .dc-home-hero-cta,
+  [data-home-content] .dc-home-radio-tile {
+    transition-duration: 1ms !important;
+    transform: none !important;
+  }
+}
+
+
+/* ── Home mobile typography system · October 2026 ───────────────────────────
+   Use a predictable type scale across the feed. Supporting copy and metadata
+   stay readable at phone widths instead of falling below a practical size.
+   All rules are scoped to Home content; the shared app chrome is unchanged.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 639px) {
+  [data-home-content] {
+    --dc-home-space: clamp(22px, 4.8vw, 28px);
+    --dc-home-gutter: clamp(16px, 4.2vw, 20px);
+    --dc-home-type-section: 19px;
+    --dc-home-type-card-title: 15px;
+    --dc-home-type-body: 13px;
+    --dc-home-type-secondary: 12.5px;
+    --dc-home-type-meta: 12px;
+  }
+
+  [data-home-content] .dc-home-section {
+    gap: 12px;
+  }
+
+  [data-home-content] .dc-home-section-heading {
+    min-height: 38px;
+    gap: 10px;
+  }
+
+  [data-home-content] .dc-home-section-heading h2 {
+    font-size: var(--dc-home-type-section);
+    font-weight: 750;
+    letter-spacing: -0.025em;
+    line-height: 1.24;
+  }
+
+  [data-home-content] .dc-home-section-action {
+    min-height: 40px;
+    font-size: 13px;
+    line-height: 1.2;
+  }
+
+  [data-home-content] .dc-home-progress-summary {
+    min-height: 32px;
+    font-size: 12.5px;
+    line-height: 1.2;
+  }
+
+  [data-home-content] .dc-home-hero-eyebrow {
+    min-height: 24px;
+    font-size: 11px;
+    letter-spacing: 0.09em;
+  }
+
+  [data-home-content] .dc-home-hero-title {
+    font-size: clamp(23px, 7vw, 29px) !important;
+    font-weight: 780;
+    letter-spacing: -0.035em;
+    line-height: 1.08;
+  }
+
+  [data-home-content] .dc-home-hero-description {
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  [data-home-content] .dc-home-hero-metadata {
+    gap: 5px;
+    margin-top: 9px;
+  }
+
+  [data-home-content] .dc-home-hero-metadata span {
+    min-height: 24px;
+    padding-inline: 8px;
+    font-size: 11px;
+    font-weight: 650;
+    line-height: 1.15;
+  }
+
+  [data-home-content] .dc-home-hero-cta {
+    min-height: 40px;
+    font-size: 13px;
+    line-height: 1.2;
+  }
+
+  [data-home-content] .dc-home-continue-action {
+    gap: 12px;
+    padding: 13px;
+  }
+
+  [data-home-content] .dc-home-continue-copy {
+    gap: 6px;
+  }
+
+  [data-home-content] .dc-home-continue-title {
+    font-size: var(--dc-home-type-card-title);
+    line-height: 1.32;
+  }
+
+  [data-home-content] .dc-home-continue-percent {
+    font-size: 12.5px;
+    line-height: 1.25;
+  }
+
+  [data-home-content] .dc-home-continue-details,
+  [data-home-content] .dc-home-continue-lesson {
+    font-size: var(--dc-home-type-secondary);
+    line-height: 1.42;
+  }
+
+  [data-home-content] .dc-home-continue-lesson-label {
+    font-size: 12px;
+  }
+
+  [data-home-content] .dc-home-continue-progress-label {
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  [data-home-content] .dc-home-continue-cta {
+    min-height: 36px;
+    font-size: 13px;
+    line-height: 1.2;
+  }
+
+  [data-home-content] .dc-home-category-item {
+    font-size: 13.5px !important;
+    line-height: 1.2;
+  }
+
+  [data-home-content] .dc-home-product-type {
+    min-height: 25px;
+    font-size: 11px;
+    line-height: 1.15;
+  }
+
+  [data-home-content] .dc-home-product-copy {
+    gap: 7px;
+    padding: 12px;
+  }
+
+  [data-home-content] .dc-home-product-title {
+    min-height: 2.6em;
+    font-size: var(--dc-home-type-card-title);
+    font-weight: 720;
+    line-height: 1.3;
+  }
+
+  [data-home-content] .dc-home-product-details,
+  [data-home-content] .dc-home-product-details-spacer {
+    font-size: var(--dc-home-type-secondary);
+    line-height: 1.42;
+  }
+
+  [data-home-content] .dc-home-product-rating {
+    font-size: 12px;
+    line-height: 1.25;
+  }
+
+  [data-home-content] .dc-home-product-rating-count {
+    font-size: 12px;
+  }
+
+  [data-home-content] .dc-home-product-price {
+    font-size: 18px;
+    line-height: 1.3;
+  }
+
+  [data-home-content] .dc-home-product-price del {
+    font-size: 13px;
+  }
+
+  [data-home-content] .dc-home-review-name {
+    font-size: 13.5px;
+    line-height: 1.35;
+  }
+
+  [data-home-content] .dc-home-review-byline {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  [data-home-content] .dc-home-review-stars {
+    font-size: 14px;
+  }
+
+  [data-home-content] .dc-home-review-comment {
+    font-size: 13.5px;
+    line-height: 1.52;
+  }
+
+  [data-home-content] .dc-home-review-course {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  [data-home-content] .dc-home-feedback-copy h2 {
+    font-size: 16px;
+    line-height: 1.35;
+  }
+
+  [data-home-content] .dc-home-feedback-copy p {
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  [data-home-content] .dc-home-feedback-button {
+    font-size: 13px;
+    line-height: 1.2;
+  }
+
+  [data-home-content] .dc-home-results-count,
+  [data-home-content] .dc-home-search-empty span {
+    font-size: 12.5px;
+    line-height: 1.45;
+  }
+
+  [data-home-content] .dc-home-search-empty p {
+    font-size: 14px;
+    line-height: 1.4;
   }
 }
