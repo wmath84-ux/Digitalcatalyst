@@ -258,8 +258,9 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             >
               {headerVariant === "flow" ? "FlowPath" : (
                 <>
-                  <span className="min-w-0 truncate whitespace-nowrap" title={`Hello, ${firstName}`}>
-                    Hello, <strong data-home-user-name className="font-extrabold">{firstName}</strong>
+                  <span className="min-w-0 truncate whitespace-nowrap" title="Hello">
+                    <strong className="font-extrabold">Hello</strong>
+                    <span className="sr-only" data-home-user-name>, {firstName}</span>
                   </span>
                   <PiHandWavingDuotone data-home-wave className="h-10 w-10 shrink-0 text-amber-200" aria-hidden="true" />
                 </>
