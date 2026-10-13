@@ -173,15 +173,15 @@ export default function MobileHeaderMenu({
                     type="button"
                     onClick={() => setOpen(false)}
                     aria-label="Close menu"
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.07] text-white/75 transition hover:bg-white/[0.12] hover:text-white"
+                    className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.07] text-white/75 transition hover:bg-white/[0.12] hover:text-white"
                     data-mobile-header-drawer-close
                   >
-                    <X size={40} />
+                    <X size={30} />
                   </button>
                 </div>
               )}
               footer={extraContent ? (
-                <div className="flex min-h-10 items-center justify-center border-t border-white/10 pt-2">
+                <div className="flex min-h-[30px] items-center justify-center border-t border-white/10 pt-2">
                   {extraContent}
                 </div>
               ) : undefined}
@@ -204,9 +204,9 @@ export default function MobileHeaderMenu({
         aria-controls={drawerId}
         className={`dc-header-menu-trigger dc-mobile-header-menu-button ${className}`.trim()}
         data-mobile-header-menu-button
-        data-button-size="40"
+        data-button-size="30"
       >
-        <Menu aria-hidden="true" size={40} strokeWidth={2.2} />
+        <Menu aria-hidden="true" size={30} strokeWidth={2.2} />
       </button>
       {typeof document !== "undefined" && open ? createPortal(drawer, document.body) : null}
     </>
