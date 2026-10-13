@@ -54,6 +54,7 @@ test("Home product cards use a restrained shadow and readable light-theme owners
   assert.match(homeCss, /box-shadow:\s*0 2px 5px -4px rgba\(15, 23, 42, 0\.2\) !important/);
   assert.match(homeCss, /\.dc-marketplace-status\[data-status="purchased"\],[\s\S]*?color:\s*#176b50 !important/);
   assert.match(homeCss, /\.dc-marketplace-status\[data-status="free"\][\s\S]*?color:\s*#176b50 !important/);
+  assert.match(homeCss, /@media \(min-width: 640px\)[\s\S]*?\.dc-marketplace-card\.is-large \.dc-marketplace-open[\s\S]*?flex-direction: column/);
 });
 
 test("Light experiment templates, helper copy and run status retain readable contrast", () => {
