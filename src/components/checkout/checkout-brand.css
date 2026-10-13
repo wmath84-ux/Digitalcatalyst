@@ -207,7 +207,7 @@ html[data-theme="light"] [data-payment-gateway] :is(button, summary):focus-visib
   [data-checkout-app] [data-checkout-buyer-details] .dc-checkout-reference summary {
     min-height: 40px;
     padding: 9px 12px;
-    border: 1px solid #dbe5f3;
+    border: 1px solid var(--checkout-edge, #dbe5f3);
     border-radius: 10px;
     background: var(--checkout-surface-raised, #f8fafc);
     color: inherit;
