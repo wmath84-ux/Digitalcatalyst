@@ -253,8 +253,8 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             <h1
               data-home-greeting
               className={headerVariant === "flow"
-                ? "min-w-0 truncate whitespace-nowrap text-[30px] font-bold leading-[30px] tracking-tight"
-                : "flex min-w-0 items-center gap-2 text-[30px] font-bold leading-[30px] tracking-tight"}
+                ? "min-w-0 truncate whitespace-nowrap text-[22px] font-bold leading-[26px] tracking-tight"
+                : "flex min-w-0 items-center gap-2 text-[22px] font-bold leading-[26px] tracking-tight"}
             >
               {headerVariant === "flow" ? "FlowPath" : (
                 <>
