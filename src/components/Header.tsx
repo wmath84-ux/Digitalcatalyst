@@ -223,17 +223,17 @@ export default function Header({
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/30">
-            {customLogo ? <BrandMark className="h-10 w-10" /> : <LogoIcon className="h-6 w-6" />}
+            {customLogo ? <BrandMark className="h-10 w-10" /> : <LogoIcon className="h-10 w-10" />}
           </div>
           <div className="flex min-w-0 flex-col justify-center leading-tight">
-            <h1 className="truncate text-xl font-bold leading-tight tracking-tight text-white">{headerTitle}</h1>
+            <h1 className="truncate text-[40px] font-bold leading-[40px] tracking-tight text-white">{headerTitle}</h1>
           </div>
         </div>
 
         {centerSearch && (
           <div className="hidden min-w-0 flex-1 justify-center px-2 lg:flex">
             <label className="myrem-hsearch" htmlFor={centerSearch.inputId ?? "dc-header-search"}>
-              <SearchIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <SearchIcon className="h-10 w-10 shrink-0" aria-hidden="true" />
               <span className="sr-only">Search</span>
               <input
                 id={centerSearch.inputId ?? "dc-header-search"}
@@ -251,7 +251,7 @@ export default function Header({
         <div className="flex shrink-0 items-center gap-2" data-header-action-cluster>
           <HeaderNotificationsButton
             count={displayedNotificationCount}
-            size={isPhoneLayout ? 40 : 36}
+            size={40}
             onClick={onNavigateToNotifications}
           />
           {isPhoneLayout ? (
