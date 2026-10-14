@@ -145,8 +145,13 @@ test("empty, loading and error states come from one shared states module", () =>
   assert.match(statesCss, /@media \(prefers-reduced-motion: reduce\)/);
 });
 
-test("long names wrap and the menu is usable on an 11-inch tablet", () => {
+test("long names wrap into roomy rows and the module library emphasizes module labels", () => {
   assert.match(menuCss, /overflow-wrap: anywhere/);
+  assert.match(menuCss, /min-height: var\(--bm-row\)/);
+  assert.match(menuCss, /height: auto/);
+  assert.match(menuCss, /line-height: 1\.4/);
+  assert.match(menuCss, /\.branched-menu__lines\s*\{[^}]*top: 50%;[^}]*transform: translateY\(-50%\)/s);
+  assert.match(libraryCss, /\.course-library__menu \[data-course-library-module\] \{\s*font-weight: 700;/);
   assert.match(libraryCss, /@media \(max-width: 480px\)/);
   assert.doesNotMatch(menuCss, /text-overflow: ellipsis/, "long names are never truncated");
 });

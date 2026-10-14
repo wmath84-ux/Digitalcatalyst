@@ -154,10 +154,11 @@
 
 .branched-menu__lines {
   position: absolute;
-  top: 0;
+  top: 50%;
   left: 0;
   overflow: visible;
   pointer-events: none;
+  transform: translateY(-50%);
 }
 
 .branched-menu__base,
@@ -207,9 +208,10 @@
   gap: 8px;
   flex: 1 1 auto;
   min-width: 0;
-  height: var(--bm-row);
+  min-height: var(--bm-row);
+  height: auto;
   margin: 0;
-  padding: 0 8px 0 var(--bm-indent);
+  padding: 6px 8px 6px var(--bm-indent);
   border: 0;
   background: none;
   color: var(--bm-muted);
@@ -284,6 +286,7 @@
   flex: 1 1 auto;
   overflow-wrap: anywhere;
   white-space: normal;
+  line-height: 1.4;
 }
 
 .branched-menu__head-label {

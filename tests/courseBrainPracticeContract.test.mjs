@@ -632,9 +632,11 @@ test("the Brain tab follows the module of the lesson being watched", () => {
   assert.match(playerApp, /const activeBrainModuleId = selectedFile \? moduleIdByFileId\[String\(selectedFile\.id\)\] \?\? null : null;/);
   assert.match(playerApp, /activeModuleId=\{activeBrainModuleId\}/);
   assert.match(brainPanel, /activeModuleId\?: string \| null;/);
-  // The hierarchy shows all accessible modules, and reveals the active lesson's branch.
+  // The clean card list shows each set's module path, so the active course
+  // context remains visible without expanding a separate branch tree.
   assert.match(brainPanel, /courseModuleSegments\(modules, set.moduleId\)/);
-  assert.match(brainPanel, /masterOpen.reveal\(ancestorSectionValues/);
+  assert.match(brainPanel, /data-brain-library-rows/);
+  assert.match(brainPanel, /data-brain-module=\{set.moduleId\}/);
   assert.match(brainPanel, /\}, \[activeModuleId\]\);/);
   assert.match(brainPanel, /setActiveSetId\(null\);/);
   assert.match(brainPanel, /data-brain-module/);
