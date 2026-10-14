@@ -63,7 +63,7 @@ import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount"
 import { useDragScroll } from "../hooks/useDragScroll";
 import { useFeatureVisibilityMap } from "../context/FeatureVisibilityContext";
 import BrandMark from "./BrandMark";
-import OpeningAdControl from "./ad/OpeningAdControl";
+import { OPENING_AD_ITEM, OPENING_AD_ITEM_ID, useOpeningAdPlayer } from "./ad/OpeningAdControl";
 import HeaderNotificationsButton from "./HeaderNotificationsButton";
 import { singleWordHeaderTitle } from "./Header";
 import DesktopPeekDock from "./glass-dock/DesktopPeekDock";
@@ -326,6 +326,11 @@ export default function DesktopShell({
   const { cartIds, favoriteIds } = useCommerce();
   const { purchasedIds } = useCatalog();
   const liveNotificationCount = useUnreadNotificationCount();
+  // The opening-animation (`ad`) player. Its option lives in the SIDE PANEL —
+  // the glass rail on tablets, the wide rail on desktops — not in the top bar
+  // (see src/components/ad/OpeningAdControl.tsx). `available` hides the row
+  // when the admin turned the animation off or it already plays at launch.
+  const openingAd = useOpeningAdPlayer();
   const [query, setQuery] = useState(initialSearchQuery);
   // Page-switcher published by the mounted page (Revision is the first user).
   // `null` on every other page, so the extra header row only exists while the
@@ -427,14 +432,27 @@ export default function DesktopShell({
   // chooses, so a deliberate collapse still survives the next visit.
   const compactRail = useCompactRail();
   const [compactRailOpen, setCompactRailOpen] = useState<boolean>(() => readStoredRailOpen());
-  const sidebarItems: GlassSidebarItem[] = railEntries.map((entry) => ({
-    id: entry.hash,
-    label: entry.label,
-    color: RAIL_COLORS[entry.key] ?? "#3A86FF",
-    Icon: entry.Icon as GlassSidebarItem["Icon"],
-    active: active === entry.key,
-    badge: entry.badge,
-  }));
+  const sidebarItems: GlassSidebarItem[] = [
+    ...railEntries.map((entry) => ({
+      id: entry.hash,
+      label: entry.label,
+      color: RAIL_COLORS[entry.key] ?? "#3A86FF",
+      Icon: entry.Icon as GlassSidebarItem["Icon"],
+      active: active === entry.key,
+      badge: entry.badge,
+    })),
+    // The `ad` option (tablet band): a row of the glass rail, not a route.
+    ...(openingAd.available
+      ? [{
+          id: OPENING_AD_ITEM_ID,
+          label: OPENING_AD_ITEM.label,
+          ariaLabel: OPENING_AD_ITEM.ariaLabel,
+          color: OPENING_AD_ITEM.color,
+          Icon: OPENING_AD_ITEM.Icon as GlassSidebarItem["Icon"],
+          active: false,
+        }]
+      : []),
+  ];
 
   // The compact rail's column REFLOWS — GlassSidebar springs its own slot
   // between 64 px and 220 px instead of painting over the page — so the
@@ -476,11 +494,13 @@ export default function DesktopShell({
             items={sidebarItems}
             open={compactRailOpen}
             onOpenChange={setCompactRailOpen}
-            onSelect={(hash) => handleNavigate(hash)}
+            onSelect={(id) => (id === OPENING_AD_ITEM_ID ? openingAd.openPlayer() : handleNavigate(id))}
             header={
               <div className="flex items-center gap-2.5">
-                <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-xl bg-indigo-600 text-white ring-1 ring-white/20">
-                  {customLogo ? <BrandMark className="h-9 w-9" /> : <Sparkles className="h-4 w-4" />}
+                {/* The app icon is 25px in the rail too — the same size the
+                    header uses, so the chrome never shows two brand sizes. */}
+                <div data-header-app-icon className="grid h-[25px] w-[25px] shrink-0 place-items-center overflow-hidden rounded-lg bg-indigo-600 text-white ring-1 ring-white/20">
+                  {customLogo ? <BrandMark className="h-[25px] w-[25px]" /> : <Sparkles className="h-4 w-4" />}
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-[13px] font-black tracking-tight text-white">{appName}</p>
@@ -529,8 +549,8 @@ export default function DesktopShell({
             so the rail feels like a continuation of the app's identity
             rather than a separate desktop chrome. */}
         <div className="flex items-center gap-3 px-5 pb-5 pt-5">
-          <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-2xl bg-indigo-600 text-white ring-1 ring-white/20">
-            {customLogo ? <BrandMark className="h-11 w-11" /> : <Sparkles className="h-5 w-5" />}
+          <div data-header-app-icon className="grid h-[25px] w-[25px] shrink-0 place-items-center overflow-hidden rounded-lg bg-indigo-600 text-white ring-1 ring-white/20">
+            {customLogo ? <BrandMark className="h-[25px] w-[25px]" /> : <Sparkles className="h-4 w-4" />}
           </div>
           <div className="min-w-0">
             <p className="truncate text-[15px] font-black tracking-tight text-white">{appName}</p>
@@ -569,7 +589,7 @@ export default function DesktopShell({
                 <RailGroup
                   id="account"
                   label="Account & Settings"
-                  count={workspaceList.length}
+                  count={workspaceList.length + (openingAd.available ? 1 : 0)}
                   hasActiveChild={workspaceList.some((e) => active === e.key)}
                 >
                   {workspaceList.map((entry) => (
@@ -580,6 +600,22 @@ export default function DesktopShell({
                       onNavigate={handleNavigate}
                     />
                   ))}
+                  {/* The `ad` option (desktop band): an action row of the
+                      rail — it opens the opening-animation player, it is
+                      not a route. See src/components/ad/OpeningAdControl.tsx. */}
+                  {openingAd.available ? (
+                    <RailItem
+                      entry={{
+                        key: OPENING_AD_ITEM_ID,
+                        label: OPENING_AD_ITEM.label,
+                        description: OPENING_AD_ITEM.description,
+                        ariaLabel: OPENING_AD_ITEM.ariaLabel,
+                        Icon: OPENING_AD_ITEM.Icon,
+                      }}
+                      active={false}
+                      onSelect={openingAd.openPlayer}
+                    />
+                  ) : null}
                 </RailGroup>
               </>
             );
@@ -684,18 +720,20 @@ export default function DesktopShell({
         >
           <div data-desktop-topbar-row className="flex h-16 items-center gap-4">
             <div className="flex min-w-0 flex-1 items-center gap-3">
-              <h1 className="truncate text-[40px] font-bold leading-[40px] tracking-tight text-white" data-desktop-page-title>
+              <h1 className="truncate text-[22px] font-bold leading-[26px] tracking-tight text-white" data-desktop-page-title>
                 {resolvedTitle}
               </h1>
-              {/* Faded `ad` control — see src/components/ad/OpeningAdControl.tsx. */}
-              <OpeningAdControl className="!text-[11px]" />
+              {/* The opening-animation `ad` option is a rail row now, not a
+                  top-bar label — see src/components/ad/OpeningAdControl.tsx. */}
             </div>
 
             {/* Search input — appears on every page that provides an
                 onSearch handler. The input is hidden on pages that
                 have no handler (e.g. media viewers, fullscreen flows). */}
             {onSearch ? (
-              <div className="relative flex w-[320px] max-w-[36vw] items-center">
+              /* Header type is 22px — set on the wrapper so the registry
+                 input's own class list stays exactly as published. */
+              <div className="relative flex w-[320px] max-w-[36vw] items-center [&_input]:text-[22px] [&_input]:leading-[26px]">
                 {/* `glass-input` capsule. The field used to be a plain
                     `bg-slate-50` box with an absolutely positioned icon; the
                     registry item owns both (icon slot + focus glow) and its
@@ -705,8 +743,8 @@ export default function DesktopShell({
                     white-on-glass for dark pages. */}
                 <GlassInput
                   type="search"
-                  className="dc-glass-input w-full [&_input]:text-[40px] [&_input]:leading-[40px]"
-                  icon={<Search className="h-10 w-10" aria-hidden="true" />}
+                  className="dc-glass-input w-full"
+                  icon={<Search className="h-[30px] w-[30px]" aria-hidden="true" />}
                   value={query}
                   data-desktop-search
                   onChange={(e) => setQuery(e.target.value)}
@@ -736,7 +774,7 @@ export default function DesktopShell({
                     aria-label="Clear search"
                     className="absolute right-2 grid h-10 w-10 place-items-center rounded-full text-white/55 transition hover:bg-white/[0.1] hover:text-white/85"
                   >
-                    <X size={40} />
+                    <X size={30} />
                   </button>
                 ) : null}
               </div>
@@ -752,19 +790,19 @@ export default function DesktopShell({
                   <button
                     type="button"
                     onClick={() => { window.location.hash = "#/revision/study"; }}
-                    className="inline-flex h-12 items-center gap-1.5 rounded-full border border-indigo-400/40 bg-gradient-to-r from-indigo-500/25 to-violet-500/25 px-3 text-[40px] leading-[40px] font-black text-white shadow-sm transition hover:brightness-110 active:scale-95"
+                    className="inline-flex h-10 items-center gap-1.5 rounded-full border border-indigo-400/40 bg-gradient-to-r from-indigo-500/25 to-violet-500/25 px-3 text-[22px] leading-[26px] font-black text-white shadow-sm transition hover:brightness-110 active:scale-95"
                     title="Quick Study / Review"
                   >
-                    <Play size={40} className="fill-current text-indigo-300" />
+                    <Play size={30} className="fill-current text-indigo-300" />
                     <span>Review</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => { window.dispatchEvent(new CustomEvent("dc-revision-quick-add")); }}
-                    className="inline-flex h-12 items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 text-[40px] leading-[40px] font-semibold text-white transition hover:bg-white/20 active:scale-95"
+                    className="inline-flex h-10 items-center gap-1 rounded-full border border-white/15 bg-white/10 px-2.5 text-[22px] leading-[26px] font-semibold text-white transition hover:bg-white/20 active:scale-95"
                     title="Add Card / Deck"
                   >
-                    <Plus size={40} />
+                    <Plus size={30} />
                     <span className="hidden sm:inline">Add</span>
                   </button>
                 </div>
@@ -774,14 +812,15 @@ export default function DesktopShell({
                 onClick={() => handleNavigate("#/subscription")}
                 aria-label="Upgrade to Premium"
                 title="Upgrade"
-                className="mr-1 hidden h-12 shrink-0 items-center gap-1.5 rounded-full border border-violet-300/40 bg-gradient-to-br from-violet-500 to-indigo-600 px-3.5 text-[40px] leading-[40px] font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_8px_20px_-8px_rgba(124,92,255,0.8)] transition hover:brightness-110 active:scale-95 sm:inline-flex"
+                className="mr-1 hidden h-10 shrink-0 items-center gap-1.5 rounded-full border border-violet-300/40 bg-gradient-to-br from-violet-500 to-indigo-600 px-3.5 text-[22px] leading-[26px] font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_8px_20px_-8px_rgba(124,92,255,0.8)] transition hover:brightness-110 active:scale-95 sm:inline-flex"
               >
-                <Crown size={40} aria-hidden="true" />
+                <Crown size={30} aria-hidden="true" />
                 Upgrade
               </button>
               <ExpandingTabs
                 ariaLabel="Quick actions"
                 itemSize={40}
+                iconSize={30}
                 activeId={
                   window.location.hash.startsWith("#/favorites")
                     ? "favorites"
@@ -801,7 +840,7 @@ export default function DesktopShell({
                     id: "favorites",
                     label: "Favorites",
                     ariaLabel: "Favorites",
-                    icon: <Heart size={40} />,
+                    icon: <Heart size={30} />,
                     badge: favoritesCount > 0 ? String(favoritesCount) : undefined,
                     badgeTone: "rose",
                   },
@@ -809,7 +848,7 @@ export default function DesktopShell({
                     id: "cart",
                     label: "Cart",
                     ariaLabel: "Cart",
-                    icon: <ShoppingBag size={40} />,
+                    icon: <ShoppingBag size={30} />,
                     badge: cartCount > 0 ? String(cartCount) : undefined,
                     badgeTone: "rose",
                   },
@@ -817,7 +856,7 @@ export default function DesktopShell({
                     id: "subscription",
                     label: "Plans",
                     ariaLabel: "Subscription",
-                    icon: <Crown size={40} />,
+                    icon: <Crown size={30} />,
                   },
                 ]}
               />
@@ -875,6 +914,9 @@ export default function DesktopShell({
           route — see isHomeDockRoute); elsewhere it keeps the peek line. */}
       <DesktopPeekDock active={active} purchasesBadge={ownedCount} />
 
+      {/* The opening-animation player the rail's `Ad` row opens (portalled
+          into <body>; null while closed). */}
+      {openingAd.player}
     </div>
   );
 }
@@ -963,29 +1005,45 @@ function RailGroup({
   );
 }
 
+/**
+ * What a rail row paints. Route rows are `RailEntry`s; an ACTION row (the
+ * opening-animation `Ad` option) has no hash and runs `onSelect` instead.
+ */
+type RailRow = Pick<RailEntry, "label" | "description" | "Icon" | "badge"> & {
+  key: string;
+  hash?: string;
+  /** Accessible name when it should say more than the label. */
+  ariaLabel?: string;
+};
+
 function RailItem({
   entry,
   active,
   onNavigate,
+  onSelect,
 }: {
-  entry: RailEntry;
+  entry: RailRow;
   active: boolean;
-  onNavigate: (hash: string) => void;
+  /** Route rows: navigate to `entry.hash` (and prefetch it on intent). */
+  onNavigate?: (hash: string) => void;
+  /** Action rows: run this instead of navigating. */
+  onSelect?: () => void;
 }) {
   const Icon = entry.Icon;
+  const hash = entry.hash;
   return (
     <button
       type="button"
-      onClick={() => onNavigate(entry.hash)}
+      onClick={() => (hash && onNavigate ? onNavigate(hash) : onSelect?.())}
       /* Desktop intent signal: the pointer resting on a rail row (or keyboard
          focus landing on it) is a strong hint the learner is about to open
          that route, so start its code chunk now — the click then renders from
          memory instead of waiting on the network. Idempotent, and skipped on
          Save-Data / 2G (see utils/lazyRoute). */
-      onPointerEnter={() => prefetchRoute(entry.hash)}
-      onFocus={() => prefetchRoute(entry.hash)}
+      onPointerEnter={() => hash && prefetchRoute(hash)}
+      onFocus={() => hash && prefetchRoute(hash)}
       aria-current={active ? "page" : undefined}
-      aria-label={active ? `${entry.label} (current page)` : entry.label}
+      aria-label={active ? `${entry.label} (current page)` : entry.ariaLabel ?? entry.label}
       data-desktop-rail-item={entry.key}
       data-active={active ? "true" : "false"}
       className={`group relative flex w-full items-center gap-3 overflow-hidden rounded-xl px-3 py-2 text-left transition ${

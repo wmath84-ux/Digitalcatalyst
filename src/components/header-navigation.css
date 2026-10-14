@@ -1,5 +1,7 @@
 /* The side-panel trigger is deliberately plain: a three-line icon with no
-   circular plate, rim, blur, or exterior shadow. Its hit target stays 40px. */
+   circular plate, rim, blur, or exterior shadow. Its hit target stays 40px
+   while the glyph itself is the 30px chrome icon size (2026-10-14: every
+   header icon is 30px, on phone, tablet and desktop alike). */
 .dc-header-menu-trigger {
   display: inline-grid;
   width: 40px;
@@ -44,7 +46,8 @@ html[data-theme="light"] .dc-header-menu-trigger:focus-visible {
 }
 
 /* Header action buttons share a glass language; the notification button uses
-   this compact refractive plate, while the menu trigger above stays plain. */
+   this compact refractive plate (40px, holding a 30px bell glyph), while the
+   menu trigger above stays plain. */
 .dc-header-glass-button {
   position: relative;
   isolation: isolate;

@@ -29,7 +29,7 @@ export default function HeaderNotificationsButton({
       title={unreadCount > 0 ? `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}` : "Notifications"}
       onClick={onClick}
     >
-      <Bell aria-hidden="true" size={40} strokeWidth={2.1} />
+      <Bell aria-hidden="true" size={30} strokeWidth={2.1} />
       {unreadCount > 0 ? (
         <span className="dc-header-notifications-badge" aria-hidden="true">
           {badge}

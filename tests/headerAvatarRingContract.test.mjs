@@ -17,7 +17,9 @@ test('the side-panel trigger is a plain 40px three-line button and Notifications
   assert.match(menu, /data-button-size="40"/);
   assert.match(menu, /<Menu\b/);
   assert.match(headerButton, /data-header-glass-button="notifications"/);
-  assert.match(headerButton, /<Bell[\s\S]*size=\{size === 40 \? 20 : 18\}/);
+  // 2026-10-14: the bell GLYPH is the 30px chrome icon size on every band
+  // (the frosted plate it sits in is the hit target and stays 40px).
+  assert.match(headerButton, /<Bell[\s\S]*size=\{30\}/);
   assert.match(headerCss, /\.dc-header-menu-trigger\s*\{[\s\S]*?width: 40px[\s\S]*?border: 0[\s\S]*?background: transparent/);
   assert.doesNotMatch(headerCss.match(/\.dc-header-menu-trigger\s*\{([^}]*)\}/)?.[1] ?? "", /border-radius:\s*999px/);
   assert.match(headerCss, /data-button-size="36"/);

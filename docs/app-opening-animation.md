@@ -1,8 +1,10 @@
 # The app opening animation (EduOS clips)
 
 Status: **fixed in `arena/01a06f6e-digitalcatalyst` (2026-09-05)**, then **changed on 2026-10-13**: the
-animation is no longer a launch splash by default — it is opt-in behind a faded `ad` in the header, and only
-plays at launch when the owner switches that on in Admin → Branding. Both modes use the same controller.
+animation is no longer a launch splash by default — it is opt-in behind a tap, and only
+plays at launch when the owner switches that on in Admin → Branding. The tap control moved again on
+**2026-10-14**: it is now an **option in the side panel** (the phone's quick-actions drawer, the tablet glass
+rail, the desktop rail's *Account & Settings* group) — see "Where the `ad` option lives" below. Both modes use the same controller.
 This document exists because the same symptom — "the opening animation does not play, neither the desktop one
 nor the mobile one" — was reported across three sessions and every answer so far changed the code without
 changing what the user could see. Read this before touching the opening again.
@@ -84,7 +86,7 @@ problem in its own right. It is now **tap-only unless the owner says otherwise**
 | `openingAnimationEnabled` | `openingPlayOnLaunch` | What the learner gets |
 |---|---|---|
 | `false` | any | nothing at all — no splash, no `ad` button, the clip is never fetched |
-| `true` | `false` *(default)* | a small faded **`ad`** in the header bar; the clip is fetched and played full-screen only when it is tapped |
+| `true` | `false` *(default)* | an **`ad`** option in the side panel (phone drawer / tablet rail / desktop rail); the clip is fetched and played full-screen only when it is picked |
 | `true` | `true` | the launch splash exactly as documented below, and **no `ad`** (it would be a button that plays what already played) |
 
 Both switches live in Admin → Branding → **Behaviour**, next to the three clip URL fields (tap `Upload` /
@@ -93,8 +95,23 @@ Both switches live in Admin → Branding → **Behaviour**, next to the three cl
 "▶ Preview the opening now" arms a one-shot runtime override, so the preview plays even while the saved
 setting is tap-only.
 
-`ad` is `src/components/ad/OpeningAdControl.tsx`: a lowercase `ad` at 40 % opacity in the header action
-cluster of every shell (mobile, desktop, home, landing). It resolves the same clip the launch would use
+### Where the `ad` option lives
+
+The owner asked for the faded `ad` label to leave the header strip and become an option of the side panel, on
+every band. `src/components/ad/OpeningAdControl.tsx` now exports the option itself (`OPENING_AD_ITEM`, with
+the owner's word `ad` as its label and a clapperboard tile) plus `useOpeningAdPlayer()`, and each panel
+renders its own row:
+
+| Band | Where the option is | Which file renders it |
+|---|---|---|
+| Phone (≤ 639 px) | the quick-actions drawer (a side panel — it slides in through `GlassSidebar`) | `src/components/MobileHeaderMenu.tsx` |
+| Tablet portrait (640–959 px portrait) | **no side panel exists** (the desktop shell starts at 960 px or in landscape), so the option stays a normal pill in the header's action cluster | `src/components/Header.tsx`, `src/home/components/Header.tsx` |
+| Tablet / narrow desktop (960 px+, or any tablet in landscape) | the compact **glass rail** | `src/components/DesktopShell.tsx` |
+| Desktop (≥ 1024 px) | the wide rail's **Account & Settings** group | `src/components/DesktopShell.tsx` |
+| Landing page | no panel at all — the faded label stays (`<OpeningAdControl />`) | `src/components/landing/Header.tsx` |
+
+The row is an action, not a route: picking it opens the player (a `<body>` portal) and the panel closes. It
+resolves the same clip the launch would use
 (`openingClipSrcFor(openingClipForWidth(window.innerWidth))`), renders the player in a portal above every
 other layer, releases the buffer on close, and on failure prints the URL it tried plus the
 `releases/download` vs `releases/tag` hint. `?opening=on|force` still plays — and the tap uses the same
@@ -167,8 +184,13 @@ nobody asked for" stays intact: nothing is forced, it only remembers a request.
 * Do **not** make the tap-only default silently eager: while `openingPlayOnLaunch` is false, neither
   `index.html` nor React may set `video.src` before the tap. "Loads a 5 MB clip on every boot" is the same bug
   as "shows an animation nobody asked for".
-* The `ad` control must stay in `data-header-action-cluster` (it is a header action) and must disappear — not
-  merely go inert — when `openingPlayOnLaunch` is true or `openingAnimationEnabled` is false.
+* The `ad` option must stay in the side panel on every band that has one, and must disappear — not
+  merely go inert — when `openingPlayOnLaunch` is true or `openingAnimationEnabled` is false. The single
+  exception is the tablet-portrait band, which renders no side panel: there the pill rides the header's
+  action cluster, and the row/list must never be *unreachable* on a band that has a panel.
+* `tests/openingAdControl.test.mjs` pins all of this (which surfaces render the option, which render the
+  faded label, and that nothing is fetched before the tap); `tests/headerChromeSizesContract.test.mjs` pins the
+  header sizes that came with the same pass (30 px icons, 22 px text, 25 px app icon).
 * `tests/openingSplashRuntime.test.mjs` boots the real `index.html` in jsdom and asserts all of this —
   including "a clip that keeps advancing is never dismissed", "a remembered
   `static` preview must not replace the clip", "a refused play() waits instead of handing over" and the `shouldReleaseOpening` table; keep it

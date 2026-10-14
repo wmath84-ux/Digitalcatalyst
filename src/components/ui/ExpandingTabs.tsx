@@ -47,6 +47,7 @@ export default function ExpandingTabs({
   ariaLabel,
   className = "",
   itemSize = 40,
+  iconSize = 20,
 }: {
   items: ExpandingTabItem[];
   /** The expanded item. `null` renders every item as an icon circle. */
@@ -56,7 +57,15 @@ export default function ExpandingTabs({
   className?: string;
   /** Circle diameter in px (default 40 — the reference size). */
   itemSize?: number;
+  /**
+   * Box size of the icon nodes the caller passes (default 20 — the reference
+   * glyph). Only used for geometry: the icon sits at a fixed left inset of
+   * `(itemSize - iconSize) / 2`, so it is centred in the collapsed circle and
+   * never moves while the pill grows around it (the headers pass 30).
+   */
+  iconSize?: number;
 }) {
+  const iconInset = Math.max(0, Math.round((itemSize - iconSize) / 2));
   return (
     <motion.div
       layout
@@ -82,12 +91,12 @@ export default function ExpandingTabs({
             whileHover={isActive ? undefined : { scale: 1.045 }}
             whileTap={{ scale: 0.94 }}
             {...(item.dataAttrs ?? {})}
-            className={`relative flex shrink-0 cursor-pointer items-center justify-start rounded-full pl-2.5 outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
+            className={`relative flex shrink-0 cursor-pointer items-center justify-start rounded-full outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
               isActive
                 ? "gap-2 bg-white/90 pr-4 text-slate-900 shadow-[0_7px_18px_rgba(0,0,0,0.34),inset_0_2px_0_rgba(255,255,255,0.98)]"
                 : "text-white/85 hover:text-white"
             }`}
-            style={{ height: itemSize, width: isActive ? undefined : itemSize }}
+            style={{ height: itemSize, width: isActive ? undefined : itemSize, paddingLeft: iconInset }}
             data-expanding-tab={item.id}
             data-active={isActive ? "true" : "false"}
           >
@@ -109,7 +118,7 @@ export default function ExpandingTabs({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -7 }}
                   transition={spring}
-                  className="whitespace-nowrap text-[18px] font-semibold leading-[20px] tracking-[0.01em]"
+                  className="whitespace-nowrap text-[22px] font-semibold leading-[26px] tracking-[0.01em]"
                 >
                   {item.label}
                 </motion.span>

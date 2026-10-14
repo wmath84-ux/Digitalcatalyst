@@ -22,24 +22,60 @@ import fs from "node:fs";
 const SOURCE = "src/components/ad/OpeningAdControl.tsx";
 const source = fs.readFileSync(SOURCE, "utf8");
 
-const HEADERS = [
+const LANDING = "src/components/landing/Header.tsx";
+// The app shells no longer paint the label: 2026-10-14 the owner moved the `ad`
+// option OUT of the header strip and INTO the side panel — the phone drawer,
+// the tablet glass rail and the desktop rail all carry it as a row.
+const SHELL_HEADERS = [
   "src/components/Header.tsx",
   "src/components/DesktopShell.tsx",
   "src/home/components/Header.tsx",
-  "src/components/landing/Header.tsx",
 ];
+const MENU = "src/components/MobileHeaderMenu.tsx";
 
-test("the faded `ad` control is mounted in every app header", () => {
-  for (const file of HEADERS) {
+test("the `ad` option lives in the side panels, and the faded label only on the landing page", () => {
+  for (const file of SHELL_HEADERS) {
     const header = fs.readFileSync(file, "utf8");
-    assert.match(header, /OpeningAdControl/, `${file} must render the control`);
-    assert.match(
+    assert.doesNotMatch(
       header,
-      /<OpeningAdControl[^>]*\/>/,
-      `${file} must render <OpeningAdControl /> (an import alone shows nothing)`,
+      /<OpeningAdControl/,
+      `${file} must not paint the label — the side panel owns the option now`,
     );
   }
-  // …and the label itself is literally the lowercase word the owner asked for.
+  // The landing page has no side panel, so it keeps the faded label.
+  const landing = fs.readFileSync(LANDING, "utf8");
+  assert.match(landing, /<OpeningAdControl[^>]*\/>/);
+
+  // The phone side panel (the quick-actions drawer) appends the option…
+  const menu = fs.readFileSync(MENU, "utf8");
+  assert.match(menu, /const openingAd = useOpeningAdPlayer\(\);/);
+  assert.match(menu, /OPENING_AD_ITEM_ID/);
+  assert.match(menu, /openingAd\.player/);
+  // …and so do the two headers, but only as the fallback for the one band
+  // that has NO side panel: 640–959 portrait (the desktop shell, and with it
+  // every rail, only starts at 960 or in landscape).
+  for (const file of ["src/components/Header.tsx", "src/home/components/Header.tsx"]) {
+    const header = fs.readFileSync(file, "utf8");
+    assert.match(header, /const openingAd = useOpeningAdPlayer\(\);/);
+    assert.match(header, /tabletWithoutSidePanel/, `${file} only offers the pill on the no-panel band`);
+    assert.match(header, /openingAd\.player/, `${file} renders the player it can open`);
+  }
+  // The home header has two variants (Home / FlowPath) and the Flow one filters
+  // the shared list down to its gear — the pill is appended AFTER that filter,
+  // so both variants keep it.
+  const home = fs.readFileSync("src/home/components/Header.tsx", "utf8");
+  assert.match(home, /const openingAdTabItem: ExpandingTabItem \| null = tabletWithoutSidePanel && openingAd\.available/);
+  assert.match(home, /\.\.\.\(openingAdTabItem \? \[openingAdTabItem\] : \[\]\)/);
+
+  // …and the desktop / tablet rails (the same shell file) do too.
+  const shell = fs.readFileSync("src/components/DesktopShell.tsx", "utf8");
+  assert.match(shell, /const openingAd = useOpeningAdPlayer\(\);/);
+  assert.match(shell, /id: OPENING_AD_ITEM_ID/);
+  assert.match(shell, /openingAd\.openPlayer/);
+  assert.match(shell, /\{openingAd\.player\}/, "the shell renders the player it opens");
+
+  // …and the label itself is still literally the lowercase word the owner asked
+  // for, on the one surface that shows it.
   assert.match(source, />\s*\n?\s*ad\s*\n?\s*<\/button>/);
   assert.match(source, /tracking-\[0\.22em\]/, "the label is small and letter-spaced");
   assert.match(source, /opacity-40/, "…and faded, not a second call to action");
@@ -48,7 +84,7 @@ test("the faded `ad` control is mounted in every app header", () => {
 test("nothing is downloaded until the learner taps `ad`", () => {
   // The clip is ~5 MB. A control that points a <video> at it on mount would
   // waste exactly the bandwidth the launch animation was removed to save.
-  assert.match(source, /\{open && typeof document !== "undefined"/, "the player renders only while open");
+  assert.match(source, /isOpen && typeof document !== "undefined"/, "the player renders only while open");
   assert.match(source, /const openPlayer = useCallback/, "the tap handler resolves the clip");
   assert.match(source, /setSrc\(openingClipSrcFor\(sources, openingClipForWidth\(window\.innerWidth\)\)\)/);
   assert.match(source, /video\.removeAttribute\("src"\)/, "closing releases the buffer");
@@ -59,8 +95,10 @@ test("nothing is downloaded until the learner taps `ad`", () => {
 test("the control hides itself when it would be redundant or unwanted", () => {
   assert.match(
     source,
-    /if \(branding\.openingAnimationEnabled === false \|\| branding\.openingPlayOnLaunch\) return null;/,
+    /const available = !\(branding\.openingAnimationEnabled === false \|\| branding\.openingPlayOnLaunch\);/,
   );
+  // `available` is what every side panel switches on to show/hide its row.
+  assert.match(source, /return \{ available, openPlayer, player \};/);
   // Both switches are read from the live branding context, not from a prop, so
   // one admin save updates every header at once.
   assert.match(source, /const branding = useBranding\(\);/);

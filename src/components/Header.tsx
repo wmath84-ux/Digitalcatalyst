@@ -9,7 +9,7 @@ import { useBranding } from "@/context/BrandingContext";
 import { useViewportBand } from "../utils/responsive";
 import ExpandingTabs, { type ExpandingTabItem } from "./ui/ExpandingTabs";
 import MobileHeaderMenu from "./MobileHeaderMenu";
-import OpeningAdControl from "./ad/OpeningAdControl";
+import { OPENING_AD_ITEM, OPENING_AD_ITEM_ID, useOpeningAdPlayer } from "./ad/OpeningAdControl";
 
 /** Keep the visible app-shell header title to one short word. */
 export function singleWordHeaderTitle(value: string): string {
@@ -132,6 +132,13 @@ export default function Header({
   const displayedNotificationCount = liveNotificationCount ?? 0;
   const viewportBand = useViewportBand();
   const isPhoneLayout = viewportBand === "compact-mobile" || viewportBand === "large-mobile";
+  // The opening-animation (`ad`) option rides the SIDE PANEL everywhere one
+  // exists: the phone drawer here, the rails in DesktopShell. The tablet
+  // bands (640–959 portrait) render no side panel at all — the desktop shell
+  // starts at 960 or in landscape — so the option stays a normal pill in this
+  // header's action cluster there, instead of becoming unreachable.
+  const openingAd = useOpeningAdPlayer();
+  const tabletWithoutSidePanel = viewportBand === "small-tablet" || viewportBand === "tablet-portrait";
   const LogoIcon = icon ?? BookIcon;
   const { logoUrl, appName, hideFrameBorders } = useBranding();
   const customLogo = logoUrl && logoUrl !== DEFAULT_LOGO_URL;
@@ -143,7 +150,7 @@ export default function Header({
           id: "search",
           label: "Search",
           ariaLabel: "Search",
-          icon: <SearchIcon className="h-10 w-10" />,
+          icon: <SearchIcon className="h-[30px] w-[30px]" />,
         }]
       : []),
     onDownloadReport
@@ -151,13 +158,13 @@ export default function Header({
           id: "download",
           label: "Report",
           ariaLabel: "Download report",
-          icon: <DownloadIcon className="h-10 w-10" />,
+          icon: <DownloadIcon className="h-[30px] w-[30px]" />,
         }
       : {
           id: "cart",
           label: "Cart",
           ariaLabel: "Cart",
-          icon: <CartIcon className="h-10 w-10" />,
+          icon: <CartIcon className="h-[30px] w-[30px]" />,
           badge: cartCount > 0 ? String(cartCount) : undefined,
           badgeTone: "rose" as const,
         },
@@ -165,17 +172,30 @@ export default function Header({
       id: "subscription",
       label: "Plans",
       ariaLabel: "Subscription",
-      icon: <CrownIcon className="h-10 w-10" />,
+      icon: <CrownIcon className="h-[30px] w-[30px]" />,
     },
     ...(onHelpClick
       ? [{
           id: "help",
           label: "Help",
           ariaLabel: "Help & FAQ",
-          icon: <HelpCircle className="h-10 w-10" />,
+          icon: <HelpCircle className="h-[30px] w-[30px]" />,
         }]
       : []),
   ];
+
+  // See `tabletWithoutSidePanel` above: on the one band with no side panel the
+  // `ad` option stays a pill here. It is appended AFTER the page's action
+  // allow-list is applied, so a page that narrows the cluster (the
+  // notifications page shows only its bell) cannot make the option vanish.
+  const openingAdTabItems: ExpandingTabItem[] = tabletWithoutSidePanel && openingAd.available
+    ? [{
+        id: OPENING_AD_ITEM_ID,
+        label: OPENING_AD_ITEM.label,
+        ariaLabel: OPENING_AD_ITEM.ariaLabel,
+        icon: <OPENING_AD_ITEM.Icon className="h-[30px] w-[30px]" aria-hidden="true" />,
+      }]
+    : [];
 
   const visibleTabItems = visibleActions
     ? tabItems.filter((item) => (visibleActions as string[]).includes(item.id))
@@ -204,6 +224,7 @@ export default function Header({
     else if (id === "subscription") onNavigateToSubscription();
     else if (id === "usage-limits") window.location.hash = "#/usage-limits";
     else if (id === "help") onHelpClick?.();
+    else if (id === OPENING_AD_ITEM_ID) openingAd.openPlayer();
   };
 
   const mobileMenuItems = [
@@ -218,7 +239,7 @@ export default function Header({
       id: "usage-limits",
       label: "Usage Limits",
       ariaLabel: "Usage Limits",
-      icon: <Gauge className="h-10 w-10" />,
+      icon: <Gauge className="h-[30px] w-[30px]" />,
       color: "#8B7CF6",
     },
   ];
@@ -243,23 +264,21 @@ export default function Header({
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl md:h-10 md:w-10 bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/30">
-            {customLogo ? <BrandMark className="h-8 w-8 md:h-10 md:w-10" /> : <LogoIcon className="h-8 w-8 md:h-10 md:w-10" />}
+          <div data-header-app-icon className="flex h-[25px] w-[25px] shrink-0 items-center justify-center overflow-hidden rounded-lg bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/30">
+            {customLogo ? <BrandMark className="h-[25px] w-[25px]" /> : <LogoIcon className="h-[25px] w-[25px]" />}
           </div>
           <div className="flex min-w-0 flex-col justify-center leading-tight">
-            <h1 className="truncate text-[24px] font-bold leading-[26px] tracking-tight text-white md:text-[40px] md:leading-[40px]">{headerTitle}</h1>
+            <h1 className="truncate text-[22px] font-bold leading-[26px] tracking-tight text-white">{headerTitle}</h1>
           </div>
-          {/* The faded `ad` label (src/components/ad/OpeningAdControl.tsx):
-              the app no longer plays the EduOS opening by itself, so this is
-              where a learner can watch it on tap. Renders nothing while the
-              admin has the launch playback on (or the animation off). */}
-          <OpeningAdControl />
+          {/* The opening-animation `ad` option is a row of the quick-actions
+              drawer (MobileHeaderMenu), not a header label — see
+              src/components/ad/OpeningAdControl.tsx. */}
         </div>
 
         {centerSearch && (
           <div className="hidden min-w-0 flex-1 justify-center px-2 lg:flex">
-            <label className="myrem-hsearch [&_input]:text-[40px] [&_input]:leading-[40px]" htmlFor={centerSearch.inputId ?? "dc-header-search"}>
-              <SearchIcon className="h-10 w-10 shrink-0" aria-hidden="true" />
+            <label className="myrem-hsearch [&_input]:text-[22px] [&_input]:leading-[26px]" htmlFor={centerSearch.inputId ?? "dc-header-search"}>
+              <SearchIcon className="h-[30px] w-[30px] shrink-0" aria-hidden="true" />
               <span className="sr-only">Search</span>
               <input
                 id={centerSearch.inputId ?? "dc-header-search"}
@@ -291,10 +310,11 @@ export default function Header({
           ) : (
             <div className="flex items-center gap-2" data-header-actions-inline>
               <ExpandingTabs
-                items={visibleTabItems}
+                items={[...visibleTabItems, ...openingAdTabItems]}
                 activeId={activeId}
                 onSelect={handleSelect}
                 ariaLabel="Header actions"
+                iconSize={30}
               />
               {action}
             </div>
@@ -302,6 +322,7 @@ export default function Header({
         </div>
       </div>
       {children}
+      {openingAd.player}
     </header>
   );
 }
