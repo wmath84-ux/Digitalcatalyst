@@ -590,9 +590,9 @@ test("the status strip is one side-scrolling line (never wrapped, never clipped)
   assert.match(panel, /const statusRef = useRef<HTMLDivElement>\(null\);/);
 });
 
-test("the toolbar stays hidden until a specific map is opened", () => {
+test("the toolbar stays hidden until a SELF map is explicitly unlocked", () => {
   // The library is the home screen: no strip until a map is on the canvas.
-  assert.match(panel, /\{libraryOpen (\|\| readOnlyMaster )?\? null : \(/);
+  assert.match(panel, /\{libraryOpen \|\| readOnlyCanvas \? null : \(/);
 });
 
 test("the toolbar rides at the top of the sheet, like the notes editor", () => {

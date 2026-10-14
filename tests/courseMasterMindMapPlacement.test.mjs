@@ -60,15 +60,16 @@ test("a lesson selection clears any open master map", () => {
 });
 
 test("the Mind Map panel renders a master map read-only with a way back", () => {
-  assert.match(panel, /MindReadOnlyContext\.Provider value=\{readOnlyMaster\}/);
-  assert.match(panel, /nodesDraggable=\{!readOnlyMaster\}/);
+  assert.match(panel, /MindReadOnlyContext\.Provider value=\{readOnlyCanvas\}/);
+  assert.match(panel, /nodesDraggable=\{!readOnlyCanvas\}/);
   assert.match(panel, /const showPlus = \(selected \|\| editing\) && !dragging && !readOnly;/);
   assert.match(panel, /data-course-mindmap-master-banner/);
   assert.match(panel, /data-course-mindmap-master-close/);
-  assert.match(panel, /const onMindChange = readOnlyMaster \? NOOP_MIND_CHANGE : onSelfMindChange;/);
+  assert.match(panel, /const readOnlyCanvas = readOnlyMaster \|\| !editMode;/);
+  assert.match(panel, /if \(!readOnlyRef.current\) onSelfMindChange\(update\);/);
 });
 
 test("a self map or a new map leaves the master view", () => {
   assert.match(panel, /const openMap = useCallback\([\s\S]*?onCloseMasterMap\?\.\(\);/);
-  assert.match(panel, /onCloseMasterMap\?\.\(\);\s*onCreateMap\?\.\(\);/);
+  assert.match(panel, /onCloseMasterMap\?\.\(\);\s*creatingMapRef.current = true;\s*onCreateMap\?\.\(\);/);
 });

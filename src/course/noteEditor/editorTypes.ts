@@ -49,6 +49,8 @@ export interface NoteEditorHandle {
   read: () => NoteDraft;
   /** True when both title and body are empty (no storable content). */
   isEmpty: () => boolean;
+  /** Accept the current document as the clean baseline without replacing its history. */
+  markSaved: () => void;
   focusTitle: () => void;
   focusBody: (position?: "start" | "end") => void;
   /** Back to a blank note, history cleared. */

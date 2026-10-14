@@ -261,7 +261,7 @@ interface CourseOverlayProps {
   onBuyUpdate: (update: PaidCourseUpdate) => void;
   // Notes wiring
   notes: CoursePlayerNote[];
-  onAddNote: (text: string) => void;
+  onAddNote: (text: string) => CoursePlayerNote | null | void;
   onEditNote: (id: string, text: string) => void;
   onDeleteNote: (id: string) => void;
   onLinkNote: (id: string, links: string[]) => void;

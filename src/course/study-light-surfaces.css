@@ -34,22 +34,8 @@ html[data-theme="light"] [data-course-notes-add] svg { color: #fff !important; }
    No extra navigation or sidebar; the question deck's behaviour stays intact. */
 html[data-theme="light"] [data-course-brain-panel] { color: var(--dc-ink, #0f172a); background: #f8fafc; color-scheme: light; }
 html[data-theme="light"] [data-brain-screen="library"] { container-type: inline-size; }
-.brain-library-eyebrow { color: var(--dc-brand, #4f46e5); font-size: 10px; font-weight: 800; letter-spacing: .12em; }
-.brain-library-title { margin: 2px 0 0; color: var(--dc-ink, #0f172a); font-size: 24px; font-weight: 800; letter-spacing: -.04em; }
 [data-brain-collection] { flex-wrap: wrap; row-gap: 12px; }
-[data-brain-library-intro] { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between; margin: 4px 0 16px; padding: 18px; border: 1px solid #e0e7ff; border-radius: 18px; background: linear-gradient(120deg, #eef2ff, #faf5ff 65%, #f0fdfa); }
-[data-brain-library-intro] h3 { color: #1e1b4b; font-size: 17px; font-weight: 750; letter-spacing: -.025em; }
-[data-brain-library-intro] p { max-width: 42ch; margin-top: 5px; color: var(--dc-ink-3, #475569); font-size: 12px; line-height: 1.6; }
-.brain-library-summary { display: flex; gap: 8px; }
-.brain-library-summary span { padding: 7px 10px; border: 1px solid #e0e7ff; border-radius: 10px; background: #fff; color: var(--dc-ink-3, #475569); font-size: 11px; white-space: nowrap; }
-.brain-library-summary strong { color: #312e81; font-size: 16px; margin-right: 3px; }
-.brain-library-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 14px; padding-bottom: 12px; }
-html[data-theme="light"] [data-brain-set],
-html[data-theme="light"] [data-brain-empty] { background: #fff !important; border: 1px solid #e2e8f0; border-radius: 18px !important; box-shadow: 0 3px 14px -8px #33415525 !important; }
-html[data-theme="light"] [data-brain-set] { display: flex; flex-direction: column; transition: border-color 160ms ease, box-shadow 160ms ease; }
-html[data-theme="light"] [data-brain-set] > div:last-child { margin-top: auto !important; padding-top: 16px; }
-html[data-theme="light"] [data-brain-set]:hover { border-color: #a5b4fc; box-shadow: 0 6px 20px -8px #4f46e520 !important; }
-html[data-theme="light"] [data-brain-set] button { min-height: 40px; }
+.brain-library-meta { font-size: 10px; font-weight: 700; white-space: normal; text-align: right; }
 html[data-theme="light"] [data-brain-screen] button:focus-visible { outline: 2px solid var(--dc-brand, #4f46e5); outline-offset: 3px; }
 
 /* The creation overlay used to be a dark island in the light player, mixing

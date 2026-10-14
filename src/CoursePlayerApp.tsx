@@ -1,4 +1,4 @@
-import CourseLoadingDots from "./course/CourseLoadingDots";
+import CourseBookLoader from "./course/CourseBookLoader";
 import "./course/courseBrandColors.css";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useLocalCourseProgress from "./course/useLocalCourseProgress";
@@ -1663,6 +1663,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       ...(selectedFile?.personalResourceId ? { personalResourceId: String(selectedFile.personalResourceId) } : {}),
     });
     if (saved) playSfxAdd();
+    return saved;
   };
 
   const editNote = (id: string, nextHtml: string) => {
@@ -2283,6 +2284,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         <CourseBrainPanel
           productId={storageProductId}
           sets={brainSets}
+          modules={modules}
           // The learner's own sets (the “+” composer writes them to the Study
           // Library shelf; the live listener feeds them back here).
           selfSets={selfBrainSets}
@@ -2411,39 +2413,17 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         Optional study tools still hydrate independently. */}
     {!isReady && (
       <div
-        className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0a0c12]"
+        className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#f8fafc]"
         data-course-player-loading
         role="status"
         aria-live="polite"
         aria-busy="true"
         data-course-theme={playerThemeCtl.theme}
       >
-        <div className="flex flex-col items-center gap-4 px-6">
-          <CourseLoadingDots />
+        <div className="flex flex-col items-center gap-7 px-6">
+          <CourseBookLoader />
 
-          {/* Stage indicators */}
-          <div className="flex flex-col items-center gap-2 text-sm text-white/70">
-            <div className="font-semibold text-white">Loading course...</div>
-            <div className="flex flex-wrap justify-center gap-2 text-xs">
-              {Object.entries(readinessStages).map(([stage, ready]) => (
-                <span
-                  key={stage}
-                  className={`inline-flex items-center gap-1 rounded-full px-2 py-1 ${
-                    ready ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-white/40'
-                  }`}
-                >
-                  {ready ? (
-                    <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  ) : (
-                    <div className="h-2 w-2 animate-pulse rounded-full bg-current" />
-                  )}
-                  {stage.charAt(0).toUpperCase() + stage.slice(1)}
-                </span>
-              ))}
-            </div>
-          </div>
+          <div className="text-sm font-medium text-slate-500">Loading course…</div>
         </div>
       </div>
     )}

@@ -4,10 +4,10 @@
 // library listing (Modules, Notes, Mind Maps). One component each, so the
 // three libraries cannot drift apart.
 
-import { AlertCircle, FileText, LoaderCircle, Network } from "lucide-react";
+import { AlertCircle, Brain, FileText, LoaderCircle, Network } from "lucide-react";
 import "./study-library-states.css";
 
-export type StudyLibraryKind = "note" | "mind-map";
+export type StudyLibraryKind = "note" | "mind-map" | "brain";
 
 export function StudyLibraryEmptyState({
   kind,
@@ -18,7 +18,7 @@ export function StudyLibraryEmptyState({
   title: string;
   description: string;
 }) {
-  const Icon = kind === "note" ? FileText : Network;
+  const Icon = kind === "note" ? FileText : kind === "brain" ? Brain : Network;
   return (
     <div className="study-library-empty" data-study-library-empty data-resource-kind={kind}>
       <span className="study-library-empty__icon" aria-hidden="true"><Icon size={23} strokeWidth={1.9} /></span>
