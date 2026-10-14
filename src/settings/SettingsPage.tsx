@@ -238,11 +238,25 @@ export default function SettingsPage() {
               <div className="settings-section-heading">
                 <span className="settings-section-icon" aria-hidden="true"><PanelsTopLeft size={19} /></span>
                 <div className="settings-section-heading-copy">
-                  <div className="settings-section-title-row"><h2 id="settings-navigation">Footer navigation</h2><span className="settings-section-count">2 styles</span></div>
-                  <p>Choose the four-button glass bar or keep the classic magnifying dock on phones and portrait tablets. Desktop keeps its existing rail and peek dock.</p>
+                  <div className="settings-section-title-row"><h2 id="settings-navigation">Footer navigation</h2><span className="settings-section-count">3 styles</span></div>
+                  <p>Choose the full-width, edge-attached bar or either existing glass dock. Desktop keeps its existing navigation rail.</p>
                 </div>
               </div>
               <div className="settings-navigation-options" role="radiogroup" aria-label="Footer navigation style">
+                <button
+                  type="button"
+                  className="settings-navigation-choice"
+                  role="radio"
+                  aria-checked={footerNavigationStyle === "youtube"}
+                  data-selected={footerNavigationStyle === "youtube" ? "true" : undefined}
+                  onClick={() => setFooterNavigationStyle("youtube")}
+                >
+                  <span className="settings-navigation-preview settings-navigation-preview--youtube" aria-hidden="true">
+                    <span><i /><i /><i /><i /><i /></span>
+                  </span>
+                  <span className="settings-navigation-choice-copy"><strong>Edge-to-edge</strong><small>Full-width bar · blue active icon · quick actions</small></span>
+                  {footerNavigationStyle === "youtube" ? <Check className="settings-navigation-choice-check" size={17} aria-hidden="true" /> : null}
+                </button>
                 <button
                   type="button"
                   className="settings-navigation-choice"
