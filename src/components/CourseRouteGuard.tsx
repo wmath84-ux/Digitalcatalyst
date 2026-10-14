@@ -76,6 +76,7 @@ export default function CourseRouteGuard({ product, onCheckout, onBack, onPurcha
         onBack={onBack}
         onPurchaseUpdate={onPurchaseUpdate}
         initialModuleId={initialModuleId}
+        initialAccess={resolution}
       />
     );
   }

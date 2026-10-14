@@ -264,8 +264,8 @@ export default function Header({
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div data-header-app-icon className="flex h-[30px] w-[30px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/30">
-            {customLogo ? <BrandMark className="h-[30px] w-[30px]" /> : <LogoIcon className="h-[30px] w-[30px]" />}
+          <div data-header-app-icon className="flex h-[36px] w-[36px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/30">
+            {customLogo ? <BrandMark className="h-[36px] w-[36px]" /> : <LogoIcon className="h-[36px] w-[36px]" />}
           </div>
           <div className="flex min-w-0 flex-col justify-center leading-tight">
             <h1 className="truncate text-[22px] font-bold leading-[26px] tracking-tight text-white">{headerTitle}</h1>

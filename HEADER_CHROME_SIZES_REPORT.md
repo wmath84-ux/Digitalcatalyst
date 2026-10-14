@@ -1,27 +1,31 @@
 # Header chrome sizes + the `ad` move (2026-10-14)
 
-The owner's brief, in one line: **every header component is sized in three numbers — icons 30 px, text
-22 px, app icon 30 px — and the `ad` text leaves the header and becomes an option/button of the side
+The owner's brief, in one line: **every header component is sized in three numbers — action icons 30 px, text
+22 px, app icon 36 px — and the `ad` text leaves the header and becomes an option/button of the side
 panel, on phone, tablet and desktop alike.**
 
 > Update (2026-10-14, later the same day): the owner asked for the header app icon to be bigger — first
 > *half again as large* (25 → 37.5 px), then settled on **30 px**, the same size as the header's action
 > icons. Every `25 px` below is now `30 px`, and `tests/headerChromeSizesContract.test.mjs` pins the new
 > number.
+>
+> Latest update (2026-10-14): the owner then asked to increase the app icon by **6 px**. The
+> header and both side-rail brand marks are now **36 px** across phone, tablet and desktop; the
+> 30 px action glyphs and 22 px text are unchanged.
 
 ## The three numbers
 
 | Element | Before | Now |
 |---|---|---|
 | Header action icons (bell, cart, plans, search, download, help, report, usage limits, menu trigger, drawer close, top-bar clear …) | 40 px glyphs (often the same 40 px as the plate they sat in, so they touched the rim) | **30 px glyphs** in the existing 40 px plates |
-| App icon (header brand mark + the rail brand block) | 32 px on phone, 40 px from `sm:`, 48 px on tablet (index.css grew it), 36 / 44 px in the rails | **30 px** everywhere the chrome shows it (25 px at first, bumped the same day) |
+| App icon (header brand mark + the rail brand block) | 32 px on phone, 40 px from `sm:`, 48 px on tablet (index.css grew it), 36 / 44 px in the rails | **36 px** everywhere the chrome shows it (raised by 6 px from the previous 30 px size) |
 | Header text (page title / greeting / expanded pill labels / header search fields) | 24 px on phone, 40 px on `md:` and up (index.css then shrank the desktop title to 16–18 px) | **22 px** on every band |
 | Discs / plates the icons sit in | 40 px | 40 px — the plates are hit targets, not icons; `tests/headerChromeSizesContract.test.mjs` keeps them there |
 
 The tablet and desktop CSS in `src/index.css` used to fight these numbers (`[data-site-header] .h-11.w-11`
 grew the logo to 48 px, `[data-site-header] h1` re-set the title to 20 px, `[data-desktop-page-title]` shrank
-through a `clamp()` to 16–18 px). Those three rules now hold the same values as the components, so the header
-reads identically on a phone, a tablet and a desktop.
+through a `clamp()` to 16–18 px). Those rules now keep the 36 px brand mark and 22 px title in sync with
+the components, so the header reads consistently on phone, tablet and desktop.
 
 ## The `ad` option now lives in the side panel
 
@@ -50,9 +54,9 @@ and the row hides itself entirely while the admin has the launch playback on or 
   for the landing page.
 * `src/components/MobileHeaderMenu.tsx` — the phone side panel appends `Ad` and owns its player.
 * `src/components/DesktopShell.tsx` — both rails carry `Ad`; the top bar drops the `ad` label and takes the
-  30 px icon / 22 px text / 30 px app-icon sizes (title, search field, Review / Add / Upgrade, Expanding Tabs).
+  30 px action-icon / 22 px text / 36 px app-icon sizes (title, search field, Review / Add / Upgrade, Expanding Tabs).
 * `src/components/Header.tsx`, `src/home/components/Header.tsx` — shared + Home/FlowPath headers: 30 px icons,
-  22 px text, 30 px app icon, no `ad` label, tablet-portrait pill as the fallback.
+  22 px text, 36 px app icon, no `ad` label, tablet-portrait pill as the fallback.
 * `src/components/HeaderNotificationsButton.tsx` — a 30 px bell in the same glass plate.
 * `src/components/ui/ExpandingTabs.tsx` — new `iconSize` prop (the icon is centred from the class list, so a
   30 px glyph sits centred in the 40 px disc) and the 22 px expanded label.

@@ -10,8 +10,8 @@
 //     header-navigation.css).
 //   · the header text is 22px — the page title / greeting / the labels the
 //     action pills expand to / the search fields.
-//   · the app icon is 30px — the header brand mark and the rail brand block
-//     (bumped from 25px on the owner's request, 2026-10-14).
+//   · the app icon is 36px — the header brand mark and both rail brand blocks
+//     (increased by 6px on the owner's request; action glyphs stay at 30px).
 //   · the `ad` option is NOT one of the header's icons: it lives in the side
 //     panel on every band (tests/openingAdControl.test.mjs pins that).
 //
@@ -80,27 +80,28 @@ test("the header text is 22px, on every band", () => {
   assert.match(read("src/components/ui/ExpandingTabs.tsx"), /text-\[22px\] font-semibold leading-\[26px\]/);
 });
 
-test("the app icon is 30px wherever the chrome shows it", () => {
-  assert.match(header, /data-header-app-icon className="flex h-\[30px\] w-\[30px\]/);
-  assert.match(header, /<BrandMark className="h-\[30px\] w-\[30px\]" \/>/);
-  assert.match(homeHeader, /<BrandMark className="h-\[30px\] w-\[30px\]/);
-  // Desktop + tablet rail brand block (the app icon on those bands).
+test("the app icon is 36px wherever the chrome shows it", () => {
+  assert.match(header, /data-header-app-icon className="flex h-\[36px\] w-\[36px\]/);
+  assert.match(header, /<BrandMark className="h-\[36px\] w-\[36px\]" \/>/);
+  assert.match(header, /<LogoIcon className="h-\[36px\] w-\[36px\]" \/>/);
+  assert.match(homeHeader, /<BrandMark className="h-\[36px\] w-\[36px\]/);
+  // Desktop + tablet rail brand blocks (wide and compact glass rails).
   assert.equal(
-    (shell.match(/data-header-app-icon className="grid h-\[30px\] w-\[30px\]/g) ?? []).length,
+    (shell.match(/data-header-app-icon className="grid h-\[36px\] w-\[36px\]/g) ?? []).length,
     2,
-    "both rail variants (wide rail + glass rail) show the 30px app icon",
+    "both rail variants show the 36px app icon",
   );
-  // The landing page is marketing chrome, not the app header: it keeps its
-  // own larger mark.
+  assert.equal((shell.match(/<BrandMark className="h-\[36px\] w-\[36px\]" \/>/g) ?? []).length, 2);
+  assert.equal((shell.match(/<Sparkles className="h-\[26px\] w-\[26px\]" \/>/g) ?? []).length, 2);
+  // Landing chrome already uses a 36px brand mark.
   assert.match(landing, /<BrandMark className="h-9 w-9 rounded-xl"/);
 });
 
 test("the tablet/desktop CSS keeps the same three numbers instead of fighting them", () => {
-  // Tablet band: the brand block used to grow to 48px and the title was
-  // re-set to 20px.
+  // Tablet band keeps the app-brand container at the new 36px size.
   assert.match(
     indexCss,
-    /\[data-site-header\] \[data-header-app-icon\] \{\s*height: 30px;\s*width: 30px;\s*\}/,
+    /\[data-site-header\] \[data-header-app-icon\] \{\s*height: 36px;\s*width: 36px;\s*\}/,
   );
   assert.match(indexCss, /\[data-site-header\] h1 \{\s*font-size: 22px;\s*\}/);
   // Desktop band: the title used to shrink through a clamp to 16–18px.

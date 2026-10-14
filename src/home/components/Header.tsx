@@ -272,7 +272,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
       <div data-home-chrome className="relative flex min-w-0 items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5 min-[390px]:gap-3">
           <span data-home-brand data-header-app-icon className="shrink-0">
-            <BrandMark className="h-[30px] w-[30px] rounded-[10px] ring-1 ring-white/25" />
+            <BrandMark className="h-[36px] w-[36px] rounded-[10px] ring-1 ring-white/25" />
           </span>
           <div className="min-w-0 flex-1 overflow-hidden">
             

@@ -190,7 +190,7 @@ nobody asked for" stays intact: nothing is forced, it only remembers a request.
   action cluster, and the row/list must never be *unreachable* on a band that has a panel.
 * `tests/openingAdControl.test.mjs` pins all of this (which surfaces render the option, which render the
   faded label, and that nothing is fetched before the tap); `tests/headerChromeSizesContract.test.mjs` pins the
-  header sizes that came with the same pass (30 px icons, 22 px text, 30 px app icon).
+  header sizes (30 px action icons, 22 px text, 36 px app icon).
 * `tests/openingSplashRuntime.test.mjs` boots the real `index.html` in jsdom and asserts all of this —
   including "a clip that keeps advancing is never dismissed", "a remembered
   `static` preview must not replace the clip", "a refused play() waits instead of handing over" and the `shouldReleaseOpening` table; keep it
