@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import GlassSidebar, { type GlassSidebarItem } from "./glass-dock/GlassSidebar";
+import { OPENING_AD_ITEM, OPENING_AD_ITEM_ID, useOpeningAdPlayer } from "./ad/OpeningAdControl";
 import "./header-navigation.css";
 
 export type MobileHeaderMenuItem = {
@@ -35,6 +36,12 @@ const ACTION_COLORS: Record<string, string> = {
  * The phone-only counterpart to the tablet Glass Sidebar. The normal
  * header keeps a dedicated Notifications glass button beside this separate
  * quick-actions trigger; contextual header actions stay in this glass drawer.
+ *
+ * This drawer IS the phone's side panel, so the opening-animation `ad` option
+ * lives here too (the owner moved it out of the header strip — see
+ * src/components/ad/OpeningAdControl.tsx). It is appended to whatever the page
+ * passed in, and its own player renders from this component, so no caller has
+ * to know about it.
  */
 export default function MobileHeaderMenu({
   items,
@@ -54,6 +61,10 @@ export default function MobileHeaderMenu({
 }) {
   const { user } = useAuth();
   const avatar = profilePhotoSrc(user?.photoURL);
+  // The opening-animation (`ad`) option: a row of THIS drawer, not a header
+  // label. `available` is false while the admin has the animation off or
+  // already playing at launch, and the row disappears with it.
+  const openingAd = useOpeningAdPlayer();
   const [open, setOpen] = useState(false);
   const drawerId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -61,16 +72,30 @@ export default function MobileHeaderMenu({
   const dialogRef = useRef<HTMLDivElement>(null);
 
   const sidebarItems: GlassSidebarItem[] = useMemo(
-    () => items.map((item) => ({
-      id: item.id,
-      label: item.label,
-      ariaLabel: item.ariaLabel,
-      color: item.color ?? ACTION_COLORS[item.id] ?? "#3A86FF",
-      icon: item.id === "profile" && avatar ? <SafeImage src={avatar} alt="" className="h-5 w-5 rounded-full object-cover" fallback={item.icon} /> : item.icon,
-      active: item.id === activeId,
-      badge: item.badge,
-    })),
-    [items, activeId, avatar],
+    () => [
+      ...items.map((item) => ({
+        id: item.id,
+        label: item.label,
+        ariaLabel: item.ariaLabel,
+        color: item.color ?? ACTION_COLORS[item.id] ?? "#3A86FF",
+        icon: item.id === "profile" && avatar ? <SafeImage src={avatar} alt="" className="h-5 w-5 rounded-full object-cover" fallback={item.icon} /> : item.icon,
+        active: item.id === activeId,
+        badge: item.badge,
+      })),
+      // `ad` — the owner's own word for the opening animation, kept as the
+      // row's label; the accessible name spells out what tapping it does.
+      ...(openingAd.available
+        ? [{
+            id: OPENING_AD_ITEM_ID,
+            label: OPENING_AD_ITEM.label,
+            ariaLabel: OPENING_AD_ITEM.ariaLabel,
+            color: OPENING_AD_ITEM.color,
+            icon: <OPENING_AD_ITEM.Icon size={30} aria-hidden="true" />,
+            active: false,
+          }]
+        : []),
+    ],
+    [items, activeId, avatar, openingAd.available],
   );
 
   useEffect(() => {
@@ -165,13 +190,17 @@ export default function MobileHeaderMenu({
               surfaceVariant="header-drawer"
               onSelect={(id) => {
                 setOpen(false);
-                onSelect(id);
+                // The `ad` row is an action, not a destination: closing the
+                // drawer and opening the player (a <body> portal, z-index
+                // above this drawer) is the whole interaction.
+                if (id === OPENING_AD_ITEM_ID) openingAd.openPlayer();
+                else onSelect(id);
               }}
               header={(
                 <div className="flex min-w-0 items-center justify-between gap-2 py-1">
                   <div className="min-w-0">
                     <p className="truncate text-[12px] font-black uppercase tracking-[0.14em] text-white/90">Quick actions</p>
-                    <p className="mt-0.5 truncate text-[10px] font-semibold text-white/50">{items.length} available</p>
+                    <p className="mt-0.5 truncate text-[10px] font-semibold text-white/50">{sidebarItems.length} available</p>
                   </div>
                   <button
                     ref={closeButtonRef}
@@ -181,7 +210,7 @@ export default function MobileHeaderMenu({
                     className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.07] text-white/75 transition hover:bg-white/[0.12] hover:text-white"
                     data-mobile-header-drawer-close
                   >
-                    <X size={40} />
+                    <X size={30} />
                   </button>
                 </div>
               )}
@@ -211,9 +240,10 @@ export default function MobileHeaderMenu({
         data-mobile-header-menu-button
         data-button-size="40"
       >
-        <Menu aria-hidden="true" size={40} strokeWidth={2.2} />
+        <Menu aria-hidden="true" size={30} strokeWidth={2.2} />
       </button>
       {typeof document !== "undefined" && open ? createPortal(drawer, document.body) : null}
+      {openingAd.player}
     </>
   );
 }

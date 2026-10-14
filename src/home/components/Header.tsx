@@ -15,7 +15,7 @@ import BrandMark from "../../components/BrandMark";
 import { useBranding } from "../../context/BrandingContext";
 import { DEFAULT_HOME_GRADIENT_FROM, DEFAULT_HOME_GRADIENT_TO } from "../../utils/branding";
 import { useViewportBand } from "../../utils/responsive";
-import OpeningAdControl from "../../components/ad/OpeningAdControl";
+import { OPENING_AD_ITEM, OPENING_AD_ITEM_ID, useOpeningAdPlayer } from "../../components/ad/OpeningAdControl";
 
 interface HeaderProps {
   userName: string;
@@ -83,6 +83,11 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
   const unreadNotificationCount = useUnreadNotificationCount() || 0;
   const viewportBand = useViewportBand();
   const isPhoneLayout = viewportBand === "compact-mobile" || viewportBand === "large-mobile";
+  // The `ad` option rides the side panel (the phone drawer here, the rails in
+  // DesktopShell). The tablet bands (640–959 portrait) render no side panel,
+  // so it stays a pill in this header's cluster there — see Header.tsx.
+  const openingAd = useOpeningAdPlayer();
+  const tabletWithoutSidePanel = viewportBand === "small-tablet" || viewportBand === "tablet-portrait";
   const firstName = userName.trim().split(/\s+/)[0] || "Learner";
   // Which header action wears the expanded pill. On Home none of the
   // shortcuts is "the current page", so the bar starts collapsed and the
@@ -171,33 +176,53 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
   }, []);
 
   const allHomeActionItems: ExpandingTabItem[] = [
-    { id: "leaderboard", label: "Leaderboard", ariaLabel: "Leaderboard", icon: <Trophy size={40} strokeWidth={2.4} /> },
-    { id: "profile", label: "Profile", ariaLabel: "Open profile", icon: <UserRound size={40} strokeWidth={2.4} /> },
+    { id: "leaderboard", label: "Leaderboard", ariaLabel: "Leaderboard", icon: <Trophy size={30} strokeWidth={2.4} /> },
+    { id: "profile", label: "Profile", ariaLabel: "Open profile", icon: <UserRound size={30} strokeWidth={2.4} /> },
     {
       id: "favorites",
       label: "Favorites",
       ariaLabel: "Favorites",
-      icon: <Heart size={40} strokeWidth={2.4} fill="currentColor" />,
+      icon: <Heart size={30} strokeWidth={2.4} fill="currentColor" />,
       badge: favoritesCount > 0 ? String(favoritesCount) : undefined,
       badgeTone: "rose",
     },
     ...(onOpenSettings
-      ? [{ id: "settings", label: "Settings", ariaLabel: "Open Flow settings", icon: <Settings size={40} strokeWidth={2.4} /> }]
+      ? [{ id: "settings", label: "Settings", ariaLabel: "Open Flow settings", icon: <Settings size={30} strokeWidth={2.4} /> }]
       : []),
   ];
-  const homeActionItems = headerVariant === "flow"
-    ? allHomeActionItems.filter((item) => item.id === "settings")
-    : allHomeActionItems.filter((item) => item.id !== "profile");
+  // See `tabletWithoutSidePanel` above: on the one band with no side panel the
+  // `ad` option rides this cluster. It is appended AFTER the variant's own
+  // filter, so both the Home header and the FlowPath variant keep it — and the
+  // phone drawer list below never doubles it up (the drawer adds its own row).
+  const openingAdTabItem: ExpandingTabItem | null = tabletWithoutSidePanel && openingAd.available
+    ? {
+        id: OPENING_AD_ITEM_ID,
+        label: OPENING_AD_ITEM.label,
+        ariaLabel: OPENING_AD_ITEM.ariaLabel,
+        icon: <OPENING_AD_ITEM.Icon size={30} strokeWidth={2.4} aria-hidden="true" />,
+      }
+    : null;
+  const homeActionItems = [
+    ...(headerVariant === "flow"
+      ? allHomeActionItems.filter((item) => item.id === "settings")
+      : allHomeActionItems.filter((item) => item.id !== "profile")),
+    ...(openingAdTabItem ? [openingAdTabItem] : []),
+  ];
   // Profile stays reachable in the phone quick-actions drawer while the old
   // header-avatar slot becomes the always-visible glass Notifications button.
   // Usage Limits belongs in the phone drawer and persistent rail only.
   const phoneMenuItems = [
     ...homeActionItems,
     ...allHomeActionItems.filter((item) => item.id === "profile"),
-    { id: "usage-limits", label: "Usage Limits", ariaLabel: "Usage Limits", icon: <Gauge size={40} strokeWidth={2.4} /> },
+    { id: "usage-limits", label: "Usage Limits", ariaLabel: "Usage Limits", icon: <Gauge size={30} strokeWidth={2.4} /> },
   ];
 
   const handleHomeAction = (id: string) => {
+    // The opening-animation pill is momentary too — it opens the player.
+    if (id === OPENING_AD_ITEM_ID) {
+      openingAd.openPlayer();
+      return;
+    }
     // The gear is momentary (opens the page's settings surface), never an
     // active/expanded destination.
     if (id === "settings") {
@@ -246,16 +271,16 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
           only as a legacy helper/attribute — nothing paints it. */}
       <div data-home-chrome className="relative flex min-w-0 items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5 min-[390px]:gap-3">
-          <span data-home-brand className="shrink-0">
-            <BrandMark className="h-8 w-8 rounded-xl ring-1 ring-white/25 md:h-10 md:w-10" />
+          <span data-home-brand data-header-app-icon className="shrink-0">
+            <BrandMark className="h-[25px] w-[25px] rounded-lg ring-1 ring-white/25" />
           </span>
           <div className="min-w-0 flex-1 overflow-hidden">
             
             <h1
               data-home-greeting
               className={headerVariant === "flow"
-                ? "min-w-0 truncate whitespace-nowrap text-[24px] font-bold leading-[26px] tracking-tight md:text-[40px] md:leading-[40px]"
-                : "flex min-w-0 items-center gap-2 text-[24px] font-bold leading-[26px] tracking-tight md:text-[40px] md:leading-[40px]"}
+                ? "min-w-0 truncate whitespace-nowrap text-[22px] font-bold leading-[26px] tracking-tight"
+                : "flex min-w-0 items-center gap-2 text-[22px] font-bold leading-[26px] tracking-tight"}
             >
               {headerVariant === "flow" ? "FlowPath" : (
                 <>
@@ -263,13 +288,14 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
                     <strong className="font-extrabold">Hello</strong>
                     <span className="sr-only" data-home-user-name>, {firstName}</span>
                   </span>
-                  <PiHandWavingDuotone data-home-wave className="h-6 w-6 shrink-0 text-amber-200 md:h-10 md:w-10" aria-hidden="true" />
+                  <PiHandWavingDuotone data-home-wave className="h-[30px] w-[30px] shrink-0 text-amber-200" aria-hidden="true" />
                 </>
               )}
             </h1>
           </div>
-          {/* Faded `ad` control — see src/components/ad/OpeningAdControl.tsx. */}
-          <OpeningAdControl />
+          {/* The opening-animation `ad` option is a row of the phone
+              quick-actions drawer / the page's side panel, not a header
+              label — see src/components/ad/OpeningAdControl.tsx. */}
         </div>
         <div data-home-actions className="flex shrink-0 items-center gap-1 min-[390px]:gap-2">
           <HeaderNotificationsButton
@@ -294,6 +320,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
                 activeId={homeActiveAction}
                 onSelect={handleHomeAction}
                 items={homeActionItems}
+                iconSize={30}
               />
             </div>
           )}
@@ -319,14 +346,14 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
         >
           <GlassInput
             ref={ref}
-            icon={<Search size={20} strokeWidth={2.4} className="h-5 w-5 md:h-10 md:w-10" />}
+            icon={<Search size={30} strokeWidth={2.4} className="h-[30px] w-[30px]" />}
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             onFocus={openSearch}
             type="text"
             inputMode="search"
             placeholder="Search courses, PDFs, e-books..."
-            className="dc-scene-field w-full [&_input]:cursor-pointer [&_input]:pr-20 [&_input]:outline-none md:[&_input]:pr-24 [&_.relative.flex]:py-2 [&_.relative.flex]:px-3 md:[&_.relative.flex]:px-4 md:[&_.relative.flex]:py-2.5"
+            className="dc-scene-field w-full [&_input]:cursor-pointer [&_input]:pr-20 [&_input]:outline-none md:[&_input]:pr-24 [&_input]:text-[22px] [&_input]:leading-[26px] [&_.relative.flex]:py-2 [&_.relative.flex]:px-3 md:[&_.relative.flex]:px-4 md:[&_.relative.flex]:py-2.5"
             readOnly
           />
           {query ? (
@@ -337,9 +364,9 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
                 onQueryChange("");
               }}
               aria-label="Clear search"
-              className="absolute right-2 top-1/2 -translate-y-1/2 [&_.size-12]:size-6"
+              className="absolute right-2 top-1/2 -translate-y-1/2 [&_.size-12]:size-[30px]"
             >
-              <X size={16} strokeWidth={2.6} className="h-4 w-4 md:h-10 md:w-10" />
+              <X size={30} strokeWidth={2.6} className="h-[30px] w-[30px]" />
             </GlassButton>
           ) : null}
         </div>
@@ -376,6 +403,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
         )}
       </div>
     </GlassSurface>
+    {openingAd.player}
     </header>
   );
 });
