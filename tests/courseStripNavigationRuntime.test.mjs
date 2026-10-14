@@ -27,13 +27,13 @@ const Nav = load('src/course/CoursePeekDock.tsx', id => {
   return require(id);
 }).default;
 test('real strip render, click, keyboard focus, hidden tabs and soft keyboard', async () => {
-  assert.equal(tabs.length, 9);
+  assert.equal(tabs.length, 10);
   const root = createRoot(document.getElementById('root'));
   const selected = [];
   const render = () => root.render(React.createElement(Nav, { tab: 'notes', hiddenTabs: ['paid'], onTabChange: key => selected.push(key) }));
   await act(render);
   const buttons = [...document.querySelectorAll('button')];
-  assert.equal(buttons.length, 8);
+  assert.equal(buttons.length, 9);
   assert.equal(document.querySelector('[data-course-strip="paid"]'), null);
   assert.equal(document.querySelector('[data-course-strip="notes"]').getAttribute('aria-pressed'), 'true');
   assert.ok(buttons.every(button => button.getAttribute('aria-label') && button.style.getPropertyValue('--strip-color')));

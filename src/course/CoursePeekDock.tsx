@@ -12,6 +12,8 @@ const LABELS: Partial<Record<DockTab, [string, string]>> = {
   modules: ['M', 'Modules'], brain: ['B', 'Brain'], notes: ['N', 'Notes'],
   mindmap: ['MM', 'Map'], ai: ['AI', 'AI'], paid: ['P', 'Paid'],
   experiment: ['E', 'Lab'], sketch: ['S', 'Sketch'], read: ['R', 'Read'],
+  // Music takes the note glyph, not an "M": Modules already owns that letter.
+  music: ['♪', 'Music'],
 }
 
 export default function CoursePeekDock({ tab, onTabChange, hiddenTabs = [] }: {

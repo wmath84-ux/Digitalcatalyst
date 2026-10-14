@@ -28,6 +28,8 @@ import { experimentHasSource } from "./utils/experimentSpec";
 import { SplitDeck, type SplitDeckHandle } from "./course/studyPanels";
 import type { SplitRegion } from "./course/splitMotion";
 import ExtraPaneTabs from "./course/ExtraPaneTabs";
+import MusicPanel from "./course/MusicPanel";
+import { collectCourseAudio } from "./course/musicLibrary";
 import SnowOverlay from "./course/SnowOverlay";
 // The mind map canvas is the single heaviest thing in the player: the panel
 // plus `@xyflow/react` is a 221 kB / 73 kB-gzip chunk. `StudyContent` only
@@ -2363,6 +2365,14 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           uid={user?.id ?? null}
         />
       )}
+      // ── MUSIC ───────────────────────────────────────────────────────────
+      // The glass player the audio lessons already use, plus the learner's
+      // library (course audio, their own files, saved links). Main pane only:
+      // a second player in an extra part would fight the first one for the
+      // speaker, so an extra part never mounts it.
+      musicPanel={opts.extra ? undefined : (
+        <MusicPanel uid={user?.id ?? null} courseAudio={courseAudio} />
+      )}
       aiPanel={opts.extra ? undefined : (
         user?.id && aiOpened ? (
           <Suspense
@@ -2402,6 +2412,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    * speak about one tab.
    */
   const studyOverlay = buildStudyPane(dockTab, handleDockTabChange);
+
+  /**
+   * The course's own audio lessons — the Music tab's first shelf. Access-scoped
+   * (a locked module contributes nothing) and read straight off the same tree
+   * every other list uses, so the library can never drift from the course.
+   */
+  const courseAudio = useMemo(
+    () => collectCourseAudio(modules, resolution.accessibleModuleIds),
+    [modules, resolution.accessibleModuleIds],
+  );
 
   /**
    * The tabs an EXTRA pane (the third / fourth part the divider adds on a big

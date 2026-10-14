@@ -35,7 +35,8 @@ test("Read is additive without changing the official CourseFileType or Note-awar
 });
 
 test("Read has its own Course Player dock tab and is excluded from lesson selection, rows and progress", () => {
-  assert.match(overlay, /export type DockTab =[^;]*\| "read";/);
+  // Later feature tabs may follow Read — Read keeps its own slot and key.
+  assert.match(overlay, /export type DockTab =[^;]*\| "read" \| "music";/);
   assert.match(overlay, /\{ key: "read", label: "Read", heading: "Read library"/);
   assert.match(overlay, /collectAccessibleReadResources\(props\.modules, unlocked, props\.ownedUpdateIds, props\.productId\)/);
   assert.match(overlay, /unlockedModuleIds\(props\.modules, props\.accessibleModuleIds, props\.ownedUpdateIds\)/);

@@ -47,7 +47,7 @@ import {
 } from "react";
 import { DEFAULT_MODULE_LISTING_STYLE } from "./playerPreferences";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from "framer-motion";
-import { BookOpen, Brain, FileText, FlaskConical, Network, NotebookPen, PenLine, ShoppingBag, Sparkles } from "lucide-react";
+import { BookOpen, Brain, FileText, FlaskConical, Music, Network, NotebookPen, PenLine, ShoppingBag, Sparkles } from "lucide-react";
 import { collectAccessibleReadResources } from "../../utils/readResources.js";
 import ReadLibraryPanel from "./ReadLibraryPanel";
 import type { ReadUpload } from "../../utils/readUploads.js";
@@ -60,7 +60,7 @@ import { EASE_OUT_MOTION } from "./splitMotion";
 import { useCourseKeyboard } from "./useCourseKeyboard";
 import { AiTabIcon } from "./studyTabIcons";
 
-export type DockTab = "modules" | "brain" | "notes" | "mindmap" | "ai" | "paid" | "player" | "experiment" | "sketch" | "read";
+export type DockTab = "modules" | "brain" | "notes" | "mindmap" | "ai" | "paid" | "player" | "experiment" | "sketch" | "read" | "music";
 export type DockOrientation = "portrait" | "landscape";
 
 type FlatModule = { module: CourseModule; depth: number };
@@ -282,6 +282,13 @@ interface CourseOverlayProps {
   // while its tab is active.
   sketchPanel?: ReactNode;
   /**
+   * Music — the player's own Glass Music Player plus the learner's library
+   * (this course's audio, their own files, their saved links). Owned by the
+   * parent, rendered as a PERSISTENT sibling of the keyed tab body so the song
+   * survives a tab switch the way a music player should.
+   */
+  musicPanel?: ReactNode;
+  /**
    * Read tab → "Add to my module": the panel hands back the learner's own
    * uploaded PDF and the PARENT opens the existing Add-to-My-Module dialog
    * (the same one the Player settings use). Optional — the tab works without
@@ -393,6 +400,15 @@ export const TABS: Array<{ key: DockTab; label: string; heading: string; hint: s
   // The Read library is a distinct resource tab; the existing eight tab keys
   // stay in their original order so their numeric keyboard shortcuts persist.
   { key: "read", label: "Read", heading: "Read library", hint: "Accessible PDFs and reading links", color: "#E879F9", icon: FileText },
+  // ── Music (owner brief, 2026-10-14) ───────────────────────────────────
+  // "Footer navigation mein ek aur button add karo music ka." The tab hosts
+  // the player's own Glass Music Player (`src/course/AudioPlayer.tsx`, the
+  // one every audio lesson already renders) plus the learner's LIBRARY:
+  // this course's audio, their own files and their saved YouTube / Spotify /
+  // SoundCloud links. Appended LAST for the same reason Read was: no existing
+  // tab's dock position or ⌘/Ctrl shortcut moves (only 1…9 have shortcuts, so
+  // the eleventh key simply has none).
+  { key: "music", label: "Music", heading: "Music", hint: "Music library — course, device aur links", color: "#FB7185", icon: Music },
 ];
 
 /** The course footer's single colour: the website's indigo (brand gradient start). */
@@ -431,6 +447,17 @@ export const PLAYER_FALLBACK = (
 export const SKETCH_FALLBACK = (
   <p className="px-4 py-6 text-center text-[11px] font-semibold text-[var(--course-muted)]">
     Sketch is course me abhi available nahi hai.
+  </p>
+);
+
+/**
+ * Rendered when a call site has no music panel to host — an EXTRA pane (the
+ * third/fourth part the divider adds) never gets one, because two players on
+ * one screen would fight over the speaker. The main pane always has one.
+ */
+export const MUSIC_FALLBACK = (
+  <p className="px-4 py-6 text-center text-[11px] font-semibold text-[var(--course-muted)]">
+    Music main study pane mein chalta hai.
   </p>
 );
 
@@ -596,6 +623,7 @@ export function StudyContent({
   experimentPanel,
   sketchPanel,
   resourceLibraryPanel,
+  musicPanel,
   moduleListingStyle = DEFAULT_MODULE_LISTING_STYLE,
 }: {
   tab: DockTab;
@@ -614,6 +642,8 @@ export function StudyContent({
   experimentPanel?: ReactNode;
   sketchPanel?: ReactNode;
   resourceLibraryPanel?: ReactNode;
+  /** Music — the glass player plus the learner's library. */
+  musicPanel?: ReactNode;
   moduleListingStyle?: "classic" | "modern";
 }) {
   return (
@@ -640,6 +670,13 @@ export function StudyContent({
         // The drawing board. Like the mind map, the parent owns the scene +
         // its Firestore hook and hands the panel down ready-rendered.
         sketchPanel ?? SKETCH_FALLBACK
+      ) : tab === "music" ? (
+        // Music. The player hands the panel down ready-rendered (live audio +
+        // the learner's library); a call site without one gets a hint, never a
+        // blank surface. The panel is ALSO mounted as a persistent sibling of
+        // this keyed body, so a song keeps playing while the learner reads
+        // their notes — this branch is only the no-panel fallback.
+        musicPanel ?? MUSIC_FALLBACK
       ) : tab === "player" ? (
         // Everything the player header used to be — course details, progress,
         // the active file's own buttons and every player preference, one list.
@@ -781,6 +818,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       experimentPanel={props.experimentPanel}
       sketchPanel={props.sketchPanel}
       resourceLibraryPanel={props.resourceLibraryPanel}
+      musicPanel={props.musicPanel}
     />
   );
 
@@ -827,7 +865,12 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // pixel the header used to take.
   // The compact study strip is an in-flow sibling below the Split Deck, not an
   // overlay on its content. Do not reserve the old 16px peek-dock spacer here.
-  const hideKeyedBody = (Boolean(props.aiPanel) && props.tab === "ai") || props.tab === "read";
+  // The AI chat and the Read library keep their own persistent bodies (their
+  // state outlives a tab switch). Music joins them for the same reason a music
+  // player exists at all: the song must NOT stop because the learner glanced at
+  // their notes — the pane stays mounted and only its visibility toggles.
+  const hideKeyedBody = (Boolean(props.aiPanel) && props.tab === "ai") || props.tab === "read"
+    || (Boolean(props.musicPanel) && props.tab === "music");
 
   return (
     <>
@@ -841,6 +884,16 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       >
         {studyBody}
       </motion.div>
+      {props.musicPanel ? (
+        <div
+          className={`h-full min-h-0 flex-1 flex-col overflow-hidden ${props.tab === "music" ? "flex" : "hidden"}`}
+          data-course-music-tab
+          hidden={props.tab !== "music"}
+          aria-hidden={props.tab !== "music"}
+        >
+          {props.musicPanel}
+        </div>
+      ) : null}
       {props.aiPanel ? (
         <div
           className={`h-full min-h-0 flex-1 flex-col overflow-hidden ${props.tab === "ai" ? "flex" : "hidden"}`}
