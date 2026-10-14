@@ -11,6 +11,44 @@ function initialsOf(name: string): string {
   return `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase();
 }
 
+const ChatItem = memo(function ChatItem({ chat, active, onSelect, onTogglePin }: {
+  chat: Chat; active: boolean; onSelect: (id: string) => void; onTogglePin: (id: string) => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "group relative flex items-center rounded-[10px] border transition-colors",
+        active ? "border-[--border] bg-[--surface] shadow-[var(--sh-xs)]" : "border-transparent hover:bg-[--hover]"
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => onSelect(chat.id)}
+        aria-current={active ? "page" : undefined}
+        className="focus-ring min-w-0 flex-1 rounded-[10px] px-3 py-2.5 text-left"
+      >
+        <div className="flex items-center gap-1.5">
+          <span className={cn("truncate text-[13px] font-medium leading-snug", active ? "text-[--ink]" : "text-[--ink-2]")}>{chat.title}</span>
+          {chat.pinned && <Pin size={10.5} className="flex-none -rotate-45 text-[--accent-ink]" aria-label="Pinned" />}
+        </div>
+        <div className="mt-0.5 truncate text-[11px] text-[--ink-3]">{chat.courseShort}</div>
+      </button>
+      <button
+        type="button"
+        onClick={() => onTogglePin(chat.id)}
+        aria-label={chat.pinned ? `Unpin ${chat.title}` : `Pin ${chat.title}`}
+        title={chat.pinned ? "Unpin" : "Pin"}
+        className={cn(
+          "focus-ring mr-1.5 flex h-[26px] w-[26px] flex-none items-center justify-center rounded-[7px] text-[--ink-3] transition-all hover:bg-[--active] hover:text-[--ink]",
+          chat.pinned ? "opacity-100 text-[--accent-ink] hover:text-[--accent-ink]" : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+        )}
+      >
+        {chat.pinned ? <PinOff size={13.5} aria-hidden="true" /> : <Pin size={13.5} aria-hidden="true" />}
+      </button>
+    </div>
+  );
+});
+
 function Sidebar({
   chats,
   activeId,
@@ -39,43 +77,6 @@ function Sidebar({
   const photoURL = profile?.photoURL || user?.photoURL;
   const pinnedChats = chats.filter((c) => c.pinned);
   const recent = chats.filter((c) => !c.pinned);
-
-  const Item = ({ chat }: { chat: Chat }) => {
-    const active = chat.id === activeId;
-    return (
-      <div
-        className={cn(
-          "group relative flex items-center rounded-[10px] border transition-colors",
-          active ? "border-[--border] bg-[--surface] shadow-[var(--sh-xs)]" : "border-transparent hover:bg-[--hover]"
-        )}
-      >
-        <button
-          type="button"
-          onClick={() => onSelect(chat.id)}
-          aria-current={active ? "page" : undefined}
-          className="focus-ring min-w-0 flex-1 rounded-[10px] px-3 py-2.5 text-left"
-        >
-          <div className="flex items-center gap-1.5">
-            <span className={cn("truncate text-[13px] font-medium leading-snug", active ? "text-[--ink]" : "text-[--ink-2]")}>{chat.title}</span>
-            {chat.pinned && <Pin size={10.5} className="flex-none -rotate-45 text-[--accent-ink]" aria-label="Pinned" />}
-          </div>
-          <div className="mt-0.5 truncate text-[11px] text-[--ink-3]">{chat.courseShort}</div>
-        </button>
-        <button
-          type="button"
-          onClick={() => onTogglePin(chat.id)}
-          aria-label={chat.pinned ? `Unpin ${chat.title}` : `Pin ${chat.title}`}
-          title={chat.pinned ? "Unpin" : "Pin"}
-          className={cn(
-            "focus-ring mr-1.5 flex h-[26px] w-[26px] flex-none items-center justify-center rounded-[7px] text-[--ink-3] transition-all hover:bg-[--active] hover:text-[--ink]",
-            chat.pinned ? "opacity-100 text-[--accent-ink] hover:text-[--accent-ink]" : "opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
-          )}
-        >
-          {chat.pinned ? <PinOff size={13.5} aria-hidden="true" /> : <Pin size={13.5} aria-hidden="true" />}
-        </button>
-      </div>
-    );
-  };
 
   return (
     <aside
@@ -121,7 +122,7 @@ function Sidebar({
             <div className="px-3 pb-1 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[--ink-4]">Pinned</div>
             <div className="flex flex-col gap-0.5">
               {pinnedChats.map((c) => (
-                <Item key={c.id} chat={c} />
+                <ChatItem key={c.id} chat={c} active={c.id === activeId} onSelect={onSelect} onTogglePin={onTogglePin} />
               ))}
             </div>
           </div>
@@ -129,7 +130,7 @@ function Sidebar({
         <div className="px-3 pb-1 pt-2 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[--ink-4]">Recent</div>
         <div className="flex flex-col gap-0.5">
           {recent.map((c) => (
-            <Item key={c.id} chat={c} />
+            <ChatItem key={c.id} chat={c} active={c.id === activeId} onSelect={onSelect} onTogglePin={onTogglePin} />
           ))}
           {recent.length === 0 && <div className="px-3 py-2 text-[12px] text-[--ink-3]">No other chats</div>}
         </div>

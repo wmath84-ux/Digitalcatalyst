@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown, ArrowUpRight, Check, Copy, ImagePlay, RotateCcw, TriangleAlert,
 } from "lucide-react";
@@ -92,6 +92,9 @@ const AssistantMessage = memo(function AssistantMessage({
   onOpenPlans?: () => void;
 }) {
   perf.bump("messageRenders");
+  const openMarkdownImage = useCallback((src: string, alt: string) => {
+    onImageClick({ id: `md-${src}`, kind: "upload", name: alt || "image", src });
+  }, [onImageClick]);
   const [copied, setCopied] = useState(false);
   const live = message.status === "thinking";
   const streaming = message.status === "streaming";
@@ -185,7 +188,7 @@ const AssistantMessage = memo(function AssistantMessage({
               {streamSplit.stable && (
                 <Markdown
                   text={streamSplit.stable}
-                  onImageClick={(src, alt) => onImageClick({ id: `md-${src}`, kind: "upload", name: alt || "image", src })}
+                  onImageClick={openMarkdownImage}
                 />
               )}
               <div className="md whitespace-pre-wrap">
@@ -196,7 +199,7 @@ const AssistantMessage = memo(function AssistantMessage({
           ) : (
             <Markdown
               text={message.content}
-              onImageClick={(src, alt) => onImageClick({ id: `md-${src}`, kind: "upload", name: alt || "image", src })}
+              onImageClick={openMarkdownImage}
             />
           )}
 
@@ -339,14 +342,18 @@ function Sentinel({
           ) : null}
         </div>
       )}
-      {hasMore && !isLoadingMore && !loadError && <div className="h-2" aria-hidden="true" />}
+      {hasMore && !isLoadingMore && !loadError && (
+        <button type="button" onClick={onRetry} className="ghost-btn focus-ring mx-auto my-2 text-[12px]">
+          Load earlier messages
+        </button>
+      )}
     </>
   );
 }
 
 /* ── the scrollable conversation ────────────────────────────── */
 
-export default function MessageList({
+const MessageList = memo(function MessageList({
   chat, tier, generating, onRetry, onImageClick, onToggleThinking, onQuizAnswer, onQuizSubmit, onFollowUp, onOpenPlans,
 }: {
   chat: Chat;
@@ -364,6 +371,9 @@ export default function MessageList({
   const { visible, hasMore, isLoadingMore, loadError, loadMore, retry } = usePagedMessages(chat, listRef);
 
   const atBottomRef = useRef(true);
+  // Layout/scroll anchoring can emit scroll events on open and resize.
+  // Only learner input may arm automatic history pagination.
+  const historyIntentRef = useRef(false);
   const [atBottom, setAtBottom] = useState(true);
   const [sentinelEl, setSentinelEl] = useState<HTMLDivElement | null>(null);
   const didInit = useRef(false);
@@ -382,14 +392,16 @@ export default function MessageList({
     []
   );
 
+  useEffect(() => () => smoothBottom.cancel(), [smoothBottom]);
+
   /* prefetch older history via IntersectionObserver (no scroll polling) */
   useEffect(() => {
     if (!sentinelEl || !hasMore) return;
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries.some((e) => e.isIntersecting)) loadMore();
+        if (entries.some((e) => e.isIntersecting) && historyIntentRef.current && !atBottomRef.current) loadMore();
       },
-      { root: null, rootMargin: `${PERF.CHAT_PREFETCH_MARGIN}px 0px 0px 0px`, threshold: 0 }
+      { root: listRef.current, rootMargin: `${PERF.CHAT_PREFETCH_MARGIN}px 0px 0px 0px`, threshold: 0 }
     );
     io.observe(sentinelEl);
     return () => io.disconnect();
@@ -452,10 +464,15 @@ export default function MessageList({
         role="log"
         aria-label="Conversation"
         className="scroll-area absolute inset-0 overflow-y-auto"
+        onWheel={(e) => { if (e.deltaY < 0) historyIntentRef.current = true; }}
+        onTouchStart={() => { historyIntentRef.current = true; }}
+        onPointerDown={() => { historyIntentRef.current = true; }}
+        onKeyDown={(e) => { if (["ArrowUp", "PageUp", "Home"].includes(e.key)) historyIntentRef.current = true; }}
         onScroll={(e) => {
           // Cheap, state-change-only updates; reads happen once per event.
           const el = e.currentTarget;
           const b = el.scrollHeight - el.scrollTop - el.clientHeight < 90;
+          if (historyIntentRef.current && !b && el.scrollTop < PERF.CHAT_PREFETCH_MARGIN && hasMore) loadMore();
           if (b !== atBottomRef.current) {
             atBottomRef.current = b;
             setAtBottom(b);
@@ -472,7 +489,7 @@ export default function MessageList({
                 isLoadingMore={isLoadingMore}
                 loadError={loadError}
                 showBeginning={!hasMore && chat.messages.length > PERF.CHAT_INITIAL_PAGE}
-                onRetry={retry}
+                onRetry={loadError ? retry : loadMore}
                 sentinelRef={setSentinelEl}
               />
               {visible.map((m) => {
@@ -519,4 +536,6 @@ export default function MessageList({
       )}
     </div>
   );
-}
+});
+
+export default MessageList;

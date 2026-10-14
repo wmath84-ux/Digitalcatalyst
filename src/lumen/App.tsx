@@ -12,7 +12,7 @@ import { useRevisionAi } from "./useRevisionAi";
 import useLumenChats from "./useLumenChats";
 import { PersonalAiApiError } from "../ai/personalAiClient";
 import { formatAnswerSheet, type GenerationSpec } from "./lib/engine";
-import { tierOf, useElementWidth } from "./lib/tier";
+import { CHAT_COLUMN_BREAKPOINTS, CHAT_FRAME_BREAKPOINTS, tierOf, useElementBreakpoint } from "./lib/tier";
 import { buildCourseContext, gradeQuiz } from "./ai/tutor";
 import { loadStudentModel, saveStudentModel } from "./ai/studentModel";
 import type { StudentModel } from "./ai/types";
@@ -46,6 +46,8 @@ export interface LumenChatProps {
    */
   onOpenSubscription?: () => void;
 }
+
+const EMPTY_NOTES: CoursePlayerNote[] = [];
 
 const asPersonalId = (value?: string | null): string | undefined => {
   const id = String(value || "").trim();
@@ -97,7 +99,7 @@ function LumenChatInner({
   resourceName,
   resourceType,
   selectedFile = null,
-  notes = [],
+  notes = EMPTY_NOTES,
   profile,
   onOpenSubscription,
 }: LumenChatProps) {
@@ -144,8 +146,8 @@ function LumenChatInner({
   const [studentModel, setStudentModel] = useState<StudentModel>(loadStudentModel);
 
   const rootRef = useRef<HTMLDivElement>(null);
-  const [frameRef, frameW] = useElementWidth<HTMLDivElement>();
-  const [colRef, colW] = useElementWidth<HTMLElement>();
+  const [frameRef, frameW] = useElementBreakpoint<HTMLDivElement>(CHAT_FRAME_BREAKPOINTS);
+  const [colRef, colW] = useElementBreakpoint<HTMLElement>(CHAT_COLUMN_BREAKPOINTS);
 
   // Visual-viewport / keyboard system (CSS-variable driven, no re-render).
   useViewportKeyboard(rootRef);
@@ -287,8 +289,9 @@ function LumenChatInner({
 
   /* ── state helpers ─────────────────────────────────────── */
 
-  const patchChat = (chatId: string, patch: Partial<Chat> | ((c: Chat) => Partial<Chat>)) =>
-    setChats((cs) => cs.map((c) => (c.id !== chatId ? c : { ...c, ...(typeof patch === "function" ? patch(c) : patch) })));
+  const patchChat = useCallback((chatId: string, patch: Partial<Chat> | ((c: Chat) => Partial<Chat>)) =>
+    setChats((cs) => cs.map((c) => (c.id !== chatId ? c : { ...c, ...(typeof patch === "function" ? patch(c) : patch) }))), [setChats]);
+  const toggleChatPin = useCallback((id: string) => patchChat(id, (c) => ({ pinned: !c.pinned })), [patchChat]);
 
   const patchMessage = (chatId: string, msgId: string, patch: Partial<Message> | ((m: Message) => Partial<Message>)) =>
     setChats((cs) =>
@@ -580,8 +583,10 @@ function LumenChatInner({
     []
   );
   const cbDraftSync = useCallback(
-    (v: string) => setDrafts((d) => (d[activeChatRef.current.id] === v ? d : { ...d, [activeChatRef.current.id]: v })),
-    []
+    // Capture the owning chat: the outgoing Composer flushes after the
+    // active-chat ref has already advanced to the newly selected chat.
+    (v: string) => setDrafts((d) => (d[chat.id] === v ? d : { ...d, [chat.id]: v })),
+    [chat.id]
   );
 
   const newChat = () => {
@@ -688,7 +693,7 @@ function LumenChatInner({
               profile={profile}
               onSelect={selectChat}
               onNewChat={newChat}
-              onTogglePin={(id) => patchChat(id, (c) => ({ pinned: !c.pinned }))}
+              onTogglePin={toggleChatPin}
               onTogglePanelPin={() => setSidebarPinned((v) => !v)}
             />
           </div>
@@ -729,6 +734,7 @@ function LumenChatInner({
           )}
 
           <MessageList
+            key={`messages-${chat.id}`}
             chat={chat}
             tier={tier}
             generating={generating}
@@ -774,7 +780,7 @@ function LumenChatInner({
                   profile={profile}
                   onSelect={selectChat}
                   onNewChat={newChat}
-                  onTogglePin={(id) => patchChat(id, (c) => ({ pinned: !c.pinned }))}
+                  onTogglePin={toggleChatPin}
                   onTogglePanelPin={() => setSidebarPinned((v) => !v)}
                   onClose={() => setDrawerOpen(false)}
                 />
