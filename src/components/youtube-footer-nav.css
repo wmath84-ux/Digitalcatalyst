@@ -216,6 +216,14 @@
   overflow-wrap: anywhere;
 }
 
+.dc-youtube-footer-quick-icon > svg {
+  display: block;
+  width: 21px;
+  height: 21px;
+  flex: 0 0 21px;
+  stroke-width: 2;
+}
+
 .dc-youtube-footer-quick-icon {
   display: grid;
   width: 32px;
