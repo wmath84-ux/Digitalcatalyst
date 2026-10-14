@@ -434,7 +434,7 @@ test("The Player tab uses the website logo in the back slot and keeps onBack", (
   assert.match(playerPanel, /data-course-back/);
   assert.match(playerPanel, /data-course-logo-back/);
   assert.match(playerPanel, /data-course-logo/);
-  assert.match(playerPanel, /src=\{logoUrl\}/);
+  assert.match(playerPanel, /src=\{resolveImageSrc\(logoUrl\)\}/); // /api/ routed through the APK-safe resolver
   assert.match(playerPanel, /onClick=\{\(\) => \{[\s\S]*onBack\(\)/);
   assert.match(coursePlayer, /onBack=\{onBack\}/);
   assert.doesNotMatch(playerPanel, /<ArrowLeft/);

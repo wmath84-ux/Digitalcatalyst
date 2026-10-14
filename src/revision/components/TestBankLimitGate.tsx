@@ -1,6 +1,6 @@
 import { Archive, ArrowUpRight, Trash2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "../../components/ui/glass-dialog";
-import { GlassButton } from "../../components/ui/glass-button";
+import { GlassButton } from "./RevisionGlassButton";
 import { PrimaryButton, SecondaryButton } from "./ui";
 import type { RevisionBankStatus } from "../engine/cloudRevisionService";
 

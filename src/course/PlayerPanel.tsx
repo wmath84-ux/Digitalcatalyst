@@ -33,6 +33,7 @@ import { GlassButton } from "../components/ui/glass-button";
 import { GlassPrefToggle } from "../components/ui/glass-pref-toggle";
 import GatePersonalAccess from "./GatePersonalAccess";
 import { toast } from "../components/ui/glass-toast";
+import { resolveImageSrc } from "../components/ui/SafeImage";
 import { useHomeHold } from "../hooks/useHomeHold";
 import type { CourseFileActions } from "./ResourceViewer";
 
@@ -265,7 +266,7 @@ export default function PlayerPanel({
           data-course-back
           data-course-logo-back
         >
-          <img src={logoUrl} alt={appName} decoding="async" width={40} height={40} className="h-10 w-10 rounded-full object-cover select-none" draggable={false} data-course-logo />
+          <img src={resolveImageSrc(logoUrl)} referrerPolicy="no-referrer" alt={appName} decoding="async" width={40} height={40} className="h-10 w-10 rounded-full object-cover select-none" draggable={false} data-course-logo />
         </GlassButton>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-black leading-tight tracking-tight" data-course-product-title>{productTitle}</p>

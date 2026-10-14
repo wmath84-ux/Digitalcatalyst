@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useExitGuard } from "./ExitGuardContext";
 import { ChevronLeftIcon } from "./icons";
 import { GlassSurface } from "../../components/ui/glass";
-import { GlassButton } from "../../components/ui/glass-button";
+import { GlassButton } from "./RevisionGlassButton";
 
 type AppHeaderProps = {
   title: string;

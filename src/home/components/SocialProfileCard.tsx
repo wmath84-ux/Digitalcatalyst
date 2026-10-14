@@ -4,6 +4,7 @@ import { SocialLinkIcon } from "../../components/ui/SocialPlatformIcon";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { resolveSocialLink, type SocialLink } from "../../utils/socialPlatform";
 import { DEFAULT_LOGO_URL } from "../../utils/branding";
+import { resolveImageSrc } from "../../components/ui/SafeImage";
 
 interface SocialProfileCardProps {
   /** Branding → Logo. Shown inside the circular logo area. */
@@ -103,7 +104,8 @@ export default function SocialProfileCard({
     <>
       <img
         className="dc-social-pic"
-        src={visibleLogo}
+        src={resolveImageSrc(visibleLogo)}
+        referrerPolicy="no-referrer"
         alt=""
         width={288}
         height={288}

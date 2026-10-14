@@ -21,7 +21,7 @@ import {
   type ProviderModel,
 } from "../engine/aiConfig";
 import { Spinner, SecondaryButton } from "./ui";
-import { GlassButton } from "../../components/ui/glass-button";
+import { GlassButton } from "./RevisionGlassButton";
 import AiConfigButton from "../../components/ui/AiConfigButton";
 import { Button as RecallButton } from "../recall/components/ui/button";
 import { Input as RecallInput } from "../recall/components/ui/input";

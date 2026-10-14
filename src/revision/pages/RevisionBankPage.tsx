@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from "../../components/ui/glass-dialog";
 import { GlassSheet, GlassSheetContent, GlassSheetTitle, GlassSheetClose } from "../../components/ui/glass-sheet";
 import { GlassInput } from "../../components/ui/glass-input";
-import { GlassButton } from "../../components/ui/glass-button";
+import { GlassButton } from "../components/RevisionGlassButton";
 import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
 import { GlassSurface } from "../../components/ui/glass";
 import { GlassTile } from "../../components/ui/glass-tile";
