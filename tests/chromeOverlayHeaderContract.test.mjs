@@ -25,7 +25,7 @@ test("overlay CSS is gated so display:none chrome cannot stack leftover pad", ()
   assert.match(css, /CHROME OVERLAY/);
   assert.match(overlay, /@media \(max-width: 959px\)/);
   assert.match(overlay, /html:not\(\[data-tablet-landscape-desktop="true"\]\) body:not\(:has\(\.dc-desktop-shell\)\)/);
-  assert.match(overlay, /--dc-site-header-seat:\s*4\.25rem/);
+  assert.match(overlay, /--dc-site-header-seat:\s*3\.5rem/);
   assert.match(overlay, /--dc-site-header-seat:\s*5rem/);
 });
 

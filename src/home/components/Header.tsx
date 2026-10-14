@@ -236,7 +236,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
       blur={0}
       style={{ borderRadius: "0 0 32px 32px" }}
       className="overflow-hidden"
-      contentClassName="px-4 pb-8 pt-[calc(1.5rem+env(safe-area-inset-top))] min-[390px]:px-5"
+      contentClassName="px-3 pb-5 pt-[calc(0.875rem+env(safe-area-inset-top))] min-[390px]:px-4 md:px-5 md:pb-8 md:pt-[calc(1.5rem+env(safe-area-inset-top))]"
     >
       {/* The header is the pack's GlassSurface at the pinned docs sensitivity
           (websiteglass.com/docs/components/glass playground: radius 24 ·
@@ -247,15 +247,15 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
       <div data-home-chrome className="relative flex min-w-0 items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5 min-[390px]:gap-3">
           <span data-home-brand className="shrink-0">
-            <BrandMark className="h-10 w-10 rounded-xl ring-1 ring-white/25" />
+            <BrandMark className="h-8 w-8 rounded-xl ring-1 ring-white/25 md:h-10 md:w-10" />
           </span>
           <div className="min-w-0 flex-1 overflow-hidden">
             
             <h1
               data-home-greeting
               className={headerVariant === "flow"
-                ? "min-w-0 truncate whitespace-nowrap text-[40px] font-bold leading-[40px] tracking-tight"
-                : "flex min-w-0 items-center gap-2 text-[40px] font-bold leading-[40px] tracking-tight"}
+                ? "min-w-0 truncate whitespace-nowrap text-[24px] font-bold leading-[26px] tracking-tight md:text-[40px] md:leading-[40px]"
+                : "flex min-w-0 items-center gap-2 text-[24px] font-bold leading-[26px] tracking-tight md:text-[40px] md:leading-[40px]"}
             >
               {headerVariant === "flow" ? "FlowPath" : (
                 <>
@@ -263,7 +263,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
                     <strong className="font-extrabold">Hello</strong>
                     <span className="sr-only" data-home-user-name>, {firstName}</span>
                   </span>
-                  <PiHandWavingDuotone data-home-wave className="h-10 w-10 shrink-0 text-amber-200" aria-hidden="true" />
+                  <PiHandWavingDuotone data-home-wave className="h-6 w-6 shrink-0 text-amber-200 md:h-10 md:w-10" aria-hidden="true" />
                 </>
               )}
             </h1>
@@ -274,7 +274,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
         <div data-home-actions className="flex shrink-0 items-center gap-1 min-[390px]:gap-2">
           <HeaderNotificationsButton
             count={unreadNotificationCount}
-            size={40}
+            size={isPhoneLayout ? 36 : 40}
             onClick={() => {
               if (onOpenNotifications) onOpenNotifications();
               else window.location.hash = "#/notifications";
@@ -300,7 +300,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
         </div>
       </div>
 
-      <div data-home-search-slot className={`relative mt-5 ${headerVariant === "flow" ? "hidden" : ""}`}>
+      <div data-home-search-slot className={`relative mt-3 md:mt-5 ${headerVariant === "flow" ? "hidden" : ""}`}>
         {/* Wave 14: the search pill is the pack Glass Input (websiteglass.com
             defaults — tint 0.4, radius 9999), the same component the store
             page's search bar renders; `dc-glass-toolbar` is gone from here. */}
@@ -319,14 +319,14 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
         >
           <GlassInput
             ref={ref}
-            icon={<Search size={40} strokeWidth={2.4} />}
+            icon={<Search size={20} strokeWidth={2.4} className="h-5 w-5 md:h-10 md:w-10" />}
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             onFocus={openSearch}
             type="text"
             inputMode="search"
             placeholder="Search courses, PDFs, e-books..."
-            className="dc-scene-field w-full [&_input]:cursor-pointer [&_input]:pr-24 [&_input]:outline-none"
+            className="dc-scene-field w-full [&_input]:cursor-pointer [&_input]:pr-20 [&_input]:outline-none md:[&_input]:pr-24 [&_.relative.flex]:py-2 [&_.relative.flex]:px-3 md:[&_.relative.flex]:px-4 md:[&_.relative.flex]:py-2.5"
             readOnly
           />
           {query ? (
@@ -339,7 +339,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
               aria-label="Clear search"
               className="absolute right-2 top-1/2 -translate-y-1/2 [&_.size-12]:size-6"
             >
-              <X size={40} strokeWidth={2.6} />
+              <X size={16} strokeWidth={2.6} className="h-4 w-4 md:h-10 md:w-10" />
             </GlassButton>
           ) : null}
         </div>

@@ -5695,7 +5695,7 @@ html[data-android-edge-to-edge="true"]::after {
    `display:none` site header on desktop cannot stack leftover pad. */
 
 :root {
-  --dc-site-header-seat: 4.25rem; /* 68px — matches .dc-page-tabs */
+  --dc-site-header-seat: 3.5rem; /* 56px — compact phone header (py-2 + 36px actions) */
 }
 
 @media (min-width: 768px) {
