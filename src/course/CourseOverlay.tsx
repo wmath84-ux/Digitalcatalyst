@@ -395,6 +395,9 @@ export const TABS: Array<{ key: DockTab; label: string; heading: string; hint: s
   { key: "read", label: "Read", heading: "Read library", hint: "Accessible PDFs and reading links", color: "#E879F9", icon: FileText },
 ];
 
+/** The course footer's single colour: the website's indigo (brand gradient start). */
+export const COURSE_FOOTER_COLOR = "#4f46e5";
+
 /** The dock's tab order — ⌘/Ctrl+1…9 walks this list. */
 export const STUDY_TAB_ORDER: DockTab[] = TABS.map(({ key }) => key);
 
@@ -437,10 +440,12 @@ export const SKETCH_FALLBACK = (
  * by both variants so the dock is identical wherever it lives.
  */
 export const buildDockItems = (tab: DockTab, hiddenTabs: DockTab[] = []): GlassDockItem[] =>
-  TABS.filter(({ key }) => !hiddenTabs.includes(key)).map(({ key, label, color, icon }) => ({
+  TABS.filter(({ key }) => !hiddenTabs.includes(key)).map(({ key, label, icon }) => ({
     id: key,
     label,
-    color,
+    // One website colour for every footer item, and circular plates.
+    color: COURSE_FOOTER_COLOR,
+    shape: 'circle' as const,
     icon,
     active: key === tab,
     dataAttrs: {

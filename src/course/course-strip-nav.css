@@ -9,16 +9,18 @@
 [data-course-strip-nav] button {
   position: relative; isolation: isolate; flex: 1 0 44px; min-width: 44px; min-height: 44px;
   display: grid; place-items: center; padding: 0 6px;
-  color: #000; font-size: 14px; line-height: 20px; font-weight: 750;
-  border: 0; background: transparent; border-radius: 8px; cursor: pointer;
+  color: #fff; font-size: 14px; line-height: 20px; font-weight: 750;
+  border: 0; background: transparent; border-radius: 999px; cursor: pointer;
 }
+/* Circular plates in the one website colour (set by CoursePeekDock). */
 [data-course-strip-nav] button::before {
-  content: ''; position: absolute; z-index: -1; inset: 8px 0;
-  background: var(--strip-color); border-radius: 6px;
-  transition: inset 150ms ease, box-shadow 150ms ease;
+  content: ''; position: absolute; z-index: -1; inset: 6px 0;
+  background: var(--strip-color); border-radius: 50%;
+  transition: inset 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+  opacity: 0.85;
 }
-[data-course-strip-nav] button[aria-pressed='true']::before { inset: 4px 0; box-shadow: inset 0 0 0 2px #000; }
-[data-course-strip-nav] button:active::before { inset: 10px 0; }
+[data-course-strip-nav] button[aria-pressed='true']::before { inset: 2px 0; opacity: 1; box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--strip-color); }
+[data-course-strip-nav] button:active::before { inset: 8px 0; }
 [data-course-strip-nav] button:focus-visible { outline: 2px solid #000; outline-offset: -2px; }
 [data-course-strip-nav] .course-strip-name { display: none; }
 /* Names only when each strip has enough space at the same readable 14px. */
