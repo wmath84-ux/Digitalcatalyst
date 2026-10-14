@@ -902,7 +902,7 @@ html[data-theme="light"] [data-settings-page]:not([data-public-profile]) :is(a, 
    readable Settings palette in both themes. */
 .settings-navigation-options {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.8rem;
 }
 
@@ -1095,5 +1095,64 @@ html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settin
     max-width: 38rem;
     font-size: 1rem;
     line-height: 1.65;
+  }
+}
+
+
+/* Miniature edge-to-edge preview for the full-width footer choice. */
+.settings-navigation-preview--youtube {
+  min-height: 40px;
+  padding: 0.18rem 0.12rem;
+  border-color: #d5e1f3;
+  border-radius: 0.6rem;
+  background: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.settings-navigation-preview--youtube > span {
+  height: 100%;
+  align-items: center;
+  gap: 0.08rem;
+}
+
+.settings-navigation-preview--youtube i {
+  width: 8px;
+  height: 8px;
+  flex-basis: 8px;
+  border: 0;
+  border-radius: 3px;
+  background: #aab6c7;
+}
+
+.settings-navigation-preview--youtube i:first-child {
+  background: #0057d9;
+}
+
+.settings-navigation-preview--youtube i:nth-child(3) {
+  width: 18px;
+  height: 18px;
+  flex-basis: 18px;
+  border: 1px solid #c8dcff;
+  border-radius: 50%;
+  color: #004ac6;
+  background: #edf4ff;
+}
+
+.settings-navigation-preview--youtube i:nth-child(3)::before {
+  display: block;
+  color: #004ac6;
+  content: "+";
+  font: 700 13px/18px system-ui, sans-serif;
+  text-align: center;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-navigation-preview--youtube {
+  border-color: #d0def2;
+  background: #ffffff;
+}
+
+@media (max-width: 767px) {
+  .settings-navigation-options {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
