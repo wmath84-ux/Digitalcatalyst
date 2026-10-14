@@ -19,6 +19,9 @@ const panel = read('src/course/MusicPanel.tsx');
 const library = read('src/course/musicLibrary.ts');
 const db = read('src/course/musicDb.ts');
 const search = read('src/course/musicSearch.ts');
+const vite = read('vite.config.ts');
+const envExample = read('.env.example');
+const indexHtml = read('index.html');
 
 test('Music is a real dock tab, appended last so no existing tab or shortcut moves', () => {
   assert.match(overlay, /export type DockTab = "modules" \| "brain" \| "notes" \| "mindmap" \| "ai" \| "paid" \| "player" \| "experiment" \| "sketch" \| "read" \| "music";/);
@@ -88,7 +91,9 @@ test('the learner\'s own files stay on the learner\'s device', () => {
 test('search is key-gated, and without a key it hands the query to YouTube itself', () => {
   assert.match(search, /export const youTubeSearchUrl = \(query: string\): string =>/);
   assert.match(search, /https:\/\/www\.youtube\.com\/results\?search_query=/);
-  assert.match(panel, /const searchKeyReady = youTubeSearchAvailable\(\);/);
+  // The key is read as STATE now, so a key injected into a live browser is
+  // noticed without a reload (the pane re-subscribes to the key event).
+  assert.match(panel, /const \[searchKeyReady, setSearchKeyReady\] = useState\(youTubeSearchAvailable\);/);
   assert.match(panel, /onClick=\{runSearch\} disabled=\{busy \|\| !query\.trim\(\)\} data-music-search-run/);
   assert.match(panel, /<a href=\{youTubeSearchUrl\(query\)\} target="_blank" rel="noopener noreferrer"\n                data-music-search-external/);
   assert.match(panel, /data-music-results/);
@@ -122,6 +127,39 @@ test('the player hands the pane the course audio and the learner, main pane only
   assert.match(player, /musicPanel=\{opts\.extra \? undefined : \(\n        <MusicPanel uid=\{user\?\.id \?\? null\} courseAudio=\{courseAudio\} \/>\n      \)\}/);
   // One speaker per screen: an extra pane never mounts the music tab.
   assert.match(player, /\(\["modules", "notes", "read", "paid"\] as DockTab\[\]\)\.filter\(\(tab\) => !hiddenTabs\.includes\(tab\)\)/);
+});
+
+test('the optional YouTube key is INJECTED from the environment — never hard-coded', () => {
+  // Build: `VITE_YOUTUBE_API_KEY` reaches the client as one plain constant, so
+  // the feature module stays free of `import.meta` and still loads in node.
+  assert.match(vite, /import \{ defineConfig, loadEnv \} from "vite";/);
+  assert.match(vite, /const env = loadEnv\(mode, process\.cwd\(\), ""\);/);
+  assert.match(vite, /__DC_YOUTUBE_API_KEY__: JSON\.stringify\(env\.VITE_YOUTUBE_API_KEY \|\| ""\),/);
+  assert.match(envExample, /VITE_YOUTUBE_API_KEY=/);
+  // Dev has no identifier replacement, so the key rides in on the document —
+  // with the placeholder treated as "not configured".
+  assert.match(indexHtml, /window\.__DC_YOUTUBE_API_KEY__ = "%VITE_YOUTUBE_API_KEY%";/);
+  assert.match(search, /const cleanKey = \(value: unknown\): string => \{/);
+  assert.match(search, /return key && !\/\^%\.\*%\$\/\.test\(key\) \? key : "";/);
+  // The three sources, in order: build constant → served global → local override.
+  assert.match(search, /declare const __DC_YOUTUBE_API_KEY__: string \| undefined;/);
+  assert.match(search, /export const MUSIC_YOUTUBE_KEY_STORAGE = "dc\.music\.youtubeKey";/);
+  assert.match(search, /export function subscribeYouTubeKey\(listener: \(\) => void\): \(\) => void \{/);
+  // The pane re-reads it live, so a key set in a live browser shows the button.
+  assert.match(panel, /const \[searchKeyReady, setSearchKeyReady\] = useState\(youTubeSearchAvailable\);/);
+  assert.match(panel, /useEffect\(\(\) => subscribeYouTubeKey\(\(\) => setSearchKeyReady\(youTubeSearchAvailable\(\)\)\), \[\]\);/);
+  assert.match(panel, /data-music-search-mode=\{searchKeyReady \? "api" : "external"\}/);
+  // A key never appears in the source, and is never logged.
+  for (const source of [search, panel, library]) {
+    assert.doesNotMatch(codeOnly(source), /AIza[0-9A-Za-z_-]{10,}/);
+    assert.doesNotMatch(codeOnly(source), /console\.[a-z]+\([^)]*[kK]ey/);
+  }
+});
+
+test('a key search that finds nothing hands the query back to YouTube', () => {
+  assert.match(panel, /setNotice\(found\.length \? "" : "YouTube se results nahin mile/);
+  assert.match(panel, /data-music-no-results/);
+  assert.match(panel, /<a href=\{youTubeSearchUrl\(query\)\} target="_blank" rel="noopener noreferrer" data-music-search-external/);
 });
 
 test('nothing in the feature scrapes a stream or bypasses a platform player', () => {

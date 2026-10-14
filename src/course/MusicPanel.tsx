@@ -51,7 +51,9 @@ import {
   musicRowBadge, removeMusicLink, saveLastMusic, saveMusicLinks, type MusicTrack,
 } from "./musicLibrary";
 import { listLocalSongs, removeLocalSong, songObjectUrl, storeLocalSong } from "./musicDb";
-import { resolveMusicTitle, searchYouTube, youTubeSearchAvailable, youTubeSearchUrl } from "./musicSearch";
+import {
+  resolveMusicTitle, searchYouTube, subscribeYouTubeKey, youTubeSearchAvailable, youTubeSearchUrl,
+} from "./musicSearch";
 
 interface MusicPanelProps {
   /** The signed-in learner — the library and the local songs are keyed on it. */
@@ -97,7 +99,16 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
   const fileRef = useRef<HTMLInputElement>(null);
   /** The blob URL currently held for a local song — revoked before the next one. */
   const blobUrlRef = useRef("");
-  const searchKeyReady = youTubeSearchAvailable();
+  /**
+   * A YouTube Data API key is what turns the search box into an in-player
+   * result list (`musicSearch.ts`). It is read at render, and re-read the
+   * moment a key is injected or cleared, so the owner can set one in a live
+   * browser and watch the button appear.
+   */
+  const [searchKeyReady, setSearchKeyReady] = useState(youTubeSearchAvailable);
+  const [searched, setSearched] = useState(false);
+
+  useEffect(() => subscribeYouTubeKey(() => setSearchKeyReady(youTubeSearchAvailable())), []);
 
   /**
    * Load the learner's own files. A local database that refuses (private
@@ -222,7 +233,12 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
     const text = query.trim();
     if (!text || !searchKeyReady) return;
     setBusy(true);
-    setResults(await searchYouTube(text));
+    const found = await searchYouTube(text);
+    setResults(found);
+    setSearched(true);
+    // A key can be valid and still return nothing (quota, offline, a
+    // filter). Say so, and hand the query to YouTube itself.
+    setNotice(found.length ? "" : "YouTube se results nahin mile (quota ya network). Neeche wale link se YouTube par search karo, phir link yahan paste kar do.");
     setBusy(false);
   }, [query, searchKeyReady]);
 
@@ -304,7 +320,8 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
       {/* ── Library sheet ───────────────────────────────────────────────── */}
       {sheetOpen && (
         <div className="flex min-h-0 flex-1 flex-col" data-music-library-sheet>
-          <div className="flex shrink-0 items-center gap-2 border-b border-white/10 px-2.5 py-2">
+          <div className="flex shrink-0 items-center gap-2 border-b border-white/10 px-2.5 py-2"
+            data-music-search-mode={searchKeyReady ? "api" : "external"}>
             <span className="relative flex-1">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input value={query} onChange={(event) => setQuery(event.target.value)}
@@ -357,6 +374,16 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
           )}
 
           <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-2.5">
+            {searchKeyReady && searched && results.length === 0 && (
+              <p className="mb-3 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-3 py-2 text-[11px] font-semibold text-amber-100" data-music-no-results>
+                YouTube se kuch nahin mila.{" "}
+                <a href={youTubeSearchUrl(query)} target="_blank" rel="noopener noreferrer" data-music-search-external
+                  className="underline decoration-amber-200/60 underline-offset-2">
+                  YouTube par khud search karo
+                </a>{" "}
+                aur link yahan paste kar do — library usi ko chala degi.
+              </p>
+            )}
             {results.length > 0 && (
               <div className="mb-3" data-music-results>
                 <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">YouTube results</p>

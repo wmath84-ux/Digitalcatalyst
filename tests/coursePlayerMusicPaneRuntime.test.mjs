@@ -16,7 +16,7 @@
 //   6. with no YouTube key the search hands the query to YouTube itself;
 //   7. the library search filters all three shelves at once.
 
-import test, { after } from "node:test";
+import test, { after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -128,8 +128,10 @@ window.Element.prototype.getBoundingClientRect = () => ({
 window.HTMLMediaElement.prototype.play = () => Promise.resolve();
 window.HTMLMediaElement.prototype.pause = () => undefined;
 window.HTMLMediaElement.prototype.load = () => undefined;
-// No network in a unit test — the oEmbed title lookup fails silently by design.
-define("fetch", () => Promise.reject(new Error("offline")));
+// No network in a unit test: a switchable stub, so a test can answer either
+// like a platform's oEmbed or like the YouTube Data API.
+let fetchResponder = () => Promise.reject(new Error("offline"));
+define("fetch", (...args) => Promise.resolve(fetchResponder(...args)));
 // No API key configured: the pane must fall back to YouTube's own search page.
 delete globalThis.__DC_YOUTUBE_API_KEY__;
 
@@ -174,6 +176,11 @@ const COURSE_TRACK = {
 function mount(options = {}) {
   fixture.mountMusic(host(), { courseAudio: [COURSE_TRACK], ...options });
 }
+
+// Every test starts offline; a test that wants an answer sets its own responder.
+beforeEach(() => {
+  fetchResponder = () => Promise.reject(new Error("offline"));
+});
 
 after(() => {
   fixture.unmountMusic();
@@ -314,6 +321,61 @@ test("with no YouTube key, search hands the query to YouTube itself", async () =
   assert.equal(link.getAttribute("href"), "https://www.youtube.com/results?search_query=arijit%20singh%20songs");
   // A per-tab result button only exists when an API key is configured.
   assert.equal(Boolean(q("[data-music-search-run]")), false);
+});
+
+test("with a YouTube key, search happens INSIDE the player and its results play here", async () => {
+  window.localStorage.clear();
+  // The owner's override slot — the same switch `VITE_YOUTUBE_API_KEY` feeds.
+  window.localStorage.setItem("dc.music.youtubeKey", "test-key");
+  fetchResponder = () => ({
+    ok: true,
+    json: () => Promise.resolve({
+      items: [
+        { id: { videoId: "dQw4w9WgXcQ" }, snippet: { title: "Never Gonna Give You Up", channelTitle: "Rick Astley" } },
+        { id: { videoId: "9bZkp7q19f0" }, snippet: { title: "GANGNAM STYLE", channelTitle: "officialpsy" } },
+      ],
+    }),
+  });
+  mount();
+  await settle();
+  assert.equal(q("[data-music-search-mode]").getAttribute("data-music-search-mode"), "api");
+  assert.equal(Boolean(q("[data-music-search-run]")), true);
+  assert.equal(Boolean(q("[data-music-search-external]")), false, "no hand-off needed when a key exists");
+
+  typeInto(q("[data-music-search]"), "koi bhi gaana");
+  await act(async () => { q("[data-music-search-run]").click(); });
+  await settle();
+  const results = qa("[data-music-result]");
+  assert.equal(results.length, 2);
+  assert.match(results[0].textContent, /Never Gonna Give You Up/);
+  assert.match(results[0].textContent, /Rick Astley/);
+
+  // Tapping a result plays it right here and keeps it on the shelf.
+  await act(async () => { results[1].click(); });
+  await settle();
+  const frame = q('[data-music-embed="youtube"]');
+  assert.equal(Boolean(frame), true);
+  assert.match(frame.getAttribute("src"), /youtube-nocookie\.com\/embed\/9bZkp7q19f0/);
+  const saved = JSON.parse(window.localStorage.getItem("dc.music.library.v1:learner-1"));
+  assert.equal(saved.tracks.length, 1);
+  assert.equal(saved.tracks[0].url, "https://www.youtube.com/watch?v=9bZkp7q19f0");
+});
+
+test("a key that returns nothing says so and offers the YouTube hand-off", async () => {
+  window.localStorage.clear();
+  window.localStorage.setItem("dc.music.youtubeKey", "test-key");
+  fetchResponder = () => ({ ok: false, status: 403, json: () => Promise.resolve({}) });
+  mount();
+  await settle();
+  typeInto(q("[data-music-search]"), "quota khatam");
+  await act(async () => { q("[data-music-search-run]").click(); });
+  await settle();
+  assert.equal(Boolean(q("[data-music-no-results]")), true);
+  assert.match(q("[data-music-notice]").textContent, /quota ya network/);
+  assert.equal(
+    q("[data-music-no-results] a").getAttribute("href"),
+    "https://www.youtube.com/results?search_query=quota%20khatam",
+  );
 });
 
 test("the library's search filters every shelf at once", async () => {

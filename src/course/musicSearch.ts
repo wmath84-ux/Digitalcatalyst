@@ -17,34 +17,78 @@
 //                    (a new tab / the platform browser), and the learner pastes
 //                    the link back — which the library already plays.
 //
-// The key is a PUBLIC key (it ships in the client), so it is read from a global
-// the deployment can set in `index.html`:
+// The key is a PUBLIC key (it ships in the client), so it is read from three
+// places, in this order — deliberately NOT through `import.meta.env`, so this
+// module still loads in every harness (node --test) as plain JavaScript:
 //
-//     <script>window.__DC_YOUTUBE_API_KEY__ = "AIza…"</script>
+//   1. the BUILD — `VITE_YOUTUBE_API_KEY` in `.env` (or the host's env
+//      settings). vite.config.ts injects it as the `__DC_YOUTUBE_API_KEY__`
+//      constant, which is what the first branch below reads;
+//   2. a deployment that would rather inject it at serve time:
+//      `<script>window.__DC_YOUTUBE_API_KEY__ = "AIza…"</script>`
+//   3. the OWNER's own browser, for verifying a key without a rebuild:
+//      `localStorage.setItem("dc.music.youtubeKey", "AIza…")`
 //
-// and, for Vite builds, the same global can be injected with
-// `define: { __DC_YOUTUBE_API_KEY__: JSON.stringify(process.env.VITE_YOUTUBE_API_KEY) }`
-// — deliberately NOT read through `import.meta.env` here, so this module loads
-// in every harness (node --test) as plain JavaScript.
+// Restrict the key to the site's HTTP referrers in Google Cloud (APIs &
+// Services → Credentials) — the Data API is billed per quota unit, and an
+// unrestricted key can be lifted out of any client bundle.
 
 import { createMusicId, youTubeEmbedUrl, type MusicTrack } from "./musicLibrary";
 
 declare const __DC_YOUTUBE_API_KEY__: string | undefined;
 
+/** The owner's own override slot — see the header. */
+export const MUSIC_YOUTUBE_KEY_STORAGE = "dc.music.youtubeKey";
+/** Fired after the override is written, so a live pane re-reads it at once. */
+export const MUSIC_YOUTUBE_KEY_EVENT = "dc:music-youtube-key";
+
+/**
+ * A value is only a key when it is a non-empty string that is not the
+ * un-substituted `%VITE_YOUTUBE_API_KEY%` placeholder index.html ships (a
+ * build with no `.env` value leaves it verbatim, and `%…%` is not a key).
+ */
+const cleanKey = (value: unknown): string => {
+  if (typeof value !== "string") return "";
+  const key = value.trim();
+  return key && !/^%.*%$/.test(key) ? key : "";
+};
+
+/** The build-time constant, if this build has one (vite.config.ts). */
+const buildKey = (): string => {
+  try {
+    return typeof __DC_YOUTUBE_API_KEY__ === "string" ? cleanKey(__DC_YOUTUBE_API_KEY__) : "";
+  } catch {
+    return "";
+  }
+};
+
 /** The configured key, or "" — never throws, never logs it. */
 export function youTubeSearchKey(): string {
+  const injected = buildKey() || cleanKey((globalThis as Record<string, unknown>).__DC_YOUTUBE_API_KEY__);
+  if (injected) return injected;
   try {
-    if (typeof __DC_YOUTUBE_API_KEY__ === "string" && __DC_YOUTUBE_API_KEY__.trim()) {
-      return __DC_YOUTUBE_API_KEY__.trim();
-    }
+    return cleanKey(globalThis.window?.localStorage.getItem(MUSIC_YOUTUBE_KEY_STORAGE));
   } catch {
-    /* not defined in this build — fall through to the global */
+    return "";
   }
-  const injected = (globalThis as Record<string, unknown>).__DC_YOUTUBE_API_KEY__;
-  return typeof injected === "string" ? injected.trim() : "";
 }
 
 export const youTubeSearchAvailable = (): boolean => Boolean(youTubeSearchKey());
+
+/**
+ * Watch for the key appearing (or being cleared) without a reload: the
+ * `storage` event covers another tab, the custom event covers this one.
+ */
+export function subscribeYouTubeKey(listener: () => void): () => void {
+  const target = globalThis.window;
+  if (!target?.addEventListener) return () => undefined;
+  target.addEventListener("storage", listener);
+  target.addEventListener(MUSIC_YOUTUBE_KEY_EVENT, listener);
+  return () => {
+    target.removeEventListener("storage", listener);
+    target.removeEventListener(MUSIC_YOUTUBE_KEY_EVENT, listener);
+  };
+}
 
 /** Where a query goes when there is no key: YouTube's own search page. */
 export const youTubeSearchUrl = (query: string): string =>
