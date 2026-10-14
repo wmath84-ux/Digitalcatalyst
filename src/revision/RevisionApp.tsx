@@ -142,6 +142,21 @@ interface RevisionAppProps {
   uidOverride?: string;
 }
 
+function RevisionPageMissing({ navigate }: { navigate: (href: string) => void }) {
+  return (
+    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 p-6 text-center" data-revision-page-missing>
+      <p className="text-base font-semibold">This revision page could not be found.</p>
+      <button
+        type="button"
+        onClick={() => navigate("#/revision")}
+        className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary"
+      >
+        Back to Revision
+      </button>
+    </div>
+  );
+}
+
 export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
   const { user } = useAuth();
   const { cartIds } = useCommerce();
@@ -400,9 +415,9 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
       case "test-review":
         return <TestReviewPage uid={uid} attemptId={route.id} />;
       case "session":
-        return route.id === null ? null : <RevisionSessionPage uid={uid} sessionId={route.id} />;
+        return route.id === null ? <RevisionPageMissing navigate={navigate} /> : <RevisionSessionPage uid={uid} sessionId={route.id} />;
       case "session-result":
-        return route.id === null ? null : <RevisionSessionResultPage uid={uid} route={route.hash} sessionId={route.id} />;
+        return route.id === null ? <RevisionPageMissing navigate={navigate} /> : <RevisionSessionResultPage uid={uid} route={route.hash} sessionId={route.id} />;
       case "weak-topics":
         return <WeakTopicsPage uid={uid} />;
       case "progress":
@@ -416,9 +431,11 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
       case "bulk-import":
         return <BulkImportPage uid={uid} route={route.hash} hasAccess={hasAccess} onRequireAccess={requireAccess} />;
       default:
-        return null;
+        // Not a ported Recall view and not a Digitalcatalyst page: show a
+        // visible fallback instead of an empty white screen.
+        return <RevisionPageMissing navigate={navigate} />;
     }
-  }, [hasAccess, requireAccess, route.id, route.page, uid, userName]);
+  }, [hasAccess, requireAccess, route.id, route.page, uid, userName, navigate]);
 
   const isFocused = route.page === "test-play" || route.page === "test-play-attempt";
   const isStudy = view === "study" || view === "match";
@@ -616,7 +633,9 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
                           <Onboarding />
                         </Suspense>
                       ) : dcPage ? (
-                        <Suspense fallback={<RecallLoading />}>{dcPage}</Suspense>
+                        <ErrorBoundary viewName="RevisionPage" onRecover={() => navigate("#/revision")}>
+                          <Suspense fallback={<RecallLoading />}>{dcPage}</Suspense>
+                        </ErrorBoundary>
                       ) : (
                         recallContent
                       )}

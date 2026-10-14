@@ -81,7 +81,7 @@ test("checkout keeps its identity colours and gains only the gloss", () => {
   const payCss = read("src/components/ui/payment-button.css");
   assert.match(payCss, /\.uzp-pay\[data-uzp-state="loading"\] \{\s*cursor: progress;/);
   // Current brand indigo token (was green before a1b4e10).
-  assert.match(payCss, /--uzp-clr: #4f46e5;/);
+  assert.match(payCss, /--uzp-clr: var\(--dc-purchase-accent, #4f46e5\);/);
   // The secondary "Back" is a plain text action (no capsule, no painted plate).
   assert.match(pg, /<button type="button" onClick=\{onGoBack\} className="dc-checkout-text-action"/);
   assert.doesNotMatch(pg, /dc-glass-soft w-full rounded-2xl bg-white\/\[0\.06\]/);
