@@ -93,7 +93,6 @@ export default function SiteFooterNav({
       <YoutubeFooterNav
         label={label}
         items={items}
-        onSelect={onSelect}
         position={position}
         dataAttrs={dataAttrs}
       />
