@@ -581,14 +581,12 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
     width: 100%;
   }
 
-  /* Header chrome keeps its app-wide sizes on a tablet: the app icon is
-     30 px (the owner's 2026-10-14 bump) and the header title 22 px on every
-     band (phone, tablet, desktop). The brand block used to grow to 48 px
-     here and the title was re-set to 20 px, which made the same header read
-     differently on a tablet. */
+  /* The app brand mark is 36 px on every band after the owner's +6 px
+     request; keep tablet header CSS in sync with the component sizes.
+     The title remains 22 px, so tablet chrome does not drift from phone. */
   [data-site-header] [data-header-app-icon] {
-    height: 30px;
-    width: 30px;
+    height: 36px;
+    width: 36px;
   }
   [data-site-header] h1 {
     font-size: 22px;

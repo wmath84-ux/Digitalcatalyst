@@ -133,6 +133,13 @@ interface CoursePlayerProps {
    */
   initialModuleId?: string;
   /**
+   * Access already resolved by CourseRouteGuard. The guard only mounts the
+   * Player for a signed-in learner with course access, so reuse that snapshot
+   * for the first render instead of showing a second readiness screen while
+   * the Player's live access listener catches up.
+   */
+  initialAccess?: CourseAccessResolution;
+  /**
    * Set when this player is opening a course the learner AUTHORED in My Study
    * Library (route `#/my-course/<courseId>`), not a catalogue product.
    *
@@ -393,7 +400,7 @@ const fileActionsSignature = (actions: CourseFileActions): string =>
     actions.editMode ? "1" : "0",
   ].join("");
 
-export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initialModuleId, mine = null }: CoursePlayerProps) {
+export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initialModuleId, initialAccess, mine = null }: CoursePlayerProps) {
   const { user } = useAuth();
   const { logoUrl, appName } = useBranding();
   const modules = product.courseContent || [];
@@ -445,7 +452,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    * whole tree.
    */
   const resolution = useMemo<CourseAccessResolution>(() => {
-    if (!isMine) return accessState.resolution;
+    if (!isMine) return initialAccess && accessState.loading ? initialAccess : accessState.resolution;
     const ids = new Set<string>();
     const visit = (nodes: CourseModule[]) => nodes.forEach((node) => {
       ids.add(String(node.id));
@@ -466,7 +473,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       resourceAccessSources: {},
       unmetDependencies: {},
     };
-  }, [accessState.resolution, isMine, modules]);
+  }, [accessState.loading, accessState.resolution, initialAccess, isMine, modules]);
   // A personal course is owned outright — there is no subscription badge to
   // show, and no "preview mode" either.
   const hasActiveSubscription = isMine ? false : accessState.hasActiveSubscription;
@@ -1324,12 +1331,14 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // Only access and local resume block the lesson. Optional study tools
   // hydrate independently; switching modules must not unmount the player.
   const readinessStages = useMemo(() => ({
-    access: !accessState.loading,
+    // The route guard has already resolved access before mounting this Player;
+    // use that snapshot immediately and let the live subscription refresh it.
+    access: Boolean(initialAccess) || !accessState.loading,
     notes: !notesCtl.loading,
     mindMap: !mindMap.loading,
     sketch: !sketch.loading,
     playback: playbackReady,
-  }), [accessState.loading, notesCtl.loading, mindMap.loading, sketch.loading, playbackReady]);
+  }), [initialAccess, accessState.loading, notesCtl.loading, mindMap.loading, sketch.loading, playbackReady]);
 
   const isReady = readinessStages.access && readinessStages.playback;
   useEffect(() => {

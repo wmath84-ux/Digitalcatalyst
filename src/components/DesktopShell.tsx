@@ -497,10 +497,10 @@ export default function DesktopShell({
             onSelect={(id) => (id === OPENING_AD_ITEM_ID ? openingAd.openPlayer() : handleNavigate(id))}
             header={
               <div className="flex items-center gap-2.5">
-                {/* The app icon is 30px in the rail too — the same size the
+                {/* The app icon is 36px in the rail too — the same size the
                     header uses, so the chrome never shows two brand sizes. */}
-                <div data-header-app-icon className="grid h-[30px] w-[30px] shrink-0 place-items-center overflow-hidden rounded-[10px] bg-indigo-600 text-white ring-1 ring-white/20">
-                  {customLogo ? <BrandMark className="h-[30px] w-[30px]" /> : <Sparkles className="h-5 w-5" />}
+                <div data-header-app-icon className="grid h-[36px] w-[36px] shrink-0 place-items-center overflow-hidden rounded-[10px] bg-indigo-600 text-white ring-1 ring-white/20">
+                  {customLogo ? <BrandMark className="h-[36px] w-[36px]" /> : <Sparkles className="h-[26px] w-[26px]" />}
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-[13px] font-black tracking-tight text-white">{appName}</p>
@@ -549,8 +549,8 @@ export default function DesktopShell({
             so the rail feels like a continuation of the app's identity
             rather than a separate desktop chrome. */}
         <div className="flex items-center gap-3 px-5 pb-5 pt-5">
-          <div data-header-app-icon className="grid h-[30px] w-[30px] shrink-0 place-items-center overflow-hidden rounded-[10px] bg-indigo-600 text-white ring-1 ring-white/20">
-            {customLogo ? <BrandMark className="h-[30px] w-[30px]" /> : <Sparkles className="h-5 w-5" />}
+          <div data-header-app-icon className="grid h-[36px] w-[36px] shrink-0 place-items-center overflow-hidden rounded-[10px] bg-indigo-600 text-white ring-1 ring-white/20">
+            {customLogo ? <BrandMark className="h-[36px] w-[36px]" /> : <Sparkles className="h-[26px] w-[26px]" />}
           </div>
           <div className="min-w-0">
             <p className="truncate text-[15px] font-black tracking-tight text-white">{appName}</p>

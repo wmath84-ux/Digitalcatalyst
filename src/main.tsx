@@ -108,6 +108,7 @@ const OpeningAnimationPreview = lazyRoute(() => import("./components/dev/Opening
 const BrainDeckPreview = lazyRoute(() => import("./components/dev/BrainDeckPreview"));
 import { FlowPathErrorBoundary } from "./components/flowpath/FlowPathErrorBoundary";
 import { StudyLibraryErrorBoundary } from "./personal-library/StudyLibraryErrorBoundary";
+import { CoursePlayerErrorBoundary } from "./components/CoursePlayerErrorBoundary";
 import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
 import GlassCommandPalette from "./components/GlassCommandPalette";
 import { GlassToaster, toast as glassToast } from "./components/ui/glass-toast";
@@ -1961,16 +1962,19 @@ function RootPage(): ReactNode {
       if (catalogLoading) return <main className="min-h-[100dvh] px-5 py-6">{pageSkeleton(hash)}</main>;
       return <InvalidCheckout onBack={() => { window.location.hash = `${STORE_HASH}/purchases`; }} />;
     }
+    const backToPurchases = () => { window.location.hash = `${STORE_HASH}/purchases`; };
     return (
-      <PageEnter pageKey={pageEnterAppKey(hash)}>
-      <CourseRouteGuard
-        product={selectedCourseProduct}
-        onCheckout={(price) => navigateToCheckout(price)}
-        onBack={() => { window.location.hash = `${STORE_HASH}/purchases`; }}
-        onPurchaseUpdate={handlePurchaseUpdate}
-        initialModuleId={selectedCourseModuleId || undefined}
-      />
-      </PageEnter>
+      <CoursePlayerErrorBoundary onBack={backToPurchases}>
+        <PageEnter pageKey={pageEnterAppKey(hash)}>
+          <CourseRouteGuard
+            product={selectedCourseProduct}
+            onCheckout={(price) => navigateToCheckout(price)}
+            onBack={backToPurchases}
+            onPurchaseUpdate={handlePurchaseUpdate}
+            initialModuleId={selectedCourseModuleId || undefined}
+          />
+        </PageEnter>
+      </CoursePlayerErrorBoundary>
     );
   }
   // Settings renders inside the desktop shell like the Profile page does.
