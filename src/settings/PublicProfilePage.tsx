@@ -1,3 +1,5 @@
+import { SafeImage } from "../components/ui/SafeImage";
+import { profilePhotoSrc } from "../utils/profilePhoto";
 import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -42,7 +44,7 @@ export default function PublicProfilePage() {
             <div className="settings-alert" role="alert"><p>{error}</p><button onClick={() => setAttempt((value) => value + 1)}>Retry</button></div>
           ) : profile ? <>
             <header className="public-profile-header">
-              {profile.photoURL ? <img className="public-profile-avatar" src={profile.photoURL} alt="" referrerPolicy="no-referrer" /> : <span className="public-profile-avatar" aria-hidden="true">{profile.name.slice(0, 1).toUpperCase()}</span>}
+              <SafeImage className="public-profile-avatar" src={profilePhotoSrc(profile.photoURL)} alt="" fallback={<span className="public-profile-avatar" aria-hidden="true">{profile.name.slice(0, 1).toUpperCase()}</span>} />
               <div><h1>{profile.name}</h1><p>Eduvora learner</p></div>
             </header>
             <section className="settings-section" aria-labelledby="public-activity-heading">

@@ -19,7 +19,8 @@ test("Plan & AI does not alias Recall Settings; the Settings route remains expli
   assert.doesNotMatch(routes, /case "settings":\s*case "profile":\s*return "settings"/);
   assert.match(app, /if \(id === "profile"\) navigate\("#\/revision\/profile"\)/);
   assert.match(app, /id === "settings"\) navigate\("#\/revision\/settings"\)/);
-  assert.match(app, /case "settings":\s*showSettings\(\)/);
+  assert.match(app, /useRevisionRouteSync\(route,/);
+  assert.match(read("src/revision/integrations/useRevisionRouteSync.ts"), /settings: state.showSettings/);
 });
 
 test("Settings is a visible destination in desktop and in-body Revision navigation", () => {

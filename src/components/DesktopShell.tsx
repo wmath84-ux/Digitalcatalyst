@@ -83,6 +83,7 @@ import GlassSidebar, {
 import { GlassSurface } from "@/components/ui/glass";
 import { GlassInput } from "@/components/ui/glass-input";
 import { GlassButton } from "@/components/ui/glass-button";
+import { profilePhotoSrc } from "../utils/profilePhoto";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { LiquidMetalButton } from "@/components/ui/LiquidMetalButton";
 import { prefetchRoute } from "@/utils/lazyRoute";
@@ -491,7 +492,7 @@ export default function DesktopShell({
               user ? (
                 <div className="flex items-center gap-2">
                   <SafeImage
-                    src={user.photoURL}
+                    src={profilePhotoSrc(user.photoURL)}
                     alt=""
                     decoding="async"
                     width={32}
@@ -630,7 +631,7 @@ export default function DesktopShell({
           {user ? (
             <div className="flex items-center gap-2.5 rounded-2xl p-2 transition hover:bg-white/[0.06]">
               <SafeImage
-                src={user.photoURL}
+                src={profilePhotoSrc(user.photoURL)}
                 alt=""
                 decoding="async"
                 width={36}

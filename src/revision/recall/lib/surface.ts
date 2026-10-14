@@ -51,7 +51,7 @@ export function softSurface(extra?: string): string {
 /** Brand-tinted soft surface (primary-soft). Used for review/learning moments. */
 export function brandSurface(extra?: string): string {
   return cn(
-    "bg-primary-soft text-on-primary-container",
+    "bg-primary-soft text-on-primary-soft",
     "border border-outline-variant",
     "rounded-2xl",
     extra,

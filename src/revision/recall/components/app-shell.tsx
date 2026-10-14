@@ -102,7 +102,7 @@ export function AppShell({ children }: AppShellProps): JSX.Element {
             <span className="font-semibold text-on-surface">{cards.length}</span>
             <span className="ml-1.5 text-on-surface-variant">{t("library.cards")}</span>
             {dueCount > 0 && (
-              <span className="ml-auto flex items-center gap-1 text-xs font-medium text-secondary">
+              <span className="ml-auto flex items-center gap-1 text-xs font-medium text-secondary-ink">
                 <Zap className="h-3 w-3" />
                 {dueCount}
               </span>

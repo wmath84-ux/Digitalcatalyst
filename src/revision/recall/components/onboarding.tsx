@@ -200,8 +200,8 @@ export function Onboarding(): JSX.Element {
 
               {/* Badge */}
               <div className="flex items-center justify-center gap-2 rounded-full bg-secondary-container/10 px-4 py-1.5">
-                <BookCheck className="h-4 w-4 text-secondary" aria-hidden="true" />
-                <span className="text-xs font-semibold text-secondary">{t("onboarding.conceptBadge")}</span>
+                <BookCheck className="h-4 w-4 text-secondary-ink" aria-hidden="true" />
+                <span className="text-xs font-semibold text-secondary-ink">{t("onboarding.conceptBadge")}</span>
               </div>
             </div>
 
@@ -267,9 +267,9 @@ export function Onboarding(): JSX.Element {
                 </div>
                 <div className="rounded-xl bg-secondary-container/10 px-4 py-3 text-center">
                   <div className="mx-auto mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-secondary/10">
-                    <Sparkles className="h-4 w-4 text-secondary" aria-hidden="true" />
+                    <Sparkles className="h-4 w-4 text-secondary-ink" aria-hidden="true" />
                   </div>
-                  <p className="text-xs font-semibold text-secondary">{t("onboarding.systemFsrs")}</p>
+                  <p className="text-xs font-semibold text-secondary-ink">{t("onboarding.systemFsrs")}</p>
                   <p className={cn(typeClass.caption, "mt-0.5 text-on-surface-variant")}>{t("onboarding.systemFsrsDesc")}</p>
                 </div>
                 <div className="rounded-xl bg-tertiary-container/10 px-4 py-3 text-center">
@@ -364,7 +364,7 @@ export function Onboarding(): JSX.Element {
         {step === "goal" && (
           <div className="space-y-6">
             <div className="space-y-2">
-              <Sparkles className="mx-auto h-10 w-10 text-secondary" aria-hidden="true" />
+              <Sparkles className="mx-auto h-10 w-10 text-secondary-ink" aria-hidden="true" />
               <h2 className="font-headline text-xl font-bold tracking-tight text-text-primary">
                 {t("onboarding.setGoal")}
               </h2>

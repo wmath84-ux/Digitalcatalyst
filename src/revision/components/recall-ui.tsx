@@ -160,7 +160,7 @@ export function RecallStat({
 }) {
   const toneClass =
     tone === "brand"
-      ? "bg-primary-soft text-on-primary-container"
+      ? "bg-primary-soft text-on-primary-soft"
       : tone === "success"
         ? "bg-tertiary-container text-on-tertiary-container"
         : tone === "motivation"
@@ -281,7 +281,7 @@ export function RecallError({ title, body, action }: { title: string; body?: Rea
 export function RecallBadge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "brand" | "success" | "warning" | "danger" }) {
   const toneClass =
     tone === "brand"
-      ? "bg-primary-soft text-on-primary-container"
+      ? "bg-primary-soft text-on-primary-soft"
       : tone === "success"
         ? "bg-tertiary-container text-on-tertiary-container"
         : tone === "warning"

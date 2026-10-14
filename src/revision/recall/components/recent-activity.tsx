@@ -90,7 +90,7 @@ export function RecentActivity(): JSX.Element | null {
             <div
               className={cn(
                 "w-10 h-10 rounded-full flex items-center justify-center shrink-0",
-                a.icon === "trending" ? "bg-secondary/10 text-secondary" : "bg-review-good/10 text-review-good",
+                a.icon === "trending" ? "bg-secondary/10 text-secondary-ink" : "bg-review-good/10 text-review-good",
               )}
             >
               {a.icon === "trending" ? (

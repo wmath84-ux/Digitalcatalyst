@@ -16,6 +16,7 @@ export function AlertDialogContent({
     <AlertDialogPrimitive.Portal>
       <AlertDialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40" />
       <AlertDialogPrimitive.Content
+        data-recall-portal
         className={cn(
           "fixed left-1/2 top-1/2 z-50 w-[min(92vw,480px)] -translate-x-1/2 -translate-y-1/2 border bg-card p-6 text-foreground shadow-sm",
           className,

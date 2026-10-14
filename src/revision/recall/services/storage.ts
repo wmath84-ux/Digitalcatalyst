@@ -9,7 +9,7 @@
  * This override applies the same three pieces of state to the Revision feature
  * shell instead — the element carrying `data-recall-root` — which is exactly the
  * element `recall-theme.css` reads. Recall's light appearance is the default;
- * the learner can still explicitly select dark or high contrast in its settings.
+ * the feature stays light even when an older/cloud setting requests dark.
  * The rest of the app is untouched (§22).
  *
  * Radix portals render under <body>, outside that root. While Revision is
@@ -34,14 +34,9 @@ let appliedPortalProperties = new Set<string>();
 let previousColorScheme: InlineValue | null = null;
 
 function isRecallThemeProperty(name: string): boolean {
-  return (
-    name.startsWith("--rc-") ||
-    name.startsWith("--radius-") ||
-    name.startsWith("--font-") ||
-    name.startsWith("--accent-") ||
-    name === "--shadow-sm" ||
-    name === "--default-ring-width"
-  );
+  // Only feature tokens may reach body. Copying Tailwind's --radius/--font
+  // scales here restyled the Home-style footer even outside the Recall root.
+  return name.startsWith("--rc-") || name.startsWith("--accent-");
 }
 
 function inlineValue(element: HTMLElement, name: string): InlineValue {
@@ -120,9 +115,9 @@ function syncPortalTheme(root: HTMLElement): void {
   }
   appliedPortalProperties = new Set(nextProperties.keys());
 
-  body.setAttribute("data-recall-theme", root.getAttribute("data-recall-theme") ?? "dark");
+  body.setAttribute("data-recall-theme", root.getAttribute("data-recall-theme") ?? "light");
   body.setAttribute("data-recall-contrast", root.getAttribute("data-recall-contrast") ?? "normal");
-  body.style.setProperty("color-scheme", computed.colorScheme);
+
 }
 
 /** The feature shell registers itself on mount (fast path, no DOM query). */
@@ -142,10 +137,10 @@ export function applyTheme(_theme: Theme): void {
   const root = resolveRoot();
   if (!root) return;
 
-  // Revision always uses the website's dark palette (see recall-theme.css).
-  root.setAttribute("data-recall-theme", "dark");
+  // Revision is always light, independently of device/host and saved settings.
+  root.setAttribute("data-recall-theme", "light");
   root.setAttribute("data-recall-contrast", "normal");
-  root.style.colorScheme = "dark";
+  root.style.colorScheme = "light";
   syncPortalTheme(root);
 }
 
@@ -167,7 +162,7 @@ export function applyAccentColor(color: AccentColor): void {
   });
   root.classList.add(`accent-${color}`);
 
-  const colors = ACCENT_COLORS[color];
+  const colors = ACCENT_COLORS[color] ?? ACCENT_COLORS.zinc;
   root.style.setProperty("--accent-light", colors.light);
   root.style.setProperty("--accent-dark", colors.dark);
   syncPortalTheme(root);

@@ -45,7 +45,6 @@ export function RevisionRouteProvider({
  */
 export function useRevisionRoute(): RevisionRouteValue {
   const context = useContext(RevisionRouteContext);
-  if (context) return context;
 
   const fallbackNavigate = useCallback((hash: string) => {
     if (typeof window !== "undefined") window.location.hash = hash;
@@ -56,10 +55,16 @@ export function useRevisionRoute(): RevisionRouteValue {
       ? parseRevisionRoute("#/revision")
       : parseRevisionRoute(window.location.hash);
 
-  return useMemo(() => ({ route, navigate: fallbackNavigate }), [route, fallbackNavigate]);
+  const fallback = useMemo(() => ({ route, navigate: fallbackNavigate }), [route, fallbackNavigate]);
+  return context ?? fallback;
 }
 
 /** Convenience for the ported chrome: is this hash the currently open page? */
 export function useIsRevisionPage(page: RevisionRoute["page"]): boolean {
   return useRevisionRoute().route.page === page;
+}
+
+/** Embedded legacy pages share the shell chrome instead of mounting a second dock. */
+export function useInRevisionShell(): boolean {
+  return useContext(RevisionRouteContext) !== null;
 }

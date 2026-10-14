@@ -1,3 +1,5 @@
+import { useInRevisionShell, useRevisionRoute } from "../integrations/route-context";
+import { RecallPage } from "./recall-ui";
 import type { ReactNode } from "react";
 import AppHeader from "./AppHeader";
 import BottomNav from "./BottomNav";
@@ -29,6 +31,11 @@ export default function PageShell({
   mergeIntoMainHeader?: boolean;
 }) {
   useRegisterRevisionHeader(mergeIntoMainHeader, title, subtitle, rightSlot);
+  const embedded = useInRevisionShell();
+  const { navigate } = useRevisionRoute();
+  if (embedded) {
+    return <RecallPage title={title} subtitle={subtitle} onBack={backHref ? () => navigate(backHref) : undefined} actions={rightSlot}>{children}</RecallPage>;
+  }
   return (
     <>
       {!mergeIntoMainHeader && (

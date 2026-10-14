@@ -297,7 +297,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
           <>
             <RecallCard className="space-y-4">
               <div className="flex items-start gap-3">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary-soft text-on-primary-container">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary-soft text-on-primary-soft">
                   <BookOpenIcon className="h-6 w-6" />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -342,7 +342,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
                 className="space-y-3 rounded-2xl border border-outline-variant bg-surface-container-low p-3 sm:p-4"
               >
                 <div className="flex items-start gap-2">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary-soft text-on-primary-container">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary-soft text-on-primary-soft">
                     <SparklesIcon className="h-4 w-4" />
                   </span>
                   <div className="min-w-0 flex-1">
@@ -417,7 +417,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
                       onClick={() => setAiLevel(level)}
                       className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
                         aiLevel === level
-                          ? "border-primary bg-primary-soft text-on-primary-container"
+                          ? "border-primary bg-primary-soft text-on-primary-soft"
                           : "border-outline-variant bg-surface text-on-surface-variant hover:bg-surface-container-high"
                       }`}
                     >
@@ -515,7 +515,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
                   className={`rounded-xl px-3 py-2.5 text-sm font-medium leading-relaxed ${
                     noticeTone === "err"
                       ? "bg-error-container text-on-error-container"
-                      : "bg-primary-soft text-on-primary-container"
+                      : "bg-primary-soft text-on-primary-soft"
                   }`}
                 >
                   {notice}

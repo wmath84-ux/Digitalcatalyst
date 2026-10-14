@@ -53,6 +53,8 @@ export interface RevisionRoute {
   page: RevisionPageId;
   /** Numeric id parsed out of the path (`/session/12`, `/test/result/9`). */
   id: number | null;
+  /** Recall deck IDs are strings (including UUIDs), not legacy numeric IDs. */
+  deckId?: string | null;
   /** The raw path after `#/revision`. */
   path: string;
   /** The full hash including `#/revision`. */
@@ -126,7 +128,11 @@ export function parseRevisionRoute(hash: string): RevisionRoute {
       return route("bank");
     case "decks":
     case "deck-browser":
-      return route("decks", parseTrailingId(second));
+      try {
+        return { ...route("decks", parseTrailingId(second)), deckId: second ? decodeURIComponent(second) : null };
+      } catch {
+        return { ...route("decks"), deckId: null };
+      }
     case "browser":
       return route("browser");
     case "tags":
@@ -202,7 +208,7 @@ export function hashForRecallView(view: RecallViewId, deckId?: string | null): s
     case "dashboard":
       return `${REVISION_HASH_PREFIX}`;
     case "deck":
-      return deckId ? `${REVISION_HASH_PREFIX}/decks/${deckId}` : `${REVISION_HASH_PREFIX}/decks`;
+      return deckId ? `${REVISION_HASH_PREFIX}/decks/${encodeURIComponent(deckId)}` : `${REVISION_HASH_PREFIX}/decks`;
     case "deck-browser":
       return `${REVISION_HASH_PREFIX}/decks`;
     case "study":

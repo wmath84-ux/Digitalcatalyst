@@ -52,9 +52,9 @@ import { RevisionTabs } from "./components/RevisionTabs";
 import { RevisionDashboardExtras } from "./components/RevisionDashboardExtras";
 import { RecallLoading } from "./components/recall-ui";
 import { bootstrapRevisionFeature, disposeRevisionFeature } from "./integrations/bootstrap";
+import { useRevisionRouteSync } from "./integrations/useRevisionRouteSync";
 import { RevisionRouteProvider } from "./integrations/route-context";
 import {
-  hashForRecallView,
   parseRevisionRoute,
   recallViewForPage,
   type RevisionPageId,
@@ -176,18 +176,10 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
 
   const initialize = useRecallStore((state) => state.initialize);
   const view = useRecallStore((state) => state.view);
-  const selectedDeckId = useRecallStore((state) => state.selectedDeckId);
   const isLoading = useRecallStore((state) => state.isLoading);
   const storeError = useRecallStore((state) => state.error);
   const showDashboard = useRecallStore((state) => state.showDashboard);
-  const showDeck = useRecallStore((state) => state.showDeck);
-  const showStats = useRecallStore((state) => state.showStats);
-  const showBrowser = useRecallStore((state) => state.showBrowser);
-  const showDeckBrowser = useRecallStore((state) => state.showDeckBrowser);
-  const showTags = useRecallStore((state) => state.showTags);
-  const showSettings = useRecallStore((state) => state.showSettings);
   const showImportHub = useRecallStore((state) => state.showImportHub);
-  const showFocusTimer = useRecallStore((state) => state.showFocusTimer);
   const startReview = useRecallStore((state) => state.startReview);
   const cards = useRecallStore((state) => state.cards);
   const settings = useRecallStore((state) => state.settings);
@@ -305,60 +297,8 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
     return () => registerRecallThemeRoot(null);
   }, [settings.theme, settings.accentColor, settings.dyslexiaFont]);
 
-  /* ── 7. Route → ported view ───────────────────────────────────────────── */
   const recallView = recallViewForPage(route.page);
-  useEffect(() => {
-    if (!recallView) return;
-    if (recallView === view) return;
-    switch (recallView) {
-      case "dashboard":
-        showDashboard();
-        break;
-      case "deck-browser":
-        showDeckBrowser();
-        break;
-      case "deck":
-        if (route.id) showDeck(String(route.id));
-        else showDeckBrowser();
-        break;
-      case "stats":
-        showStats();
-        break;
-      case "browser":
-        showBrowser();
-        break;
-      case "tags":
-        showTags();
-        break;
-      case "settings":
-        showSettings();
-        break;
-      case "import-hub":
-        showImportHub();
-        break;
-      case "focus-timer":
-        showFocusTimer();
-        break;
-      default:
-        break;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recallView, route.id, route.page]);
-
-  /* ── 8. Ported view → hash (back button, refresh and shared links work) ── */
-  const lastMirrored = useRef<string>("");
-  useEffect(() => {
-    if (!recallView) return;
-    const target = hashForRecallView(
-      recallView === "deck" && selectedDeckId ? "deck" : recallView,
-      selectedDeckId,
-    );
-    if (target === lastMirrored.current) return;
-    lastMirrored.current = target;
-    if (window.location.hash !== target && !window.location.hash.startsWith(`${REVISION_HASH}/test`)) {
-      window.location.hash = target;
-    }
-  }, [recallView, selectedDeckId]);
+  useRevisionRouteSync(route, !dataLoading && !isLoading);
 
   /* ── 9. Global shortcuts owned by upstream's App ───────────────────────── */
   useEffect(() => {
@@ -438,7 +378,7 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
   }, [hasAccess, requireAccess, route.id, route.page, uid, userName, navigate]);
 
   const isFocused = route.page === "test-play" || route.page === "test-play-attempt";
-  const isStudy = view === "study" || view === "match";
+  const isStudy = recallView !== null && (view === "study" || view === "match");
 
   const recallContent = (
     <Suspense
@@ -511,10 +451,11 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
 
   return (
     <RevisionRouteProvider route={route} navigate={navigate}>
+      <div data-revision-host className="relative min-h-0 w-full">
       <div
         ref={rootRef}
         data-recall-root
-        data-recall-theme="dark"
+        data-recall-theme="light"
         data-revision-app
         data-revision-frame
         className="min-h-dvh bg-background font-body text-on-surface antialiased"
@@ -536,9 +477,8 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
             </main>
           ) : (
             <div
-              data-revision-shell
+              data-revision-shell className="flex min-h-dvh flex-col"
               data-revision-bounded-shell={!isDesktopHost ? "true" : undefined}
-              className={isDesktopHost ? "flex min-h-dvh flex-col" : "relative flex h-dvh min-h-0 flex-col overflow-hidden"}
             >
               {/* On mobile / tablet-portrait, render the unified app header with Recall quick actions */}
               {!isDesktopHost && !isFocused && (
@@ -560,10 +500,10 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
                       <button
                         type="button"
                         onClick={() => startReview(null)}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-400/40 bg-indigo-500/25 px-2.5 py-1 text-xs font-bold text-white shadow-sm hover:bg-indigo-500/35 active:scale-95 transition-all"
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-400/40 bg-indigo-500/25 px-2.5 py-1 text-xs font-bold text-on-surface shadow-sm hover:bg-indigo-500/35 active:scale-95 transition-all"
                         aria-label="Quick Review"
                       >
-                        <Play className="h-3.5 w-3.5 fill-current text-indigo-300" />
+                        <Play className="h-3.5 w-3.5 fill-current text-primary" />
                         <span>Review</span>
                         {dueCount > 0 && (
                           <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-400 px-1 text-[9px] font-black text-black">
@@ -574,7 +514,7 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
                       <button
                         type="button"
                         onClick={() => setShowQuickAdd(true)}
-                        className="rounded-full border border-white/15 bg-white/10 p-1.5 text-white hover:bg-white/20 active:scale-95 transition-all"
+                        className="rounded-full border border-outline-variant bg-surface p-1.5 text-on-surface hover:bg-surface-container active:scale-95 transition-all"
                         aria-label="Add Card or Deck"
                         title="Add Card or Deck"
                       >
@@ -634,7 +574,7 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
                           <Onboarding />
                         </Suspense>
                       ) : dcPage ? (
-                        <ErrorBoundary viewName="RevisionPage" onRecover={() => navigate("#/revision")}>
+                        <ErrorBoundary key={route.hash} viewName="RevisionPage" onRecover={() => navigate("#/revision")}>
                           <Suspense fallback={<RecallLoading />}>{dcPage}</Suspense>
                         </ErrorBoundary>
                       ) : (
@@ -644,25 +584,6 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
                   </>
                 )}
               </main>
-
-              {/* On mobile / tablet-portrait, render the unified floating footer nav */}
-              {!isDesktopHost && !isFocused && (
-                <BottomNav
-                  active="revision"
-                  peek
-                  peekAlwaysOpen
-                  onChange={(tab: TabKey) => {
-                    if (tab === "home") window.location.hash = "#/home";
-                    else if (tab === "myday") window.location.hash = "#/my-day";
-                    else if (tab === "store") window.location.hash = "#/store";
-                    else if (tab === "purchases") window.location.hash = "#/store/purchases";
-                    else if (tab === "profile") window.location.hash = "#/profile";
-                    else if (tab === "study-library") window.location.hash = "#/study-library";
-                    else if (tab === "flowpath") window.location.hash = "#/flowpath";
-                    else if (tab === "revision") window.location.hash = "#/revision";
-                  }}
-                />
-              )}
             </div>
           )}
 
@@ -695,6 +616,25 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
 
         {/* Cart badge parity with the rest of the app shell. */}
         <span className="sr-only" data-revision-cart-count={cartIds.size} />
+      </div>
+      {/* Host footer stays outside Recall typography, radius and touch rules. */}
+      {!isStudy && !isDesktopHost && !isFocused && (
+                <BottomNav
+                  active="revision"
+                  peek
+                  peekAlwaysOpen
+                  onChange={(tab: TabKey) => {
+                    if (tab === "home") window.location.hash = "#/home";
+                    else if (tab === "myday") window.location.hash = "#/my-day";
+                    else if (tab === "store") window.location.hash = "#/store";
+                    else if (tab === "purchases") window.location.hash = "#/store/purchases";
+                    else if (tab === "profile") window.location.hash = "#/profile";
+                    else if (tab === "study-library") window.location.hash = "#/study-library";
+                    else if (tab === "flowpath") window.location.hash = "#/flowpath";
+                    else if (tab === "revision") window.location.hash = "#/revision";
+                  }}
+                />
+      )}
       </div>
     </RevisionRouteProvider>
   );

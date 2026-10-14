@@ -186,14 +186,24 @@ function plateFor(luminance) {
 
 /** The master logo, cropped to its own glyph so padding is decided here. */
 async function readGlyph(source = SRC_MASTER) {
-  const { data, info } = await sharp(source).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const original = await sharp(source).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, height } = original.info;
+  const corners = [0, width - 1, (height - 1) * width, width * height - 1].map((i) => i * 4);
+  const uniformOpaquePlate = corners.every((i) => original.data[i + 3] >= 250 &&
+    [0, 1, 2].every((c) => Math.abs(original.data[i + c] - original.data[c]) <= 10));
+  // Uploaded JPG/opaque PNG logos have padding too. Alpha-only bounds treated
+  // that whole plate as artwork and silently shrank maskable/Android icons.
+  const prepared = uniformOpaquePlate
+    ? await sharp(source).trim({ background: { r: original.data[0], g: original.data[1], b: original.data[2] }, threshold: 40 }).png().toBuffer()
+    : source;
+  const { data, info } = await sharp(prepared).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const bounds = opaqueBounds(data, info.width, info.height);
-  const glyph = await sharp(source)
+  const glyph = await sharp(prepared)
     .ensureAlpha()
     .extract({ left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height })
     .png()
     .toBuffer();
-  return { glyph, bounds, masterSize: info.width, luminance: glyphLuminance(data, info.width, bounds) };
+  return { glyph, bounds, masterSize: width, luminance: glyphLuminance(data, info.width, bounds) };
 }
 
 /**

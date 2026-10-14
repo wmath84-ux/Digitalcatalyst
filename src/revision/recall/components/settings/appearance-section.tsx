@@ -36,7 +36,7 @@ export function AppearanceSection(): JSX.Element {
                 className={`h-8 w-8 rounded-full border-2 transition-all ${
                   settings.accentColor === color ? "border-primary scale-110" : "border-outline recall-dark:border-outline"
                 }`}
-                style={{ backgroundColor: `var(--accent-${color})` }}
+                style={{ backgroundColor: `var(--rc-accent-${color})` }}
                 aria-label={`${color} accent color`}
               />
             ))}
