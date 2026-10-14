@@ -118,7 +118,7 @@ export default function ExpandingTabs({
             {item.badge ? (
               <span
                 aria-label={item.badgeAriaLabel}
-                className={`absolute -right-0.5 -top-0.5 z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[14px] leading-[20px] font-bold text-white ring-2 ring-[#0a0c12] ${
+                className={`absolute -right-1.5 -top-1.5 z-10 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] leading-[16px] font-bold text-white ring-2 ring-[#0a0c12] ${
                   item.badgeTone === "rose" ? "bg-rose-500" : "bg-indigo-600"
                 }`}
               >
