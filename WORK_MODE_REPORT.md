@@ -1,6 +1,6 @@
 # Work Mode — implementation report
 
-**Status (2026-10-15):** Phases 0–5 are implemented on `arena/0846f33a-digitalcatalyst`. Work-created content has no app-cloud save/sync path; AI prompts and any opted-in Work Notes sent for generation are still transmitted to the learner’s configured AI provider for processing, while chat history stays on-device. Phase 4 now includes a local JSON backup/export and an explicitly confirmed restore. Phase 5 includes scoped light/dark coverage, accessible lazy-loading states, reduced-motion support, device safe-area spacing, and documented bundle measurements.
+**Status (2026-10-15):** Phases 0–5 are implemented on `arena/0846f33a-digitalcatalyst`. The reported Course Player startup crash was traced to `courseAudio` being read while `buildStudyPane` eagerly created the Music tab before the `useMemo` initialized it; the declaration now precedes the pane construction and has a regression check. Work-created content has no app-cloud save/sync path; AI prompts and any opted-in Work Notes sent for generation are still transmitted to the learner’s configured AI provider for processing, while chat history stays on-device. Phase 4 includes a local JSON backup/export and an explicitly confirmed restore. Phase 5 includes scoped light/dark coverage, accessible lazy-loading states, reduced-motion support, device safe-area spacing, and documented bundle measurements.
 
 **Implementation is complete; final external sign-off is still pending.** This sandbox cannot verify Android notifications while the app is asleep or terminated, and visual browser inspection could not launch because the available Chromium build requires the missing system library `libnspr4.so`. Do not interpret those checks as passed. The full design specification is in `docs/work-mode-implementation-plan.md`.
 
@@ -9,6 +9,8 @@
 - `npm run test:work` — **28/28 passed**, including local-storage isolation, My Day reminder/repeat logic, Work split interactions, lazy page loading, and Work Revision backup/restore.
 - Course Brain deck, practice, and SELF contracts — **54/54 passed**; Course score history and SELF controls remain covered separately from Work.
 - `npm run test:course-sync` — **152/152 passed**, including Course Notes/Mind Map cloud-sync/runtime contracts and Course player session/scope behavior.
+- `npm run test:chat` — **75 passed, 1 browser-only test skipped**; Course split and AI regressions remain green.
+- `node --test tests/coursePlayerWhiteScreenRecoveryContract.test.mjs` — **3/3 passed**, including the new eager-study-pane initialization contract; a Vite SSR smoke render of `CoursePlayerApp` also succeeded after the ordering fix.
 - `npx tsc --noEmit` — passed.
 - `git diff --check` — passed.
 - `NODE_OPTIONS=--max-old-space-size=2560 npm run build:low-heap` — passed. The ordinary heap setting previously failed from memory pressure. Existing warnings remain for missing `VITE_YOUTUBE_API_KEY`, mixed dynamic/static imports, and shared chunks over the configured size warning.

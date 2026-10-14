@@ -2416,21 +2416,25 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   );
 
   /**
-   * The deck's MAIN study pane: the player's own tab state, so the footer
-   * navigation, the ⌘/Ctrl+1…9 shortcuts and the keyboard takeover all still
-   * speak about one tab.
-   */
-  const studyOverlay = buildStudyPane(dockTab, handleDockTabChange);
-
-  /**
    * The course's own audio lessons — the Music tab's first shelf. Access-scoped
    * (a locked module contributes nothing) and read straight off the same tree
    * every other list uses, so the library can never drift from the course.
+   *
+   * Compute this before calling `buildStudyPane`: that helper eagerly creates
+   * the MusicPanel element, which reads `courseAudio` during CoursePlayer's
+   * render (the JSX is not deferred until the tab is selected).
    */
   const courseAudio = useMemo(
     () => collectCourseAudio(modules, resolution.accessibleModuleIds),
     [modules, resolution.accessibleModuleIds],
   );
+
+  /**
+   * The deck's MAIN study pane: the player's own tab state, so the footer
+   * navigation, the ⌘/Ctrl+1…9 shortcuts and the keyboard takeover all still
+   * speak about one tab.
+   */
+  const studyOverlay = buildStudyPane(dockTab, handleDockTabChange);
 
   /**
    * The tabs an EXTRA pane (the third / fourth part the divider adds on a big
