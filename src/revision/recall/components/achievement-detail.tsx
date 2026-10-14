@@ -92,7 +92,7 @@ export function AchievementDetail({ achievement, onContinue }: AchievementDetail
         {/* Title */}
         <h2
           id="achievement-title"
-          className={cn("mt-4 text-center font-display text-2xl font-bold text-secondary")}
+          className={cn("mt-4 text-center font-display text-2xl font-bold text-secondary-ink")}
         >
           {achievement.title}
         </h2>

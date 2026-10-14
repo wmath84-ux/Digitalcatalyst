@@ -1,11 +1,10 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { AlertIcon } from "./icons";
-import { GlassSurface } from "../../components/ui/glass";
 import { GlassButton } from "./RevisionGlassButton";
 
 export function Spinner({ className = "h-6 w-6" }: { className?: string }) {
   return (
-    <svg className={`animate-spin text-indigo-300 ${className}`} viewBox="0 0 24 24" fill="none">
+    <svg className={`animate-spin text-primary ${className}`} viewBox="0 0 24 24" fill="none">
       <circle className="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" />
       <path className="opacity-90" d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
     </svg>
@@ -16,13 +15,13 @@ export function FullScreenLoader({ label = "Loading…" }: { label?: string }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
       <Spinner className="h-8 w-8" />
-      <p className="dc-scene-ink text-sm font-medium text-white/75">{label}</p>
+      <p className="dc-scene-ink text-sm font-medium text-on-surface-variant">{label}</p>
     </div>
   );
 }
 
 export function Shimmer({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-2xl border border-white/10 bg-indigo-500/10 ${className}`} />;
+  return <div className={`animate-pulse rounded-2xl border border-outline-variant bg-indigo-500/10 ${className}`} />;
 }
 
 export function DashboardSkeleton() {
@@ -64,12 +63,12 @@ export function EmptyState({
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 py-16 text-center">
       {icon && (
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-500/20 text-indigo-300">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-500/20 text-primary">
           {icon}
         </div>
       )}
-      <h3 className="dc-scene-ink text-base font-bold text-white">{title}</h3>
-      {description && <p className="dc-scene-ink max-w-[280px] text-sm leading-relaxed text-white/75">{description}</p>}
+      <h3 className="dc-scene-ink text-base font-bold text-on-surface">{title}</h3>
+      {description && <p className="dc-scene-ink max-w-[280px] text-sm leading-relaxed text-on-surface-variant">{description}</p>}
       {action}
     </div>
   );
@@ -78,11 +77,11 @@ export function EmptyState({
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 py-16 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-500/20 text-rose-300">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-500/20 text-error">
         <AlertIcon className="h-8 w-8" />
       </div>
-      <h3 className="dc-scene-ink text-base font-bold text-white">Something went wrong</h3>
-      <p className="dc-scene-ink max-w-[280px] text-sm leading-relaxed text-white/75">{message}</p>
+      <h3 className="dc-scene-ink text-base font-bold text-on-surface">Something went wrong</h3>
+      <p className="dc-scene-ink max-w-[280px] text-sm leading-relaxed text-on-surface-variant">{message}</p>
       {onRetry && (
         <GlassButton variant="capsule" onClick={onRetry} className="mt-1">
           Try again
@@ -95,7 +94,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
 export function ProgressBar({ value, className = "" }: { value: number; className?: string }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
-    <div className={`h-2 w-full overflow-hidden rounded-full border border-white/15 ${className}`}>
+    <div className={`h-2 w-full overflow-hidden rounded-full border border-outline-variant ${className}`}>
       <div
         className="h-full rounded-full bg-indigo-600 transition-all duration-300"
         style={{ width: `${clamped}%` }}
@@ -105,19 +104,19 @@ export function ProgressBar({ value, className = "" }: { value: number; classNam
 }
 
 const statusStyles: Record<string, string> = {
-  learning: "bg-amber-500/20 text-amber-200 border-amber-400/30",
-  improving: "bg-sky-500/20 text-sky-200 border-sky-400/30",
-  mastered: "bg-emerald-500/20 text-emerald-200 border-emerald-400/30",
-  easy: "bg-emerald-500/20 text-emerald-200 border-emerald-400/30",
-  medium: "bg-amber-500/20 text-amber-200 border-amber-400/30",
-  hard: "bg-rose-500/20 text-rose-200 border-rose-400/30",
-  correct: "bg-emerald-500/20 text-emerald-200 border-emerald-400/30",
-  wrong: "bg-rose-500/20 text-rose-200 border-rose-400/30",
-  skipped: "text-white/85 border-white/15",
+  learning: "bg-amber-500/20 text-on-secondary-fixed-variant border-amber-400/30",
+  improving: "bg-sky-500/20 text-primary border-sky-400/30",
+  mastered: "bg-emerald-500/20 text-tertiary border-emerald-400/30",
+  easy: "bg-emerald-500/20 text-tertiary border-emerald-400/30",
+  medium: "bg-amber-500/20 text-on-secondary-fixed-variant border-amber-400/30",
+  hard: "bg-rose-500/20 text-error border-rose-400/30",
+  correct: "bg-emerald-500/20 text-tertiary border-emerald-400/30",
+  wrong: "bg-rose-500/20 text-error border-rose-400/30",
+  skipped: "text-on-surface-variant border-outline-variant",
 };
 
 export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?: string }) {
-  const cls = statusStyles[tone] ?? "text-white/85 border-white/15";
+  const cls = statusStyles[tone] ?? "text-on-surface-variant border-outline-variant";
   return (
     <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold capitalize ${cls}`}>
       {children}
@@ -131,15 +130,9 @@ export function Card({
   ...rest
 }: { children: ReactNode; className?: string } & HTMLAttributes<HTMLDivElement>) {
   return (
-    /* The card now wears the store's light-blue glass material
-       (`.dc-rev-glass`) — the same transparent lens the store hero card
-       uses.  `tint` and `tintColor` match the store hero's values so
-       revision-glass.css can paint the frost + tint layers identically.
-       `dc-scene-plate` stays as the fallback contrast plate for the
-       `?glass=off` kill switch and old WebViews without backdrop-filter. */
-    <GlassSurface tint={0.62} tintColor="173,216,255" radius={20} className={`rev-card dc-rev-glass p-4 text-white dc-scene-plate ${className}`} {...rest}>
+    <div className={`rev-card rounded-2xl border border-outline-variant bg-surface p-4 text-on-surface ${className}`} {...rest}>
       {children}
-    </GlassSurface>
+    </div>
   );
 }
 
@@ -161,7 +154,7 @@ export function PrimaryButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`flex min-h-[50px] w-full items-center justify-center gap-2 rounded-full bg-indigo-600 px-5 text-[15px] font-bold text-white transition hover:bg-indigo-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`flex min-h-[50px] w-full items-center justify-center gap-2 rounded-full bg-indigo-600 px-5 text-[15px] font-bold text-on-primary transition hover:bg-indigo-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
     >
       {children}
     </button>
@@ -194,7 +187,7 @@ export function SecondaryButton({
       variant="capsule"
       onClick={onClick}
       disabled={disabled}
-      className={`w-full disabled:cursor-not-allowed disabled:opacity-50 [&>span>div]:w-full ${surface} ${className}`}
+      className={`${size === "sm" ? "w-auto [&>span>div]:w-auto" : "w-full [&>span>div]:w-full"} disabled:cursor-not-allowed disabled:opacity-50 ${surface} ${className}`}
     >
       <span className="inline-flex items-center justify-center gap-2 font-bold">{children}</span>
     </GlassButton>

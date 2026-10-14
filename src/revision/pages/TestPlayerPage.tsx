@@ -288,7 +288,7 @@ export default function TestPlayerPage({
                   className={cn(
                     "flex w-full items-start gap-3 rounded-2xl border p-3.5 text-left transition-colors",
                     selected
-                      ? "border-primary bg-primary-soft text-on-primary-container"
+                      ? "border-primary bg-primary-soft text-on-primary-soft"
                       : "border-outline-variant bg-surface hover:bg-surface-container-low",
                   )}
                 >

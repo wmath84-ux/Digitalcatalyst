@@ -56,7 +56,7 @@ export default function Hero() {
               onClick={openInstallPanel}
               className="[&>span>div]:h-14 [&>span>div]:px-7 [&>span>div]:text-base [&>span>div]:font-bold [&>span>div]:text-black"
             >
-              ⬇️ Install the PWA
+              <span style={{ color: "#000000" }}>⬇️ Install the PWA</span>
             </GlassButton>
           </div>
           <p className="mt-3 text-xs text-white/55">

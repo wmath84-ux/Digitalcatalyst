@@ -30,22 +30,32 @@ type SafeImageProps = Omit<ImgHTMLAttributes<HTMLImageElement>, "src" | "onError
 export function SafeImage({ src, fallback = null, secondarySrc, referrerPolicy, ...rest }: SafeImageProps) {
   const primary = resolveImageSrc(src);
   const secondary = resolveImageSrc(secondarySrc);
-  const [failed, setFailed] = useState<string | null>(null);
+  // Remember every failed candidate, not only the most recent one. Otherwise
+  // primary -> secondary -> primary loops forever when both fail in a WebView.
+  const sourceKey = JSON.stringify([primary, secondary]);
+  const [attempt, setAttempt] = useState<{ key: string; failed: string[] }>({ key: sourceKey, failed: [] });
+  const failed = attempt.key === sourceKey ? attempt.failed : [];
 
-  // A changed URL must re-arm the image.
   useEffect(() => {
-    setFailed(null);
-  }, [primary]);
+    // A real reconnect permits one new attempt; never retry on an error loop.
+    const retry = () => setAttempt({ key: sourceKey, failed: [] });
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
+  }, [sourceKey]);
 
-  const current = !primary || failed === primary ? secondary : primary;
-  if (!current || failed === current) return <>{fallback}</>;
+  const current = [primary, secondary].find((candidate) => candidate && !failed.includes(candidate));
+  if (!current) return <>{fallback}</>;
 
   return (
     <img
       {...rest}
+      key={`${sourceKey}:${current}`}
       src={current}
       referrerPolicy={referrerPolicy ?? "no-referrer"}
-      onError={() => setFailed(current)}
+      onError={() => setAttempt((previous) => ({
+        key: sourceKey,
+        failed: [...new Set([...(previous.key === sourceKey ? previous.failed : []), current])],
+      }))}
     />
   );
 }

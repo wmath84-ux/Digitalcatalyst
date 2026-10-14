@@ -119,22 +119,32 @@ test("Radix portals inherit Recall theme tokens and restore the host body on unm
   try {
     const body = dom.window.document.body;
     body.style.setProperty("--rc-shad-card", "host-token");
+    body.style.setProperty("--radius-2xl", "16px");
+    body.style.setProperty("--color-white", "host-white");
     body.setAttribute("data-recall-theme", "host-theme");
     body.setAttribute("data-recall-contrast", "host-contrast");
     const root = dom.window.document.createElement("div");
     root.setAttribute("data-recall-root", "");
     root.style.setProperty("--rc-shad-card", "0 0% 100%");
     root.style.setProperty("--rc-background", "#f7f9fb");
+    root.style.setProperty("--radius-2xl", "28px");
+    root.style.setProperty("--color-white", "#fff");
     dom.window.document.body.append(root);
 
     const { applyTheme, registerRecallThemeRoot } = require(outfile);
     registerRecallThemeRoot(root);
     assert.equal(body.style.getPropertyValue("--rc-shad-card"), "0 0% 100%");
     assert.equal(body.getAttribute("data-recall-theme"), "light");
+    assert.equal(body.style.getPropertyValue("--radius-2xl"), "16px");
+    assert.equal(body.style.getPropertyValue("--color-white"), "host-white");
     applyTheme("dark");
-    assert.equal(body.getAttribute("data-recall-theme"), "dark");
+    // Product requirement: old/cloud dark and contrast preferences must not
+    // darken Revision or its portalled controls. Keep exercising both inputs.
+    assert.equal(body.getAttribute("data-recall-theme"), "light");
+    assert.equal(root.style.colorScheme, "light");
     applyTheme("high-contrast");
-    assert.equal(body.getAttribute("data-recall-contrast"), "high");
+    assert.equal(body.getAttribute("data-recall-contrast"), "normal");
+    assert.equal(body.getAttribute("data-recall-theme"), "light");
 
     registerRecallThemeRoot(null);
     assert.equal(body.style.getPropertyValue("--rc-shad-card"), "host-token");

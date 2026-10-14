@@ -52,6 +52,8 @@
    ══════════════════════════════════════════════════════════════════════════ */
 
 [data-recall-root] {
+  /* Do not inherit the host light theme’s remapped white ink. */
+  --color-white: #ffffff;
   /* ── M3 surface tiers (light) ── */
   --rc-surface: #ffffff;
   --rc-surface-dim: #d8dadc;
@@ -820,4 +822,11 @@
     font-size: 0.8rem;
     line-height: 1.25;
   }
+}
+
+/* Radix surfaces live under body; don't tint the host footer to theme them. */
+[data-recall-portal] {
+  --color-white: #ffffff;
+  color-scheme: light;
+  font-family: var(--rc-font-body);
 }

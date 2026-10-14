@@ -1,3 +1,6 @@
+import { useAuth } from "../context/AuthContext";
+import { profilePhotoSrc } from "../utils/profilePhoto";
+import { SafeImage } from "./ui/SafeImage";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
@@ -49,6 +52,8 @@ export default function MobileHeaderMenu({
   className?: string;
   ariaLabel?: string;
 }) {
+  const { user } = useAuth();
+  const avatar = profilePhotoSrc(user?.photoURL);
   const [open, setOpen] = useState(false);
   const drawerId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -61,11 +66,11 @@ export default function MobileHeaderMenu({
       label: item.label,
       ariaLabel: item.ariaLabel,
       color: item.color ?? ACTION_COLORS[item.id] ?? "#3A86FF",
-      icon: item.icon,
+      icon: item.id === "profile" && avatar ? <SafeImage src={avatar} alt="" className="h-5 w-5 rounded-full object-cover" fallback={item.icon} /> : item.icon,
       active: item.id === activeId,
       badge: item.badge,
     })),
-    [items, activeId],
+    [items, activeId, avatar],
   );
 
   useEffect(() => {

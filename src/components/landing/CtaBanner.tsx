@@ -43,9 +43,9 @@ export default function CtaBanner() {
             variant="capsule"
             type="button"
             onClick={openInstallPanel}
-            className="[&>span>div]:h-14 [&>span>div]:px-8 [&>span>div]:text-lg [&>span>div]:font-bold [&>span>div]:text-emerald-300"
+            className="[&>span>div]:h-14 [&>span>div]:px-8 [&>span>div]:text-lg [&>span>div]:font-bold [&>span>div]:text-black"
           >
-            ⬇️ Install the PWA
+            <span style={{ color: "#000000" }}>⬇️ Install the PWA</span>
           </GlassButton>
         </div>
         </LandingGlassCard>

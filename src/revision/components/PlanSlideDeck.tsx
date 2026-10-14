@@ -401,6 +401,9 @@ export function PlanSlideDeck({
   );
 
   const onDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    // Very short movements can report huge velocity when WebView pointer
+    // events share a frame. Require deliberate travel before using velocity.
+    if (Math.abs(info.offset.x) < 20) return;
     if (info.offset.x <= -DISMISS_OFFSET || info.velocity.x <= -DISMISS_VELOCITY) go(1);
     else if (info.offset.x >= DISMISS_OFFSET || info.velocity.x >= DISMISS_VELOCITY) go(-1);
   };

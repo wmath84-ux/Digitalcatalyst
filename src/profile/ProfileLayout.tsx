@@ -9,20 +9,9 @@ import { useId, useState, type FormEvent, type ReactNode } from "react";
 import "./profile-minimal.css";
 import { ChevronRight, LoaderCircle, X } from "lucide-react";
 
-/**
- * Normalize Google-hosted avatars for embedded WebViews, where the default
- * image size can occasionally return 403 when a localhost Referer is sent.
- * Other image providers (including Firebase Storage) keep their URL as-is.
- */
-export function profilePhotoSrc(url?: string): string {
-  const src = String(url || "").trim();
-  if (!src) return "";
-  if (/googleusercontent\.com/i.test(src)) {
-    if (/=s\d+/.test(src)) return src.replace(/=s\d+(-c)?/, "=s256-c");
-    return `${src}${src.includes("?") ? "" : "=s256-c"}`;
-  }
-  return src;
-}
+import { profilePhotoSrc } from "../utils/profilePhoto";
+export { profilePhotoSrc } from "../utils/profilePhoto";
+import { SafeImage } from "../components/ui/SafeImage";
 
 /* ── Shared types ───────────────────────────────────────────────────── */
 export type MembershipTier = "normal" | "basic" | "premium" | "pro";
@@ -141,8 +130,6 @@ export type ProfileLayoutProps = {
 /* Account facts and controls: plain sections, not a stack of nested cards. */
 export default function ProfileLayout({ name, email, photoURL, bio, initials, memberSince, onEdit, onChoosePhoto, photoUploading = false, photoError, membership, onOpenPlans, onOpenFeature, stats, referral, renewal, onOpenUsageLimits, onOpenStudyLibrary, library, onOpenSettings, saving, message, onLogout, isAdmin, onOpenDashboard }: ProfileLayoutProps) {
   const src = profilePhotoSrc(photoURL);
-  const [brokenPhoto, setBrokenPhoto] = useState("");
-  const showPhoto = Boolean(src) && src !== brokenPhoto;
   const snapshot = renewal?.subscription || membership.subscription;
   const now = renewal?.now || Date.now();
   const active = membership.active;
@@ -163,7 +150,7 @@ export default function ProfileLayout({ name, email, photoURL, bio, initials, me
 
       <section data-profile-hero className="dc-account-identity">
         <button type="button" data-profile-photo-upload aria-label={photoURL ? "Change profile photo" : "Add profile photo"} onClick={onChoosePhoto} disabled={!onChoosePhoto || photoUploading} aria-busy={photoUploading || undefined} className="dc-account-photo-action">
-          {showPhoto ? <img src={src} alt="" referrerPolicy="no-referrer" onError={() => setBrokenPhoto(src)} /> : <span data-profile-photo-fallback className="dc-account-avatar">{initials}</span>}
+          <SafeImage src={src} alt="" fallback={<span data-profile-photo-fallback className="dc-account-avatar">{initials}</span>} />
           {onChoosePhoto ? <span>{photoUploading ? "Uploading…" : photoURL ? "Change photo" : "Add photo"}</span> : null}
         </button>
         <div className="dc-account-identity-copy">

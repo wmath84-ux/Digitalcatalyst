@@ -51,7 +51,7 @@ export function TryCard({ card, onContinue }: TryCardProps): JSX.Element {
     return (
       <div className={cn(cardSurface("p-6"), "space-y-4 text-center")}>
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-secondary-container/10">
-          <Sparkles className="h-6 w-6 text-secondary" aria-hidden="true" />
+          <Sparkles className="h-6 w-6 text-secondary-ink" aria-hidden="true" />
         </div>
         <p className="text-sm text-on-surface-variant">{t("onboarding.tryAhaMessage")}</p>
         <button

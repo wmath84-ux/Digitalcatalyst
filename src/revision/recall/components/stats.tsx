@@ -89,7 +89,7 @@ export function Stats(): JSX.Element {
                 className={cn("w-full rounded-t-md transition-all duration-500", i === 6 ? "bg-secondary-container" : "bg-primary-soft")}
                 style={{ height: `${(day.count / maxCount) * 100}%`, minHeight: day.count > 0 ? 4 : 0 }}
               />
-              <span className={cn(typeClass.caption, "mt-1", i === 6 ? "text-secondary font-semibold" : "text-outline")}>
+              <span className={cn(typeClass.caption, "mt-1", i === 6 ? "text-secondary-ink font-semibold" : "text-outline")}>
                 {day.label}
               </span>
             </div>

@@ -97,7 +97,7 @@ function ProviderTile({
           {meta.mark}
         </span>
         <span className="w-full min-w-0 pr-4">
-          <span className={cn("block truncate text-sm font-bold", selected ? "text-on-primary-container" : "text-on-surface")}>
+          <span className={cn("block truncate text-sm font-bold", selected ? "text-on-primary-soft" : "text-on-surface")}>
             {meta.name}
           </span>
           <span className="mt-1 block text-xs leading-snug text-on-surface-variant">{meta.tagline}</span>

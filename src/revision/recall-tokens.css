@@ -55,6 +55,8 @@
 
   /* M3 secondary (motivation amber) */
   --color-secondary: hsl(var(--rc-shad-secondary));
+  /* Amber ink is distinct from the neutral secondary button fill. */
+  --color-secondary-ink: var(--rc-secondary);
   --color-on-secondary: var(--rc-on-secondary);
   --color-secondary-container: var(--rc-secondary-container);
   --color-on-secondary-container: var(--rc-on-secondary-container);

@@ -77,7 +77,7 @@ function SourceOption({
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5">
-          <span className={cn("text-sm font-bold", selected ? "text-on-primary-container" : "text-on-surface")}>
+          <span className={cn("text-sm font-bold", selected ? "text-on-primary-soft" : "text-on-surface")}>
             {title}
           </span>
           {badge ? (
