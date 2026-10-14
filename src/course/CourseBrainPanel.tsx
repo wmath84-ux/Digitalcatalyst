@@ -384,7 +384,7 @@ export default function CourseBrainPanel({
         className="relative flex h-full min-h-0 flex-col overflow-hidden p-3 pb-16"
         data-course-brain-panel=""
         data-brain-screen="library"
-        style={{ fontSize: S(16) }}
+        style={!workMode ? { fontSize: S(16) } : undefined}
       >
         {!workMode ? (
           <>
