@@ -1,7 +1,7 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { AlertIcon } from "./icons";
 import { GlassSurface } from "../../components/ui/glass";
-import { GlassButton } from "../../components/ui/glass-button";
+import { GlassButton } from "./RevisionGlassButton";
 
 export function Spinner({ className = "h-6 w-6" }: { className?: string }) {
   return (

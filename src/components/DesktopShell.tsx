@@ -83,6 +83,7 @@ import GlassSidebar, {
 import { GlassSurface } from "@/components/ui/glass";
 import { GlassInput } from "@/components/ui/glass-input";
 import { GlassButton } from "@/components/ui/glass-button";
+import { SafeImage } from "@/components/ui/SafeImage";
 import { LiquidMetalButton } from "@/components/ui/LiquidMetalButton";
 import { prefetchRoute } from "@/utils/lazyRoute";
 
@@ -489,13 +490,19 @@ export default function DesktopShell({
             footer={
               user ? (
                 <div className="flex items-center gap-2">
-                  {user.photoURL ? (
-                    <img src={user.photoURL} alt="" decoding="async" width={32} height={32} className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-white/10" />
-                  ) : (
-                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-indigo-600 text-[10px] font-black text-white">
-                      {initials}
-                    </div>
-                  )}
+                  <SafeImage
+                    src={user.photoURL}
+                    alt=""
+                    decoding="async"
+                    width={32}
+                    height={32}
+                    className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+                    fallback={
+                      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-indigo-600 text-[10px] font-black text-white">
+                        {initials}
+                      </div>
+                    }
+                  />
                   <p className="min-w-0 flex-1 truncate text-[11px] font-black text-white">{user.name}</p>
                   <button
                     type="button"
@@ -622,13 +629,19 @@ export default function DesktopShell({
         <div className="border-t border-white/10 p-3">
           {user ? (
             <div className="flex items-center gap-2.5 rounded-2xl p-2 transition hover:bg-white/[0.06]">
-              {user.photoURL ? (
-                <img src={user.photoURL} alt="" decoding="async" width={36} height={36} className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-white/10" />
-              ) : (
-                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-indigo-600 text-xs font-black text-white">
-                  {initials}
-                </div>
-              )}
+              <SafeImage
+                src={user.photoURL}
+                alt=""
+                decoding="async"
+                width={36}
+                height={36}
+                className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+                fallback={
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-indigo-600 text-xs font-black text-white">
+                    {initials}
+                  </div>
+                }
+              />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[12px] font-black text-white">{user.name}</p>
                 <p className="truncate text-[10px] font-semibold text-white/55">{user.email}</p>

@@ -159,6 +159,8 @@ export type GlassDockItem = {
   id: string
   label: string
   color: string
+  /** Plate shape: the default rounded square, or a full circle (course footer). */
+  shape?: 'square' | 'circle'
   icon: GlassDockIcon
   active?: boolean
   badge?: number
@@ -223,6 +225,7 @@ function DockItem({
   id,
   icon: Icon,
   color,
+  shape = 'square',
   label,
   mouseX,
   index,
@@ -430,7 +433,7 @@ function DockItem({
                 // tint and gains a soft glow instead of switching palettes.
                 background: active ? `${color}30` : `${color}18`,
                 border: active ? `1px solid ${color}55` : `1px solid ${color}22`,
-                borderRadius: 12,
+                borderRadius: shape === 'circle' ? '50%' : 12,
                 boxShadow: active ? `0 0 16px ${color}44` : 'none',
               }
         }

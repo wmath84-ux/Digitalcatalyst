@@ -12,6 +12,7 @@ import {
 } from "./StoreAdvancedFilters";
 import "./store-marketplace.css";
 import "./store-filter-radio.css";
+import "./marketplace-card-shared.css";
 import useDragScroll from "../hooks/useDragScroll";
 import { useStoreFilters } from "../hooks/useStoreFilters";
 import { openCommandPalette } from "../lib/commandPalette";

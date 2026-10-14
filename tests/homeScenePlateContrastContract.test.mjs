@@ -144,7 +144,9 @@ test("Home's bar, hero frame, tiles, segment and popover wear the plate", () => 
   assert.match(header, /className="dc-scene-plate dc-scene-plate--bar absolute left-0 right-0/);
   assert.match(hero, /className="dc-scene-plate select-none overflow-hidden touch-pan-y"/);
   assert.match(tile, /dc-scene-plate group relative overflow-hidden text-white/);
-  assert.match(categories, /className="dc-segment dc-scene-plate shrink-0 dc-home-category-group"/);
+  // Categories are the radio-tile rail (CategoryNav): the tiles carry their own
+  // surface, so the rail is asserted by its current markup.
+  assert.match(categories, /className="dc-home-category-scroll dc-home-radio-rail"/);
 });
 
 test("the search pill gets a rim and legible placeholder ink inside the bar", () => {
@@ -179,7 +181,7 @@ test("Home's shared section headings and bare actions carry the scene ink hook",
   // component applies the existing per-glyph scrim consistently across Home.
   assert.match(css, /:where\(\.dc-scene-ink\) \{\s*\n\s*text-shadow:/);
   assert.match(sectionHeader, /<h2 id=\{id\} className="dc-scene-ink text-base font-bold text-white md:text-lg">/);
-  assert.match(home, /<HomeSectionHeader[\s\S]*?title="Trending Now"/);
+  assert.match(home, /<HomeSectionHeader[\s\S]*?title="Trending"/);
   assert.match(home, /dc-home-section-action dc-scene-ink/);
   assert.match(home, /dc-home-results-count dc-scene-ink/);
   // Empty categories use the shared glass card rather than bare scene copy.

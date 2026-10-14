@@ -1,6 +1,10 @@
 // Compact, direct-access study strips replace the icon dock and reveal handle.
 import { useRef, type CSSProperties, type KeyboardEvent } from 'react'
 import { TABS, type DockTab } from './CourseOverlay'
+
+// The footer's single website colour — same value as COURSE_FOOTER_COLOR in
+// CourseOverlay.tsx (kept local here: CourseOverlay imports nothing from the strip).
+const FOOTER_COLOR = '#4f46e5'
 import { useCourseKeyboard } from './useCourseKeyboard'
 import './course-strip-nav.css'
 
@@ -38,7 +42,7 @@ export default function CoursePeekDock({ tab, onTabChange, hiddenTabs = [] }: {
               aria-label={item.heading} title={item.heading}
               aria-pressed={tab === item.key}
               onClick={() => onTabChange(item.key)} onKeyDown={event => moveFocus(event, index)}
-              style={{ '--strip-color': item.color } as CSSProperties}>
+              style={{ '--strip-color': FOOTER_COLOR } as CSSProperties}>
               <span className="course-strip-letter" aria-hidden="true">{letter}</span>
               <span className="course-strip-name" aria-hidden="true">{name}</span>
             </button>

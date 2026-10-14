@@ -109,7 +109,7 @@ export default function ExpandingTabs({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -7 }}
                   transition={spring}
-                  className="whitespace-nowrap text-[40px] font-semibold leading-[40px] tracking-[0.01em]"
+                  className="whitespace-nowrap text-[18px] font-semibold leading-[20px] tracking-[0.01em]"
                 >
                   {item.label}
                 </motion.span>
@@ -118,7 +118,7 @@ export default function ExpandingTabs({
             {item.badge ? (
               <span
                 aria-label={item.badgeAriaLabel}
-                className={`absolute -right-0.5 -top-0.5 z-10 flex h-10 min-w-[40px] items-center justify-center rounded-full px-1 text-[40px] leading-[40px] font-bold text-white ring-2 ring-[#0a0c12] ${
+                className={`absolute -right-1.5 -top-1.5 z-10 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] leading-[16px] font-bold text-white ring-2 ring-[#0a0c12] ${
                   item.badgeTone === "rose" ? "bg-rose-500" : "bg-indigo-600"
                 }`}
               >

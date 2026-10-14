@@ -237,17 +237,17 @@ export default function Header({
          shadow and glow. `bg-white/75` and `backdrop-blur-xl` stay in the class list — they are the published
          material that `?glass=off` restores, and the gate means this rule only
          ever applies while glass is on. */
-      className={`dc-scene-plate dc-scene-plate--bar sticky top-0 z-30 bg-white/75 px-4 py-3 sm:px-5 md:px-8 md:py-4 backdrop-blur-xl transition-all duration-300 ${
+      className={`dc-scene-plate dc-scene-plate--bar sticky top-0 z-30 bg-white/75 px-3 py-2 min-[390px]:px-4 sm:px-5 sm:py-3 md:px-8 md:py-4 backdrop-blur-xl transition-all duration-300 ${
         hideFrameBorders || seamless ? "" : "mobile-header-glow"
       }`}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/30">
-            {customLogo ? <BrandMark className="h-10 w-10" /> : <LogoIcon className="h-10 w-10" />}
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl md:h-10 md:w-10 bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/30">
+            {customLogo ? <BrandMark className="h-8 w-8 md:h-10 md:w-10" /> : <LogoIcon className="h-8 w-8 md:h-10 md:w-10" />}
           </div>
           <div className="flex min-w-0 flex-col justify-center leading-tight">
-            <h1 className="truncate text-[40px] font-bold leading-[40px] tracking-tight text-white">{headerTitle}</h1>
+            <h1 className="truncate text-[24px] font-bold leading-[26px] tracking-tight text-white md:text-[40px] md:leading-[40px]">{headerTitle}</h1>
           </div>
           {/* The faded `ad` label (src/components/ad/OpeningAdControl.tsx):
               the app no longer plays the EduOS opening by itself, so this is
@@ -277,7 +277,7 @@ export default function Header({
         <div className="flex shrink-0 items-center gap-2" data-header-action-cluster>
           <HeaderNotificationsButton
             count={displayedNotificationCount}
-            size={40}
+            size={isPhoneLayout ? 36 : 40}
             onClick={onNavigateToNotifications}
           />
           {isPhoneLayout ? (

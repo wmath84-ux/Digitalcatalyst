@@ -43,8 +43,9 @@ export default function BottomNav({ route }: { route: string }) {
     };
   });
 
-  // The shared site footer capsule (src/components/SiteFooterNav.tsx) — the
-  // same design and material as Home / Store / My Day. This nav used to be
+  // The shared site footer (src/components/SiteFooterNav.tsx) with the same
+  // peek settings Home uses (visible, never collapses, drag strip on the line),
+  // so the Revision footer is the Home footer design. This nav used to be
   // hidden from 768 px up, which left Revision without any footer on a tablet
   // in portrait; the text tab row (src/components/ui/PageTabs.tsx) stays the
   // desktop nav and steps aside in the 768–959 px portrait band where this
@@ -52,6 +53,8 @@ export default function BottomNav({ route }: { route: string }) {
   return (
     <SiteFooterNav
       label="Bottom navigation"
+      peek
+      peekAlwaysOpen
       items={items}
       onSelect={(href) => {
         navigate(href);

@@ -28,6 +28,7 @@ import { useHomepageProductReviews } from "../hooks/useProductReviews";
 import { useAuth } from "../context/AuthContext";
 import { useHomeBanners } from "./hooks/useHomeBanners";
 import "./home.css";
+import "../components/marketplace-card-shared.css";
 
 /**
  * Maximum number of courses the home page "Continue Learning" section shows.

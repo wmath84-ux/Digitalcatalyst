@@ -120,7 +120,7 @@ function syncPortalTheme(root: HTMLElement): void {
   }
   appliedPortalProperties = new Set(nextProperties.keys());
 
-  body.setAttribute("data-recall-theme", root.getAttribute("data-recall-theme") ?? "light");
+  body.setAttribute("data-recall-theme", root.getAttribute("data-recall-theme") ?? "dark");
   body.setAttribute("data-recall-contrast", root.getAttribute("data-recall-contrast") ?? "normal");
   body.style.setProperty("color-scheme", computed.colorScheme);
 }
@@ -142,9 +142,10 @@ export function applyTheme(_theme: Theme): void {
   const root = resolveRoot();
   if (!root) return;
 
-  root.setAttribute("data-recall-theme", "light");
+  // Revision always uses the website's dark palette (see recall-theme.css).
+  root.setAttribute("data-recall-theme", "dark");
   root.setAttribute("data-recall-contrast", "normal");
-  root.style.colorScheme = "light";
+  root.style.colorScheme = "dark";
   syncPortalTheme(root);
 }
 

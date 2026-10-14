@@ -42,6 +42,7 @@ function Avatar({
       <img
         src={src}
         alt=""
+        referrerPolicy="no-referrer"
         loading="lazy"
         decoding="async"
         width={size}

@@ -2473,29 +2473,40 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           data-course-progress-bar
           data-progress-value={progress}
         >
-          {/* Progress track and fill */}
-          <div className="relative h-3 min-w-0 flex-1">
-            <span aria-hidden className="pointer-events-none absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 overflow-hidden rounded-full bg-white/10" />
+          {/* Progress track — the Uiverse "moody squid" loader layout: a
+              rounded track, a rounded fill and three circular checkpoints at
+              33 / 66 / 100 %. The fill and the checkpoints follow the REAL
+              progress value (no looping demo animation); a checkpoint lights
+              up in the website colour once the fill reaches it. */}
+          <div className="relative h-3 min-w-0 flex-1" data-course-progress-track>
+            <span aria-hidden className="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-white/15" />
             <span
               aria-hidden
               data-course-progress-fill
-              className="pointer-events-none absolute left-0 top-1/2 h-1 -translate-y-1/2 overflow-hidden rounded-full transition-[width] duration-300 ease-out"
+              className="pointer-events-none absolute left-0 top-1/2 h-2 -translate-y-1/2 rounded-full transition-[width] duration-500 ease-out"
               style={{
-                width: `${progress}%`,
-                background: "linear-gradient(90deg, #38bdf8, #a78bfa)",
-                boxShadow: "0 0 10px rgba(139, 92, 246, 0.45)",
+                width: `${Math.min(100, Math.max(0, progress))}%`,
+                background: "#4f46e5",
+                boxShadow: "0 0 8px rgba(79, 70, 229, 0.55)",
               }}
             />
-            {/* Runway loader animation overlay - continuous shimmer effect */}
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-0 overflow-hidden rounded-full opacity-60"
-              style={{
-                background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
-                backgroundSize: "200% 100%",
-                animation: "runwayShimmer 2s linear infinite",
-              }}
-            />
+            {[33.333, 66.666, 100].map((at) => {
+              const reached = progress >= at - 0.5;
+              return (
+                <span
+                  key={at}
+                  aria-hidden
+                  data-course-progress-checkpoint
+                  data-reached={reached ? "true" : "false"}
+                  className={`pointer-events-none absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 transition-[transform,background-color,border-color] duration-300 ease-out ${reached ? "scale-100" : "scale-75"}`}
+                  style={{
+                    left: `${at}%`,
+                    background: reached ? "#4f46e5" : "#1f2937",
+                    borderColor: reached ? "#c7d2fe" : "#535353",
+                  }}
+                />
+              );
+            })}
           </div>
           <span
             aria-hidden

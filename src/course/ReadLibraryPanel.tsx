@@ -93,7 +93,10 @@ const writePageToStorage = (productId: string, resourceId: string, page: number)
 /** `course:<id>` / `mine:<id>` — one reader, two sources, no id collisions. */
 type ActiveKind = "course" | "learner";
 
-const withKind = (kind: ActiveKind, id: string) => `${kind}:${id}`;
+// The learner's own PDFs are keyed `mine:<id>` (what `kindOf` and the row's
+// `data-course-read-open` use). Writing `learner:<id>` here made `kindOf` return
+// null, so the reader opened with no document: the blank screen after upload.
+const withKind = (kind: ActiveKind, id: string) => `${kind === "learner" ? "mine" : kind}:${id}`;
 const kindOf = (activeId: string | null): ActiveKind | null =>
   activeId?.startsWith("mine:") ? "learner" : activeId?.startsWith("course:") ? "course" : null;
 const bareId = (activeId: string | null) => (activeId ? activeId.slice(activeId.indexOf(":") + 1) : "");

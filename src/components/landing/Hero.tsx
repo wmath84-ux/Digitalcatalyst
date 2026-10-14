@@ -54,7 +54,7 @@ export default function Hero() {
               variant="capsule"
               type="button"
               onClick={openInstallPanel}
-              className="[&>span>div]:h-14 [&>span>div]:px-7 [&>span>div]:text-base [&>span>div]:font-bold [&>span>div]:text-emerald-300"
+              className="[&>span>div]:h-14 [&>span>div]:px-7 [&>span>div]:text-base [&>span>div]:font-bold [&>span>div]:text-black"
             >
               ⬇️ Install the PWA
             </GlassButton>
