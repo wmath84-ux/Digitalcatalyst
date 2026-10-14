@@ -2,13 +2,14 @@ import { useEffect, useState, type ReactNode } from "react";
 import GlassDock, { type GlassDockItem } from "./glass-dock/GlassDock";
 import SitePeekFooter from "./SitePeekFooter";
 import UiverseFooterNav from "./UiverseFooterNav";
+import YoutubeFooterNav from "./YoutubeFooterNav";
 import { useFooterNavigationStyle } from "../utils/footerNavigationStyle";
 
 /**
  * The ONE site footer navigation. The saved display preference chooses
- * between the four-tab Uiverse pill and the preserved magnifying GlassDock.
- * Both share the real footer measurement hook, safe-area clearance and route
- * behavior. Peek-mode remains available whenever the classic dock is selected.
+ * between the edge-to-edge YouTube-style bar, four-tab Uiverse pill and the
+ * preserved magnifying GlassDock. All designs share footer measurement,
+ * safe-area clearance and route behavior; desktop keeps its existing navigation rail.
  */
 
 /** Narrow phones use 38px plates so the seven-tab dock fits without clipping. */
@@ -86,6 +87,17 @@ export default function SiteFooterNav({
 }: SiteFooterNavProps) {
   const compact = useCompactFit();
   const navigationStyle = useFooterNavigationStyle();
+
+  if (navigationStyle === "youtube") {
+    return (
+      <YoutubeFooterNav
+        label={label}
+        items={items}
+        position={position}
+        dataAttrs={dataAttrs}
+      />
+    );
+  }
 
   if (navigationStyle === "uiverse") {
     const purchasesBadge = items.find((item) => item.id === "purchases")?.badge ?? 0;

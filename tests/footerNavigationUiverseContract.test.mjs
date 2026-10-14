@@ -17,8 +17,8 @@ const notificationsCss = read("src/components/header-navigation.css");
 const chromeCss = read("src/light-theme-pages.css");
 
 test("the new footer is the default and the existing magnifying dock remains selectable", () => {
-  assert.match(preference, /type FooterNavigationStyle = "uiverse" \| "glass-dock"/);
-  assert.match(preference, /DEFAULT_STYLE: FooterNavigationStyle = "uiverse"/);
+  assert.match(preference, /type FooterNavigationStyle = "youtube" \| "uiverse" \| "glass-dock"/);
+  assert.match(preference, /DEFAULT_STYLE: FooterNavigationStyle = "youtube"/);
   assert.match(preference, /localStorage\.getItem\(STORAGE_KEY\)/);
   assert.match(preference, /localStorage\.setItem\(STORAGE_KEY, next\)/);
   assert.match(sharedFooter, /useFooterNavigationStyle\(\)/);
@@ -26,6 +26,9 @@ test("the new footer is the default and the existing magnifying dock remains sel
   assert.match(sharedFooter, /<UiverseFooterNav/);
   assert.match(sharedFooter, /if \(peek\)/, "the classic peek mode remains in the glass-dock branch");
   assert.match(sharedFooter, /<SitePeekFooter/);
+  assert.match(settings, /setFooterNavigationStyle\("youtube"\)/);
+  assert.match(settings, /aria-checked=\{footerNavigationStyle === "youtube"\}/);
+  assert.match(settings, /Edge-to-edge/);
   assert.match(settings, /setFooterNavigationStyle\("uiverse"\)/);
   assert.match(settings, /setFooterNavigationStyle\("glass-dock"\)/);
   assert.match(settings, /aria-checked=\{footerNavigationStyle === "uiverse"\}/);
