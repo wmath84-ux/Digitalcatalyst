@@ -276,13 +276,20 @@ test("the branched menu draws its own connected branch lines", () => {
   assert.match(menuCss, /\.branched-menu__item\[data-active\]/, "the active branch is accent-coloured");
 });
 
+test("the collapsed split peek rail is a solid white strip", () => {
+  const rule = ALL_RULES.find((r) => r.selector.includes('[data-course-peek-rail]') && !r.selector.includes('[data-peek-icon]'));
+  assert.ok(rule, 'no peek rail rule');
+  const painted = Object.fromEntries(declarations(rule.body).map((d) => [d.property, d.value]));
+  assert.match(painted.background ?? '', /^#ffffff/i);
+  assert.match(painted['backdrop-filter'] ?? '', /^none/);
+});
+
 test("nothing floats: the dock and the rails are solid plates", () => {
   // The room's HUD and trays were frosted glass over a canvas. The flat player
   // gets the same plate family with NO blur, so nothing reads as floating.
   // (The divider's old grabber/bubble pills are gone — it is a bare line now.)
   const solid = [
     '[data-course-dock] [data-glass-dock]',
-    '[data-course-peek-rail]',
     '[data-course-image-viewer] [data-glass-dock]',
   ];
   for (const target of solid) {
