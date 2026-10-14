@@ -84,10 +84,22 @@ export default function YoutubeFooterNav({
       setMenuOpen(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMenuOpen(false);
+        triggerRef.current?.focus();
+        return;
+      }
+      if (!(event.target instanceof Node) || !menuRef.current?.contains(event.target)
+        || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+      const buttons = Array.from(menuRef.current.querySelectorAll<HTMLButtonElement>('button[role="menuitem"]'));
+      if (!buttons.length) return;
+      const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      const nextIndex = event.key === "Home" ? 0
+        : event.key === "End" ? buttons.length - 1
+          : (index + (["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : -1) + buttons.length) % buttons.length;
       event.preventDefault();
-      setMenuOpen(false);
-      triggerRef.current?.focus();
+      buttons[nextIndex]?.focus();
     };
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
