@@ -299,7 +299,9 @@ test("the player feeds the panel the SELF list, the course list and the writer",
     /selfExperimentsFromCourses\(myLibrary\.courses, storageProductId\)\.map\(\(experiment\) => \(\{/,
   );
   assert.match(player, /file: selfExperimentCourseFile\(experiment\),/);
-  assert.match(player, /experimentPanel=\{studyExperiment \? \(/);
+  // An EXTRA part keeps the stage free for the pane it opened (two experiment
+  // stages on screen would race over one spec), the main pane still gets it.
+  assert.match(player, /experimentPanel=\{opts\.extra \? undefined : studyExperiment \? \(/);
   assert.match(player, /<ExperimentPanel/);
   assert.match(player, /onCreateSelfExperiment=\{createSelfExperiment\}/);
   assert.match(player, /selfExperimentSeed=\{\{/);

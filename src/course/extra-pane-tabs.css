@@ -1,0 +1,69 @@
+/* The extra pane's own tab chooser (see src/course/ExtraPaneTabs.tsx).
+   Same language as the player's footer strip — a circular plate in the course
+   colour plus the readable name — but a row of its own at the top of the part
+   it belongs to, because the footer navigation speaks for the main study pane
+   only. Nothing here is ever stretched: the plates are real circles. */
+
+.extra-pane-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  padding: 4px 6px;
+  background: color-mix(in srgb, var(--course-panel, #0b0f1a) 88%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, #ffffff 12%, transparent);
+  container-type: inline-size;
+}
+
+.extra-pane-tab {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.extra-pane-tab-plate {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #4f46e5;
+  opacity: 0.82;
+  transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+}
+
+.extra-pane-tab[aria-selected='true'] .extra-pane-tab-plate {
+  opacity: 1;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 0 0 4px #4f46e5;
+}
+
+.extra-pane-tab:active .extra-pane-tab-plate { transform: scale(0.86); }
+.extra-pane-tab:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+
+/* The name only appears when the part is wide enough to carry it. */
+.extra-pane-tab-name { display: none; }
+
+@container (min-width: 320px) {
+  .extra-pane-tab { padding: 0 10px; }
+  .extra-pane-tab-name { display: inline; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .extra-pane-tab-plate { transition: none; }
+  .extra-pane-tab:active .extra-pane-tab-plate { transform: none; }
+}

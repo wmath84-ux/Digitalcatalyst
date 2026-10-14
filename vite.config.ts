@@ -5,7 +5,7 @@ import { fileURLToPath } from "url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import browserslist from "browserslist";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -241,8 +241,27 @@ function pdfjsViewerAssets(): import("vite").Plugin {
   };
 }
 
+/*
+ * The Music tab's optional YouTube search (`src/course/musicSearch.ts`).
+ *
+ * A YouTube Data API v3 key is a PUBLIC key — it ships in the client — so it
+ * is never read from `import.meta.env` in the feature code (that would break
+ * the node harnesses) but injected here as a plain global:
+ *
+ *     VITE_YOUTUBE_API_KEY=AIza…        # .env, or the host's env settings
+ *
+ * Without a key the Music library still plays every pasted YouTube / Spotify /
+ * SoundCloud / audio link — the search box then hands the query to YouTube's
+ * own search page and the learner pastes the link straight back. A key only
+ * turns on the in-player result list.
+ */
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  return {
+  define: {
+    __DC_YOUTUBE_API_KEY__: JSON.stringify(env.VITE_YOUTUBE_API_KEY || ""),
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -378,4 +397,5 @@ export default defineConfig({
     allowedHosts: true,
     host: "0.0.0.0",
   },
+  };
 });

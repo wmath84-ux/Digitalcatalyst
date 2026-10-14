@@ -19,6 +19,14 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/png" href="/icons/icon-192x192.png" />
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+    <!-- Optional integrations. Vite substitutes %VITE_YOUTUBE_API_KEY% from
+         .env / the host's env settings (see .env.example); the Course Player's
+         Music tab turns its YouTube search on when a key is present and falls
+         back to YouTube's own search page when it is not. An un-substituted
+         %…% placeholder counts as "not configured". -->
+    <script>
+      window.__DC_YOUTUBE_API_KEY__ = "%VITE_YOUTUBE_API_KEY%";
+    </script>
     <title>Eduvora | Digital Catalyst</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

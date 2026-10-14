@@ -68,7 +68,7 @@ test("the player's own keyboard shortcuts keep priority over the editor's", () =
 // ---------------------------------------------------------------------------
 
 test("Sketch is one more entry in the existing tab infrastructure", () => {
-  assert.match(overlay, /export type DockTab =[^;]*\| "sketch" \| "read";/);
+  assert.match(overlay, /export type DockTab =[^;]*\| "sketch" \| "read" \| "music";/);
   assert.match(overlay, /\{ key: "sketch", label: "Sketch",[\s\S]*?color: "#F97316", icon: PenLine \}/);
   // The dock items and the tab order are still derived from the ONE list.
   assert.match(overlay, /export const STUDY_TAB_ORDER: DockTab\[\] = TABS\.map\(\(\{ key \}\) => key\);/);
@@ -125,7 +125,9 @@ test("the Sketch body is mounted by the same StudyContent switch as every other 
   // the editor's unmount on a tab switch.
   assert.match(player, /const sketch = useCourseSketch\(\{/);
   assert.match(player, /moduleId: activeMindMapModuleId,/);
-  assert.match(player, /sketchPanel=\{\(/);
+  // An EXTRA part never mounts the board (two Excalidraw canvases would
+  // fight over one scene) — the main pane still gets the real panel.
+  assert.match(player, /sketchPanel=\{opts\.extra \? undefined : \(/);
 });
 
 test("the editor's chunk is lazy — a learner who never draws never downloads it", () => {

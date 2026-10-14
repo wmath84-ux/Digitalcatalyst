@@ -214,7 +214,10 @@ test("The footer dock lives INSIDE the study pane", () => {
   // dock (`[data-course-dock]`), i.e. the DOM is
   // `[data-course-study-pane] [data-course-dock]`.
   assert.match(studyPanels, /data-course-study-pane=""[\s\S]*?\{study\}/);
-  assert.match(coursePlayer, /const studyOverlay = \(/);
+  // ONE builder serves the main pane and every extra part (owner's 2026-10-14
+  // split brief), so both speak the same tab language.
+  assert.match(coursePlayer, /const studyOverlay = buildStudyPane\(dockTab, handleDockTabChange\);/);
+  assert.match(coursePlayer, /const buildStudyPane = \(/);
   assert.match(coursePlayer, /study=\{studyOverlay\}/);
   // The overlay ends with the dock (module panel, footer navigation and
   // content all live in the split).
