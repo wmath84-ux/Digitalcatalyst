@@ -15,6 +15,14 @@
 //      a one-shot cloud read, so remote edits appear on reopen or refresh
 //      without a refresh. Ownership is re-derived from the path by
 //      firestore.rules, so one learner can never read or write another's notes.
+//   A cloud read that is older than CLOUD_READ_STALE_MS is refreshed when the
+//   learner comes back to the tab/app (visibilitychange / online) and when the
+//   Notes tab is opened again — a note written on the OTHER device therefore
+//   shows up on return WITHOUT a live listener and without a manual reload.
+//   A read is never started while this device still has unacknowledged edits
+//   (`dirty` / `writing` / `deleted` / in-flight), so freshness can never race
+//   a save of the learner's own work.
+//
 //   2. localStorage mirrors every change (the pre-existing
 //      `dc.courseNotes.{uid}.{productId}` key) plus a tombstone list of deleted
 //      ids. A refused or failed write — offline, rules not deployed yet, a tab
@@ -50,6 +58,7 @@ import {
   sanitizeNoteId,
   type NormalizedNote,
 } from "../../utils/courseNotes";
+import { shouldRefreshNotesFromCloud } from "./cloudFreshness";
 import { richTextToPlain } from "../utils/richText";
 import type { CoursePlayerNote } from "../types/course";
 
@@ -89,6 +98,9 @@ export interface UseCourseNotesResult {
 
 /** Short enough to feel instant, long enough to coalesce a burst of edits. */
 const DEFAULT_DEBOUNCE_MS = 30000;
+
+/** The freshness rule lives in its own module so it can be tested directly. */
+export { CLOUD_READ_STALE_MS, shouldRefreshNotesFromCloud } from "./cloudFreshness";
 const MAX_SYNC_ATTEMPTS = 8;
 
 /** Newest first — the order the notes grid has always shown. */
@@ -134,6 +146,8 @@ interface NotesSession {
   disposed: boolean;
   listenerFailed: boolean;
   deviceSaved: boolean;
+  /** Epoch ms of the last settled cloud read (0 = never read this session). */
+  lastCloudReadAt: number;
 }
 
 interface NotesView {
@@ -162,7 +176,7 @@ export default function useCourseNotes(input: UseCourseNotesInput): UseCourseNot
     notes: scoped ? byRecency(loadLocalNotes(uidText, productText)) : [],
     dirty: new Set(), deleted: new Set(scoped ? loadDeletedNoteIds(uidText, productText) : []),
     writing: new Set(), timer: null, retry: null, attempts: 0, inFlight: false,
-    flushWanted: false, disposed: false, listenerFailed: false, deviceSaved: true,
+    flushWanted: false, disposed: false, listenerFailed: false, deviceSaved: true, lastCloudReadAt: 0,
   }), [uidText, productText, scoped]);
   const scopeRef = useRef(session);
   scopeRef.current = session;
@@ -290,6 +304,7 @@ export default function useCourseNotes(input: UseCourseNotesInput): UseCourseNot
     publish(session, { notes: session.notes, loading: session.notes.length === 0, status: session.notes.length ? "ready" : "loading", errorMessage: null });
     void fetchCloudNotes(uidText, productText).then((cloud) => {
       if (cancelled || scopeRef.current !== session) return;
+      session.lastCloudReadAt = Date.now();
       const localById = new Map(loadLocalNotes(uidText, productText).map((note) => [note.id, note]));
       for (const note of session.notes) {
         const mirrored = localById.get(note.id);
@@ -316,6 +331,7 @@ export default function useCourseNotes(input: UseCourseNotesInput): UseCourseNot
       });
     }, (error) => {
       if (cancelled || scopeRef.current !== session) return;
+      session.lastCloudReadAt = Date.now();
       session.listenerFailed = true;
       publish(session, { loading: false, status: "error", errorMessage: describeNotesError(error) });
       if (session.attempts < MAX_SYNC_ATTEMPTS) {
@@ -408,11 +424,25 @@ export default function useCourseNotes(input: UseCourseNotesInput): UseCourseNot
     session.disposed = false;
     const onLeave = () => flushRef.current(session);
     const onOnline = () => {
-      if (session.listenerFailed) reload();
+      if (session.listenerFailed || shouldRefreshNotesFromCloud({
+        dirty: session.dirty.size, writing: session.writing.size,
+        deleted: session.deleted.size, inFlight: session.inFlight,
+        lastCloudReadAt: session.lastCloudReadAt,
+      })) reload();
       flushRef.current(session);
     };
     const onVisible = () => {
-      if (document.visibilityState === "visible" && session.listenerFailed) reload();
+      if (document.visibilityState === "visible") {
+        // A failed read retries immediately; a successful-but-old read is
+        // repeated so work done on the learner's other device is visible here
+        // without closing the panel. Unacknowledged local edits always win.
+        if (session.listenerFailed) reload();
+        else if (shouldRefreshNotesFromCloud({
+          dirty: session.dirty.size, writing: session.writing.size,
+          deleted: session.deleted.size, inFlight: session.inFlight,
+          lastCloudReadAt: session.lastCloudReadAt,
+        })) reload();
+      }
       onLeave();
     };
     document.addEventListener("visibilitychange", onVisible);

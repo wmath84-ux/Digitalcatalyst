@@ -39,7 +39,13 @@ import { CloudinaryImageUploadField } from "@/components/admin/products/Cloudina
 import { PrimaryButton, SecondaryButton } from "@/components/admin/ui";
 import { useToast } from "@/components/admin/AdminProviders";
 import { useBranding } from "@/context/BrandingContext";
-import { attachOpeningSplash } from "@/utils/openingSplash";
+import {
+  attachOpeningSplash,
+  openingClipForWidth,
+  openingClipSrcFor,
+  setOpeningRuntimeOverride,
+} from "@/utils/openingSplash";
+import BrandUrlField from "@/components/admin/BrandUrlField";
 import { SocialLinkIcon, SocialPlatformIcon } from "@/components/ui/SocialPlatformIcon";
 import SocialProfileCard from "@/home/components/SocialProfileCard";
 import {
@@ -65,7 +71,14 @@ type BrandDraft = {
   logoUrl: string;
   appName: string;
   tagline: string;
+  /** The animation exists in the app (its `ad` control + launch playback). */
   openingAnimationEnabled: boolean;
+  /** Play it by itself while the app opens (off by default = tap-only). */
+  openingPlayOnLaunch: boolean;
+  /** Direct public URL of the clip (a GitHub release asset), or "" for bundled. */
+  openingAnimationUrl: string;
+  openingAnimationUrlMobile: string;
+  openingAnimationUrlDesktop: string;
   hideFrameBorders: boolean;
   homeGradientFrom: string;
   homeGradientTo: string;
@@ -110,11 +123,14 @@ interface SectionDef {
 const SECTIONS: SectionDef[] = [
   { key: "identity", label: "Identity", description: "App name + tagline shown across the app, the landing page, and notifications.", icon: "🪪", fieldCount: 2 },
   { key: "social", label: "Social profile", description: "The profile card at the bottom of the Home page: logo, name and bio come from Identity & Logo — every account you add below gets its own link + icon.", icon: "🔗", fieldCount: 3 },
-  { key: "logo", label: "Logo", description: "Square PNG / JPG that becomes the installed PWA icon, splash logo and notification avatar.", icon: "🖼️", fieldCount: 1 },
+  { key: "logo", label: "Logo", description: "Square PNG / JPG that becomes the installed PWA icon, splash logo and notification avatar. Upload it, or paste a direct release-URL.", icon: "🖼️", fieldCount: 2 },
   { key: "gradient", label: "Home gradient", description: "Background gradient behind the home greeting and search bar.", icon: "🎨", fieldCount: 2 },
-  { key: "behaviour", label: "App behaviour", description: "App opening animation and the thin top / bottom border lines.", icon: "✨", fieldCount: 2 },
+  { key: "behaviour", label: "App behaviour", description: "Opening animation (on launch or on tap, clip URL) and the thin top / bottom border lines.", icon: "✨", fieldCount: 5 },
   { key: "support", label: "Support", description: "Contact details shown in the subscription help overlay.", icon: "📞", fieldCount: 2 },
 ];
+
+/** A blank draft row for the logo-source note (see the Logo section). */
+const isReleaseLogoHost = (url: string) => /github\.com|githubusercontent\.com|gitlab\.com|bitbucket\.org/i.test(url);
 
 /**
  * Rotating URL hints for the account rows whose platform is still
@@ -147,11 +163,20 @@ const pickHex = (value: unknown, fallback: string) => {
 export default function BrandingPage() {
   const branding = useBranding();
   const { notify } = useToast();
+  // Which way the admin is feeding the logo: an upload (Cloudinary) or a
+  // direct URL (a release asset). Purely a UI mode — both write `logoUrl`.
+  const [logoSource, setLogoSource] = useState<"upload" | "url">(
+    isReleaseLogoHost(branding.logoUrl) ? "url" : "upload",
+  );
   const [draft, setDraft] = useState<BrandDraft>({
     logoUrl: branding.logoUrl,
     appName: branding.appName,
     tagline: branding.tagline,
     openingAnimationEnabled: branding.openingAnimationEnabled,
+    openingPlayOnLaunch: branding.openingPlayOnLaunch,
+    openingAnimationUrl: branding.openingAnimationUrl,
+    openingAnimationUrlMobile: branding.openingAnimationUrlMobile,
+    openingAnimationUrlDesktop: branding.openingAnimationUrlDesktop,
     hideFrameBorders: branding.hideFrameBorders,
     homeGradientFrom: branding.homeGradientFrom,
     homeGradientTo: branding.homeGradientTo,
@@ -171,6 +196,10 @@ export default function BrandingPage() {
       appName: branding.appName,
       tagline: branding.tagline,
       openingAnimationEnabled: branding.openingAnimationEnabled,
+      openingPlayOnLaunch: branding.openingPlayOnLaunch,
+      openingAnimationUrl: branding.openingAnimationUrl,
+      openingAnimationUrlMobile: branding.openingAnimationUrlMobile,
+      openingAnimationUrlDesktop: branding.openingAnimationUrlDesktop,
       hideFrameBorders: branding.hideFrameBorders,
       homeGradientFrom: branding.homeGradientFrom,
       homeGradientTo: branding.homeGradientTo,
@@ -185,6 +214,10 @@ export default function BrandingPage() {
     branding.appName,
     branding.tagline,
     branding.openingAnimationEnabled,
+    branding.openingPlayOnLaunch,
+    branding.openingAnimationUrl,
+    branding.openingAnimationUrlMobile,
+    branding.openingAnimationUrlDesktop,
     branding.hideFrameBorders,
     branding.homeGradientFrom,
     branding.homeGradientTo,
@@ -262,6 +295,19 @@ export default function BrandingPage() {
     // which silenced the opening on desktop AND mobile with nothing in the UI
     // to explain it.
     const openingAnimationEnabled = merged.openingAnimationEnabled !== false;
+    // OFF by default (fail-safe): only an explicit true turns the launch
+    // playback on, so a stale draft or a save from another section can never
+    // start a 10-second video in front of every app open.
+    const openingPlayOnLaunch = merged.openingPlayOnLaunch === true;
+    // Only an absolute https URL is stored — a typo, a repo path or a
+    // `javascript:` string degrades to "" and the bundled clip plays instead.
+    const httpsOnly = (value: string) => {
+      const text = (value || "").trim();
+      return /^https:\/\//i.test(text) ? text.slice(0, 600) : "";
+    };
+    const openingAnimationUrl = httpsOnly(merged.openingAnimationUrl);
+    const openingAnimationUrlMobile = httpsOnly(merged.openingAnimationUrlMobile);
+    const openingAnimationUrlDesktop = httpsOnly(merged.openingAnimationUrlDesktop);
     const hideFrameBorders = merged.hideFrameBorders !== false;
     const homeGradientFrom = pickHex(merged.homeGradientFrom, DEFAULT_BRANDING.homeGradientFrom);
     const homeGradientTo = pickHex(merged.homeGradientTo, DEFAULT_BRANDING.homeGradientTo);
@@ -278,10 +324,43 @@ export default function BrandingPage() {
     try {
       await setDoc(
         doc(db, BRANDING_DOC_PATH.collection, BRANDING_DOC_PATH.id),
-        { logoUrl, appName, tagline, openingAnimationEnabled, hideFrameBorders, homeGradientFrom, homeGradientTo, socialUrl, socialLinks, supportEmail, supportPhone, updatedAt: serverTimestamp() },
+        {
+          logoUrl,
+          appName,
+          tagline,
+          openingAnimationEnabled,
+          openingPlayOnLaunch,
+          openingAnimationUrl,
+          openingAnimationUrlMobile,
+          openingAnimationUrlDesktop,
+          hideFrameBorders,
+          homeGradientFrom,
+          homeGradientTo,
+          socialUrl,
+          socialLinks,
+          supportEmail,
+          supportPhone,
+          updatedAt: serverTimestamp(),
+        },
         { merge: true },
       );
-      writeCachedBranding({ logoUrl, appName, tagline: tagline || DEFAULT_BRANDING.tagline, openingAnimationEnabled, hideFrameBorders, homeGradientFrom, homeGradientTo, supportEmail, supportPhone, socialUrl, socialLinks });
+      writeCachedBranding({
+        logoUrl,
+        appName,
+        tagline: tagline || DEFAULT_BRANDING.tagline,
+        openingAnimationEnabled,
+        openingPlayOnLaunch,
+        openingAnimationUrl,
+        openingAnimationUrlMobile,
+        openingAnimationUrlDesktop,
+        hideFrameBorders,
+        homeGradientFrom,
+        homeGradientTo,
+        supportEmail,
+        supportPhone,
+        socialUrl,
+        socialLinks,
+      });
       notify("success", "Branding updated. It now applies live across the app and PWA.");
     } catch (err) {
       notify("error", err instanceof Error ? err.message : "Could not save branding.");
@@ -657,25 +736,79 @@ export default function BrandingPage() {
                 </div>
               </div>
 
-              <CloudinaryImageUploadField
-                folder="branding"
-                tags={["branding", "logo"]}
-                label="Upload logo image"
-                hint="PNG or JPG works best. Square 512×512 images look cleanest as the app/PWA icon."
-                onUploaded={(url) => {
-                  update("logoUrl", url);
-                  void persist({ logoUrl: url });
-                }}
-              />
-              <label className="block text-xs font-semibold text-slate-600">
-                Or paste a logo URL
-                <input
-                  value={draft.logoUrl}
-                  onChange={(e) => update("logoUrl", e.target.value)}
-                  placeholder="https://…"
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal text-slate-800"
+              {/* Two ways in, one stored value (`logoUrl`): an upload, or a
+                  direct release URL. The admin picks the source, so a URL can
+                  never be silently replaced by an upload and vice versa. */}
+              <div className="flex gap-1.5 rounded-full bg-slate-100 p-1" role="tablist" aria-label="Logo source">
+                {([
+                  { id: "upload" as const, label: "Upload" },
+                  { id: "url" as const, label: "Release URL" },
+                ]).map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={logoSource === option.id}
+                    onClick={() => setLogoSource(option.id)}
+                    data-branding-logo-source={option.id}
+                    data-branding-logo-source-active={logoSource === option.id ? "true" : "false"}
+                    className={`flex-1 rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
+                      logoSource === option.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              {logoSource === "upload" ? (
+                <CloudinaryImageUploadField
+                  folder="branding"
+                  tags={["branding", "logo"]}
+                  label="Upload logo image"
+                  hint="PNG or JPG works best. Square 512×512 images look cleanest as the app/PWA icon: the app places the artwork inside the mask-safe area for you."
+                  onUploaded={(url) => {
+                    update("logoUrl", url);
+                    void persist({ logoUrl: url });
+                  }}
                 />
-              </label>
+              ) : (
+                <BrandUrlField
+                  label="Logo release URL"
+                  kind="image"
+                  dataAttr="logo-url"
+                  value={draft.logoUrl}
+                  onChange={(value) => update("logoUrl", value)}
+                  placeholder="https://github.com/<owner>/<repo>/releases/download/<tag>/logo.png"
+                  hint="The DIRECT asset link of a release (right-click → copy link), or any public https image. The PWA icon is generated from it — the artwork is centred on a square canvas inside the launcher's safe area, so no mask can cut it. For the APK's own launcher icon, run the Android build: it bakes this same logo in (no code change), and a reinstall is what shows it on the home screen."
+                />
+              )}
+
+              <div className="rounded-xl border border-slate-200 bg-white p-3" data-branding-logo-live>
+                <p className="text-[11px] font-bold text-slate-700">What a new install will show</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                  The installed PWA asks <code className="rounded bg-slate-100 px-1">/api/brand-icon</code> for these three
+                  files. They are rendered from the logo above, so this is the exact artwork the launcher masks.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  {[
+                    { src: "/api/brand-icon?size=192", label: "192 · any" },
+                    { src: "/api/brand-icon?size=512", label: "512 · any" },
+                    { src: "/api/brand-icon?size=512&maskable=1", label: "512 · maskable" },
+                  ].map((icon) => (
+                    <span key={icon.src} className="flex flex-col items-center gap-1">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`${icon.src}&_=${draft.logoUrl ? encodeURIComponent(draft.logoUrl).slice(0, 24) : "default"}`}
+                        alt={icon.label}
+                        className="h-16 w-16 rounded-full border border-slate-200 bg-white object-cover"
+                        data-branding-logo-preview={icon.label}
+                      />
+                      <span className="text-[9px] font-bold uppercase tracking-wide text-slate-500">{icon.label}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : null}
 
@@ -752,24 +885,137 @@ export default function BrandingPage() {
                     checked={draft.openingAnimationEnabled}
                     onChange={(e) => update("openingAnimationEnabled", e.target.checked)}
                     className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    data-branding-opening-enabled
                   />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-xs font-bold text-slate-700">App opening animation page</span>
+                    <span className="block text-xs font-bold text-slate-700">Opening animation available in the app</span>
                     <span className="mt-0.5 block text-[11px] leading-relaxed text-slate-500">
-                      Play the EduOS opening animation while the app opens. Phones use the mobile clip; tablet and
-                      desktop use the landscape clip. This is on by default. A device whose OS asks for reduced motion
-                      gets the static brand card instead of the clip (it is never skipped entirely).
+                      Turns the EduOS opening animation into a feature of the app: learners can watch it from the faded
+                      <strong> ad </strong> control in the header. Turning this off hides that control everywhere and
+                      disables the launch playback. On by default.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-3" data-branding-opening-launch>
+                <label className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={draft.openingPlayOnLaunch}
+                    onChange={(e) => update("openingPlayOnLaunch", e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    data-branding-opening-play-on-launch
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-xs font-bold text-slate-700">
+                      Play the animation by itself while the app opens
+                    </span>
+                    <span className="mt-0.5 block text-[11px] leading-relaxed text-slate-500">
+                      On: every learner watches the clip before the app opens (the <strong>ad</strong> control in the
+                      header hides, because the animation already plays). Off (default): the app opens straight away —
+                      nothing is downloaded — and the faded <strong>ad</strong> control in the header plays this same
+                      clip on tap. A device whose OS asks for reduced motion gets the static brand card instead of the
+                      clip, and Data Saver / 2G connections skip the download; both can be forced per device with
+                      <code className="mx-1 rounded bg-slate-100 px-1">?opening=force</code>.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3" data-branding-opening-clips>
+                <p className="text-xs font-bold text-slate-700">Animation clip (release URL)</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                  Optional. Point the animation at a GitHub release asset and update it later without touching code.
+                  Leave the fields empty to keep playing the bundled EduOS clips.
+                </p>
+                <div className="mt-3 space-y-3">
+                  <BrandUrlField
+                    label="Clip URL (both phone and desktop)"
+                    kind="video"
+                    dataAttr="opening-clip"
+                    value={draft.openingAnimationUrl}
+                    onChange={(value) => update("openingAnimationUrl", value)}
+                    placeholder="https://github.com/<owner>/<repo>/releases/download/<tag>/opening.mp4"
+                    hint="Right-click the .mp4 in the release → “Copy link address”. A release PAGE link (…/releases/tag/…) returns HTML and will not play."
+                  />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <BrandUrlField
+                      label="Phone override (portrait, optional)"
+                      kind="video"
+                      dataAttr="opening-clip-mobile"
+                      value={draft.openingAnimationUrlMobile}
+                      onChange={(value) => update("openingAnimationUrlMobile", value)}
+                      placeholder="…/opening-portrait.mp4"
+                    />
+                    <BrandUrlField
+                      label="Tablet / desktop override (landscape, optional)"
+                      kind="video"
+                      dataAttr="opening-clip-desktop"
+                      value={draft.openingAnimationUrlDesktop}
+                      onChange={(value) => update("openingAnimationUrlDesktop", value)}
+                      placeholder="…/opening-landscape.mp4"
+                    />
+                  </div>
+                  <p className="text-[11px] font-semibold text-slate-600" data-branding-opening-resolved>
+                    This device will play:{" "}
+                    <code className="break-all rounded bg-slate-100 px-1 text-[10px]">
+                      {openingClipSrcFor(
+                        {
+                          any: draft.openingAnimationUrl,
+                          mobile: draft.openingAnimationUrlMobile,
+                          desktop: draft.openingAnimationUrlDesktop,
+                        },
+                        openingClipForWidth(typeof window === "undefined" ? 1280 : window.innerWidth),
+                      )}
+                    </code>
+                    <span className="ml-1 font-normal text-slate-500">
+                      (save first — the header control reads the saved branding)
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+                <label className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={draft.openingPlayOnLaunch && draft.openingAnimationEnabled}
+                    onChange={(e) => {
+                      // One tap = "show it to everyone": both switches on, saved
+                      // immediately, exactly like the border-lines toggle below.
+                      const on = e.target.checked;
+                      update("openingAnimationEnabled", on ? true : draft.openingAnimationEnabled);
+                      update("openingPlayOnLaunch", on);
+                      void persist({ openingAnimationEnabled: on ? true : draft.openingAnimationEnabled, openingPlayOnLaunch: on });
+                    }}
+                    className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    data-branding-opening-quick-launch
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-xs font-bold text-slate-700">Quick: show it to everyone (1 tap)</span>
+                    <span className="mt-0.5 block text-[11px] leading-relaxed text-slate-500">
+                      Saves immediately: turns the animation on and plays it by itself on every app open. While it is
+                      on, the header&apos;s <strong>ad</strong> control stays hidden.
                     </span>
                   </span>
                 </label>
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
                   <button
                     type="button"
+                    data-branding-opening-preview
                     onClick={() => {
                       // Replay the real overlay, from this page, without a
                       // reload — the opening is otherwise only visible on a
                       // cold boot, which made every report unverifiable.
-                      attachOpeningSplash()?.replay();
+                      // `setOpeningRuntimeOverride("on")` arms the launch mode
+                      // for this one playback, so the button previews the
+                      // animation even while the saved setting is "on tap",
+                      // and the override is dropped when the clip ends.
+                      setOpeningRuntimeOverride("on");
+                      const controller = attachOpeningSplash();
+                      controller?.replay();
+                      void controller?.whenDone().then(() => setOpeningRuntimeOverride(null));
                     }}
                     className="rounded-xl bg-[#0B63FF] px-3 py-2 text-[11px] font-bold text-white"
                   >
@@ -782,8 +1028,8 @@ export default function BrandingPage() {
                     Diagnostics (clips + decision)
                   </a>
                   <span className="text-[11px] text-slate-500">
-                    Save first — the preview plays what this browser currently has cached. Append{" "}
-                    <code>?opening=debug</code> to see the reason in the corner.
+                    Save first — the preview plays what this browser currently has cached, and always plays the clip
+                    (even in tap-only mode). Append <code>?opening=debug</code> to see the reason in the corner.
                   </span>
                 </div>
               </div>
@@ -873,6 +1119,10 @@ export default function BrandingPage() {
               appName: DEFAULT_BRANDING.appName,
               tagline: DEFAULT_BRANDING.tagline,
               openingAnimationEnabled: DEFAULT_BRANDING.openingAnimationEnabled,
+              openingPlayOnLaunch: DEFAULT_BRANDING.openingPlayOnLaunch,
+              openingAnimationUrl: DEFAULT_BRANDING.openingAnimationUrl,
+              openingAnimationUrlMobile: DEFAULT_BRANDING.openingAnimationUrlMobile,
+              openingAnimationUrlDesktop: DEFAULT_BRANDING.openingAnimationUrlDesktop,
               hideFrameBorders: DEFAULT_BRANDING.hideFrameBorders,
               homeGradientFrom: DEFAULT_BRANDING.homeGradientFrom,
               homeGradientTo: DEFAULT_BRANDING.homeGradientTo,

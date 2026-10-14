@@ -1,9 +1,11 @@
 # The app opening animation (EduOS clips)
 
-Status: **fixed in `arena/01a06f6e-digitalcatalyst` (2026-09-05)**. This document exists because the same
-symptom — "the opening animation does not play, neither the desktop one nor the mobile one" — was reported
-across three sessions and every answer so far changed the code without changing what the user could see.
-Read this before touching the opening again.
+Status: **fixed in `arena/01a06f6e-digitalcatalyst` (2026-09-05)**, then **changed on 2026-10-13**: the
+animation is no longer a launch splash by default — it is opt-in behind a faded `ad` in the header, and only
+plays at launch when the owner switches that on in Admin → Branding. Both modes use the same controller.
+This document exists because the same symptom — "the opening animation does not play, neither the desktop one
+nor the mobile one" — was reported across three sessions and every answer so far changed the code without
+changing what the user could see. Read this before touching the opening again.
 
 ## What ships
 
@@ -18,9 +20,11 @@ of the 5 MB arrives. The frames are **not** recreated in CSS anywhere — the cl
 ## Who owns what (there is exactly one owner now)
 
 * **`index.html`** — the `#app-opening-splash` overlay (outside `#root`) and a *CSS-only brand card*
-  (`.app-boot-fallback`: ring + wordmark + shine). Its tiny boot script only: applies cached branding
-  (title/wordmark), picks the clip for the viewport, sets `video.src`, calls `play()` once, and marks the
-  splash `data-opening="skipped"` **only** for an explicit off / branding off / offline boot.
+  (`.app-boot-fallback`: ring + wordmark + shine). Its tiny boot script applies cached branding
+  (title/wordmark), picks the clip for the viewport, and then: if `openingPlayOnLaunch` is **false** (the
+  default) it marks the splash `data-opening="skipped"` immediately, before a single byte of video is
+  requested — the app is interactive at once and the clip is only fetched when the learner taps `ad`; if it is
+  true it sets `video.src`, calls `play()` once, and the controller takes over. See "Two modes" below.
 * **`src/utils/openingSplash.ts`** — the decision table (`resolveOpeningDecision`, pure) and the runtime
   controller that is the **only** writer of the splash's visibility. It fades the clip in over the card when
   the clip produces a frame, keeps the card if it does not, and holds the opening for at least
@@ -71,6 +75,37 @@ animation at all, which the user reads as broken. The clip choice is locked at b
    `merged.openingAnimationEnabled === true`, so any save whose draft value was not exactly `true`
    persisted `false` — and the boot splash reads that cached copy *before* React exists. Now it fails
    open (`!== false`) and the same page has a ▶ Preview button.
+
+## Two modes, one controller (2026-10-13)
+
+The animation used to run on every cold boot, and "app open hote hi animation dikhta hai" was reported as a
+problem in its own right. It is now **tap-only unless the owner says otherwise**:
+
+| `openingAnimationEnabled` | `openingPlayOnLaunch` | What the learner gets |
+|---|---|---|
+| `false` | any | nothing at all — no splash, no `ad` button, the clip is never fetched |
+| `true` | `false` *(default)* | a small faded **`ad`** in the header bar; the clip is fetched and played full-screen only when it is tapped |
+| `true` | `true` | the launch splash exactly as documented below, and **no `ad`** (it would be a button that plays what already played) |
+
+Both switches live in Admin → Branding → **Behaviour**, next to the three clip URL fields (tap `Upload` /
+`Release URL` on the Logo section for the icon; for clips paste the *direct asset* URL —
+`.../releases/download/<tag>/<file>.mp4`, not the `releases/tag/<tag>` page). Nothing here needs a code edit.
+"▶ Preview the opening now" arms a one-shot runtime override, so the preview plays even while the saved
+setting is tap-only.
+
+`ad` is `src/components/ad/OpeningAdControl.tsx`: a lowercase `ad` at 40 % opacity in the header action
+cluster of every shell (mobile, desktop, home, landing). It resolves the same clip the launch would use
+(`openingClipSrcFor(openingClipForWidth(window.innerWidth))`), renders the player in a portal above every
+other layer, releases the buffer on close, and on failure prints the URL it tried plus the
+`releases/download` vs `releases/tag` hint. `?opening=on|force` still plays — and the tap uses the same
+`resolveOpeningDecision()` table, so an override that says `off` wins over the button too.
+
+### The clip comes from the Branding document, not from the bundle
+
+The three clip URLs are optional. Empty means "use the bundled `public/assets/animations/*.mp4`", and a
+non-empty URL **overrides the bundled file** for that band. The override is applied by both `index.html`
+(boot) and `openingSplash.ts` (tap), and it is a plain `https://` URL, so a new animation is a Release
+upload + one field — never a rebuild.
 
 ## Diagnosing on the device that is complaining
 
@@ -129,6 +164,11 @@ nobody asked for" stays intact: nothing is forced, it only remembers a request.
   `shouldReleaseOpening()` so it stays testable, and keep it far above clip length + load ceiling.
 * Do **not** persist an override that changes what plays. Remembering "less
   motion" is fine; remembering "static preview" strands every later boot.
+* Do **not** make the tap-only default silently eager: while `openingPlayOnLaunch` is false, neither
+  `index.html` nor React may set `video.src` before the tap. "Loads a 5 MB clip on every boot" is the same bug
+  as "shows an animation nobody asked for".
+* The `ad` control must stay in `data-header-action-cluster` (it is a header action) and must disappear — not
+  merely go inert — when `openingPlayOnLaunch` is true or `openingAnimationEnabled` is false.
 * `tests/openingSplashRuntime.test.mjs` boots the real `index.html` in jsdom and asserts all of this —
   including "a clip that keeps advancing is never dismissed", "a remembered
   `static` preview must not replace the clip", "a refused play() waits instead of handing over" and the `shouldReleaseOpening` table; keep it

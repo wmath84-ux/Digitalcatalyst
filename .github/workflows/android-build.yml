@@ -55,6 +55,19 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
+      # The launcher icon of an installed APK cannot be changed remotely, so the
+      # build bakes in whatever logo the admin has saved in Branding → Logo.
+      # This reads settings/branding with the Admin SDK and regenerates every
+      # icon from it (mask-safe, via scripts/generate-icons.cjs). Without the
+      # service-account secret it logs why and leaves the committed icons
+      # untouched, and it never fails the build.
+      - name: Sync app icon from live branding
+        continue-on-error: true
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        run: node scripts/sync-android-icon.mjs
+
       - name: Build web app
         run: npm run build
         env:
@@ -148,6 +161,19 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
+      # The launcher icon of an installed APK cannot be changed remotely, so the
+      # build bakes in whatever logo the admin has saved in Branding → Logo.
+      # This reads settings/branding with the Admin SDK and regenerates every
+      # icon from it (mask-safe, via scripts/generate-icons.cjs). Without the
+      # service-account secret it logs why and leaves the committed icons
+      # untouched, and it never fails the build.
+      - name: Sync app icon from live branding
+        continue-on-error: true
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        run: node scripts/sync-android-icon.mjs
+
       - name: Build web app
         run: npm run build
         env:
@@ -231,3 +257,22 @@ jobs:
             gh release create android-apk "$apk" --target "$GITHUB_SHA" \
               --title "$title" --notes "$notes" --latest=false
           fi
+
+      # Keep the committed icons and the master logo in step with the branding
+      # this build baked in, so the WEB build (Vercel) and the next APK agree on
+      # the artwork without anyone running a script by hand. Only files that
+      # actually changed are committed, and only on a push to main.
+      - name: Commit regenerated icons
+        run: |
+          set -e
+          changed=$(git status --porcelain -- public/icons public/branding resources android/app/src/main/res)
+          if [ -z "$changed" ]; then
+            echo "Icons already match the live branding — nothing to commit."
+            exit 0
+          fi
+          echo "$changed"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/icons public/branding resources android/app/src/main/res
+          git commit -m "chore(brand-icons): regenerate from live branding [skip ci]"
+          git push

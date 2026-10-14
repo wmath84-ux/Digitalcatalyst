@@ -8,7 +8,9 @@
 //   - Direct video      — native <video> with controls.
 //   - Direct audio      — native <audio> with controls.
 //   - Drive             — drive.google.com preview.
-//   - PDF               — drive preview or direct iframe.
+//   - PDF               — the bundled Mozilla PDF.js viewer; a Google Drive
+//                         file stays in Drive's own preview frame (its byte
+//                         URL is CORS-blocked, see isPdfJsEmbed).
 //   - Google Doc        — /document/d/<id>/preview (exportable).
 //   - Google Sheet      — /spreadsheets/d/<id>/preview.
 //   - Google Slides     — /presentation/d/<id>/embed.
@@ -26,9 +28,11 @@
 //   · Video    → the <video> is paused and `currentTime` stored/restored.
 //   · Audio    → the AudioPlayer pauses and stores/restores its position.
 //   · Image    → zoom + pan are stored and restored.
-//   · Docs / PDF / Sheets / Slides / Forms / mind maps / embeds → the same
-//     live iframe is simply hidden, so the remote document keeps its own
-//     page, scroll and zoom without any reload.
+//   · Docs / Sheets / Slides / Forms / mind maps / embeds → the same live
+//     iframe is simply hidden, so the remote document keeps its own page,
+//     scroll and zoom without any reload.
+//   · PDF (PDF.js) → the page number is stored on every page change and
+//     restored on the next open, exactly like a media position.
 //
 // The viewer shows a "Loading…" indicator while the iframe
 // boots, a "Preview unavailable" panel when the embed URL
@@ -43,10 +47,11 @@ import { GlassSurface } from "../components/ui/glass";
 import type { CourseFile } from "../types/course";
 import { isExperimentFileType } from "../types/course";
 import ImageViewer from "./ImageViewer";
+import PdfJsGenericViewer from "./PdfJsGenericViewer";
 import AudioPlayer from "./AudioPlayer";
 import ExperimentStage from "./ExperimentStage";
 import { buildExperimentDocument, experimentDownloadName } from "../utils/experimentSpec";
-import { editableGoogleKind, getCourseDownload, getCourseEmbed, getGoogleEditorUrl, getYouTubeWatchUrl, hasNativeMobileRendering, isEditableGoogleFile, VIEWPORT_AWARE_KINDS, type CourseDownload, type DocsEditorChrome } from "../utils/courseEmbed";
+import { editableGoogleKind, getCourseDownload, isPdfJsEmbed, pdfJsSourceUrl, getCourseEmbed, getGoogleEditorUrl, getYouTubeWatchUrl, hasNativeMobileRendering, isEditableGoogleFile, VIEWPORT_AWARE_KINDS, type CourseDownload, type DocsEditorChrome } from "../utils/courseEmbed";
 import { useDocsEditorAccess } from "../hooks/useDocsEditorAccess";
 import { resumePosition, type CoursePlaybackPatch, type CoursePlaybackStore } from "./playbackState";
 import { toggleFullscreen as toggleAppFullscreen } from "../utils/fullscreen";
@@ -276,6 +281,24 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, o
 
   const download = experimentDownload ?? nativeDownload;
   const isSupported = SUPPORTED_KINDS.has(embed.kind);
+  // ── PDF lessons open in the bundled Mozilla PDF.js viewer ───────────────
+  // Owner brief: "PDF ko pdf.js se kholna hai." A `pdf` lesson (or a `.pdf`
+  // e-book) is served by the SAME locally bundled Generic Viewer the Read tab
+  // uses — with its toolbar, thumbnails, search and page resume — instead of
+  // being handed to whatever the surrounding browser does with a raw PDF
+  // inside an <iframe> (Chrome's built-in viewer on a desktop; nothing at all
+  // in the packaged Android app, whose WebView has no PDF viewer).
+  //
+  // A Google Drive file keeps Drive's own `/preview` frame: its byte URL
+  // redirects through a host with no CORS header, so PDF.js could never fetch
+  // it (docs/read-resources.md).
+  const pdfJs = isPdfJsEmbed(embed);
+  const pdfJsUrl = pdfJs ? pdfJsSourceUrl(embed, file.url) : "";
+  // Escape hatch for the one case PDF.js cannot win: a host that refuses the
+  // cross-origin read. The browser's own viewer may still render it in a plain
+  // frame, and on a desktop it always did — so the learner chooses, explicitly.
+  const [basicPdfFrame, setBasicPdfFrame] = useState(false);
+  const showPdfJsViewer = pdfJs && !basicPdfFrame;
   const isImage = file.type === "image" && embed.kind === "direct";
   const isVideo = file.type === "video" && embed.kind === "direct";
   const isAudio = file.type === "audio" && embed.kind === "direct";
@@ -388,6 +411,17 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, o
             resumeAt={resumePosition(entry)}
             onProgress={(position, duration) => report({ position, duration })}
           />
+        ) : showPdfJsViewer ? (
+          <div className="h-full min-h-0 w-full overflow-hidden bg-slate-950" data-course-pdf-stage="pdfjs">
+            <PdfJsGenericViewer
+              src={pdfJsUrl}
+              title={file.name}
+              initialPage={typeof entry?.page === "number" ? entry.page : 1}
+              onPageChange={(page) => report({ page })}
+              originalUrl={pdfJsUrl}
+              onOpenBasicViewer={() => setBasicPdfFrame(true)}
+            />
+          </div>
         ) : !embed.url ? (
           <MissingEmbedState file={file} download={download} />
         ) : isCinematic ? (
@@ -406,7 +440,7 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, o
             )}
           </div>
         ) : (
-          <EmbedFrame url={embed.url} title={file.name} kind={embed.kind} supported={isSupported} mobileDocument={mobileDocument} editMode={isEditingInline} editorOriginalUrl={isEditingInline ? getGoogleEditorUrl(file) : ""} />
+          <EmbedFrame url={embed.url} title={file.name} kind={embed.kind} supported={isSupported} mobileDocument={mobileDocument} editMode={isEditingInline} editorOriginalUrl={isEditingInline ? getGoogleEditorUrl(file) : ""} pdfBasicFrame={pdfJs && basicPdfFrame} />
         )}
       </div>
     </div>
@@ -659,6 +693,12 @@ interface EmbedFrameProps {
    */
   mobileDocument?: boolean;
   /**
+   * True for the fallback of a PDF whose host refused a cross-origin read:
+   * this frame is only reached from that state, so it is labelled as such in
+   * the stage (tests and support both key off `data-pdf-basic-frame`).
+   */
+  pdfBasicFrame?: boolean;
+  /**
    * True when the frame is loading Google's FULL editor (`/edit`). Changes
    * the loading copy and the failure panel: an editor that refuses to load
    * almost always means the file isn't shared with edit permission or the
@@ -706,7 +746,7 @@ const EDITOR_VIEWPORT_WIDTHS: Record<string, number> = {
   slides: 860,
 };
 
-function EmbedFrame({ url, originalUrl = "", title, kind, supported, mobileDocument = false, editMode = false, editorOriginalUrl = "" }: EmbedFrameProps) {
+function EmbedFrame({ url, originalUrl = "", title, kind, supported, mobileDocument = false, editMode = false, editorOriginalUrl = "", pdfBasicFrame = false }: EmbedFrameProps) {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -842,6 +882,7 @@ function EmbedFrame({ url, originalUrl = "", title, kind, supported, mobileDocum
       className="relative h-full min-h-0 w-full min-w-0 overflow-hidden"
       data-course-viewer-embed
       data-embed-kind={kind}
+      data-pdf-basic-frame={pdfBasicFrame ? "true" : undefined}
       data-viewport-mode={mobileDocument ? "mobile" : "desktop"}
       data-editor-fit={scalingEditor ? editorScale.toFixed(2) : undefined}
     >
@@ -849,7 +890,7 @@ function EmbedFrame({ url, originalUrl = "", title, kind, supported, mobileDocum
         <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-[var(--course-loading)] text-[var(--course-text)]">
           <div className="flex flex-col items-center gap-2">
             <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/25 border-t-violet-400" />
-            <p className="text-xs font-semibold text-[var(--course-muted)]">{editMode ? "Loading Google editor…" : "Loading preview…"}</p>
+            <p className="text-xs font-semibold text-[var(--course-muted)]">{editMode ? "Loading Google editor…" : pdfBasicFrame ? "Opening in the browser's PDF viewer…" : "Loading preview…"}</p>
           </div>
         </div>
       ) : null}

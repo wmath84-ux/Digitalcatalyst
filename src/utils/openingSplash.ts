@@ -37,6 +37,15 @@
 //   • Every branch is overridable from the URL, and `?opening=debug` shows a
 //     badge with the exact reason — so "it does not play on my phone" can be
 //     answered from a screenshot instead of a guess.
+//
+// The product rule refined (2026): the opening is TAP-ONLY by default. The
+// admin turns `openingPlayOnLaunch` on (Branding → App behaviour) when every
+// learner should watch it while the app opens; with it off, the header's faded
+// `ad` control plays the very same clip on demand (`src/components/ad/…`,
+// mounted from main.tsx) and nothing is downloaded at boot. `opening=on`
+// re-arms the launch playback on a single device so a report can always be
+// reproduced, and the clip itself may be a GitHub release asset URL
+// (`openingAnimationUrl` / `…Mobile` / `…Desktop`) instead of the bundled MP4.
 
 import { useEffect, useState } from "react";
 
@@ -115,6 +124,15 @@ export interface OpeningInput {
   width: number;
   /** `settings/branding.openingAnimationEnabled` (cached or live). */
   brandingEnabled: boolean;
+  /**
+   * `settings/branding.openingPlayOnLaunch`. OFF (and absent) means the
+   * opening is tap-only: nothing plays or downloads while the app opens, and
+   * the header's `ad` control opens it. `?opening=on` / `?opening=force`
+   * re-arm the launch playback for one device.
+   */
+  playOnLaunch?: boolean;
+  /** Admin release-URL clips (see OpeningClipSources). */
+  clips?: OpeningClipSources | null;
   reducedMotion: boolean;
   offline: boolean;
   override: OpeningOverride | null;
@@ -275,12 +293,35 @@ export function openingSrcForClip(clip: OpeningClip): string {
 }
 
 /**
+ * Admin-configured clips (Branding → App behaviour). Every field is optional
+ * and an empty/invalid one falls back to the bundled EduOS clip, so a typo can
+ * never turn the launch animation into a black screen — the worst case is the
+ * shipped clip.
+ */
+export type OpeningClipSources = {
+  /** Release-asset URL used for both bands. */
+  any?: string | null;
+  mobile?: string | null;
+  desktop?: string | null;
+};
+
+/** The clip for one band: its own override, else the shared one, else shipped. */
+export function openingClipSrcFor(sources: OpeningClipSources | null | undefined, clip: OpeningClip): string {
+  const specific = clip === "mobile" ? sources?.mobile : sources?.desktop;
+  const candidate = (specific || sources?.any || "").trim();
+  // Only an absolute https URL can be a release asset; anything else (a repo
+  // path, a release PAGE link, a `javascript:` string) falls back to the
+  // bundled clip instead of being handed to the <video> element.
+  return /^https:\/\//i.test(candidate) ? candidate : openingSrcForClip(clip);
+}
+
+/**
  * The single source of truth for whether the opening plays, which file, and
  * for how long. Pure — no DOM — so it is unit-tested directly.
  */
 export function resolveOpeningDecision(input: OpeningInput): OpeningDecision {
   const clip = input.lockedClip ?? openingClipForWidth(input.width);
-  const src = openingSrcForClip(clip);
+  const src = openingClipSrcFor(input.clips, clip);
   const timings = { ...DEFAULT_OPENING_TIMINGS, ...(input.timings ?? {}) };
   const base = { clip, src, debug: input.override === "debug", minVisibleMs: timings.minVisibleMs, timings };
 
@@ -302,6 +343,20 @@ export function resolveOpeningDecision(input: OpeningInput): OpeningDecision {
   }
   if (input.override === "static") {
     return { ...base, show: true, mode: "static", reason: "forced the static opening card (opening=static)" };
+  }
+  // THE product rule: the opening runs while the app opens only when the admin
+  // asked for it. Otherwise it is tap-only — the header's `ad` control plays
+  // this very clip on demand, and `?opening=on` arms the launch playback on
+  // one device so the behaviour stays reproducible.
+  if (!input.playOnLaunch && input.override !== "on" && input.override !== "force") {
+    return {
+      ...base,
+      show: false,
+      mode: "video",
+      reason:
+        "the opening is set to play on tap — open it from the header's ad control " +
+        "(App branding → App behaviour turns the launch playback on; ?opening=on plays it now)",
+    };
   }
   if (input.reducedMotion && input.override !== "force" && !input.preferFullClip) {
     return {
@@ -376,18 +431,44 @@ export function setPreferFullClip(next: boolean): void {
   }
 }
 
-function readStoredBrandingOpening(): boolean {
-  if (!isBrowser()) return true;
+/** The cached branding fields the opening cares about, read defensively. */
+function readStoredOpeningBranding(): {
+  enabled: boolean;
+  playOnLaunch: boolean;
+  clips: OpeningClipSources;
+} {
+  const fallback = { enabled: true, playOnLaunch: false, clips: {} as OpeningClipSources };
+  if (!isBrowser()) return fallback;
   try {
     const cached = window.localStorage.getItem(OPENING_BRAND_CACHE_KEY);
-    if (!cached) return true;
-    const parsed = JSON.parse(cached) as { openingAnimationEnabled?: unknown };
-    // Only an explicit `false` turns the opening off — the same rule as
-    // normalizeBranding, so a partial/corrupt cache can never hide it.
-    return parsed?.openingAnimationEnabled !== false;
+    if (!cached) return fallback;
+    const parsed = JSON.parse(cached) as {
+      openingAnimationEnabled?: unknown;
+      openingPlayOnLaunch?: unknown;
+      openingAnimationUrl?: unknown;
+      openingAnimationUrlMobile?: unknown;
+      openingAnimationUrlDesktop?: unknown;
+    };
+    const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+    return {
+      // Only an explicit `false` turns the opening off — the same rule as
+      // normalizeBranding, so a partial/corrupt cache can never hide it.
+      enabled: parsed?.openingAnimationEnabled !== false,
+      // …and only an explicit `true` turns the launch playback on.
+      playOnLaunch: parsed?.openingPlayOnLaunch === true,
+      clips: {
+        any: text(parsed?.openingAnimationUrl),
+        mobile: text(parsed?.openingAnimationUrlMobile),
+        desktop: text(parsed?.openingAnimationUrlDesktop),
+      },
+    };
   } catch {
-    return true;
+    return fallback;
   }
+}
+
+function readStoredBrandingOpening(): boolean {
+  return readStoredOpeningBranding().enabled;
 }
 
 function prefersReducedMotion(): boolean {
@@ -397,11 +478,14 @@ function prefersReducedMotion(): boolean {
 function currentInput(timings?: Partial<OpeningTimings>): OpeningInput {
   const boot = (window as unknown as { __eduosBoot?: { clip?: OpeningClip } }).__eduosBoot;
   const lockedClip = boot?.clip === "mobile" || boot?.clip === "desktop" ? boot.clip : null;
+  const branding = readStoredOpeningBranding();
   return {
     lockedClip,
     timings,
     width: window.innerWidth,
-    brandingEnabled: readStoredBrandingOpening(),
+    brandingEnabled: branding.enabled,
+    playOnLaunch: branding.playOnLaunch,
+    clips: branding.clips,
     reducedMotion: prefersReducedMotion(),
     preferFullClip: readPreferFullClip(),
     offline: navigator.onLine === false,
@@ -668,7 +752,7 @@ function createController(els: Elements, injectedTimings?: Partial<OpeningTiming
       `clip=${decision.clip} · ${OPENING_CLIP_DURATION_MS}ms · file=${decision.src}\n` +
       `held for: ended / stall ${decision.timings.stallTimeoutMs}ms / load ceiling ${decision.timings.loadCeilingMs}ms / backstop ${decision.timings.hardCeilingMs}ms\n` +
       `${media}\n` +
-      `branding.openingAnimationEnabled=${readStoredBrandingOpening()} · onLine=${navigator.onLine} · reducedMotion=${prefersReducedMotion()}\n` +
+      `branding.openingAnimationEnabled=${readStoredBrandingOpening()} · playOnLaunch=${readStoredOpeningBranding().playOnLaunch} · onLine=${navigator.onLine} · reducedMotion=${prefersReducedMotion()}\n` +
       `first frame: ${firstFrameAt === null ? "never" : `${Math.round(firstFrameAt)}ms`} · elapsed ${Math.round(now() - start)}ms\n` +
       (lastError ? `note: ${lastError}\n` : "") +
       `try: ?opening=force · ?opening=static · replay: __eduosOpening.replay()`;

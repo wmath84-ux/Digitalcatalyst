@@ -5,6 +5,7 @@ import { openApp } from "@/utils/pwaInstall";
 import BrandMark from "@/components/BrandMark";
 import { useBranding } from "@/context/BrandingContext";
 import { GlassSurface } from "@/components/ui/glass";
+import OpeningAdControl from "@/components/ad/OpeningAdControl";
 
 export default function Header() {
   const { appName, tagline } = useBranding();
@@ -30,6 +31,9 @@ export default function Header() {
           </span>
         </a>
 
+        <div className="flex shrink-0 items-center gap-2">
+        {/* Faded `ad` control — see src/components/ad/OpeningAdControl.tsx. */}
+        <OpeningAdControl />
         <button
           type="button"
           onClick={openApp}
@@ -39,6 +43,7 @@ export default function Header() {
           <span className="hidden sm:inline">Open App</span>
           <span className="sm:hidden">Open</span>
         </button>
+        </div>
       </GlassSurface>
     </motion.header>
   );

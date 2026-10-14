@@ -63,6 +63,7 @@ import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount"
 import { useDragScroll } from "../hooks/useDragScroll";
 import { useFeatureVisibilityMap } from "../context/FeatureVisibilityContext";
 import BrandMark from "./BrandMark";
+import OpeningAdControl from "./ad/OpeningAdControl";
 import HeaderNotificationsButton from "./HeaderNotificationsButton";
 import { singleWordHeaderTitle } from "./Header";
 import DesktopPeekDock from "./glass-dock/DesktopPeekDock";
@@ -668,10 +669,12 @@ export default function DesktopShell({
           className="dc-scene-plate dc-scene-plate--bar absolute inset-x-0 top-0 z-30 border-b border-white/10 px-6"
         >
           <div data-desktop-topbar-row className="flex h-16 items-center gap-4">
-            <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
               <h1 className="truncate text-[40px] font-bold leading-[40px] tracking-tight text-white" data-desktop-page-title>
                 {resolvedTitle}
               </h1>
+              {/* Faded `ad` control — see src/components/ad/OpeningAdControl.tsx. */}
+              <OpeningAdControl className="!text-[11px]" />
             </div>
 
             {/* Search input — appears on every page that provides an

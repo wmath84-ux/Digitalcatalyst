@@ -24,6 +24,8 @@ export const store = new Map();
 export const submitted = [];
 export const committed = [];
 export const state = { readDelay: 0, writeDelay: 0, failReads: null, failWrites: null };
+/** Every read that reached the "server": { list, doc } — freshness is measured here. */
+export const reads = { list: 0, doc: 0 };
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const clone = (x) => x == null ? x : JSON.parse(JSON.stringify(x));
 const fail = (code) => Object.assign(new Error(code), { code });
@@ -32,6 +34,7 @@ export const collection = doc;
 export const where = (field, op, value) => ({ field, op, value });
 export const query = (ref, ...filters) => ({ ...ref, filters });
 export async function getDoc(ref) {
+  reads.doc += 1;
   const data = clone(store.get(ref.path));
   const error = state.failReads;
   if (state.readDelay) await sleep(state.readDelay);
@@ -39,6 +42,7 @@ export async function getDoc(ref) {
   return { exists: () => data != null, data: () => data };
 }
 export async function getDocs(ref) {
+  reads.list += 1;
   const prefix = ref.path + "/";
   const docs = Array.from(store.entries()).filter(([key, data]) => key.startsWith(prefix) && !key.slice(prefix.length).includes("/") &&
     (ref.filters || []).every(f => data[f.field] === f.value)).map(([key, value]) => ({ id: key.split("/").pop(), data: () => clone(value) }));
@@ -63,7 +67,7 @@ export async function deleteDoc(ref) {
   store.delete(ref.path);
   committed.push({ kind: "delete", path: ref.path });
 }
-export function reset() { store.clear(); submitted.length = 0; committed.length = 0; Object.assign(state, { readDelay: 0, writeDelay: 0, failReads: null, failWrites: null }); }
+export function reset() { store.clear(); submitted.length = 0; committed.length = 0; reads.list = 0; reads.doc = 0; Object.assign(state, { readDelay: 0, writeDelay: 0, failReads: null, failWrites: null }); }
 `);
 
 const dom = new JSDOM("<!doctype html><body><div id='host'></div></body>", { pretendToBeVisual: true, url: "http://localhost/" });
@@ -123,6 +127,30 @@ const mount = (props = input(), strict = true) => {
 };
 const unmount = (board) => { act(() => board.unmount()); mounted.delete(board); };
 const fresh = () => { cloud.reset(); window.localStorage.clear(); app.authState.uid = "u1"; };
+// The hooks' freshness rule is deliberately time-based, so the tests move the
+// clock instead of sleeping for a minute. Every `Date.now()` in the bundle reads
+// the same patched constructor.
+const realNow = Date.now;
+let clockOffset = 0;
+const withClock = async (fn) => {
+  const previousOffset = clockOffset;
+  const previousNow = Date.now;
+  clockOffset = 0;
+  Date.now = () => realNow() + clockOffset;
+  try {
+    return await fn();
+  } finally {
+    clockOffset = previousOffset;
+    Date.now = previousNow;
+  }
+};
+const advanceClock = (ms) => { clockOffset += ms; };
+const returnToApp = async () => {
+  await act(async () => {
+    document.dispatchEvent(new window.Event("visibilitychange"));
+    await sleep(30);
+  });
+};
 const seed = (scope, key, mind, updatedAt = 10) => {
   const payload = fixture.toFirestoreMindMap(mind, { uid: scope.uid, productId: scope.productId, moduleId: scope.moduleId, mapKey: key, updatedAt });
   cloud.store.set(mapPath(scope, key), payload); return payload;
@@ -329,4 +357,82 @@ test("reconnect retries failed map/library reads, restoring existing remote maps
   assert.ok(ctl().maps.some(map => map.mapKey === "remote-second"));
   assert.equal(text("error"), "");
   assert.equal(cloud.submitted.filter(op => op.kind === "set").length, 0, "read recovery uploaded an unverified empty seed");
+});
+
+/* ── freshness (owner report: "mind map course player me dikhta nahi") ────── */
+
+test("returning to the tab re-reads the module library once the read has gone stale", async () => {
+  await withClock(async () => {
+    fresh();
+    const board = mount();
+    await settle();
+    const atMount = cloud.reads.list;
+    assert.ok(atMount >= 1, "the module library was never read");
+
+    // Another device draws a map in THIS module. No listener is installed, so
+    // the board cannot see it until the read is repeated.
+    const scope = input();
+    seed(scope, "phone", fixture.createMindMap("Phone map", "Phone map"), 5000);
+    assert.doesNotMatch(text("maps"), /Phone map/, "a background write must not churn the open canvas");
+
+    // …and the learner comes back to the app a minute later.
+    advanceClock(61_000);
+    await returnToApp();
+    await settle();
+    assert.ok(cloud.reads.list > atMount, "the stale library read was not repeated");
+    assert.match(text("maps"), /Phone map/, "a map saved on another device is still invisible in the Course Player");
+
+    unmount(board);
+  });
+});
+
+test("a fresh library read already on the screen is not repeated on every focus", async () => {
+  await withClock(async () => {
+    fresh();
+    const board = mount();
+    await settle();
+    const atMount = cloud.reads.list;
+    await returnToApp();
+    await settle();
+    assert.equal(cloud.reads.list, atMount, "returning within the freshness window must not cost a query");
+    unmount(board);
+  });
+});
+
+test("opening the Mind Map tab again always re-reads the library (the player's own refresh)", async () => {
+  await withClock(async () => {
+    fresh();
+    const board = mount();
+    await settle();
+    const atMount = cloud.reads.list;
+    const scope = input();
+    seed(scope, "laptop", fixture.createMindMap("Laptop map", "Laptop map"), 6000);
+
+    // `reload()` is what CoursePlayerApp calls the moment the Mind Map dock tab
+    // is opened — no staleness window applies to an explicit tab open.
+    await act(async () => { ctl().reload(); await sleep(30); });
+    await settle();
+    assert.ok(cloud.reads.list > atMount, "opening the tab did not re-read the library");
+    assert.match(text("maps"), /Laptop map/);
+    unmount(board);
+  });
+});
+
+test("freshness never races unsaved work: a pending upload blocks the repeat read", async () => {
+  await withClock(async () => {
+    fresh();
+    cloud.state.failWrites = "unavailable";
+    const board = mount();
+    await settle();
+    branch("Offline branch");
+    await settle(40);
+    const afterFailedWrite = cloud.reads.list;
+
+    advanceClock(61_000);
+    await returnToApp();
+    await settle();
+    assert.equal(cloud.reads.list, afterFailedWrite, "a read may not run while this device still has an unacknowledged map");
+    assert.match(text("nodes"), /Offline branch/, "the unsaved branch must survive");
+    unmount(board);
+  });
 });

@@ -107,8 +107,9 @@
 // drag-pan AND node dragging, and a custom node is just a React component,
 // so the `+` button is ordinary JSX rather than DOM surgery.
 
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createContext, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { createFrameCoalescer, hasRealPositionChange, mergeNodeChanges } from "./mindMapDrag";
 import {
   Background,
   BackgroundVariant,
@@ -400,7 +401,7 @@ const EMPTY_FACING: Record<string, "left" | "right"> = Object.freeze({});
  * inside the node carry the `nodrag` class so pressing them never starts a
  * drag, and taps that end on a button are left to the button's own click.
  */
-function MindNode({ id, data, dragging }: NodeProps<Node<MindNodeData>>) {
+function MindNodeInner({ id, data, dragging }: NodeProps<Node<MindNodeData>>) {
   const readOnly = useContext(MindReadOnlyContext);
   const {
     topic,
@@ -748,6 +749,30 @@ function MindNode({ id, data, dragging }: NodeProps<Node<MindNodeData>>) {
   );
 }
 
+/**
+ * The card is memoised on purpose, and the comparator is the whole point.
+ *
+ * React Flow re-renders a node whenever its POSITION moves — it passes
+ * `positionAbsoluteX/Y` into the component and applies the transform on the
+ * wrapper around it. Pulling a 60-node branch therefore re-rendered 60 cards
+ * whose rendered output does not depend on their position at all: the wrapper
+ * moves, the card's markup is identical. Skipping those renders is what makes a
+ * large drag cheap; the position props are ignored here exactly because the
+ * wrapper — not this component — owns the movement.
+ */
+const MindNode = memo(MindNodeInner, (previous, next) =>
+  previous.id === next.id
+  && previous.data === next.data
+  && previous.selected === next.selected
+  && previous.dragging === next.dragging
+  && previous.isConnectable === next.isConnectable
+  && previous.zIndex === next.zIndex
+  && previous.parentId === next.parentId
+  && previous.width === next.width
+  && previous.height === next.height
+  && previous.draggable === next.draggable
+  && previous.deletable === next.deletable);
+
 // Defined once at module scope: a fresh object each render makes React Flow
 // tear down and rebuild every node, losing focus mid-typing.
 const NODE_TYPES = { mindNode: MindNode };
@@ -847,7 +872,7 @@ export const buildRopePath = (
   return `M ${sourceX},${sourceY} C ${c1.x},${c1.y} ${c2.x},${c2.y} ${targetX},${targetY}`;
 };
 
-function RopeEdge({
+function RopeEdgeInner({
   id,
   source,
   target,
@@ -902,6 +927,25 @@ function RopeEdge({
     </>
   );
 }
+
+/**
+ * Same reasoning as `MindNode`: an edge only needs to re-render when its own
+ * geometry (or its colour/width) changed. React Flow recomputes the handle
+ * positions for every edge on each frame, so without this comparator a drag
+ * anywhere on the canvas re-rendered every rope in the map.
+ */
+const RopeEdge = memo(RopeEdgeInner, (previous, next) =>
+  previous.id === next.id
+  && previous.sourceX === next.sourceX
+  && previous.sourceY === next.sourceY
+  && previous.targetX === next.targetX
+  && previous.targetY === next.targetY
+  && previous.sourcePosition === next.sourcePosition
+  && previous.targetPosition === next.targetPosition
+  && previous.source === next.source
+  && previous.target === next.target
+  && previous.style === next.style
+  && previous.selected === next.selected);
 
 const EDGE_TYPES = { rope: RopeEdge };
 
@@ -1779,15 +1823,23 @@ function MindMapCanvas(props: MindMapPanelProps) {
   }, [layoutNodes]);
 
   // React Flow reports the picked node's live position through `onNodesChange`
-  // on EVERY pointer move. That callback is therefore the single place the
+  // on EVERY pointer event. That callback is therefore the single place the
   // whole connected group is moved: when a drag session is active, the picked
   // node's position change is applied and EVERY node in its subtree is
   // shifted by the same delta in the SAME state update. One write per frame
   // means the primary node and its branches can never fall out of lock-step
   // (two competing setNodes calls could win a stale frame), so the movement
   // is visible live while the finger is still down.
-  const onNodesChange = useCallback((changes: NodeChange<Node<MindNodeData>>[]) => {
+  //
+  // Perf (reported: "60+ nodes par drag lag"): the batch is coalesced to ONE
+  // update per animation frame (a 120 Hz pointer stream, a duplicated event or
+  // a stalled frame used to re-run this whole pass two or three times for a
+  // single visible position), and a batch that provably moves nothing returns
+  // the previous state so React bails out instead of re-rendering the branch.
+  // Both rules live in `./mindMapDrag` and are unit-tested there.
+  const applyDragBatch = useCallback((changes: NodeChange<Node<MindNodeData>>[]) => {
     setNodes((current) => {
+      if (!hasRealPositionChange(current, changes)) return current;
       const session = dragSessionRef.current;
       const dragChange = session
         ? changes.find((change) => change.type === "position" && change.id === session.id)
@@ -1798,13 +1850,40 @@ function MindMapCanvas(props: MindMapPanelProps) {
       if (!moved) return next;
       const dx = moved.position.x - session.origin.x;
       const dy = moved.position.y - session.origin.y;
-      return next.map((item) => {
+      let shifted = false;
+      const movedNodes = next.map((item) => {
         if (item.id === session.id || !session.moving.has(item.id)) return item;
         const start = session.starts.get(item.id);
-        return start ? { ...item, position: { x: start.x + dx, y: start.y + dy } } : item;
+        if (!start) return item;
+        const x = start.x + dx;
+        const y = start.y + dy;
+        // Only the boxes that actually changed get a new object: an unchanged
+        // object keeps its identity, so React Flow skips that node entirely.
+        if (item.position.x === x && item.position.y === y) return item;
+        shifted = true;
+        return { ...item, position: { x, y } };
       });
+      return shifted ? movedNodes : next;
     });
   }, []);
+
+  // One pending batch per frame. `flush()` is called on drag stop (so the drop
+  // commits the final position) and on unmount; `cancel()` drops a batch that
+  // belongs to a map the learner already left.
+  const dragBatchRef = useRef<ReturnType<typeof createFrameCoalescer<NodeChange<Node<MindNodeData>>[]>> | null>(null);
+  if (!dragBatchRef.current) {
+    dragBatchRef.current = createFrameCoalescer<NodeChange<Node<MindNodeData>>[]>(
+      (batch) => applyDragBatch(batch),
+      (pendingBatch, incoming) => mergeNodeChanges(pendingBatch, incoming),
+    );
+  }
+  const onNodesChange = useCallback((changes: NodeChange<Node<MindNodeData>>[]) => {
+    dragBatchRef.current?.push(changes);
+  }, []);
+
+  // A batch belongs to the map it was queued for: dropping it on the way out
+  // means a switch to another map can never move that map's nodes.
+  useEffect(() => () => { dragBatchRef.current?.cancel(); }, []);
 
   const edges: Edge[] = useMemo(
     () =>
@@ -2432,6 +2511,9 @@ function MindMapCanvas(props: MindMapPanelProps) {
             syncDragFacing(node.id, node.position.x);
           }}
           onNodeDragStop={(_event, node) => {
+            // Apply the last frame BEFORE the drop is committed, so the position
+            // written into the map is the one under the finger.
+            dragBatchRef.current?.flush();
             const session = dragSessionRef.current;
             dragSessionRef.current = null;
             draggingRef.current = false;

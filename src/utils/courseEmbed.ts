@@ -1,3 +1,4 @@
+import { githubRawPdfUrl } from "../../utils/readResources.js";
 import type { CourseFile } from "../types/course";
 
 const safeUrl = (value?: string) => {
@@ -33,6 +34,60 @@ export const getCourseEmbedProxyUrl = (value: string): string =>
   `/api/embed-proxy?url=${encodeURIComponent(value)}`;
 
 export const getCourseFileUrl = (file: CourseFile) => safeUrl(file.embedUrl || file.youtubeUrl || file.url);
+
+/**
+ * Is this embed a PDF that the bundled Mozilla PDF.js viewer should render?
+ *
+ * WHY (owner brief): "PDF ko pdf.js se kholna hai." A `pdf` lesson used to be
+ * dropped into a plain <iframe> of its own URL, so what the learner saw was
+ * whatever the surrounding browser felt like drawing — Chrome's built-in
+ * viewer on a desktop, a download prompt or an empty box inside the packaged
+ * Android app (WebView has no PDF viewer at all). Every PDF that can be read
+ * by script should therefore go through the SAME locally bundled PDF.js
+ * Generic Viewer the Read tab already uses: same toolbar, same thumbnails,
+ * same search, working on every target the app ships on.
+ *
+ * The ONE exception is a Google Drive file. Google's `/preview` page is an
+ * HTML document that renders the PDF for us inside an iframe; its byte URL
+ * (`/uc?export=download&id=…`) redirects to `*.googleusercontent.com`, which
+ * sends no `Access-Control-Allow-Origin`, so PDF.js can never fetch it
+ * (documented in docs/read-resources.md). Drive therefore stays in Drive's own
+ * frame — see `getCourseEmbed`'s `google.kind === "drive"` branch.
+ */
+export const isPdfJsEmbed = (embed: { url?: string; kind?: string } | null | undefined): boolean => {
+  if (!embed || embed.kind !== "pdf") return false;
+  const url = String(embed.url || "").trim();
+  if (!url) return false;
+  let host = "";
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return false;
+    host = parsed.hostname.toLowerCase();
+    // Drive/Docs hosts answer with an HTML frame (Drive) or an HTML page
+    // (gview), never with PDF bytes a script can read.
+    if (host === "drive.google.com" || host.endsWith(".drive.google.com")) return false;
+    if (host === "docs.google.com" || host.endsWith(".docs.google.com")) return false;
+  } catch {
+    return false;
+  }
+  return true;
+};
+
+/**
+ * The URL the PDF.js viewer should be pointed at for this lesson: a GitHub
+ * `blob`/`raw` link is rewritten to `raw.githubusercontent.com` (the only
+ * GitHub address that answers with the bytes and allows a cross-origin read),
+ * everything else is used as stored.
+ */
+export const pdfJsSourceUrl = (embed: { url?: string; kind?: string } | null | undefined, raw?: string): string => {
+  if (!isPdfJsEmbed(embed)) return "";
+  const stored = String(embed?.url || "");
+  if (stored) return githubRawPdfUrl(stored) || stored;
+  // Only when the embed decided on an empty URL does the file's own link get a
+  // chance — and even then a GitHub page link is rewritten to the raw host.
+  const fallback = String(raw || "");
+  return githubRawPdfUrl(fallback) || fallback;
+};
 
 /**
  * Return a top-level YouTube URL for the escape hatch next to an embedded

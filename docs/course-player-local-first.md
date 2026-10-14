@@ -11,8 +11,13 @@
   remove operations so unrelated completion IDs from other devices survive.
   In-flight acknowledgements only clear the revisions they actually uploaded.
 - Notes restore the existing local mirror and fetch the remote list once, not via
-  a live subscription. Remote edits are retrieved on reopen or explicit refresh.
-  Existing merge, tombstone, retry and account-scope safeguards remain.
+  a live subscription. Remote edits are retrieved on reopen, an explicit
+  refresh, **or when the learner comes back to the tab/app (visibilitychange /
+  online) once the last read is older than a minute** — and the Mind Map library
+  behaves the same way, plus on every fresh opening of its dock tab. Both reads
+  are refused while this device still has unacknowledged edits, so freshness can
+  never race a save (rule: `src/course/cloudFreshness.ts`). Existing merge,
+  tombstone, retry and account-scope safeguards remain.
 - Notes and Mind Map automatic backup use 30 seconds of quiet. Sketch uses 30
   seconds of quiet with a two-minute maximum while drawing continuously; its
   existing 350-ms local checkpoint remains. Explicit Save, lifecycle flushes,

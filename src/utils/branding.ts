@@ -18,8 +18,35 @@ export type Branding = {
   logoUrl: string;
   appName: string;
   tagline: string;
-  /** Controls the animated app-opening splash screen. Default is on. */
+  /**
+   * Whether the EduOS opening animation exists in this app at all: it is what
+   * the header's faded `ad` control opens on tap, and `?opening=on` re-arms it
+   * on a device. Only an explicit `false` removes it (Branding → App
+   * behaviour). Default on.
+   *
+   * It no longer means "play while the app opens" — that is
+   * `openingPlayOnLaunch`, which is OFF by default.
+   */
   openingAnimationEnabled: boolean;
+  /**
+   * Play the opening animation by itself while the app opens — reported
+   * "bye default user ko app open hote samay dikhana ho to main vahan se on kar
+   * sakun". OFF by default: a fresh install opens straight to the app and the
+   * header's `ad` control plays the clip on tap. While this is on, the control
+   * is hidden (the animation is already playing by itself).
+   */
+  openingPlayOnLaunch: boolean;
+  /**
+   * Direct, public URL of the opening clip — a GitHub RELEASE ASSET
+   * (`https://github.com/<owner>/<repo>/releases/download/<tag>/<file>.mp4`),
+   * not the release page. Empty = the bundled EduOS clips are used, so this is
+   * opt-in and a typo can never leave the launch animation blank.
+   */
+  openingAnimationUrl: string;
+  /** Optional phone-only clip (portrait). Falls back to `openingAnimationUrl`. */
+  openingAnimationUrlMobile: string;
+  /** Optional tablet/desktop-only clip (landscape). Falls back to `openingAnimationUrl`. */
+  openingAnimationUrlDesktop: string;
   /**
    * Hides the thin horizontal separator lines at the edges of the app chrome:
    * the line between the status bar / app header and the content (top) and
@@ -69,6 +96,10 @@ export const DEFAULT_BRANDING: Branding = {
   appName: DEFAULT_APP_NAME,
   tagline: DEFAULT_TAGLINE,
   openingAnimationEnabled: true,
+  openingPlayOnLaunch: false,
+  openingAnimationUrl: "",
+  openingAnimationUrlMobile: "",
+  openingAnimationUrlDesktop: "",
   hideFrameBorders: true,
   homeGradientFrom: DEFAULT_HOME_GRADIENT_FROM,
   homeGradientTo: DEFAULT_HOME_GRADIENT_TO,
@@ -91,6 +122,19 @@ function sanitize(value: unknown, fallback: string, max = 60): string {
   return text.slice(0, max);
 }
 
+/**
+ * Only an absolute https URL may become the opening clip. Anything else (a
+ * relative path, a `javascript:` string, a GitHub *release page* link that
+ * would never load as a video) degrades to "" so the shipped clip plays
+ * instead of a black splash. The admin field says "direct .mp4 asset URL".
+ */
+function sanitizeAnimationUrl(value: unknown): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return "";
+  if (!/^https:\/\//i.test(text)) return "";
+  return text.slice(0, 600);
+}
+
 // Hex colours only — a malformed value can never reach the stylesheet.
 function sanitizeColor(value: unknown, fallback: string): string {
   const text = typeof value === "string" ? value.trim() : "";
@@ -110,8 +154,14 @@ export function normalizeBranding(data: Partial<Record<keyof Branding, unknown>>
     appName: sanitize(data?.appName, DEFAULT_APP_NAME),
     tagline: sanitize(data?.tagline, DEFAULT_TAGLINE, 80),
     // On by default: only an explicit `false` (toggle turned off in the
-    // admin panel) skips the opening animation.
+    // admin panel) removes the opening animation from the app.
     openingAnimationEnabled: data?.openingAnimationEnabled !== false,
+    // OFF by default: the launch animation is an opt-in from the admin panel
+    // now ("bye default user ko app open hote samay dikhana").
+    openingPlayOnLaunch: data?.openingPlayOnLaunch === true,
+    openingAnimationUrl: sanitizeAnimationUrl(data?.openingAnimationUrl),
+    openingAnimationUrlMobile: sanitizeAnimationUrl(data?.openingAnimationUrlMobile),
+    openingAnimationUrlDesktop: sanitizeAnimationUrl(data?.openingAnimationUrlDesktop),
     // Hidden by default: only an explicit `false` (toggle turned off in the
     // admin panel) brings the top/bottom separator lines back.
     hideFrameBorders: data?.hideFrameBorders !== false,

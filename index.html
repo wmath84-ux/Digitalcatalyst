@@ -140,6 +140,15 @@
         var name = "Eduvora";
         var tagline = "Digital Catalyst";
         var enabled = true;
+        // NEW (2026): the opening is TAP-ONLY by default. `playOnLaunch` is the
+        // admin's "show it to every learner while the app opens" switch;
+        // `clipAny/clipMobile/clipDesktop` are release-asset URLs from Branding
+        // (empty = the shipped EduOS MP4s). Read before React so a tap-only app
+        // never even requests the clip at boot.
+        var playOnLaunch = false;
+        var clipAny = "";
+        var clipMobile = "";
+        var clipDesktop = "";
         var hideFrameBorders = true;
         var override = "";
         try {
@@ -152,6 +161,10 @@
           if (!/^https?:\/\//.test(logo) && !logo.startsWith("/")) logo = "/icons/icon-192x192.png";
           document.documentElement.dataset.hideFrameBorders = String(data.hideFrameBorders !== false);
           enabled = data.openingAnimationEnabled !== false;
+          playOnLaunch = data.openingPlayOnLaunch === true;
+          clipAny = typeof data.openingAnimationUrl === "string" ? data.openingAnimationUrl.trim() : "";
+          clipMobile = typeof data.openingAnimationUrlMobile === "string" ? data.openingAnimationUrlMobile.trim() : "";
+          clipDesktop = typeof data.openingAnimationUrlDesktop === "string" ? data.openingAnimationUrlDesktop.trim() : "";
           if (data.logoUrl) {
             var icon = document.createElement("link");
             icon.rel = "icon";
@@ -202,6 +215,11 @@
         var src = isMobile
           ? "/assets/animations/EduOS_app_opening_mobile.mp4"
           : "/assets/animations/EduOS_app_opening_desktop.mp4";
+        // Branding can point either band at a public release asset. Only an
+        // absolute https URL is accepted; anything else keeps the bundled clip
+        // (mirrors openingClipSrcFor() in src/utils/openingSplash.ts).
+        var custom = (isMobile ? (clipMobile || clipAny) : (clipDesktop || clipAny)).trim();
+        if (/^https:\/\//i.test(custom)) src = custom;
         var offline = navigator.onLine === false;
         // Mirror of OPENING_PREFER_FULL_KEY: a device that opted into the full
         // clip despite its own reduced-motion setting must not flash the card
@@ -216,9 +234,13 @@
         var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
         var slowNet = !!conn && (conn.saveData === true || /(^|-)2g$/.test(String(conn.effectiveType || "")));
         var show = override !== "off" && (enabled || override === "on" || override === "force") && !(offline && override !== "force");
-        var playClip = show && override !== "static" && !(REDUCE && override !== "force" && !preferFull) && !(slowNet && override !== "force");
+        // …and it only PLAYS BY ITSELF when the admin turned the launch
+        // playback on. Tap-only is the default: the header's faded `ad`
+        // control opens the clip on demand, so no bytes are fetched here.
+        var auto = show && (playOnLaunch || override === "on" || override === "force");
+        var playClip = auto && override !== "static" && !(REDUCE && override !== "force" && !preferFull) && !(slowNet && override !== "force");
 
-        if (splash && !show) splash.dataset.opening = "skipped";
+        if (splash && !auto) splash.dataset.opening = "skipped";
         if (video) {
           // Browsers (incl. mobile Chrome) silently refuse any autoplay that is
           // NOT muted. The Capacitor Android WebView is the only host that lets
@@ -239,11 +261,19 @@
           var playing = video.play();
           if (playing && playing.catch) playing.catch(function () {});
         } else if (video) {
-          // Reduced motion / static: never decode the clip, just show the card.
+          // Reduced motion / static / tap-only: never decode the clip, just
+          // show the card (or nothing at all, when the opening is tap-only).
           try { video.pause(); } catch (e) {}
-          if (splash && show) splash.setAttribute("data-motion", "reduce");
+          if (splash && auto) splash.setAttribute("data-motion", "reduce");
         }
-        window.__eduosBoot = { clip: isMobile ? "mobile" : "desktop", src: playClip ? src : null, t0: Date.now(), reducedMotion: REDUCE };
+        window.__eduosBoot = {
+          clip: isMobile ? "mobile" : "desktop",
+          src: playClip ? src : null,
+          videoUrl: src,
+          playOnLaunch: playOnLaunch,
+          t0: Date.now(),
+          reducedMotion: REDUCE,
+        };
         // Decorative “tap for sound” pill: the clip autoplays muted, so the
         // first tap anywhere unmutes it (mirrored in src/utils/openingSplash.ts
         // once React takes over). The pill itself is not a button.

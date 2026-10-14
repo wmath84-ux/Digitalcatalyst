@@ -1,23 +1,43 @@
 /**
- * Generates the app's raster notification/PWA icon assets.
+ * Generates every raster brand icon the app ships, from the ONE master logo
+ * (public/branding/logo-source.png):
  *
- * The full-colour web/PWA icons (icon-192x192, icon-512x512 and the maskable
- * icon) are produced by resizing the brand's master logo
- * (public/branding/logo-source.png) with `sharp`. This replaces the old
- * hand-drawn book-shaped placeholder that used to be rendered pixel-by-pixel
- * in pure JS.
+ *   · public/icons/icon-192x192.png, icon-512x512.png   → PWA "any"
+ *   · public/icons/maskable-icon-512x512.png            → PWA "maskable"
+ *   · public/icons/badge-96x96.png                      → notification badge
+ *   · android mipmap-*\/ic_launcher.png, ic_launcher_round.png
+ *   · android mipmap-*\/ic_launcher_foreground.png      → adaptive foreground
  *
- * The `badge` is monochrome on purpose: Web Push `badge`, local-notification
- * badges AND the Android status-bar small icon are rendered by the OS using
- * only the alpha channel — any opaque area shows up as a solid white blob,
- * and colour is ignored. We therefore derive the badge from the SAME master
- * logo: take its alpha (silhouette), flatten the RGB to pure white, and keep
- * a transparent background. The matching Android vector lives at
- * android/app/src/main/res/drawable/ic_stat_eduvora.xml, so native FCM/local
- * notifications and web push show the same brand glyph.
+ * ── Why the artwork is placed by measurement, not by eye ────────────────────
+ * The brand mark is a DIAGONAL glyph (two strokes crossing), so its extreme
+ * pixels sit at the CORNERS of its own bounding box. Every icon mask the
+ * platforms apply — round, squircle, rounded-square, the 80 % maskable safe
+ * circle, Android's 66 dp adaptive safe circle — cuts those corners first.
+ * The old generator pasted the master 1:1 (85 % coverage, tips 34 px from a
+ * 512 px edge), which is precisely the reported "icon bahut zoom dikhta hai,
+ * side se cut raha hai".
  *
- * Run: node scripts/generate-icons.cjs
+ * So this script measures the master's opaque bounding box, crops to it, and
+ * re-places the glyph on each canvas at a coverage that is provably inside the
+ * mask that canvas will meet:
+ *
+ *   canvas                       mask it must survive            coverage
+ *   ───────────────────────────  ──────────────────────────────  ────────
+ *   PWA "any" (192/512)          rounded-square / circle         0.68
+ *   PWA "maskable" (512)         80 % safe circle (radius 0.40)  0.56
+ *   Android legacy launcher      round mask (radius 0.50)        0.62
+ *   Android adaptive foreground  circular mask (radius 0.333)    0.44
+ *
+ * A diagonal glyph whose bounding box is `coverage × canvas` reaches
+ * `0.5 × coverage × √2` from the centre (its tips), so each value above keeps
+ * the tips inside the mask radius with a small safety margin. The numbers are
+ * exported so `tests/appIconSafeZone.test.mjs` can assert the committed PNGs
+ * still obey them — a hand-edited asset can no longer silently regress.
+ *
+ * Run:  node scripts/generate-icons.cjs           (regenerates every asset)
+ *       node scripts/generate-icons.cjs --check   (verify only, exit 1 on drift)
  */
+
 const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
@@ -25,7 +45,41 @@ const sharp = require('sharp');
 
 const ROOT = path.join(__dirname, '..');
 const SRC_MASTER = path.join(ROOT, 'public', 'branding', 'logo-source.png');
-const outDir = path.join(ROOT, 'public', 'icons');
+const ICON_DIR = path.join(ROOT, 'public', 'icons');
+const ANDROID_RES = path.join(ROOT, 'android', 'app', 'src', 'main', 'res');
+
+/**
+ * Glyph bounding-box side as a fraction of the canvas, per icon kind. The
+ * invariant every value must hold: `0.5 * coverage * Math.SQRT2 <= maskRadius`.
+ */
+const COVERAGE = {
+  /** PWA `purpose: "any"` — 0.68 → tips at 0.481 of the canvas. */
+  any: 0.68,
+  /** PWA `purpose: "maskable"` — 0.56 → tips at 0.396 < 0.40 (the safe circle). */
+  maskable: 0.56,
+  /** Legacy Android launcher (square + round PNG) — 0.62 → tips at 0.438. */
+  launcher: 0.62,
+  /** Adaptive-icon foreground — tips measured at 0.62 of the half-canvas
+   *  (≈32 dp of the 108 dp layer), inside BOTH the 36 dp circular mask and the
+   *  33 dp "always visible" safe circle. */
+  adaptiveForeground: 0.44,
+  /** Notification badge — near full-bleed on purpose (rendered ~24 dp). */
+  badge: 0.86,
+};
+
+/** Android density buckets: mdpi … xxxhdpi. */
+const DENSITIES = [
+  { name: 'mdpi', launcher: 48, adaptive: 108 },
+  { name: 'hdpi', launcher: 72, adaptive: 162 },
+  { name: 'xhdpi', launcher: 96, adaptive: 216 },
+  { name: 'xxhdpi', launcher: 144, adaptive: 324 },
+  { name: 'xxxhdpi', launcher: 192, adaptive: 432 },
+];
+
+const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
+/** The app's white theme — the adaptive background is #FFFFFF, so a maskable
+ *  icon with the same plate looks identical on both install paths. */
+const BRAND_PLATE = { r: 255, g: 255, b: 255, alpha: 1 };
 
 // ---------------------------------------------------------------- PNG encode
 function crc32(buf) {
@@ -65,30 +119,77 @@ function encodePNG(w, h, rgba) {
   return Buffer.concat([sig, chunk('IHDR', ihdr), chunk('IDAT', idat), chunk('IEND', Buffer.alloc(0))]);
 }
 
-// ---------------------------------------------------------------- badge
+// ---------------------------------------------------------------- measuring
 /**
- * Build the monochrome notification badge from the master logo's alpha
- * channel. The master is the brand glyph on a transparent background, so its
- * alpha IS the silhouette: we resize it to the badge canvas and then force
- * every pixel's RGB to white while preserving its alpha. The OS renders only
- * that alpha, so the result is a crisp white brand mark on transparent —
- * exactly what Android/Chrome require for the status-bar small icon / Web
- * Push badge, with no risk of an opaque square blob.
+ * Opaque bounding box of an RGBA buffer, as { left, top, width, height }.
+ * `alphaFloor` sits below the anti-aliased edge so a soft 1-pixel halo cannot
+ * inflate the box (which would silently shrink the placed glyph).
  */
-async function makeBadge(size) {
-  const { data, info } = await sharp(SRC_MASTER)
-    .resize(size, size, { fit: 'cover', kernel: sharp.kernel.lanczos3 })
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
+function opaqueBounds(data, width, height, alphaFloor = 16) {
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (data[(y * width + x) * 4 + 3] < alphaFloor) continue;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (maxX < 0) return { left: 0, top: 0, width, height };
+  return { left: minX, top: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
+}
 
+/** The master logo, cropped to its own glyph so padding is decided here. */
+async function readGlyph(source = SRC_MASTER) {
+  const { data, info } = await sharp(source).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const bounds = opaqueBounds(data, info.width, info.height);
+  const glyph = await sharp(source)
+    .ensureAlpha()
+    .extract({ left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height })
+    .png()
+    .toBuffer();
+  return { glyph, bounds, masterSize: info.width };
+}
+
+/**
+ * One icon canvas: `glyph` centred on a `size × size` plate, its longer side
+ * equal to `coverage × size`. Returns the PNG bytes.
+ */
+async function composeIcon(glyph, size, coverage, background) {
+  const inner = Math.max(1, Math.round(size * coverage));
+  const scaled = await sharp(glyph)
+    .resize(inner, inner, { fit: 'inside', kernel: sharp.kernel.lanczos3 })
+    .png()
+    .toBuffer();
+  const meta = await sharp(scaled).metadata();
+  return sharp({ create: { width: size, height: size, channels: 4, background } })
+    .composite([
+      {
+        input: scaled,
+        left: Math.round((size - meta.width) / 2),
+        top: Math.round((size - meta.height) / 2),
+      },
+    ])
+    .png()
+    .toBuffer();
+}
+
+/**
+ * Notification badge: the master's alpha IS the silhouette (the OS renders only
+ * alpha), forced to pure white with faint halo pixels dropped.
+ */
+async function makeBadge(glyph, size, coverage) {
+  const placed = await composeIcon(glyph, size, coverage, TRANSPARENT);
+  const { data, info } = await sharp(placed).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const out = Buffer.alloc(info.width * info.height * 4);
   for (let p = 0; p < info.width * info.height; p += 1) {
     const src = p * 4;
     const dst = p * 4;
     let alpha = data[src + 3];
-    // Drop faint halo pixels (<6% opacity) so resizing never leaves a ghost
-    // outline around the glyph; keep the rest anti-aliased for crisp edges.
     if (alpha < 16) alpha = 0;
     out[dst] = 255;
     out[dst + 1] = 255;
@@ -98,70 +199,87 @@ async function makeBadge(size) {
   return encodePNG(info.width, info.height, out);
 }
 
-// ---------------------------------------------------------------- main logo icons
-/**
- * Resize the full-colour master logo into a plain square PNG at the requested
- * size. The master already carries transparent padding around the emblem so the
- * art is never clipped when the OS applies a rounded/square mask.
- */
-async function makeLogoPng(size) {
-  const png = await sharp(SRC_MASTER)
-    .resize(size, size, { fit: 'cover', kernel: sharp.kernel.lanczos3 })
-    .png()
-    .toBuffer();
-  return png;
+/** Every file this script owns, as { file, kind, size } — used by --check too. */
+function targets() {
+  const list = [
+    { file: path.join(ICON_DIR, 'icon-192x192.png'), kind: 'any', size: 192 },
+    { file: path.join(ICON_DIR, 'icon-512x512.png'), kind: 'any', size: 512 },
+    { file: path.join(ICON_DIR, 'maskable-icon-512x512.png'), kind: 'maskable', size: 512 },
+    { file: path.join(ICON_DIR, 'badge-96x96.png'), kind: 'badge', size: 96 },
+  ];
+  for (const density of DENSITIES) {
+    const dir = path.join(ANDROID_RES, `mipmap-${density.name}`);
+    list.push({ file: path.join(dir, 'ic_launcher.png'), kind: 'launcher', size: density.launcher });
+    list.push({ file: path.join(dir, 'ic_launcher_round.png'), kind: 'launcher', size: density.launcher });
+    list.push({
+      file: path.join(dir, 'ic_launcher_foreground.png'),
+      kind: 'adaptiveForeground',
+      size: density.adaptive,
+    });
+  }
+  return list;
 }
 
-/**
- * Maskable icon. `fit: cover` fills the whole canvas with the master, but OS
- * icon masks (Circle, Squircle, Rounded-square) crop the outer ~20% of the
- * safe zone. To keep the emblem inside the visible safe area we scale the
- * master logo down to ~80% of the canvas and centre it on the transparent
- * canvas, so the mask never clips the artwork.
- */
-async function makeMaskablePng(size = 512, scale = 0.8) {
-  const inner = Math.round(size * scale);
-  const logo = await sharp(SRC_MASTER)
-    .resize(inner, inner, { fit: 'cover', kernel: sharp.kernel.lanczos3 })
-    .png()
-    .toBuffer();
-  const offset = Math.round((size - inner) / 2);
-  const composed = await sharp({
-    create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
-  })
-    .composite([{ input: logo, left: offset, top: offset }])
-    .png()
-    .toBuffer();
-  return composed;
+async function build(glyph, target) {
+  const coverage = COVERAGE[target.kind];
+  if (target.kind === 'badge') return makeBadge(glyph, target.size, coverage);
+  // "any" stays transparent (a mark, not a tile). Everything Android shows on
+  // its own launcher plate — maskable, legacy launcher, adaptive foreground —
+  // is made to match the white adaptive background so both install paths look
+  // like the same app.
+  const background = target.kind === 'any' ? TRANSPARENT : BRAND_PLATE;
+  return composeIcon(glyph, target.size, coverage, background);
 }
 
 async function main() {
+  const checkOnly = process.argv.includes('--check');
   if (!fs.existsSync(SRC_MASTER)) {
     console.error(`Master logo not found at ${SRC_MASTER}.`);
     console.error('Save the brand logo there (square, transparent PNG) and re-run this script.');
     process.exit(1);
   }
 
-  fs.mkdirSync(outDir, { recursive: true });
+  const { glyph, bounds, masterSize } = await readGlyph();
+  const measured = (bounds.width / masterSize) * 100;
+  console.log(
+    `Master ${masterSize}×${masterSize}: glyph ${bounds.width}×${bounds.height} ` +
+      `(${measured.toFixed(1)}% of the canvas) — cropped, then re-placed per mask.`,
+  );
 
-  // Notification badge — white-on-transparent silhouette OF THE BRAND LOGO
-  // (derived from its alpha channel). A full-colour image would be flattened
-  // to an opaque blob by the OS badge renderer; the silhouette matches the
-  // Android status-bar vector (res/drawable/ic_stat_eduvora.xml).
-  fs.writeFileSync(path.join(outDir, 'badge-96x96.png'), await makeBadge(96));
+  let drift = 0;
+  for (const target of targets()) {
+    const bytes = await build(glyph, target);
+    const rel = path.relative(ROOT, target.file);
+    if (checkOnly) {
+      const current = fs.existsSync(target.file) ? fs.readFileSync(target.file) : null;
+      if (!current || !current.equals(bytes)) {
+        drift += 1;
+        console.error(`drift: ${rel}`);
+      }
+      continue;
+    }
+    fs.mkdirSync(path.dirname(target.file), { recursive: true });
+    fs.writeFileSync(target.file, bytes);
+    console.log(`wrote ${rel} (${target.kind}, ${target.size}px, coverage ${COVERAGE[target.kind]})`);
+  }
 
-  // Full-colour web/PWA icons from the master logo.
-  fs.writeFileSync(path.join(outDir, 'icon-192x192.png'), await makeLogoPng(192));
-  fs.writeFileSync(path.join(outDir, 'icon-512x512.png'), await makeLogoPng(512));
-
-  // Maskable PNG (logo scaled to ~80% with safe padding). Replaces the old
-  // maskable SVG so the installed PWA icon shows the new brand logo.
-  fs.writeFileSync(path.join(outDir, 'maskable-icon-512x512.png'), await makeMaskablePng(512, 0.8));
-
-  console.log('Wrote badge-96x96.png, icon-192x192.png, icon-512x512.png, maskable-icon-512x512.png');
+  if (checkOnly) {
+    if (drift) {
+      console.error(`${drift} icon file(s) differ from the master logo. Run: node scripts/generate-icons.cjs`);
+      process.exit(1);
+    }
+    console.log('All brand icons match the master logo and their mask-safe coverage.');
+    return;
+  }
+  console.log('Done — PWA + Android icons regenerated from the master logo.');
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+// Exported for scripts/sync-android-icon.mjs (live branding → APK icon).
+module.exports = { COVERAGE, DENSITIES, TRANSPARENT, BRAND_PLATE, opaqueBounds, readGlyph, composeIcon, makeBadge, targets, build };
+
+if (require.main === module) {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

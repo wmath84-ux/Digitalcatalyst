@@ -77,8 +77,13 @@ test("a branding save can never switch the opening off by accident", () => {
   // undefined — the one-line cause of "no opening on desktop AND mobile".
   assert.match(brandingPage, /const openingAnimationEnabled = merged\.openingAnimationEnabled !== false;/);
   assert.doesNotMatch(brandingPage, /merged\.openingAnimationEnabled === true/);
-  // The admin can watch it without a cold boot.
-  assert.match(brandingPage, /attachOpeningSplash\(\)\?\.replay\(\)/);
+  // The admin can watch it without a cold boot — and the preview still plays
+  // the clip while the saved setting is tap-only, so the button can never look
+  // broken (`setOpeningRuntimeOverride("on")` is one-shot, and is dropped when
+  // the clip ends).
+  assert.match(brandingPage, /setOpeningRuntimeOverride\("on"\);/);
+  assert.match(brandingPage, /attachOpeningSplash\(\);/);
+  assert.match(brandingPage, /controller\?\.replay\(\);/);
 });
 
 test("opening animation is on by default", () => {

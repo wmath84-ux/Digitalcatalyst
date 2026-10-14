@@ -346,9 +346,15 @@ test("the dragged node tracks the pointer LIVE — the primary node included", (
   assert.match(panel, /const dx = moved\.position\.x - session\.origin\.x;/);
   assert.match(panel, /const dy = moved\.position\.y - session\.origin\.y;/);
   // 3. Its branch rides along at the same rigid offset every frame, in the SAME
-  //    update, so head and descendants can never fall out of lock-step.
+  //    update, so head and descendants can never fall out of lock-step. Only a
+  //    box that actually moved gets a new object — an unchanged one keeps its
+  //    identity, which is what lets React Flow skip it (see the drag-perf
+  //    contract in tests/coursePlayerMindMapDragPerf.test.mjs).
   assert.match(panel, /if \(item\.id === session\.id \|\| !session\.moving\.has\(item\.id\)\) return item;/);
-  assert.match(panel, /return start \? \{ \.\.\.item, position: \{ x: start\.x \+ dx, y: start\.y \+ dy \} \} : item;/);
+  assert.match(panel, /const x = start\.x \+ dx;/);
+  assert.match(panel, /const y = start\.y \+ dy;/);
+  assert.match(panel, /if \(item\.position\.x === x && item\.position\.y === y\) return item;/);
+  assert.match(panel, /return \{ \.\.\.item, position: \{ x, y \} \};/);
   // 4. Mid-drag, a layout pass must not snap nodes back to the tidy tree:
   //    live positions win while `draggingRef` is armed, and the flag is
   //    armed from drag START (before the first move can land).
