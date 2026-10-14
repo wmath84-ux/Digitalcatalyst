@@ -51,6 +51,11 @@ import {
   toFirestoreReadUpload,
   type ReadUpload,
 } from "../../utils/readUploads.js";
+import {
+  describeUploadFailure,
+  type ReadUploadStep,
+  type UploadFailure,
+} from "./uploadFailure";
 
 export type ReadUploadsState = "idle" | "loading" | "ready" | "error";
 
@@ -70,6 +75,15 @@ export interface ReadUploadProgress {
   name: string;
   stage: ReadUploadStage;
   /**
+   * WHICH await the attempt is inside. A stage alone ("preparing") covers four
+   * different operations with four different causes, so the row would read as
+   * an unexplained "pending". The UI names the step (and how long it has been
+   * running) so a stuck upload always says where it is stuck.
+   */
+  step: ReadUploadStep;
+  /** Epoch ms of the attempt's start — the UI shows the elapsed seconds. */
+  startedAt: number;
+  /**
    * 0–1, the SDK's own bytesTransferred / totalBytes while `uploading`.
    * `null` while the current step has no measurable progress (preparing,
    * finalizing) — the UI shows an indeterminate bar instead of a number.
@@ -77,7 +91,12 @@ export interface ReadUploadProgress {
   progress: number | null;
   bytesTransferred: number;
   totalBytes: number;
-  /** The network is gone; the task is paused and resumes by itself. */
+  /**
+   * The browser says the device is offline, so the task is paused. It resumes
+   * by itself on `online`; if the device never comes back the attempt fails
+   * with a reason after READ_UPLOAD_OFFLINE_CEILING_MS instead of waiting
+   * forever (that infinite wait was the "pending, no percent, no reason" bug).
+   */
   waitingForNetwork: boolean;
   /** 1-based position in a multi-file pick. */
   fileIndex: number;
@@ -91,7 +110,15 @@ export interface UseReadUploadsResult {
   /** Newest first; the learner's whole shelf for this account. */
   uploads: ReadUpload[];
   uploading: ReadUploadProgress | null;
+  /** The one-line reason for the last failure (the headline of `uploadFailure`). */
   uploadError: string | null;
+  /**
+   * The SAME failure with its technical cause: Firebase's code, the HTTP
+   * status, the server's own message, the step that died and the Storage path.
+   * The panel shows it behind "Why did this fail?" so a report is never just
+   * "it did not upload" — see src/course/uploadFailure.ts.
+   */
+  uploadFailure: UploadFailure | null;
   /** Recoverable upload failure (clear it when the learner dismisses it). */
   clearUploadError: () => void;
   /**
@@ -142,6 +169,18 @@ const errorCode = (thrown: unknown): string =>
  * weak connection is never cut off; only a dead one is.
  */
 export const READ_UPLOAD_STALL_MS = 60_000;
+/**
+ * How long an upload may sit PAUSED because the browser says the device is
+ * offline. Offline time is deliberately NOT a byte-stall (a learner in a lift
+ * or a train must not lose a half-finished upload), but it cannot be endless
+ * either: `navigator.onLine` is wrong often enough — Android WebView and
+ * installed PWAs report `false` behind some captive portals and on Wi-Fi the
+ * OS considers "no internet" — that an unbounded pause left the row reading
+ * "pending" forever with no percentage and no reason, which is exactly the
+ * reported failure. After this ceiling the attempt is cancelled and reported
+ * with its real cause, and Retry re-runs it.
+ */
+export const READ_UPLOAD_OFFLINE_CEILING_MS = 120_000;
 const TOKEN_TIMEOUT_MS = 10_000;
 const SDK_TIMEOUT_MS = 20_000;
 const HEADER_TIMEOUT_MS = 15_000;
@@ -184,42 +223,6 @@ const readFileHead = (file: Blob): Promise<ArrayBuffer> => {
     reader.onerror = () => reject(reader.error || new Error("read failed"));
     reader.readAsArrayBuffer(head);
   });
-};
-
-const describeUploadError = (thrown: unknown, name: string): string => {
-  const code = errorCode(thrown);
-  const file = `“${name}”`;
-  switch (code) {
-    case "dc/not-pdf":
-      return `${file} is not a real PDF (its contents do not start like one). Export or save it as PDF and try again.`;
-    case "dc/unreadable":
-      return `${file} could not be read from this device. Pick the file again — if it lives in a cloud drive, download it first.`;
-    case "dc/stalled":
-      return `The upload of ${file} stopped moving — no data reached the server for ${Math.round(READ_UPLOAD_STALL_MS / 1000)} seconds. Check your connection and press Retry.`;
-    case "dc/sdk-load":
-      return "The uploader could not load. Check your connection and press Retry.";
-    case "dc/url-timeout":
-    case "dc/doc-failed":
-      return `${file} reached cloud storage but could not be added to your library yet. Press Retry to finish — it will not upload again.`;
-    case "storage/unauthenticated":
-      return "Your sign-in has expired. Sign in again, then press Retry.";
-    case "storage/unauthorized":
-    case "permission-denied":
-      return "The upload was refused for this account (only PDFs up to 100 MB are accepted). Sign in again and retry.";
-    case "storage/retry-limit-exceeded":
-    case "storage/canceled":
-    case "unavailable":
-      return `The upload of ${file} did not finish — check your connection and press Retry.`;
-    case "storage/server-file-wrong-size":
-    case "storage/invalid-checksum":
-      return `${file} was damaged on the way to the server. Press Retry.`;
-    case "storage/quota-exceeded":
-      return "Cloud storage is full right now — try again later.";
-    case "resource-exhausted":
-      return "That file is too large to store.";
-    default:
-      return `${file} could not be uploaded. Press Retry, or pick the file again.`;
-  }
 };
 
 const describeSaveError = (thrown: unknown): string => {
@@ -276,6 +279,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState<ReadUploadProgress | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadFailure, setUploadFailure] = useState<UploadFailure | null>(null);
 
   const activityRef = useRef<{ timers: Map<string, ReturnType<typeof setTimeout>>; firstAt: Map<string, number>; pending: Map<string, number>; pageCounts: Map<string, number> }>(
     { timers: new Map(), firstAt: new Map(), pending: new Map(), pageCounts: new Map() },
@@ -349,14 +353,18 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
       batch: { index: number; count: number },
       resume: StoredObject | null,
     ): Promise<ReadUpload | null> => {
-      const fail = (message: string, retry: FailedUpload | null) => {
+      const fail = (message: string, retry: FailedUpload | null, failure: UploadFailure | null = null) => {
         failedRef.current = retry;
         if (!mountedRef.current) return;
         setRetryableName(retry ? sanitizeReadUploadName(retry.file.name, "My PDF") : null);
         setUploadError(message);
+        setUploadFailure(failure);
       };
       if (attemptRef.current) {
-        if (mountedRef.current) setUploadError("Another PDF is still uploading — wait for it to finish or cancel it first.");
+        if (mountedRef.current) {
+          setUploadError("Another PDF is still uploading — wait for it to finish or cancel it first.");
+          setUploadFailure(null);
+        }
         return null;
       }
       const issue = readUploadFileIssue(file);
@@ -387,10 +395,14 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
       };
       attemptRef.current = attempt;
       const live = () => attemptRef.current === attempt && !attempt.cancelled;
+      /** The await the attempt is inside right now — named for the learner. */
+      let currentStep: ReadUploadStep = stored ? "download-url" : "read-file";
       let view: ReadUploadProgress = {
         uploadId,
         name,
         stage: "preparing",
+        step: currentStep,
+        startedAt: Date.now(),
         progress: null,
         bytesTransferred: stored ? file.size : 0,
         totalBytes: file.size,
@@ -402,6 +414,21 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
         view = { ...view, ...patch };
         attempt.stage = view.stage;
         if (live() && mountedRef.current) setUploading(view);
+      };
+      /** Move to the next named step, so a slow one is visible as such. */
+      const enter = (next: ReadUploadStep) => {
+        currentStep = next;
+        show({ step: next });
+      };
+      /**
+       * Report a thrown failure WITH its cause. The learner gets one line; the
+       * panel's "Why did this fail?" gets the code, the HTTP status, the
+       * server's own message and the step; the console gets the raw object.
+       */
+      const failThrown = (thrown: unknown, retry: FailedUpload | null) => {
+        const failure = describeUploadFailure({ thrown, fileName: name, step: currentStep, storagePath });
+        console.warn(`[read-upload] failed at "${currentStep}" — ${failure.detail}`, thrown);
+        fail(failure.headline, retry, failure);
       };
       // Each await goes through `step`, so Cancel interrupts whatever the
       // attempt is waiting for (the header read, the SDK import, the task…).
@@ -419,6 +446,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
       if (mountedRef.current) {
         setRetryableName(null);
         setUploadError(null);
+        setUploadFailure(null);
       }
       show({});
 
@@ -439,6 +467,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
 
           // 2. A fresh ID token, bounded: if the refresh itself cannot reach
           // the server the SDK still refreshes on its own, so carry on.
+          enter("sign-in");
           try {
             await step(withTimeout(auth.currentUser?.getIdToken(true) ?? Promise.resolve(""), TOKEN_TIMEOUT_MS, "dc/token-timeout"));
           } catch (thrown) {
@@ -447,6 +476,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
         }
 
         // 3. The Storage SDK is code-split; a failed chunk load must not hang.
+        enter("load-uploader");
         const storage = await step(withTimeout(getFirebaseStorage(), SDK_TIMEOUT_MS, "dc/sdk-load"));
         const { getDownloadURL, ref, uploadBytesResumable } = await step(
           withTimeout(import("firebase/storage"), SDK_TIMEOUT_MS, "dc/sdk-load"),
@@ -463,6 +493,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
           // bar at "0%" for fast uploads: the UI claimed a measured value it
           // did not have. The bar stays indeterminate until the first real
           // progress event lands, then shows the true percentage.
+          enter("bytes");
           show({ stage: "uploading", progress: null });
           await step(
             new Promise<void>((resolve, reject) => {
@@ -471,6 +502,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
               let finished = false;
               let lastBytes = -1;
               let watchdog: ReturnType<typeof setTimeout> | undefined;
+              let offlineCeiling: ReturnType<typeof setTimeout> | undefined;
               let offline = false;
               const arm = () => {
                 if (watchdog) clearTimeout(watchdog);
@@ -486,6 +518,25 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
                   reject(new UploadStepError("dc/stalled"));
                 }, READ_UPLOAD_STALL_MS);
               };
+              // Offline time is not a byte-stall, but it is NOT endless either:
+              // `navigator.onLine` lies often enough (Android WebView, installed
+              // PWAs, Wi-Fi the OS calls "no internet") that an unbounded pause
+              // left the row on "pending" with no percentage and no reason. So a
+              // paused attempt gets its own ceiling and then fails honestly.
+              const armOfflineCeiling = () => {
+                if (offlineCeiling) clearTimeout(offlineCeiling);
+                if (finished) return;
+                offlineCeiling = setTimeout(() => {
+                  if (finished) return;
+                  finish();
+                  try {
+                    task.cancel();
+                  } catch {
+                    /* the task is already over */
+                  }
+                  reject(new UploadStepError("dc/offline-ceiling"));
+                }, READ_UPLOAD_OFFLINE_CEILING_MS);
+              };
               const onOffline = () => {
                 offline = true;
                 if (watchdog) clearTimeout(watchdog);
@@ -495,9 +546,11 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
                   /* not pausable in this state */
                 }
                 show({ waitingForNetwork: true });
+                armOfflineCeiling();
               };
               const onOnline = () => {
                 offline = false;
+                if (offlineCeiling) clearTimeout(offlineCeiling);
                 try {
                   task.resume();
                 } catch {
@@ -509,6 +562,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
               const finish = () => {
                 finished = true;
                 if (watchdog) clearTimeout(watchdog);
+                if (offlineCeiling) clearTimeout(offlineCeiling);
                 window.removeEventListener("offline", onOffline);
                 window.removeEventListener("online", onOnline);
               };
@@ -552,6 +606,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
 
         // 5. Finishing: download URL + library document. No percentage exists
         // for these, so the bar goes indeterminate rather than pretending.
+        enter("download-url");
         show({ stage: "finalizing", progress: null, bytesTransferred: file.size, waitingForNetwork: false });
         let url: string;
         try {
@@ -579,6 +634,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
           updatedAt: now,
           lastOpenedAt: now,
         });
+        enter("library-write");
         const write = setDoc(doc(db, "users", owner, READ_UPLOAD_COLLECTION, uploadId), payload);
         try {
           await step(withTimeout(write, DOC_WRITE_TIMEOUT_MS, "dc/doc-timeout"));
@@ -594,10 +650,8 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
           const retry: FailedUpload = { file, module, submodule, stored: landed };
           void write.catch((late) => {
             if (attemptRef.current) return; // never stomp on a newer upload's status
-            fail(
-              errorCode(late) === "permission-denied"
-                ? describeUploadError(late, name)
-                : describeUploadError(new UploadStepError("dc/doc-failed"), name),
+            failThrown(
+              errorCode(late) === "permission-denied" ? late : new UploadStepError("dc/doc-failed"),
               retry,
             );
           });
@@ -608,7 +662,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
         // The learner's own Cancel is not an error, and a superseded attempt
         // has nothing left to say.
         if (attempt.cancelled || code === "dc/cancelled" || attemptRef.current !== attempt) return null;
-        fail(describeUploadError(thrown, name), code === "dc/not-pdf" ? null : { file, module, submodule, stored: landed });
+        failThrown(thrown, code === "dc/not-pdf" ? null : { file, module, submodule, stored: landed });
         return null;
       } finally {
         if (attemptRef.current === attempt) {
@@ -834,6 +888,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
     failedRef.current = null;
     setRetryableName(null);
     setUploadError(null);
+    setUploadFailure(null);
   }, []);
 
   return useMemo(
@@ -844,6 +899,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
       uploads,
       uploading,
       uploadError,
+      uploadFailure,
       clearUploadError,
       cancelUpload,
       retryUpload,
@@ -863,6 +919,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
       uploads,
       uploading,
       uploadError,
+      uploadFailure,
       clearUploadError,
       cancelUpload,
       retryUpload,

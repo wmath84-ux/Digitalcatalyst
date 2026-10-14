@@ -52,6 +52,7 @@ import {
   X,
   } from "lucide-react";
 import type { AccessibleReadResource } from "../../utils/readResources.js";
+import { READ_UPLOAD_STEP_LABEL, type UploadFailure } from "./uploadFailure";
 import {
   groupReadUploads,
   readUploadMetaLabel,
@@ -108,15 +109,22 @@ export type ReadUploadModuleRequest = (row: ReadUpload) => void;
 const formatMegabytes = (bytes: number) => `${(Math.max(0, bytes) / 1024 / 1024).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
 
 /**
- * The upload's honest status: what step it is on, real byte progress while
- * bytes move (indeterminate while a step has no measurable progress), Cancel
- * while it can still be stopped, and — after a failure — the reason with
- * Retry / Dismiss. Rendered in the library AND inside the compose sheet (which
- * covers the library while it is open).
+ * The upload's honest status: WHICH step it is on and for how long, real byte
+ * progress while bytes move (indeterminate while a step has no measurable
+ * progress), Cancel while it can still be stopped, and — after a failure — the
+ * reason, the action to take, and the technical cause behind "Why did this
+ * fail?". Rendered in the library AND inside the compose sheet (which covers
+ * the library while it is open).
+ *
+ * The point of the detail block: an upload that fails must never be reported as
+ * just "it did not upload". Firebase's code, the HTTP status, the server's own
+ * message and the step that died are one tap away and one tap from the
+ * clipboard (src/course/uploadFailure.ts).
  */
 function UploadStatus({
   uploading,
   error,
+  failure,
   canRetry,
   onCancel,
   onRetry,
@@ -125,25 +133,44 @@ function UploadStatus({
 }: {
   uploading: ReadUploadProgress | null;
   error: string | null;
+  failure: UploadFailure | null;
   canRetry: boolean;
   onCancel: () => void;
   onRetry: () => void;
   onDismiss: () => void;
   className?: string;
 }) {
+  // A stuck upload has to be visibly stuck: "pending" with no clock is what
+  // made this look broken, so the row counts its own seconds.
+  const [seconds, setSeconds] = useState(0);
+  const startedAt = uploading?.startedAt ?? 0;
+  useEffect(() => {
+    if (!startedAt) {
+      setSeconds(0);
+      return undefined;
+    }
+    const tick = () => setSeconds(Math.max(0, Math.round((Date.now() - startedAt) / 1000)));
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [startedAt]);
+
   if (uploading) {
     const batch = uploading.fileCount > 1 ? ` (${uploading.fileIndex} of ${uploading.fileCount})` : "";
     const percent = uploading.progress === null ? null : Math.round(uploading.progress * 100);
-    const label =
-      uploading.stage === "preparing"
-        ? `Preparing ${uploading.name}${batch}…`
-        : uploading.stage === "finalizing"
-          ? `Adding ${uploading.name}${batch} to your library…`
-          : uploading.waitingForNetwork
-            ? `Waiting for a connection — ${uploading.name}${batch} resumes automatically`
-            : `Uploading ${uploading.name}${batch}`;
+    const stepLabel = READ_UPLOAD_STEP_LABEL[uploading.step] ?? "Working";
+    const label = uploading.waitingForNetwork
+      ? `Waiting for a connection — ${uploading.name}${batch} resumes automatically`
+      : `${stepLabel} — ${uploading.name}${batch}`;
     return (
-      <div className={className} role="status" aria-live="polite" data-course-read-upload-progress data-stage={uploading.stage}>
+      <div
+        className={className}
+        role="status"
+        aria-live="polite"
+        data-course-read-upload-progress
+        data-stage={uploading.stage}
+        data-step={uploading.step}
+      >
         <div className="flex items-center gap-2 text-[11px] font-semibold text-violet-100">
           <CloudUpload size={14} className="shrink-0" aria-hidden="true" />
           <span className="min-w-0 flex-1 truncate" data-course-read-upload-stage>{label}</span>
@@ -153,6 +180,7 @@ function UploadStatus({
               {percent}%
             </span>
           ) : null}
+          <span className="shrink-0 tabular-nums text-violet-200/60" data-course-read-upload-elapsed>{seconds}s</span>
           {uploading.stage !== "finalizing" ? (
             <button
               type="button"
@@ -179,33 +207,67 @@ function UploadStatus({
             <div className="h-full w-full animate-pulse rounded-full bg-violet-400/60" data-course-read-upload-indeterminate />
           )}
         </div>
+        {uploading.waitingForNetwork ? (
+          <p className="mt-1 text-[10px] leading-relaxed text-amber-200/90" data-course-read-upload-offline-hint>
+            This device reports no internet connection. The upload is paused and resumes by itself; if the
+            connection does not come back it stops with a reason instead of waiting forever.
+          </p>
+        ) : null}
       </div>
     );
   }
   if (!error) return null;
   return (
-    <div className={`flex items-start gap-2 ${className}`} role="alert" data-course-read-upload-error>
-      <span className="min-w-0 flex-1">{error}</span>
-      {canRetry ? (
+    <div className={className} role="alert" data-course-read-upload-error>
+      <div className="flex items-start gap-2">
+        <span className="min-w-0 flex-1" data-course-read-upload-error-headline>{error}</span>
+        {canRetry ? (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-300/20 px-2 py-0.5 font-bold text-amber-50 hover:bg-amber-300/30"
+            data-course-read-upload-retry
+          >
+            <RotateCcw size={12} aria-hidden="true" />
+            Retry
+          </button>
+        ) : null}
         <button
           type="button"
-          onClick={onRetry}
-          className="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-300/20 px-2 py-0.5 font-bold text-amber-50 hover:bg-amber-300/30"
-          data-course-read-upload-retry
+          onClick={onDismiss}
+          className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-amber-100/80 hover:bg-white/10"
+          aria-label="Dismiss"
+          data-course-read-upload-dismiss
         >
-          <RotateCcw size={12} aria-hidden="true" />
-          Retry
+          <X size={12} aria-hidden="true" />
         </button>
+      </div>
+      {failure ? (
+        <div className="mt-1.5">
+          <p className="text-[11px] leading-relaxed text-amber-100/90" data-course-read-upload-error-hint>
+            {failure.hint}
+          </p>
+          <details className="mt-1.5 rounded-lg border border-amber-400/20 bg-black/20 p-2" data-course-read-upload-why>
+            <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/90">
+              Why did this fail?
+            </summary>
+            <code className="mt-1.5 block break-all font-mono text-[10px] leading-relaxed text-amber-100/90" data-course-read-upload-why-detail>
+              {failure.detail}
+            </code>
+            <button
+              type="button"
+              onClick={() => {
+                const line = `${failure.detail} · headline="${failure.headline}"`;
+                void navigator.clipboard?.writeText(line).catch(() => undefined);
+              }}
+              className="mt-1.5 rounded-md border border-amber-400/30 px-2 py-0.5 text-[10px] font-bold text-amber-100 hover:bg-amber-400/10"
+              data-course-read-upload-copy
+            >
+              Copy details
+            </button>
+          </details>
+        </div>
       ) : null}
-      <button
-        type="button"
-        onClick={onDismiss}
-        className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-amber-100/80 hover:bg-white/10"
-        aria-label="Dismiss"
-        data-course-read-upload-dismiss
-      >
-        <X size={12} aria-hidden="true" />
-      </button>
     </div>
   );
 }
@@ -692,6 +754,7 @@ export default function ReadLibraryPanel({
         <UploadStatus
           uploading={readUploads.uploading}
           error={readUploads.uploadError}
+          failure={readUploads.uploadFailure}
           canRetry={Boolean(readUploads.retryableName)}
           onCancel={cancelUpload}
           onRetry={() => void retryUpload()}
@@ -1190,6 +1253,7 @@ export default function ReadLibraryPanel({
               <UploadStatus
                 uploading={readUploads.uploading}
                 error={readUploads.uploadError}
+                failure={readUploads.uploadFailure}
                 canRetry={Boolean(readUploads.retryableName)}
                 onCancel={cancelUpload}
                 onRetry={() => void retryUpload()}
