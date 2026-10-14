@@ -164,6 +164,13 @@ export interface PlayerPanelProps {
   onAddToPersonalModule?: () => void;
   onSaveForLater?: () => void;
   // Preferences
+  /**
+   * The player shell's own theme, read from the shared persisted theme layer
+   * (`useCourseTheme("player", uid)`). Light is the fallback — this row is how
+   * a learner flips it, and the choice survives a reload because it is saved
+   * per feature + per learner, not per visit.
+   */
+  playerTheme?: "light" | "dark";
   snowMode: boolean;
   onSnowModeChange: (next: boolean) => void;
   showViewportToggle: boolean;
@@ -202,6 +209,7 @@ export default function PlayerPanel({
   personalLibraryActionBusy = null,
   onAddToPersonalModule,
   onSaveForLater,
+  playerTheme = "light",
   snowMode,
   onSnowModeChange,
   showViewportToggle,
@@ -400,6 +408,24 @@ export default function PlayerPanel({
       {/* ── 4. Player settings — every preference, one list ──────────── */}
       <SectionLabel>Player settings</SectionLabel>
       <div data-course-panel-section="settings" data-course-settings-menu>
+        {/* Appearance is LIGHT-ONLY app-wide — there is no dark palette any
+            more, so there is deliberately no dark ACTION to expose here
+            (src/lib/theme.ts: "Legacy dark preferences and callers are
+            normalized"). The row is an INDICATOR: the same passive label the
+            Profile page shows through ThemeModeToggle, so the learner never
+            hunts for a switch that would silently do nothing. */}
+        <div
+          className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-2.5"
+          data-course-setting="lightTheme"
+          data-course-player-theme={playerTheme}
+        >
+          {/* Same passive label ThemeModeToggle renders on the Profile page,
+              spelled out here so the row reads like every other setting. */}
+          <span className="text-[12px] font-semibold text-[var(--course-text)]">Light appearance</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--course-muted)]">
+            Always on
+          </span>
+        </div>
         {settingsRow("Snowfall", snowMode, (next) => onSnowModeChange(next), "snow")}
         {showViewportToggle ? settingsRow("Desktop view", desktopView, (next) => onDesktopViewChange(next), "viewport") : null}
         {canFullscreen ? settingsRow("Hide status bar", courseFullscreen, (next) => onHideStatusBarChange(next), "fullscreen") : null}

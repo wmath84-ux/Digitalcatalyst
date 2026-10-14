@@ -1943,6 +1943,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         setAddOfficialOpen(true);
       }}
       onSaveForLater={() => { void saveSelectedOfficialForLater(); }}
+      playerTheme={playerThemeCtl.theme}
       snowMode={snowMode}
       onSnowModeChange={setSnowMode}
       showViewportToggle={showViewportToggle}

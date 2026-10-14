@@ -60,7 +60,7 @@ export function uploadBytesResumable(target, file, metadata) {
     // test drivers
     progress(bytes, state = "running") { task.observers?.next({ bytesTransferred: bytes, totalBytes: file.size, state }); },
     complete() { task.observers?.complete(); },
-    fail(code) { task.observers?.error({ code }); },
+    fail(code, extra) { task.observers?.error(Object.assign({ code }, extra)); },
   };
   tasks.push(task);
   return task;
@@ -137,6 +137,7 @@ import * as React from "react";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import useReadUploads from "./src/course/useReadUploads";
+export { READ_UPLOAD_OFFLINE_CEILING_MS } from "./src/course/useReadUploads";
 
 export const latest: { ctl: any; views: any[] } = { ctl: null, views: [] };
 
@@ -175,6 +176,9 @@ await build({
 });
 
 const fixture = await import(pathToFileURL(path.join(DIR, "fixture.mjs")).href);
+// The ceiling comes out of the SAME bundle the tests drive, so the test can
+// never drift from the value the hook actually uses.
+const { READ_UPLOAD_OFFLINE_CEILING_MS } = fixture;
 const storage = await import(pathToFileURL(STORAGE_STUB).href);
 const firestore = await import(pathToFileURL(FIRESTORE_STUB).href);
 
@@ -310,7 +314,11 @@ test("a dead upload is detected by the inactivity watchdog, reported with Retry,
   assert.equal(task(0).cancelled, true, "the stalled task was cancelled — no zombie upload");
   assert.equal(ctl().uploading, null);
   assert.match(ctl().uploadError, /stopped moving/);
-  assert.match(ctl().uploadError, /Retry/);
+  // The action lives in the hint (the panel shows headline + hint together).
+  assert.match(ctl().uploadFailure.hint, /Retry/);
+  assert.equal(ctl().uploadFailure.code, "dc/stalled");
+  assert.equal(ctl().uploadFailure.step, "bytes", "the report says WHERE it died");
+  assert.match(ctl().uploadFailure.detail, /code=dc\/stalled/);
   assert.equal(ctl().retryableName, "Dead.pdf");
 
   const retried = ctl().retryUpload();
@@ -379,7 +387,10 @@ test("bytes stored but the finishing step failed → Retry finishes WITHOUT uplo
   task().complete();
   assert.equal(await pending, null);
   await settle();
-  assert.match(ctl().uploadError, /check your connection/i);
+  assert.match(ctl().uploadError, /did not finish/);
+  assert.match(ctl().uploadFailure.hint, /check the connection/i);
+  assert.equal(ctl().uploadFailure.code, "storage/retry-limit-exceeded");
+  assert.equal(ctl().uploadFailure.step, "download-url");
   assert.equal(ctl().retryableName, "Half.pdf");
 
   storage.state.failDownloadUrl = null;
@@ -414,7 +425,10 @@ test("a library write that never answers cannot hang the upload: it completes as
   // A late refusal is still surfaced, with a finish-only Retry.
   firestore.releaseHung("permission-denied");
   await settle();
-  assert.match(ctl().uploadError, /refused/);
+  assert.match(ctl().uploadError, /not allowed to save/i);
+  assert.match(ctl().uploadFailure.hint, /Firestore rules/);
+  assert.equal(ctl().uploadFailure.code, "permission-denied");
+  assert.equal(ctl().uploadFailure.step, "library-write");
   assert.equal(ctl().retryableName, "Slow.pdf");
 });
 
@@ -429,9 +443,11 @@ test("going offline pauses the task (no false stall) and coming back resumes it"
     await settle();
     assert.equal(task().paused, 1);
     assert.equal(ctl().uploading.waitingForNetwork, true);
-    mock.timers.tick(5 * 60_000);
+    // Offline time is NOT a byte-stall: 90 s of silence online would have
+    // failed by now, but a paused attempt waits for the connection.
+    mock.timers.tick(90_000);
     await settle();
-    assert.equal(task().cancelled, false, "offline time never counts as a stall");
+    assert.equal(task().cancelled, false, "offline time never counts as a byte-stall");
     window.dispatchEvent(new window.Event("online"));
     await settle();
     assert.equal(task().resumed, 1);
@@ -442,6 +458,56 @@ test("going offline pauses the task (no false stall) and coming back resumes it"
   } finally {
     mock.timers.reset();
   }
+});
+
+// THE regression this suite used to encode as correct behaviour: a device that
+// reported itself offline (`navigator.onLine === false` at the start, or an
+// `offline` event with no `online` after it) paused the task with NO ceiling,
+// so the row read "pending" forever — no percentage, no reason, no end. That is
+// exactly the reported "upload nahin hota, pending hi dikhta hai". Offline is
+// still not a byte-stall, but it now has a ceiling that fails with a reason.
+test("a device that never comes back online fails WITH A REASON instead of pending forever", async () => {
+  mock.timers.enable({ apis: ["setTimeout"] });
+  let pending;
+  try {
+    pending = ctl().uploadPdf(pdfFile("Stuck.pdf"));
+    await untilTask();
+    task().progress(1 * MB);
+    await settle();
+    window.dispatchEvent(new window.Event("offline"));
+    await settle();
+    assert.equal(ctl().uploading.waitingForNetwork, true);
+    mock.timers.tick(READ_UPLOAD_OFFLINE_CEILING_MS + 1_000);
+    await settle();
+  } finally {
+    mock.timers.reset();
+  }
+  assert.equal(await pending, null);
+  await settle();
+  assert.equal(task().cancelled, true, "the paused task is not left running");
+  assert.equal(ctl().uploading, null, "the pending row is gone");
+  assert.equal(ctl().uploadFailure.code, "dc/offline-ceiling");
+  assert.match(ctl().uploadError, /no internet connection/i);
+  assert.match(ctl().uploadFailure.hint, /Retry/);
+  assert.equal(ctl().retryableName, "Stuck.pdf", "Retry re-runs it once the network is back");
+});
+
+test("a storage 403 reports the RULES, with the server's own message attached", async () => {
+  const pending = ctl().uploadPdf(pdfFile("Rules.pdf"));
+  await untilTask();
+  task().fail("storage/unauthorized", {
+    serverResponse: '{"error":{"code":403,"message":"Permission denied. Could not perform this operation"}}',
+  });
+  assert.equal(await pending, null);
+  await settle();
+  const failure = ctl().uploadFailure;
+  assert.equal(failure.code, "storage/unauthorized");
+  assert.equal(failure.status, 403);
+  assert.equal(failure.serverMessage, "Permission denied. Could not perform this operation");
+  assert.equal(failure.step, "bytes");
+  assert.doesNotMatch(failure.headline, /100 MB/, "a rules failure is not blamed on the size limit");
+  assert.match(failure.hint, /firebase deploy --only storage/);
+  assert.match(failure.detail, /path=userReadUploads\//, "the object path is in the report");
 });
 
 test("Cancel during a multi-file pick stops the rest of the batch", async () => {

@@ -73,7 +73,10 @@ test("the sync script is safe by construction", () => {
   // tests/appIconSafeZone.test.mjs) applies to a brand-new logo too.
   assert.match(script, /const icons = require\("\.\/generate-icons\.cjs"\);/);
   assert.match(script, /await icons\.readGlyph\(normalised\)/);
-  assert.match(script, /await icons\.build\(glyph, target\)/);
+  assert.match(script, /await icons\.build\(glyph, target, plate\)/);
+  // The plate is MEASURED from the logo, so a white mark is never composited on
+  // the white plate (a blank launcher icon) — same rule as the dev generator.
+  assert.match(script, /icons\.plateFor\(luminance\)/);
   // Nothing is touched when the bytes already match.
   assert.match(script, /async function writeIfChanged\(file, bytes\)/);
   assert.match(script, /if \(current && current\.equals\(bytes\)\) return false;/);
@@ -116,5 +119,6 @@ test("the generator can verify itself, and the stamp is valid, greppable XML", a
   assert.doesNotMatch(script, /<string name="brand_icon_source">\$\{url/, "the full URL must not bloat the resources");
   // The COVERAGE table is the single source of the geometry, and it is exported
   // for the tests.
-  assert.match(generator, /module\.exports = \{ COVERAGE, DENSITIES/);
+  assert.match(generator, /module\.exports = \{\s*COVERAGE,\s*DENSITIES,/);
+  assert.match(generator, /plateFor,/, "the plate rule is exported too, so the tests can drive it");
 });

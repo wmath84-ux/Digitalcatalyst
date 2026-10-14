@@ -44,6 +44,19 @@ export type IconVariant = keyof typeof ICON_COVERAGE;
  *  installed PWA icon matches the Android adaptive icon beside it. */
 export const ICON_PLATE = { r: 255, g: 255, b: 255, alpha: 1 } as const;
 
+/**
+ * The plate for a LIGHT logo. Uploaded brand marks are very often white artwork
+ * on transparency, and white artwork on `ICON_PLATE` installs as a BLANK icon
+ * (an empty white square on the home screen). So the plate follows the artwork,
+ * exactly like scripts/generate-icons.cjs does at build time.
+ */
+export const ICON_DARK_PLATE = { r: 15, g: 23, b: 42, alpha: 1 } as const;
+
+/** Mean luminance at/above which artwork counts as "light". */
+export const LIGHT_ARTWORK_LUMINANCE = 200;
+
+export type IconPlate = typeof ICON_PLATE | typeof ICON_DARK_PLATE;
+
 /** Alpha at or below this counts as "outside the artwork". */
 export const ALPHA_FLOOR = 16;
 
@@ -100,9 +113,36 @@ export function isOpaqueTile(image: RgbaImage, alphaFloor = ALPHA_FLOOR): boolea
   return true;
 }
 
+/**
+ * Mean luminance (0–255) of the opaque pixels inside `bounds` — the number that
+ * decides the plate. Sampled with a step so a 4000 px upload stays cheap.
+ */
+export function inkLuminance(image: RgbaImage, bounds: Bounds, alphaFloor = ALPHA_FLOOR): number {
+  const { data, width } = image;
+  const stepX = Math.max(1, Math.floor(bounds.width / 256));
+  const stepY = Math.max(1, Math.floor(bounds.height / 256));
+  let total = 0;
+  let counted = 0;
+  for (let y = bounds.top; y < bounds.top + bounds.height; y += stepY) {
+    const row = y * width * 4;
+    for (let x = bounds.left; x < bounds.left + bounds.width; x += stepX) {
+      const i = row + x * 4;
+      if (data[i + 3] < alphaFloor) continue;
+      total += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+      counted += 1;
+    }
+  }
+  return counted ? total / counted : 0;
+}
+
+/** White for a dark mark, the app's dark slate for a light one. */
+export function plateForLuminance(luminance: number): IconPlate {
+  return luminance >= LIGHT_ARTWORK_LUMINANCE ? ICON_DARK_PLATE : ICON_PLATE;
+}
+
 export type IconPlan =
   | { kind: "passthrough"; reason: "opaque-tile"; size: number }
-  | { kind: "mark"; size: number; coverage: number; bounds: Bounds; left: number; top: number; width: number; height: number; plate: typeof ICON_PLATE | null };
+  | { kind: "mark"; size: number; coverage: number; bounds: Bounds; left: number; top: number; width: number; height: number; plate: IconPlate | null };
 
 /**
  * The placement decision for one variant. Pure: same inputs → same plan, so
@@ -132,7 +172,7 @@ export function planBrandIconImage(input: {
     top: Math.round((size - height) / 2),
     width,
     height,
-    plate: variant === "maskable" ? ICON_PLATE : null,
+    plate: variant === "maskable" ? plateForLuminance(inkLuminance(image, bounds)) : null,
   };
 }
 
