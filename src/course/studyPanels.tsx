@@ -48,13 +48,18 @@ import {
   type RefObject,
 } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useMotionValueEvent, useReducedMotion, type AnimationPlaybackControls, type MotionValue } from "framer-motion";
-import { ArrowLeftRight, ArrowUpDown, PlayCircle } from "lucide-react";
+import { ArrowLeftRight, ArrowUpDown, PanelBottom, PanelLeft, PanelRight, PanelTop, PlayCircle, X } from "lucide-react";
 import { GlassSurface } from "../components/ui/glass";
 import {
   DEFAULT_SPLIT_RATIO,
   DIVIDER_HIT,
   DIVIDER_LINE,
   ENTRY_START,
+  EXTRA_PANE_DEFAULT,
+  EXTRA_PANE_ENTRY,
+  EXTRA_PANE_MAX,
+  EXTRA_PANE_MIN,
+  SPLIT_WIDE_MIN_PX,
   EASE_OUT_MOTION,
   FILL_THRESHOLD,
   KEY_STEP,
@@ -76,13 +81,18 @@ import {
   SWAP_TAP_SLOP_PX,
   clampSplitRatio,
   loadSplitCollapsed,
+  loadSplitExtras,
   loadSplitRatio,
   loadSplitSwapped,
   saveSplitCollapsed,
+  saveSplitExtras,
   saveSplitRatio,
   saveSplitSwapped,
   splitFloorFor,
   type SplitAxis,
+  type SplitExtraPane,
+  type SplitExtras,
+  type SplitRegion,
   type SplitSide,
 } from "./splitMotion";
 import { useCourseKeyboard } from "./useCourseKeyboard";
@@ -213,49 +223,53 @@ function PeekRail({
 
 // ── The divider ─────────────────────────────────────────────────────────────
 
-interface SplitDividerProps {
-  axis: SplitAxis;
-  ratio: MotionValue<number>;
-  dragging: boolean;
-  /** Lesson-side percent, kept in React state for the a11y read-out. */
-  ariaNow: number;
-  collapsed: SplitSide | null;
-  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  onPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  onPointerCancel: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  onDoubleClick: () => void;
-  onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
-  /** True while the STUDY pane is the first one (the panes are swapped). */
-  swapped: boolean;
-  /** Swap the two panes — the switch button's one job. */
-  onSwap: () => void;
+/**
+ * One small control the divider reveals beside its switch button.
+ *
+ * The owner's brief (2026-10-14): on a tablet-sized or desktop stage, tapping
+ * the line must offer MORE than the swap — "the left content area splits into
+ * one more part" and "the right one splits too". Every divider carries the
+ * same two things: the switch, and the way its region's pane count changes.
+ * A phone-sized stage keeps the bare switch it always had (a third pane does
+ * not fit there), so the split controls simply are not rendered below
+ * SPLIT_WIDE_MIN_PX.
+ */
+export interface SplitDividerAction {
+  id: string;
+  /** Accessible name + tooltip — the button itself is deliberately icon-only. */
+  label: string;
+  icon: ReactNode;
+  onPress: () => void;
 }
 
-function SplitDivider({
-  axis,
-  ratio,
-  dragging,
-  ariaNow,
-  collapsed,
-  onPointerDown,
-  onPointerMove,
-  onPointerUp,
-  onPointerCancel,
-  onDoubleClick,
-  onKeyDown,
-  swapped,
-  onSwap,
-}: SplitDividerProps) {
-  const dividerRef = useRef<HTMLDivElement | null>(null);
-  const row = axis === "row"; // landscape → a vertical divider
+/** The small round button every divider control is drawn as. */
+const WAKE_BUTTON_STYLE: CSSProperties = {
+  width: SWAP_BUTTON_PX,
+  height: SWAP_BUTTON_PX,
+  background: "rgba(10, 12, 18, 0.88)",
+  border: `1px solid ${DIVIDER_LINE}`,
+  color: DIVIDER_LINE,
+  boxShadow: `0 0 12px ${DIVIDER_LINE}55`,
+  touchAction: "manipulation",
+};
 
-  // ── The switch button ───────────────────────────────────────────────────
-  // At rest the divider is what it has always been: a bare 2px yellow line.
-  // TAP the line and a very small switch icon appears on it; tap that and the
-  // two panes trade places (tap it again and they trade back). The button
-  // fades out on its own after an idle window, or on the next tap of the line,
-  // so nothing permanent is added to the divider's chrome.
+/**
+ * Tap-to-reveal for a divider's control cluster — ONE implementation, shared
+ * by the main divider and by the extra-pane dividers inside a region.
+ *
+ * The divider's own resize drag owns the pointer, so a TAP is recognised on
+ * pointer UP: the press only counts when the pointer barely moved and came up
+ * quickly. A real resize never reveals the cluster. The cluster fades on its
+ * own after an idle window, on the next tap of the line, and on a rotation.
+ */
+function useDividerReveal(
+  axis: SplitAxis,
+  handlers: {
+    onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
+    onPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
+    onPointerCancel: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  },
+) {
   const [swapVisible, setSwapVisible] = useState(false);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearHideTimer = useCallback(() => {
@@ -296,13 +310,13 @@ function SplitDivider({
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     tapRef.current = { x: event.clientX, y: event.clientY, at: Date.now(), id: event.pointerId };
-    onPointerDown(event);
+    handlers.onPointerDown(event);
   };
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
     const start = tapRef.current;
     tapRef.current = null;
-    onPointerUp(event);
+    handlers.onPointerUp(event);
     if (!start || start.id !== event.pointerId) return;
     const moved = Math.hypot(event.clientX - start.x, event.clientY - start.y);
     if (moved <= SWAP_TAP_SLOP_PX && Date.now() - start.at <= SWAP_TAP_MS) toggleSwapHint();
@@ -310,12 +324,66 @@ function SplitDivider({
 
   const handlePointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
     tapRef.current = null;
-    onPointerCancel(event);
+    handlers.onPointerCancel(event);
   };
+
+  return { swapVisible, revealSwap, handlePointerDown, handlePointerUp, handlePointerCancel };
+}
+
+interface SplitDividerProps {
+  axis: SplitAxis;
+  ratio: MotionValue<number>;
+  dragging: boolean;
+  /** Lesson-side percent, kept in React state for the a11y read-out. */
+  ariaNow: number;
+  collapsed: SplitSide | null;
+  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerCancel: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onDoubleClick: () => void;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
+  /** True while the STUDY pane is the first one (the panes are swapped). */
+  swapped: boolean;
+  /** Swap the two panes — the switch button's one job. */
+  onSwap: () => void;
+  /** The split controls (wide stages only). Empty at every other size. */
+  actions?: SplitDividerAction[];
+  /** "main" = the region divider; "nested" = a divider inside a region. */
+  kind?: "main" | "nested";
+}
+
+function SplitDivider({
+  axis,
+  ratio,
+  dragging,
+  ariaNow,
+  collapsed,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
+  onDoubleClick,
+  onKeyDown,
+  swapped,
+  onSwap,
+  actions = [],
+  kind = "main",
+}: SplitDividerProps) {
+  const dividerRef = useRef<HTMLDivElement | null>(null);
+  const row = axis === "row"; // landscape → a vertical divider
+
+  // ── The control cluster ─────────────────────────────────────────────────
+  // At rest the divider is what it has always been: a bare 2px yellow line.
+  // TAP the line and the tiny controls appear on it; tap it again and they
+  // fade away. The cluster fades out on its own after an idle window, so
+  // nothing permanent is added to the divider's chrome.
+  const { swapVisible, revealSwap, handlePointerDown, handlePointerUp, handlePointerCancel } =
+    useDividerReveal(axis, { onPointerDown, onPointerUp, onPointerCancel });
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     // Keyboard parity with the tap: "s" swaps the panes outright, and the
-    // switch is shown while it does so (the same control, same feedback).
+    // cluster is shown while it does so (the same control, same feedback).
     if (event.key === "s" || event.key === "S") {
       event.preventDefault();
       revealSwap();
@@ -338,11 +406,16 @@ function SplitDivider({
       role="separator"
       tabIndex={0}
       aria-orientation={row ? "vertical" : "horizontal"}
-      aria-label="Split deck divider — drag to resize the lesson and study panes"
+      aria-label={
+        kind === "main"
+          ? "Split deck divider — drag to resize the lesson and study panes"
+          : "Region divider — drag to resize the two parts of this area"
+      }
       aria-valuemin={SPLIT_MIN}
       aria-valuemax={SPLIT_MAX}
       aria-valuenow={ariaNow}
       data-course-split-divider=""
+      data-divider-kind={kind}
       data-axis={axis}
       data-dragging={dragging ? "true" : "false"}
       data-collapsed={collapsed ?? "none"}
@@ -385,55 +458,268 @@ function SplitDivider({
         transition={{ duration: 0.24, ease: EASE_OUT_MOTION }}
       />
 
-      {/* The switch: revealed by a tap on the line, centred ON the line, and
-          deliberately tiny. Its own pointer events never reach the divider,
-          so pressing it can never start a resize drag. */}
+      {/* The cluster: revealed by a tap on the line, centred ON the line, and
+          deliberately tiny. Its own pointer events never reach the divider, so
+          pressing a control can never start a resize drag. */}
       <span
         aria-hidden={swapVisible ? undefined : true}
         className="pointer-events-none absolute left-1/2 top-1/2 z-40 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
       >
         <AnimatePresence initial={false}>
           {swapVisible ? (
-            <motion.button
-              type="button"
-              data-course-split-swap=""
-              data-swapped={swapped ? "true" : "false"}
-              aria-label={
-                swapped
-                  ? "Swap the panes back — lesson first, study pane second"
-                  : "Swap the panes — study pane first, lesson second"
-              }
-              title="Swap the two panes"
-              className="pointer-events-auto grid cursor-pointer place-items-center rounded-full"
-              style={{
-                width: SWAP_BUTTON_PX,
-                height: SWAP_BUTTON_PX,
-                background: "rgba(10, 12, 18, 0.88)",
-                border: `1px solid ${DIVIDER_LINE}`,
-                color: DIVIDER_LINE,
-                boxShadow: `0 0 12px ${DIVIDER_LINE}55`,
-                touchAction: "manipulation",
-              }}
+            <motion.span
+              data-course-split-cluster={kind}
+              className={`pointer-events-auto flex items-center justify-center gap-1.5 ${row ? "flex-col" : "flex-row"}`}
               initial={{ opacity: 0, scale: 0.5 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.5 }}
               transition={{ duration: 0.16, ease: EASE_OUT_MOTION }}
-              onPointerDown={(event) => event.stopPropagation()}
-              onPointerUp={(event) => event.stopPropagation()}
-              onDoubleClick={(event) => event.stopPropagation()}
-              onKeyDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.stopPropagation();
-                // Every press swaps: the same button takes the panes back.
-                onSwap();
-                revealSwap();
-              }}
             >
-              {row ? <ArrowLeftRight size={SWAP_ICON_PX} /> : <ArrowUpDown size={SWAP_ICON_PX} />}
-            </motion.button>
+              <motion.button
+                type="button"
+                data-course-split-swap=""
+                data-swapped={swapped ? "true" : "false"}
+                aria-label={
+                  swapped
+                    ? "Swap the panes back — lesson first, study pane second"
+                    : "Swap the panes — study pane first, lesson second"
+                }
+                title="Swap the two panes"
+                className="pointer-events-auto grid cursor-pointer place-items-center rounded-full"
+                style={WAKE_BUTTON_STYLE}
+                onPointerDown={(event) => event.stopPropagation()}
+                onPointerUp={(event) => event.stopPropagation()}
+                onDoubleClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  // Every press swaps: the same button takes the panes back.
+                  onSwap();
+                  revealSwap();
+                }}
+              >
+                {row ? <ArrowLeftRight size={SWAP_ICON_PX} /> : <ArrowUpDown size={SWAP_ICON_PX} />}
+              </motion.button>
+              {/* The split controls — one per region that can still grow, or
+                  the merge control for a region that already has its pane. */}
+              {actions.map((action) => (
+                <motion.button
+                  key={action.id}
+                  type="button"
+                  data-course-split-action={action.id}
+                  aria-label={action.label}
+                  title={action.label}
+                  className="pointer-events-auto grid cursor-pointer place-items-center rounded-full"
+                  style={WAKE_BUTTON_STYLE}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onPointerUp={(event) => event.stopPropagation()}
+                  onDoubleClick={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    action.onPress();
+                    // The cluster stays up after a press (its idle timer is
+                    // restarted), so a second control is one tap away.
+                    revealSwap();
+                  }}
+                >
+                  {action.icon}
+                </motion.button>
+              ))}
+            </motion.span>
           ) : null}
         </AnimatePresence>
       </span>
+    </div>
+  );
+}
+// ── The extra pane (the third / fourth part, inside one region) ─────────────
+//
+// The owner's brief (2026-10-14): the divider's button must ALSO be able to
+// grow the deck — "left mein jo actual content area hai, yah split ho jayega
+// ek aur part mein" and the same for the right one. So a REGION (the lesson
+// side or the study side) can host one more pane beside its own, with its own
+// divider between them, and every divider offers the switch and the way the
+// pane count changes.
+//
+// The pair is deliberately simple next to the deck: no peek rails (the pane is
+// removed, not collapsed) and no fill-to-edge — it is a resizable pair whose
+// only persistence is its percentage.
+
+const clampExtraPercent = (value: number) =>
+  Math.min(EXTRA_PANE_MAX, Math.max(EXTRA_PANE_MIN, Number.isFinite(value) ? value : EXTRA_PANE_DEFAULT));
+
+interface ExtraPaneRegionProps {
+  axis: SplitAxis;
+  /** Which region this pair lives in (marks the boxes for CSS and tests). */
+  region: SplitRegion;
+  /** The region's own pane — the lesson stack, or the study overlay. */
+  primary: ReactNode;
+  /** The added study pane. */
+  extra: ReactNode;
+  /** The added pane's share of the region, in percent (persisted). */
+  percent: number;
+  /** A settled share (drag release, keyboard step, 50/50) → persist it. */
+  onPercent: (percent: number) => void;
+  /** True while the ADDED pane is the region's first one. */
+  swapped: boolean;
+  onSwap: () => void;
+  /** The region's controls: merge this pane, or split the other region. */
+  actions: SplitDividerAction[];
+  /** The wrapper's flex classes — the pair fills whatever box it is given. */
+  className: string;
+}
+
+function ExtraPaneRegion({
+  axis,
+  region,
+  primary,
+  extra,
+  percent,
+  onPercent,
+  swapped,
+  onSwap,
+  actions,
+  className,
+}: ExtraPaneRegionProps) {
+  const row = axis === "row";
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const primaryRef = useRef<HTMLDivElement | null>(null);
+  const extraRef = useRef<HTMLDivElement | null>(null);
+  const initial = clampExtraPercent(percent);
+  const percentMv = useMotionValue(initial);
+  const [dragging, setDragging] = useState(false);
+  const [ariaNow, setAriaNow] = useState(Math.round(100 - initial));
+  const dragRef = useRef<{ pointerId: number; start: number; size: number } | null>(null);
+
+  // Rotation (or another course) hands a new stored share down.
+  useEffect(() => {
+    percentMv.set(clampExtraPercent(percent));
+  }, [percent, percentMv]);
+
+  // The panes' flex-grow is written straight to the DOM on every frame of the
+  // drag: no React re-render, exactly like the deck's own divider.
+  useMotionValueEvent(percentMv, "change", (value) => {
+    if (primaryRef.current) primaryRef.current.style.flexGrow = String(Math.max(0.0001, 100 - value));
+    if (extraRef.current) extraRef.current.style.flexGrow = String(Math.max(0.0001, value));
+  });
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const box = containerRef.current?.getBoundingClientRect();
+    if (!box) return;
+    dragRef.current = {
+      pointerId: event.pointerId,
+      start: row ? box.left : box.top,
+      size: row ? box.width : box.height,
+    };
+    containerRef.current?.setPointerCapture?.(event.pointerId);
+    setDragging(true);
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || drag.size <= 0) return;
+    const pointer = row ? event.clientX : event.clientY;
+    percentMv.set(clampExtraPercent(((pointer - drag.start) / drag.size) * 100));
+  };
+
+  const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    setDragging(false);
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const settled = Math.round(percentMv.get());
+    setAriaNow(Math.round(100 - settled));
+    onPercent(settled);
+  };
+
+  const handlePointerCancel = () => {
+    dragRef.current = null;
+    setDragging(false);
+  };
+
+  const setPercent = useCallback(
+    (next: number) => {
+      const clamped = clampExtraPercent(next);
+      percentMv.set(clamped);
+      setAriaNow(Math.round(100 - clamped));
+      onPercent(Math.round(clamped));
+    },
+    [onPercent, percentMv],
+  );
+
+  const fiftyFiftyPair = useCallback(() => setPercent(EXTRA_PANE_DEFAULT), [setPercent]);
+
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const keys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "Enter"];
+    if (!keys.includes(event.key)) return;
+    event.preventDefault();
+    const step = event.shiftKey ? KEY_STEP_FINE : KEY_STEP;
+    const current = percentMv.get();
+    const next =
+      event.key === "ArrowLeft" || event.key === "ArrowUp"
+        ? current - step
+        : event.key === "ArrowRight" || event.key === "ArrowDown"
+          ? current + step
+          : event.key === "Home"
+            ? EXTRA_PANE_MIN
+            : event.key === "End"
+              ? EXTRA_PANE_MAX
+              : EXTRA_PANE_DEFAULT;
+    setPercent(next);
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className={`relative ${className}`}
+      data-course-region={region}
+      data-region-split="on"
+      data-region-swapped={swapped ? "true" : "false"}
+    >
+      <div
+        ref={primaryRef}
+        className="relative flex min-h-0 min-w-0 flex-col overflow-hidden"
+        data-region-pane="primary"
+        style={{
+          flexGrow: Math.max(0.0001, 100 - initial),
+          flexShrink: 1,
+          flexBasis: "0%",
+          order: swapped ? 2 : 0,
+        }}
+      >
+        {primary}
+      </div>
+      <SplitDivider
+        kind="nested"
+        axis={axis}
+        ratio={percentMv}
+        dragging={dragging}
+        ariaNow={ariaNow}
+        collapsed={null}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        onDoubleClick={fiftyFiftyPair}
+        onKeyDown={handleKeyDown}
+        swapped={swapped}
+        onSwap={onSwap}
+        actions={actions}
+      />
+      <div
+        ref={extraRef}
+        className="relative flex min-h-0 min-w-0 flex-col overflow-hidden"
+        data-region-pane="extra"
+        style={{
+          flexGrow: Math.max(0.0001, initial),
+          flexShrink: 1,
+          flexBasis: "0%",
+          order: swapped ? 0 : 2,
+        }}
+      >
+        {extra}
+      </div>
     </div>
   );
 }
@@ -492,6 +778,22 @@ export interface SplitDeckProps {
    */
   solid?: boolean;
   handleRef?: RefObject<SplitDeckHandle | null>;
+  /**
+   * Renders the content of an EXTRA pane — the third or fourth part the
+   * divider's split controls add inside a region (wide stages only).
+   *
+   * The deck owns the pane's presence, its share and its tab; the player only
+   * says what a pane showing a given tab looks like. `setTab` is the pane's own
+   * tab switch, so each part keeps its own tab without the deck knowing the
+   * tab list.
+   */
+  renderExtraPane?: (region: SplitRegion, tab: string, setTab: (tab: string) => void) => ReactNode;
+  /**
+   * The tab a brand-new extra pane opens on. `used` lists every tab the deck is
+   * already showing (the two remembered panes), so the new part lands on a tab
+   * that is not on screen twice — the owner's "vah empty nahin rahega" rule.
+   */
+  extraPaneTab?: (used: string[]) => string;
 }
 
 /** Narrow phone OR a phone turned sideways (a short viewport). Both are the
@@ -516,6 +818,8 @@ export function SplitDeck({
   solid = false,
   handleRef,
   keyboardExpandEnabled = false,
+  renderExtraPane,
+  extraPaneTab,
 }: SplitDeckProps) {
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const lessonRef = useRef<HTMLDivElement | null>(null);
@@ -583,6 +887,113 @@ export function SplitDeck({
   /** While dragging, the smaller pane leans on its divider-side edge. */
   const [compressed, setCompressed] = useState<SplitSide | null>(null);
 
+  // ── The extra panes (the third / fourth part) ─────────────────────────────
+  //
+  // Each REGION (the lesson side, the study side) can host one more pane: the
+  // divider's split controls add it, its own little cluster removes it. What is
+  // remembered per course + axis is the pane's presence, its tab and its share
+  // of the region — a phone in portrait must not inherit a laptop's layout, and
+  // the deck must never fail to open because of its own storage.
+  const [extras, setExtras] = useState<SplitExtras>({ lesson: null, study: null });
+  const updateExtras = useCallback(
+    (next: SplitExtras) => {
+      setExtras(next);
+      saveSplitExtras(courseId, axis, next);
+    },
+    [axis, courseId],
+  );
+
+  /** The tabs the deck is already showing — a new pane must not repeat one. */
+  const usedExtraTabs = useCallback(
+    () => [extras.lesson?.tab, extras.study?.tab].filter((tab): tab is string => Boolean(tab)),
+    [extras.lesson?.tab, extras.study?.tab],
+  );
+
+  /** "Split this region into another part": a NEW study pane, never an empty box. */
+  const splitRegion = useCallback(
+    (region: SplitRegion) => {
+      if (extras[region]) return;
+      const tab = extraPaneTab?.(usedExtraTabs()) ?? "modules";
+      updateExtras({
+        ...extras,
+        [region]: { tab, percent: EXTRA_PANE_ENTRY, swapped: false },
+      });
+    },
+    [extraPaneTab, extras, updateExtras, usedExtraTabs],
+  );
+
+  /** "Back to two parts": the region's extra pane is removed, its content with it. */
+  const mergeRegion = useCallback(
+    (region: SplitRegion) => {
+      if (!extras[region]) return;
+      updateExtras({ ...extras, [region]: null });
+    },
+    [extras, updateExtras],
+  );
+
+  const patchRegion = useCallback(
+    (region: SplitRegion, patch: Partial<SplitExtraPane>) => {
+      const pane = extras[region];
+      if (!pane) return;
+      updateExtras({ ...extras, [region]: { ...pane, ...patch } });
+    },
+    [extras, updateExtras],
+  );
+
+  /**
+   * The split controls belong to BIG stages only (the owner's "tablet ki badi
+   * screen size aur desktop ke liye hi"): the deck measures itself, so the
+   * buttons follow the real stage, not the device name.
+   */
+  const wide = renderExtraPane ? deckWidth >= SPLIT_WIDE_MIN_PX : false;
+  const row = axis === "row";
+
+  const splitAction = useCallback(
+    (region: SplitRegion): SplitDividerAction => ({
+      id: `split-${region}`,
+      label:
+        region === "lesson"
+          ? "Split the lesson area into one more part"
+          : "Split the study area into one more part",
+      icon: row ? (
+        region === "lesson" ? <PanelLeft size={SWAP_ICON_PX} /> : <PanelRight size={SWAP_ICON_PX} />
+      ) : region === "lesson" ? (
+        <PanelTop size={SWAP_ICON_PX} />
+      ) : (
+        <PanelBottom size={SWAP_ICON_PX} />
+      ),
+      onPress: () => splitRegion(region),
+    }),
+    [row, splitRegion],
+  );
+
+  /** The controls the MAIN divider reveals (only for regions still splittable). */
+  const mainActions = useMemo<SplitDividerAction[]>(() => {
+    if (!wide) return [];
+    const actions: SplitDividerAction[] = [];
+    if (!extras.lesson) actions.push(splitAction("lesson"));
+    if (!extras.study) actions.push(splitAction("study"));
+    return actions;
+  }, [extras.lesson, extras.study, splitAction, wide]);
+
+  /** The controls a REGION's own divider reveals: merge, plus the other side. */
+  const regionActions = useCallback(
+    (region: SplitRegion): SplitDividerAction[] => {
+      const other: SplitRegion = region === "lesson" ? "study" : "lesson";
+      const actions: SplitDividerAction[] = [
+        {
+          id: `merge-${region}`,
+          label: "Remove this extra part — back to two panes",
+          icon: <X size={SWAP_ICON_PX} />,
+          onPress: () => mergeRegion(region),
+        },
+      ];
+      if (wide && !extras[other]) actions.push(splitAction(other));
+      return actions;
+    },
+    [extras, mergeRegion, splitAction, wide],
+  );
+
   const collapsedRef = useRef<SplitSide | null>(null);
   collapsedRef.current = collapsed;
   const lastRatioRef = useRef(DEFAULT_SPLIT_RATIO[axis]);
@@ -628,6 +1039,9 @@ export function SplitDeck({
   useLayoutEffect(() => {
     const stored = loadSplitRatio(courseId, axis, floor);
     const storedCollapsed = loadSplitCollapsed(courseId, axis);
+    // The extra panes come back with the course and the axis (a third pane
+    // that fits a laptop has no place on a phone in portrait).
+    setExtras(loadSplitExtras(courseId, axis));
     lastRatioRef.current = stored;
     collapsedRef.current = storedCollapsed;
     setCollapsed(storedCollapsed);
@@ -665,6 +1079,7 @@ export function SplitDeck({
     if (axisRunsRef.current === 1) return;
     const stored = loadSplitRatio(courseId, axis, floor);
     const storedCollapsed = loadSplitCollapsed(courseId, axis);
+    setExtras(loadSplitExtras(courseId, axis));
     lastRatioRef.current = stored;
     setCollapsed(storedCollapsed);
     if (storedCollapsed) {
@@ -901,6 +1316,24 @@ export function SplitDeck({
     [keyboardInset],
   );
 
+  /**
+   * The extra panes' CONTENT. The player renders it (the deck never knows what
+   * a study tab shows); the deck only decides that a pane exists, what tab it
+   * opens on and how much of the region it takes. Each pane gets its own
+   * `setTab`, so two parts can show two different tabs at once — which is the
+   * whole point of splitting.
+   */
+  const buildExtraPane = useCallback(
+    (region: SplitRegion) => {
+      const pane = extras[region];
+      if (!pane || !renderExtraPane) return null;
+      return renderExtraPane(region, pane.tab, (tab: string) => patchRegion(region, { tab }));
+    },
+    [extras, patchRegion, renderExtraPane],
+  );
+  const lessonExtra = buildExtraPane("lesson");
+  const studyExtra = buildExtraPane("study");
+
   return (
     <div
       ref={sectionRef}
@@ -926,13 +1359,39 @@ export function SplitDeck({
         data-collapsed={collapsed === "lesson" ? "true" : "false"}
         style={keyboardTakeover ? { display: "none" } : lessonStyle}
       >
-        <div
-          className="absolute inset-0 min-h-0 min-w-0 overflow-hidden"
-          data-course-lesson-content=""
-          style={collapsed === "lesson" ? { pointerEvents: "none" } : undefined}
-        >
-          {lesson}
-        </div>
+        {/* The lesson side's second part (wide stages): the viewer stack keeps
+            its own box, and the added pane sits beside it. The viewer stack is
+            still never unmounted — it only gets a narrower box. */}
+        {lessonExtra ? (
+          <ExtraPaneRegion
+            axis={axis}
+            region="lesson"
+            className={`h-full w-full ${row ? "flex-row" : "flex-col"}`}
+            primary={
+              <div
+                className="absolute inset-0 min-h-0 min-w-0 overflow-hidden"
+                data-course-lesson-content=""
+                style={collapsed === "lesson" ? { pointerEvents: "none" } : undefined}
+              >
+                {lesson}
+              </div>
+            }
+            extra={lessonExtra}
+            percent={extras.lesson?.percent ?? EXTRA_PANE_DEFAULT}
+            onPercent={(percent) => patchRegion("lesson", { percent })}
+            swapped={extras.lesson?.swapped === true}
+            onSwap={() => patchRegion("lesson", { swapped: !(extras.lesson?.swapped === true) })}
+            actions={regionActions("lesson")}
+          />
+        ) : (
+          <div
+            className="absolute inset-0 min-h-0 min-w-0 overflow-hidden"
+            data-course-lesson-content=""
+            style={collapsed === "lesson" ? { pointerEvents: "none" } : undefined}
+          >
+            {lesson}
+          </div>
+        )}
         {collapsed === "lesson" ? (
           <PeekRail
             side="lesson"
@@ -964,6 +1423,7 @@ export function SplitDeck({
           onKeyDown={onSplitKeyDown}
           swapped={swapped}
           onSwap={toggleSwap}
+          actions={mainActions}
         />
       )}
 
@@ -985,16 +1445,45 @@ export function SplitDeck({
           className="h-full w-full"
           contentClassName="flex h-full min-h-0 flex-col overflow-hidden"
         >
-          {/* Study content fades in and rises 8px behind the divider's draw. */}
-          <motion.div
-            className="flex min-h-0 flex-1 flex-col overflow-hidden"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.15, delay: 0.06, ease: EASE_OUT_MOTION }}
-            style={collapsed === "study" ? { pointerEvents: "none" } : undefined}
-          >
-            {study}
-          </motion.div>
+          {/* The study side's second part (wide stages). During a keyboard
+              takeover the pair steps aside entirely: the writing surface gets
+              the whole deck, exactly like the lesson side does. */}
+          {studyExtra && !keyboardTakeover ? (
+            <ExtraPaneRegion
+              axis={axis}
+              region="study"
+              className={`min-h-0 min-w-0 flex-1 ${row ? "flex-row" : "flex-col"}`}
+              primary={
+                /* Study content fades in and rises 8px behind the divider's draw. */
+                <motion.div
+                  className="flex min-h-0 flex-1 flex-col overflow-hidden"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.15, delay: 0.06, ease: EASE_OUT_MOTION }}
+                  style={collapsed === "study" ? { pointerEvents: "none" } : undefined}
+                >
+                  {study}
+                </motion.div>
+              }
+              extra={studyExtra}
+              percent={extras.study?.percent ?? EXTRA_PANE_DEFAULT}
+              onPercent={(percent) => patchRegion("study", { percent })}
+              swapped={extras.study?.swapped === true}
+              onSwap={() => patchRegion("study", { swapped: !(extras.study?.swapped === true) })}
+              actions={regionActions("study")}
+            />
+          ) : (
+            /* Study content fades in and rises 8px behind the divider's draw. */
+            <motion.div
+              className="flex min-h-0 flex-1 flex-col overflow-hidden"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.15, delay: 0.06, ease: EASE_OUT_MOTION }}
+              style={collapsed === "study" ? { pointerEvents: "none" } : undefined}
+            >
+              {study}
+            </motion.div>
+          )}
         </GlassSurface>
         {collapsed === "study" ? (
           <PeekRail

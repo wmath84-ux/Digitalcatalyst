@@ -10,7 +10,8 @@
 //     header-navigation.css).
 //   · the header text is 22px — the page title / greeting / the labels the
 //     action pills expand to / the search fields.
-//   · the app icon is 25px — the header brand mark and the rail brand block.
+//   · the app icon is 30px — the header brand mark and the rail brand block
+//     (bumped from 25px on the owner's request, 2026-10-14).
 //   · the `ad` option is NOT one of the header's icons: it lives in the side
 //     panel on every band (tests/openingAdControl.test.mjs pins that).
 //
@@ -79,15 +80,15 @@ test("the header text is 22px, on every band", () => {
   assert.match(read("src/components/ui/ExpandingTabs.tsx"), /text-\[22px\] font-semibold leading-\[26px\]/);
 });
 
-test("the app icon is 25px wherever the chrome shows it", () => {
-  assert.match(header, /data-header-app-icon className="flex h-\[25px\] w-\[25px\]/);
-  assert.match(header, /<BrandMark className="h-\[25px\] w-\[25px\]" \/>/);
-  assert.match(homeHeader, /<BrandMark className="h-\[25px\] w-\[25px\]/);
+test("the app icon is 30px wherever the chrome shows it", () => {
+  assert.match(header, /data-header-app-icon className="flex h-\[30px\] w-\[30px\]/);
+  assert.match(header, /<BrandMark className="h-\[30px\] w-\[30px\]" \/>/);
+  assert.match(homeHeader, /<BrandMark className="h-\[30px\] w-\[30px\]/);
   // Desktop + tablet rail brand block (the app icon on those bands).
   assert.equal(
-    (shell.match(/data-header-app-icon className="grid h-\[25px\] w-\[25px\]/g) ?? []).length,
+    (shell.match(/data-header-app-icon className="grid h-\[30px\] w-\[30px\]/g) ?? []).length,
     2,
-    "both rail variants (wide rail + glass rail) show the 25px app icon",
+    "both rail variants (wide rail + glass rail) show the 30px app icon",
   );
   // The landing page is marketing chrome, not the app header: it keeps its
   // own larger mark.
@@ -99,7 +100,7 @@ test("the tablet/desktop CSS keeps the same three numbers instead of fighting th
   // re-set to 20px.
   assert.match(
     indexCss,
-    /\[data-site-header\] \[data-header-app-icon\] \{\s*height: 25px;\s*width: 25px;\s*\}/,
+    /\[data-site-header\] \[data-header-app-icon\] \{\s*height: 30px;\s*width: 30px;\s*\}/,
   );
   assert.match(indexCss, /\[data-site-header\] h1 \{\s*font-size: 22px;\s*\}/);
   // Desktop band: the title used to shrink through a clamp to 16–18px.

@@ -5,28 +5,46 @@
   padding: 0 max(8px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
   background: #fff; border-top: 1px solid #e2e8f0;
 }
-.course-strip-track { display: flex; gap: 6px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
+.course-strip-track {
+  display: flex; gap: 6px; overflow-x: auto; overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  /* ── Wide stages: CENTRE, never stretch (owner, 2026-10-14) ─────────────
+     The strips used to be `flex: 1`, so on a desktop every one of them grew
+     until it filled the bar — and the circular plate drawn behind each label
+     (a percentage-width box) stretched into a wide ellipse with it. The row
+     now keeps its items at their natural size and centres the whole group,
+     and `safe` keeps the FIRST strip reachable when the row still overflows
+     (plain `center` + overflow hides it off the scroll start). */
+  justify-content: safe center;
+}
 [data-course-strip-nav] button {
-  position: relative; isolation: isolate; flex: 1 0 44px; min-width: 44px; min-height: 44px;
-  display: grid; place-items: center; padding: 0 6px;
+  position: relative; isolation: isolate; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 44px; min-height: 44px; min-width: 44px; padding: 0 6px;
   color: #fff; font-size: 14px; line-height: 20px; font-weight: 750;
   border: 0; background: transparent; border-radius: 999px; cursor: pointer;
 }
-/* Circular plates in the one website colour (set by CoursePeekDock). */
-[data-course-strip-nav] button::before {
-  content: ''; position: absolute; z-index: -1; inset: 6px 0;
-  background: var(--strip-color); border-radius: 50%;
-  transition: inset 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
-  opacity: 0.85;
+/* The plate is a REAL 32px circle at every width — it used to be a
+   percentage-width box on a stretched button, i.e. an ellipse wherever the
+   footer was wide. */
+.course-strip-plate {
+  display: grid; place-items: center;
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--strip-color); opacity: 0.85;
+  transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
 }
-[data-course-strip-nav] button[aria-pressed='true']::before { inset: 2px 0; opacity: 1; box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--strip-color); }
-[data-course-strip-nav] button:active::before { inset: 8px 0; }
+[data-course-strip-nav] button[aria-pressed='true'] .course-strip-plate {
+  opacity: 1; box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--strip-color);
+}
+[data-course-strip-nav] button:active .course-strip-plate { transform: scale(0.86); }
 [data-course-strip-nav] button:focus-visible { outline: 2px solid #000; outline-offset: -2px; }
-[data-course-strip-nav] .course-strip-name { display: none; }
+.course-strip-name { display: none; }
 /* Names only when each strip has enough space at the same readable 14px. */
 @container (min-width: 720px) {
-  [data-course-strip-nav] .course-strip-letter { display: none; }
+  [data-course-strip-nav] button { padding: 0 14px; }
   [data-course-strip-nav] .course-strip-name { display: inline; }
-  [data-course-strip-nav] button { flex-basis: 72px; }
 }
-@media (prefers-reduced-motion: reduce) { [data-course-strip-nav] button::before { transition: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .course-strip-plate { transition: none; }
+  [data-course-strip-nav] button:active .course-strip-plate { transform: none; }
+}

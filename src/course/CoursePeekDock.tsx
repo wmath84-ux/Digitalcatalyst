@@ -43,7 +43,7 @@ export default function CoursePeekDock({ tab, onTabChange, hiddenTabs = [] }: {
               aria-pressed={tab === item.key}
               onClick={() => onTabChange(item.key)} onKeyDown={event => moveFocus(event, index)}
               style={{ '--strip-color': FOOTER_COLOR } as CSSProperties}>
-              <span className="course-strip-letter" aria-hidden="true">{letter}</span>
+              <span className="course-strip-plate" aria-hidden="true">{letter}</span>
               <span className="course-strip-name" aria-hidden="true">{name}</span>
             </button>
           )

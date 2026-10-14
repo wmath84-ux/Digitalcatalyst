@@ -99,6 +99,96 @@ export const SWAP_ICON_PX = 12;
 export const SWAP_HINT_MS = 3600;
 export const SWAP_TAP_SLOP_PX = 6;
 export const SWAP_TAP_MS = 400;
+
+// ── Extra panes (the divider's SPLIT controls) ──────────────────────────────
+//
+// Owner brief (2026-10-14): on a tablet-sized or desktop stage the divider's
+// little button must offer ONE MORE thing — the deck can grow a third (and, by
+// splitting the other region too, a fourth) pane, so the learner can keep the
+// lesson, the modules and the notes on screen at once. The split controls are
+// deliberately absent on phone-sized stages: there is no room for a third
+// pane, and the two-pane deck is already the whole screen there.
+
+/** The two regions of the deck an extra pane can live in. */
+export type SplitRegion = "lesson" | "study";
+/** A stage narrower than this never offers the split controls. */
+export const SPLIT_WIDE_MIN_PX = 900;
+/** The extra pane's own share band inside its region, in percent. */
+export const EXTRA_PANE_MIN = 15;
+export const EXTRA_PANE_MAX = 85;
+/** A brand-new extra pane opens as an even split. */
+export const EXTRA_PANE_DEFAULT = 50;
+/** How far the extra pane is drawn open when it is first added. */
+export const EXTRA_PANE_ENTRY = 40;
+
+/** One region's extra pane, as it is remembered. */
+export interface SplitExtraPane {
+  /** The study tab this pane shows (a `DockTab` key; kept as a string here so
+   *  the motion module never imports the overlay). */
+  tab: string;
+  /** The pane's share of its region, in percent. */
+  percent: number;
+  /** True while this pane is the FIRST one of its region (the region traded
+   *  places — same gesture as the main divider, one region down). */
+  swapped?: boolean;
+}
+
+export interface SplitExtras {
+  lesson?: SplitExtraPane | null;
+  study?: SplitExtraPane | null;
+}
+
+/**
+ * Which regions carry an extra pane. Per course AND per axis: whether a third
+ * pane fits is a property of the stage, so a phone in portrait keeps the pair
+ * the learner set up in landscape.
+ */
+export const splitExtrasKey = (courseId: string, axis: SplitAxis) =>
+  `dc.splitDeck.extras.v1:${courseId}:${axis}`;
+
+const clampExtraPercent = (value: unknown): number => {
+  const raw = typeof value === "number" ? value : Number.parseFloat(String(value ?? ""));
+  if (!Number.isFinite(raw)) return EXTRA_PANE_DEFAULT;
+  return Math.min(EXTRA_PANE_MAX, Math.max(EXTRA_PANE_MIN, Math.round(raw)));
+};
+
+const readExtraPane = (value: unknown): SplitExtraPane | null => {
+  if (!value || typeof value !== "object") return null;
+  const pane = value as { tab?: unknown; percent?: unknown; swapped?: unknown };
+  const tab = typeof pane.tab === "string" && pane.tab.trim() ? pane.tab : "modules";
+  return { tab, percent: clampExtraPercent(pane.percent), swapped: pane.swapped === true };
+};
+
+/**
+ * The remembered extra panes for one course + axis. Every failure mode (no
+ * key, truncated JSON, a hand-edited value, private mode) reads as "no extra
+ * panes" — the deck must never fail to open because of its own storage.
+ */
+export const loadSplitExtras = (courseId: string, axis: SplitAxis): SplitExtras => {
+  try {
+    const raw = localStorage.getItem(splitExtrasKey(courseId, axis));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as { lesson?: unknown; study?: unknown };
+    if (!parsed || typeof parsed !== "object") return {};
+    return { lesson: readExtraPane(parsed.lesson), study: readExtraPane(parsed.study) };
+  } catch {
+    return {};
+  }
+};
+
+export const saveSplitExtras = (courseId: string, axis: SplitAxis, extras: SplitExtras): void => {
+  try {
+    const lesson = extras.lesson ? readExtraPane(extras.lesson) : null;
+    const study = extras.study ? readExtraPane(extras.study) : null;
+    if (!lesson && !study) {
+      localStorage.removeItem(splitExtrasKey(courseId, axis));
+      return;
+    }
+    localStorage.setItem(splitExtrasKey(courseId, axis), JSON.stringify({ lesson, study }));
+  } catch {
+    /* private mode / storage disabled — the panes still work for this visit */
+  }
+};
 /**
  * The ratio the study pane starts from when the deck opens. Not exactly 0: a
  * truly zero-width pane would squash the dock's flex layout for one frame

@@ -125,7 +125,9 @@ test("the Sketch body is mounted by the same StudyContent switch as every other 
   // the editor's unmount on a tab switch.
   assert.match(player, /const sketch = useCourseSketch\(\{/);
   assert.match(player, /moduleId: activeMindMapModuleId,/);
-  assert.match(player, /sketchPanel=\{\(/);
+  // An EXTRA part never mounts the board (two Excalidraw canvases would
+  // fight over one scene) — the main pane still gets the real panel.
+  assert.match(player, /sketchPanel=\{opts\.extra \? undefined : \(/);
 });
 
 test("the editor's chunk is lazy — a learner who never draws never downloads it", () => {

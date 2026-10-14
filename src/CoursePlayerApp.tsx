@@ -26,6 +26,8 @@ import ExperimentStage from "./course/ExperimentStage";
 import ExperimentPanel, { type PlayerExperiment } from "./course/ExperimentPanel";
 import { experimentHasSource } from "./utils/experimentSpec";
 import { SplitDeck, type SplitDeckHandle } from "./course/studyPanels";
+import type { SplitRegion } from "./course/splitMotion";
+import ExtraPaneTabs from "./course/ExtraPaneTabs";
 import SnowOverlay from "./course/SnowOverlay";
 // The mind map canvas is the single heaviest thing in the player: the panel
 // plus `@xyflow/react` is a 221 kB / 73 kB-gzip chunk. `StudyContent` only
@@ -2119,11 +2121,15 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    * Mind map / AI / Paid / Player) plus the footer dock, rendered in-flow
    * inside the Split Deck's study pane.
    */
-  const studyOverlay = (
+  const buildStudyPane = (
+    paneTab: DockTab,
+    onPaneTabChange: (tab: DockTab) => void,
+    opts: { extra?: boolean } = {},
+  ) => (
     <CourseOverlay
       orientation={useLandscapeRails ? "landscape" : "portrait"}
-      tab={dockTab}
-      onTabChange={handleDockTabChange}
+      tab={paneTab}
+      onTabChange={onPaneTabChange}
       modules={modules}
       courseTitle={product.title}
       personalModules={personalModules.modules}
@@ -2158,7 +2164,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       // The mind map editor is owned here (not inside the overlay) so its
       // Firestore hook and canvas state survive the pane being collapsed and
       // reopened — the learner never loses an unsaved branch to a tab switch.
-      mindMapPanel={(
+      mindMapPanel={opts.extra ? undefined : (
         <Suspense
           fallback={(
             <div className="grid min-h-0 flex-1 place-items-center p-6 text-center text-sm font-semibold text-white/60">
@@ -2205,7 +2211,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       // The sketch board, owned here for the same reason as the mind map:
       // the scene + its Firestore hook outlive the editor, which only mounts
       // while the Sketch tab is on screen.
-      sketchPanel={(
+      sketchPanel={opts.extra ? undefined : (
         <Suspense
           fallback={(
             <div className="grid min-h-0 flex-1 place-items-center p-6 text-center text-sm font-semibold text-white/60">
@@ -2248,7 +2254,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           />
         </Suspense>
       )}
-      playerPanel={playerPanel}
+      playerPanel={opts.extra ? undefined : playerPanel}
       // Structured resource library — replaces the flat module list when the
       // course has note/mind_map resources. Owned here, hosted by the overlay.
       resourceLibraryPanel={resourceLibraryPanel}
@@ -2257,7 +2263,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       // My Modules — the Modules tab swaps its official list for the
       // learner-owned manager panel (owned here, hosted by the overlay).
       personalModulesOpen={personalModulesOpen}
-      personalModulesPanel={(
+      personalModulesPanel={opts.extra ? undefined : (
         <PersonalModulesPanel
           personal={personalModules}
           productTitle={product.title}
@@ -2280,7 +2286,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       // ── Brain tab: the course's practice sets, rendered with the revision
       // test-taking design. Owned here because it reads the course tree and
       // reports completions into the learner's progress.
-      brainPanel={
+      brainPanel={opts.extra ? undefined : (
         <CourseBrainPanel
           productId={storageProductId}
           sets={brainSets}
@@ -2303,14 +2309,14 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           }}
           uid={user?.id ?? null}
         />
-      }
+      )}
       // ── Experiment tab: the course's own 2D experiments (MASTER) and the
       // learner's own (SELF). The parent owns the panel because it reads BOTH
       // the course tree and the Study Library shelf — and owns the “+” save,
       // so a created experiment is already on the shelf before the sheet
       // closes. Both open in this study pane; only an accessible MASTER
       // experiment can report official completion. The upper lesson stays put.
-      experimentPanel={studyExperiment ? (
+      experimentPanel={opts.extra ? undefined : studyExperiment ? (
         <div className="flex h-full min-h-0 flex-col bg-white text-slate-900" data-course-study-experiment>
           <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 px-3 py-2">
             <button type="button" onClick={() => setStudyExperiment(null)}
@@ -2357,7 +2363,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           uid={user?.id ?? null}
         />
       )}
-      aiPanel={
+      aiPanel={opts.extra ? undefined : (
         user?.id && aiOpened ? (
           <Suspense
             fallback={(
@@ -2386,9 +2392,56 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             />
           </Suspense>
         ) : undefined
-      }
+      )}
     />
   );
+
+  /**
+   * The deck's MAIN study pane: the player's own tab state, so the footer
+   * navigation, the ⌘/Ctrl+1…9 shortcuts and the keyboard takeover all still
+   * speak about one tab.
+   */
+  const studyOverlay = buildStudyPane(dockTab, handleDockTabChange);
+
+  /**
+   * The tabs an EXTRA pane (the third / fourth part the divider adds on a big
+   * stage) may show. Deliberately NOT the whole dock: two mind maps, two
+   * sketch boards, two AI chats, two live experiment stages or two video
+   * elements in one screenful would fight over a singleton session at the
+   * learner's expense. Everything listed here renders real content of its own.
+   */
+  const extraPaneTabs = useMemo(
+    () => (["modules", "notes", "read", "paid"] as DockTab[]).filter((tab) => !hiddenTabs.includes(tab)),
+    [hiddenTabs],
+  );
+
+  /**
+   * What an extra part looks like: its OWN tab chooser on top (the main study
+   * pane's tab is the footer navigation's job) and then the very same study
+   * pane the main one uses, with its own tab state — so the lesson, the
+   * modules and the notes can sit on screen together, and no part is ever an
+   * empty box.
+   */
+  const renderExtraPane = (region: SplitRegion, tab: string, setTab: (tab: string) => void) => {
+    const paneTab = (extraPaneTabs.includes(tab as DockTab) ? tab : extraPaneTabs[0] ?? "modules") as DockTab;
+    return (
+      <div className="flex h-full min-h-0 min-w-0 flex-col" data-course-extra-pane={region}>
+        <ExtraPaneTabs tab={paneTab} tabs={extraPaneTabs} paneId={region} onChange={(next) => setTab(next)} />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          {buildStudyPane(paneTab, (next) => setTab(next), { extra: true })}
+        </div>
+      </div>
+    );
+  };
+
+  /**
+   * The tab a fresh extra pane opens on: the first one the deck is not already
+   * showing, so splitting never puts the same tool on screen twice.
+   */
+  const extraPaneTab = (used: string[]) => {
+    const taken = new Set<string>([dockTab, ...used]);
+    return extraPaneTabs.find((tab) => !taken.has(tab)) ?? extraPaneTabs[0] ?? "modules";
+  };
 
   // The active tab drives the divider's colour, its glow and the study peek
   // rail's icon — the deck never keeps its own copy of the tab list.
@@ -2586,6 +2639,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           keyboardExpandEnabled={dockTab === "notes" || dockTab === "mindmap" || dockTab === "ai" || dockTab === "sketch"}
           solid={dockTab === "notes" || dockTab === "mindmap" || dockTab === "brain" || dockTab === "ai" || dockTab === "player" || dockTab === "sketch"}
           handleRef={splitDeckRef}
+          // The divider's split controls (tablet-sized + desktop stages only:
+          // the deck measures itself and hides them on a phone-sized stage).
+          renderExtraPane={renderExtraPane}
+          extraPaneTab={extraPaneTab}
         />
       </section>
       </div>
