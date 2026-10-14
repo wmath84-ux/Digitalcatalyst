@@ -114,6 +114,8 @@ export default function PerfectFreehandSketch({
   resourceName,
   debounceMs,
   readOnly = false,
+  localOnly = false,
+  theme = "light",
 }: {
   /** The signed-in learner — scopes the board and the remembered style. */
   uid?: string | null;
@@ -127,8 +129,12 @@ export default function PerfectFreehandSketch({
   debounceMs?: number;
   /** Course player view mode: keep the canvas visible, disable editing. */
   readOnly?: boolean;
+  /** Never read or write a cloud document in Work mode. */
+  localOnly?: boolean;
+  /** Work's scoped page theme; Course Player behavior stays light-only. */
+  theme?: "light" | "dark";
 }) {
-  const sketch = usePerfectFreehandSketch({ uid, productId, moduleId, resourceId, resourceName, debounceMs });
+  const sketch = usePerfectFreehandSketch({ uid, productId, moduleId, resourceId, resourceName, debounceMs, localOnly });
 
   const [strokes, setStrokes] = useState<QuickSketchStroke[]>([]);
   const [style, setStyle] = useState<QuickSketchStyle>(() => readStoredStyle(uid));
@@ -458,6 +464,19 @@ export default function PerfectFreehandSketch({
 
   const statusText = useMemo(() => {
     if (sketch.loading) return "Loading…";
+    if (localOnly) {
+      switch (sketch.status) {
+        case "saving":
+        case "pending":
+          return "Saving on this device…";
+        case "saved":
+          return "Saved on this device";
+        case "error":
+          return "Device save needs attention";
+        default:
+          return sketch.scoped ? "Device only · ready" : "Kept on this device";
+      }
+    }
     switch (sketch.status) {
       case "saving":
         return "Saving…";
@@ -470,12 +489,12 @@ export default function PerfectFreehandSketch({
       default:
         return sketch.scoped ? "Ready" : "Not saving";
     }
-  }, [sketch.loading, sketch.scoped, sketch.status]);
+  }, [localOnly, sketch.loading, sketch.scoped, sketch.status]);
 
   const statusState = sketch.status === "error" ? "error" : sketch.status;
 
   return (
-    <div ref={rootRef} className="dc-qsk" data-quick-sketch="" data-read-only={readOnly ? "true" : "false"} data-quick-sketch-tool={tool}>
+    <div ref={rootRef} className="dc-qsk" data-quick-sketch="" data-quick-sketch-theme={theme} data-read-only={readOnly ? "true" : "false"} data-quick-sketch-tool={tool}>
       {sketch.loading ? (
         <div className="dc-qsk-loading" data-quick-sketch-loading="">
           <span aria-label="Loading your sketch" />
@@ -556,7 +575,7 @@ export default function PerfectFreehandSketch({
           >
             {sketch.activeBoardTitle}
           </button>
-          <span className="dc-qsk-chip-status" data-quick-sketch-status={statusState} role="status" aria-live="polite">
+          <span className="dc-qsk-chip-status" data-state={statusState} data-quick-sketch-status={statusState} role="status" aria-live="polite">
             {statusText}
           </span>
           {sketch.status === "error" && sketch.scoped ? (
@@ -565,7 +584,7 @@ export default function PerfectFreehandSketch({
               className="dc-qsk-chip-button"
               data-quick-sketch-retry=""
               onClick={() => sketch.retry()}
-              title="Try saving again (your drawing is kept on this device)"
+              title={localOnly ? "Try saving again on this device" : "Try saving again (your drawing is kept on this device)"}
             >
               Retry
             </button>

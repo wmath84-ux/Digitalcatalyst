@@ -1,0 +1,169 @@
+/* src/work/work-theme.css
+ *
+ * WORK MODE's own light + dark palette.
+ *
+ * Owner brief (2026-10-14): "Han aur light aur dark theme rakhna donon."
+ *
+ * Why this file exists instead of using the app's theme:
+ *
+ *   · src/lib/theme.ts is LIGHT-ONLY by an explicit owner decision —
+ *     `resolveDocumentTheme()` returns "light" unconditionally and
+ *     `applyDocumentTheme()` forces `html[data-theme="light"]`. The Course
+ *     Player is pinned the same way (`loadCourseTheme()` in
+ *     src/course/playerPreferences.tsx). Flipping the document theme for Work
+ *     would repaint the whole app and break the contract tests that pin it.
+ *   · So Work carries a SCOPED theme: `[data-work-shell][data-work-theme]`.
+ *     Nothing outside the shell can see these tokens, and `html[data-theme]`
+ *     stays "light" while Work is open in dark — pinned by
+ *     tests/workModeThemeContract.test.mjs.
+ *
+ * The token NAMES are the design reference's own (the Obsidian-style workspace
+ * the owner uploaded as recreate-obsidian-notes-design.zip), so the toolbar,
+ * the top bar and the side drawer extracted from it drop in unmodified:
+ *
+ *   --workspace-bg --surface-bg --sidebar-bg --rail-bg --text-primary
+ *   --text-secondary --text-tertiary --border-color --accent-color
+ *   --accent-hover --accent-muted --accent-bg --input-bg --hover-bg --active-bg
+ *
+ * The VALUES are this app's: paper/ink from the light theme the learner already
+ * knows, and the accent from src/glass-theme.css's own indigo/violet pair
+ * (`--dc-accent-indigo 79 70 229`, `--dc-accent-violet 124 58 237`) — brief 2:
+ * "apna app ka design follow karo aur vahi color bhi use karna hai".
+ *
+ * Panels that already own a theme prop (NoteEditor, MindMapPanel, SketchPanel,
+ * LumenChat) receive Work's theme through that prop, so their internals paint a
+ * real dark palette instead of being CSS-inverted.
+ */
+
+/* ── Light (default) ─────────────────────────────────────────────────────── */
+
+[data-work-shell] {
+  /* surfaces */
+  --workspace-bg: #f7f9fb;              /* the app's own light page tint */
+  --surface-bg: #ffffff;
+  --sidebar-bg: #f8f8f8;
+  --rail-bg: #f2f2f2;
+  --input-bg: #ffffff;
+  --hover-bg: #f3f4f6;
+  --active-bg: #ede9fe;
+
+  /* ink */
+  --text-primary: #1a1a1a;
+  --text-secondary: #6b6b6b;
+  --text-tertiary: #9ca3af;
+  --border-color: #e5e5e5;
+
+  /* accent — the app's indigo, with the reference's own ramp shape */
+  --accent-color: rgb(var(--dc-accent-indigo, 79 70 229));
+  --accent-hover: rgb(var(--dc-accent-indigo-deep, 67 56 202));
+  --accent-muted: rgba(var(--dc-accent-violet, 124 58 237), 0.42);
+  --accent-bg: rgba(var(--dc-accent-indigo, 79 70 229), 0.10);
+
+  /* Work chrome */
+  --work-header-h: 48px;                /* the brief's "header ka area fix" */
+  --work-nav-h: 60px;                   /* the reference pill's own height */
+  --work-nav-cell: 52px;
+  --work-nav-active: rgb(var(--dc-accent-indigo, 79 70 229));
+  --work-nav-plate: var(--surface-bg);
+  --work-nav-shadow: 0 10px 15px rgba(0, 0, 0, 0.041);   /* verbatim reference */
+  --work-divider-grab: 26px;
+  --work-shadow-card: 0 18px 40px -28px rgba(15, 23, 42, 0.45);
+  --work-shadow-pop: 0 24px 60px -24px rgba(15, 23, 42, 0.35);
+
+  color-scheme: light;
+  background: var(--workspace-bg);
+  color: var(--text-primary);
+}
+
+/* ── Dark ────────────────────────────────────────────────────────────────── */
+
+[data-work-shell][data-work-theme="dark"] {
+  --workspace-bg: #0d0d0d;
+  --surface-bg: #121212;
+  --sidebar-bg: #1a1a1a;
+  --rail-bg: #141414;
+  --input-bg: #18181b;
+  --hover-bg: #27272a;
+  --active-bg: rgba(var(--dc-accent-violet, 124 58 237), 0.22);
+
+  --text-primary: #e6e6e6;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #71717a;
+  --border-color: #27272a;
+
+  --accent-color: rgb(var(--dc-accent-violet, 124 58 237));
+  --accent-hover: #a78bfa;
+  --accent-muted: rgba(167, 139, 250, 0.40);
+  --accent-bg: rgba(var(--dc-accent-violet, 124 58 237), 0.18);
+
+  --work-nav-active: #a78bfa;
+  --work-nav-plate: var(--surface-bg);
+  --work-nav-shadow: 0 10px 15px rgba(0, 0, 0, 0.55);
+  --work-shadow-card: 0 18px 40px -28px rgba(0, 0, 0, 0.85);
+  --work-shadow-pop: 0 24px 60px -24px rgba(0, 0, 0, 0.75);
+
+  color-scheme: dark;
+}
+
+/* The divider's core line keeps the app's ONE divider colour (splitMotion.ts:
+ * `DIVIDER_LINE #FFBE0B`) — in Work it is still "the divider", never a tab
+ * colour, so the two environments read identically. */
+[data-work-shell] [data-course-split-line] {
+  background: #ffbe0b;
+}
+
+/* Reduced motion: the reference's lift and the deck's springs both stand down.
+ * (The deck's own reduced-motion rules live in src/index.css; these are Work's
+ * additions — the pill's lift and the page transition.) */
+@media (prefers-reduced-motion: reduce) {
+  [data-work-footer-nav] button,
+  [data-work-shell] [data-work-page-enter] {
+    transition: none !important;
+    animation: none !important;
+  }
+  [data-work-footer-nav] button:hover,
+  [data-work-footer-nav] button[aria-current="page"] {
+    transform: none !important;
+  }
+}
+
+/* Selection + scrollbar, the reference's own treatment, scoped so the rest of
+ * the app keeps its rules. */
+[data-work-shell] ::selection {
+  background: var(--accent-muted);
+  color: var(--text-primary);
+}
+
+[data-work-shell] * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-tertiary) transparent;
+}
+
+[data-work-shell] ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+[data-work-shell] ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+[data-work-shell] ::-webkit-scrollbar-thumb {
+  background: var(--text-tertiary);
+  border: 2px solid transparent;
+  border-radius: 5px;
+  background-clip: padding-box;
+}
+
+[data-work-shell] ::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+  background-clip: padding-box;
+}
+
+/* The Android status/navigation bar sampler (src/utils/systemBarColor.ts) reads
+ * the page's own background; Work publishes its theme on the shell so a dark
+ * Work session gets light system-bar icons without touching the global theme. */
+[data-work-shell][data-work-theme="dark"] {
+  --dc-scene-ink: #e6e6e6;
+  --dc-scene-plate: #0d0d0d;
+}

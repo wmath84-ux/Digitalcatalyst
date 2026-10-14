@@ -421,7 +421,7 @@ test("the mind map has a genuine light palette and exposes no dead theme switch"
   // worse than no switch.
   assert.match(panel, /export type MindMapTheme = "dark" \| "light";/);
   assert.match(panel, /useCourseTheme\("mindMap", uid \?\? null(?:, "light")?\)/);
-  assert.match(panel, /const mindTheme: MindMapTheme = mindThemeCtl\.theme;/);
+  assert.match(panel, /const mindTheme: MindMapTheme = themeOverride \?\? mindThemeCtl\.theme;/);
   assert.match(panel, /data-mindmap-theme=\{mindTheme\}/);
   assert.match(panel, /course-mindmap-shell/);
   // Light-only: no dark/light control on the bar, and no dark action wired to
@@ -613,7 +613,7 @@ test("the warning text lives in the save drop-down, not in a persistent bar", ()
   // Owner (2026-09-29): the long warning line at the bottom is gone — tapping
   // the blinking beacon opens the message itself.
   assert.doesNotMatch(panel, /data-course-mindmap-error/);
-  assert.match(toolbar, /<ToolbarMenu[\s\S]*?label="Cloud save"[\s\S]*?data-course-mindmap-save-message/);
+  assert.match(toolbar, /<ToolbarMenu[\s\S]*?label=\{storageOnly \? "Device-only save" : "Cloud save"\}[\s\S]*?data-course-mindmap-save-message/);
   assert.match(toolbar, /\{errorMessage \? \(\s*<p className="mm-menu-note" data-course-mindmap-save-message>/);
 });
 
@@ -652,9 +652,9 @@ test("cloud save is an icon with a blinking beacon, and the words moved to its m
   assert.match(toolbar, /data-course-mindmap-save/);
   assert.match(toolbar, /data-save-status=\{status\}/);
   assert.match(toolbar, /data-blink=\{saveBlink \? "true" : "false"\}/);
-  assert.match(toolbar, /status === "saving" \? <CloudUpload \/> : status === "saved" \? <CloudCheck \/> : status === "error" \? <CloudAlert \/> : <Cloud \/>/);
+  assert.match(toolbar, /storageOnly[\s\S]*?status === "saving" \? <CloudUpload \/> : status === "saved" \? <CloudCheck \/> : status === "error" \? <CloudAlert \/> : <Cloud \/>/);
   assert.match(toolbar, /\{saveBlink \? <span className="mm-blink" data-course-mindmap-save-blink aria-hidden="true" \/> : null\}/);
-  assert.match(toolbar, /<ToolbarMenu[\s\S]*?label="Cloud save"[\s\S]*?data-course-mindmap-save-label/);
+  assert.match(toolbar, /<ToolbarMenu[\s\S]*?label=\{storageOnly \? "Device-only save" : "Cloud save"\}[\s\S]*?data-course-mindmap-save-label/);
   assert.match(toolbar, /data-course-mindmap-save-now/);
   // The beacon blinks (and only while a message is live): a finished save
   // blinks for a beat, an in-flight or failed one keeps blinking.

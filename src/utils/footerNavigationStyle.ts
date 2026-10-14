@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-export type FooterNavigationStyle = "youtube" | "uiverse" | "glass-dock";
+export type FooterNavigationStyle = "youtube" | "uiverse" | "glass-dock" | "work-pill";
 
 const STORAGE_KEY = "dc-footer-navigation-style";
 const CHANGE_EVENT = "dc:footer-navigation-style-change";
@@ -40,7 +40,7 @@ export function ensureDefaultFooterNavigationStyle(): void {
 }
 
 function normalizeStyle(value: string | null | undefined): FooterNavigationStyle {
-  if (value === "youtube" || value === "uiverse" || value === "glass-dock") return value;
+  if (value === "youtube" || value === "uiverse" || value === "glass-dock" || value === "work-pill") return value;
   return DEFAULT_STYLE;
 }
 

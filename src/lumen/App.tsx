@@ -45,6 +45,10 @@ export interface LumenChatProps {
    * actually fixes it instead of a dead end.
    */
   onOpenSubscription?: () => void;
+  /** Keep chat history on-device; AI prompts are still sent for inference. */
+  storageOnly?: boolean;
+  /** Scoped Work theme; the Course Player's light-only policy is unchanged. */
+  themeOverride?: "light" | "dark";
 }
 
 const EMPTY_NOTES: CoursePlayerNote[] = [];
@@ -102,18 +106,17 @@ function LumenChatInner({
   notes = EMPTY_NOTES,
   profile,
   onOpenSubscription,
+  storageOnly = false,
+  themeOverride,
 }: LumenChatProps) {
   const revisionAi = useRevisionAi(learnerUid);
   const shortLabel = courseShort || courseTitle;
 
-  // AI follows the shared light-only appearance policy.
+  // AI follows the shared light-only appearance policy by default; Work may supply a scoped theme.
   const lumenThemeCtl = useCourseTheme("ai", learnerUid, "light");
-  // Cloud-backed chat history. Before this hook the whole conversation list
-  // lived in React state and vanished the moment the player unmounted — the
-  // reported "course player ke andar jo AI chats hote hain vah save nahin ho
-  // rahe". `useLumenChats` keeps Firestore as the source of truth
-  // (users/{uid}/aiChats), mirrors every change to localStorage, and merges
-  // the live cloud copy so the same chats open on every device.
+  const theme = themeOverride ?? lumenThemeCtl.theme;
+  // Course Player uses cloud-backed history; Work opts into storageOnly so its
+  // conversation list is device-local and never subscribes to Firestore.
   const {
     chats,
     activeId,
@@ -128,6 +131,7 @@ function LumenChatInner({
     productId,
     courseTitle,
     courseShort: shortLabel,
+    storageOnly,
   });
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -681,7 +685,7 @@ function LumenChatInner({
   /* ── layout ────────────────────────────────────────────── */
 
   return (
-    <div ref={rootRef} className={lumenThemeCtl.theme === "dark" ? "lumen-root lumen-dark" : "lumen-root"} data-lumen-theme={lumenThemeCtl.theme}>
+    <div ref={rootRef} className={theme === "dark" ? "lumen-root lumen-dark" : "lumen-root"} data-lumen-theme={theme}>
       <div ref={frameRef} className="relative flex h-full min-h-0 min-w-0 w-full bg-[--bg]">
         {dockSidebar && (
           <div className="h-full flex-none">
@@ -714,7 +718,8 @@ function LumenChatInner({
             syncState={chatSyncStatus}
             syncError={chatSyncError}
             onRetrySync={() => { flushChats(); reloadChats(); }}
-            theme={lumenThemeCtl.theme}
+            storageOnly={storageOnly}
+            theme={theme}
           />
 
           {/* A failed cloud save must never be a silent state: say what

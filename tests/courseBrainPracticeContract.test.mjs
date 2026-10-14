@@ -77,6 +77,7 @@ const visibility = read("src/course/fileVisibility.ts");
 const library = read("src/course/CourseResourceLibrary.tsx");
 const playerApp = read("src/CoursePlayerApp.tsx");
 const brainPanel = read("src/course/CourseBrainPanel.tsx");
+const brainScoreStorage = read("src/course/brainScoreStorage.ts");
 const brainDeck = read("src/course/BrainQuestionDeck.tsx");
 const brainCards = read("src/course/BrainCards.tsx");
 const revisionPlayer = read("src/revision/pages/TestPlayerPage.tsx");
@@ -585,8 +586,11 @@ test("passing a set marks its resource complete exactly once and stays inside th
   assert.match(playerApp, /Math\.min\(100, Math\.round\(\(completedIds\.size \/ totalEligibleFiles\.length\) \* 100\)\)/);
 });
 
-test("practice history is per device and never touches the revision bank", () => {
-  assert.match(brainPanel, /const scoreKey = \(productId: string\) => `dc:courseBrain:\$\{productId\}`;/);
+test("practice history stays per-device and Work uses its own score namespace", () => {
+  assert.match(brainScoreStorage, /const COURSE_SCORE_PREFIX = "dc:courseBrain:"/);
+  assert.match(brainScoreStorage, /const WORK_SCORE_PREFIX = "work:device:revision-brain-scores:v1:"/);
+  assert.match(brainScoreStorage, /workMode \? WORK_SCORE_PREFIX : COURSE_SCORE_PREFIX/);
+  assert.match(brainPanel, /saveBrainScores\(productId, next, workMode\)/);
   assert.match(brainPanel, /best: Math\.max\(score, scores\[activeSet\.id\]\?\.best \?\? 0\)/);
   assert.doesNotMatch(brainPanel, /from "\.\.\/revision\/engine\//, "practice sets never write to the revision Test Bank");
 });

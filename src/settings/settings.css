@@ -898,7 +898,7 @@ html[data-theme="light"] [data-settings-page]:not([data-public-profile]) :is(a, 
   outline-color: #004ac6;
 }
 
-/* The footer-style preference is a small preview switch, kept inside the same
+/* Footer-style + app-opening preferences: compact option cards in the same
    readable Settings palette in both themes. */
 .settings-navigation-options {
   display: grid;
@@ -1155,4 +1155,42 @@ html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settin
   .settings-navigation-options {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* Work's global footer-style preview + device-only launch choice. */
+.settings-navigation-preview--work {
+  min-height: 40px;
+  border-color: rgba(167, 139, 250, 0.42);
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.42), rgba(124, 58, 237, 0.34));
+}
+
+.settings-navigation-preview--work i {
+  width: 9px;
+  height: 9px;
+  flex-basis: 9px;
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.settings-navigation-preview--work i:first-child {
+  background: #c4b5fd;
+  box-shadow: 0 0 0 3px rgba(196, 181, 253, 0.16);
+}
+
+.settings-work-launch-preview {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  border-radius: 14px;
+  background: rgba(124, 58, 237, 0.12);
+  color: #a99cff;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-work-launch-preview {
+  border-color: #d6e1f4;
+  background: #edf4ff;
+  color: #4f46e5;
 }

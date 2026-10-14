@@ -3,7 +3,9 @@ import {
   ArrowLeft,
   ArrowUpRight,
   Bell,
+  BriefcaseBusiness,
   Check,
+  Home,
   ChevronRight,
   Loader2,
   PanelsTopLeft,
@@ -22,6 +24,7 @@ import { getNativePushPermission, isAndroidNative, registerForPush } from "../ut
 import { type PreferenceKey } from "../../utils/userPreferences";
 import { useUserPreferences } from "./useUserPreferences";
 import { setFooterNavigationStyle, useFooterNavigationStyle } from "../utils/footerNavigationStyle";
+import { setWorkLaunchChoice, useWorkLaunchChoice, type WorkLaunchChoice } from "../work/storage/workPrefs";
 import "./settings.css";
 
 const LABELS: Record<PreferenceKey, string> = {
@@ -53,6 +56,44 @@ export function SettingSwitch({ setting, checked, disabled, saving, description,
         <span className="settings-switch-state" data-switch-state={saving ? "saving" : checked ? "on" : "off"} aria-hidden="true">{saving ? "Saving" : checked ? "On" : "Off"}</span>
       </div>
     </div>
+  );
+}
+
+function WorkLaunchPreference() {
+  const selected = useWorkLaunchChoice();
+  const options: Array<{ value: WorkLaunchChoice; label: string; description: string; Icon: typeof Home }> = [
+    { value: "ask", label: "Ask every time", description: "Choose Home or Work when the app opens.", Icon: PanelsTopLeft },
+    { value: "home", label: "Always open Home", description: "Skip the choice card and go to Home.", Icon: Home },
+    { value: "work", label: "Always open Work", description: "Skip the choice card and open Work mode.", Icon: BriefcaseBusiness },
+  ];
+  return (
+    <section className="settings-section" aria-labelledby="settings-work-opening" data-work-launch-preference>
+      <div className="settings-section-heading">
+        <span className="settings-section-icon" aria-hidden="true"><BriefcaseBusiness size={19} /></span>
+        <div className="settings-section-heading-copy">
+          <div className="settings-section-title-row"><h2 id="settings-work-opening">App opening</h2><span className="settings-section-count">On this device</span></div>
+          <p>Choose what appears when you open the app. This setting is saved locally on this device.</p>
+        </div>
+      </div>
+      <div className="settings-navigation-options" role="radiogroup" aria-label="App opening preference">
+        {options.map(({ value, label, description, Icon }) => (
+          <button
+            key={value}
+            type="button"
+            className="settings-navigation-choice"
+            role="radio"
+            aria-checked={selected === value}
+            data-selected={selected === value ? "true" : undefined}
+            data-work-launch-choice={value}
+            onClick={() => setWorkLaunchChoice(value)}
+          >
+            <span className="settings-work-launch-preview" aria-hidden="true"><Icon size={20} /></span>
+            <span className="settings-navigation-choice-copy"><strong>{label}</strong><small>{description}</small></span>
+            {selected === value ? <Check className="settings-navigation-choice-check" size={17} aria-hidden="true" /> : null}
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -141,7 +182,7 @@ export default function SettingsPage() {
   };
 
   const navigateFooter = (tab: TabKey) => {
-    const routes: Record<TabKey, string> = { home: "#/home", myday: "#/my-day", store: "#/store", purchases: "#/store/purchases", profile: "#/profile", revision: "#/revision", flowpath: "#/flowpath", "study-library": "#/study-library" };
+    const routes: Record<TabKey, string> = { home: "#/home", myday: "#/my-day", store: "#/store", purchases: "#/store/purchases", profile: "#/profile", revision: "#/revision", flowpath: "#/flowpath", "study-library": "#/study-library", work: "#/work" };
     window.location.hash = routes[tab];
   };
 
@@ -152,6 +193,7 @@ export default function SettingsPage() {
           <p className="settings-eyebrow">Your account</p>
           <h1>Settings</h1><p>Sign in to manage notifications and privacy.</p>
           <button className="settings-primary" onClick={() => { window.location.hash = "#/auth?mode=login&return=%23%2Fsettings"; }}>Sign in <ChevronRight size={16} /></button>
+          <WorkLaunchPreference />
         </main>
       </div>
     </div>
@@ -238,8 +280,8 @@ export default function SettingsPage() {
               <div className="settings-section-heading">
                 <span className="settings-section-icon" aria-hidden="true"><PanelsTopLeft size={19} /></span>
                 <div className="settings-section-heading-copy">
-                  <div className="settings-section-title-row"><h2 id="settings-navigation">Footer navigation</h2><span className="settings-section-count">3 styles</span></div>
-                  <p>Choose the full-width, edge-attached bar or either existing glass dock. Desktop keeps its existing navigation rail.</p>
+                  <div className="settings-section-title-row"><h2 id="settings-navigation">Footer navigation</h2><span className="settings-section-count">4 styles</span></div>
+                  <p>Choose one of the app's mobile navigation designs. Desktop keeps its existing navigation rail.</p>
                 </div>
               </div>
               <div className="settings-navigation-options" role="radiogroup" aria-label="Footer navigation style">
@@ -285,8 +327,24 @@ export default function SettingsPage() {
                   <span className="settings-navigation-choice-copy"><strong>Classic glass dock</strong><small>Seven-item dock with magnification and peek mode</small></span>
                   {footerNavigationStyle === "glass-dock" ? <Check className="settings-navigation-choice-check" size={17} aria-hidden="true" /> : null}
                 </button>
+                <button
+                  type="button"
+                  className="settings-navigation-choice"
+                  role="radio"
+                  aria-checked={footerNavigationStyle === "work-pill"}
+                  data-selected={footerNavigationStyle === "work-pill" ? "true" : undefined}
+                  onClick={() => setFooterNavigationStyle("work-pill")}
+                  data-footer-style="work-pill"
+                >
+                  <span className="settings-navigation-preview settings-navigation-preview--work" aria-hidden="true">
+                    <span><i /><i /><i /><i /><i /><i /></span>
+                  </span>
+                  <span className="settings-navigation-choice-copy"><strong>Work pill</strong><small>Six learning tools · compact rounded pill</small></span>
+                  {footerNavigationStyle === "work-pill" ? <Check className="settings-navigation-choice-check" size={17} aria-hidden="true" /> : null}
+                </button>
               </div>
             </section>
+            <WorkLaunchPreference />
             <p className="settings-footnote">Changes save automatically. You can turn any setting back on. Browser or phone permission can only be changed on that device.</p>
           </div>
         </main>

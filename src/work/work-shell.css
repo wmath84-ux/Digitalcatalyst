@@ -1,0 +1,142 @@
+/* src/work/work-shell.css
+ *
+ * The Work environment reuses Course Player's `SplitDeck`, whose divider,
+ * flex-order swap, spring/snap physics, nested extras, persisted ratios and
+ * accessibility are all real production code. The original chrome rules are
+ * intentionally scoped to `.course-player-shell` in `src/index.css`; re-scope
+ * the *same* design to `[data-work-shell]` here so Home/Store/course pages do
+ * not inherit Work's parked-divider or surface rules.
+ *
+ * Owner brief (2026-10-14):
+ *
+ *   "default last opened page dikhega … ful screen mein footer navigation ke
+ *    sath … divider bye default hamesha top per hoga … direct swipe karke
+ *    divider ko kahin bhi adjust kar sakta hai … mobile users ke liye simple
+ *    keval swap ka button … desktop badi screen per 1, 2, 3, 4 screen splits."
+ */
+
+/* Keep the fullscreen shell's header and canvas inside device cutouts. The
+   footer owns the bottom inset separately, so it can keep its measured height. */
+.work-shell {
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px);
+}
+
+/* The same 2px yellow core line / keyboard ring as the Course Player. */
+.work-shell [data-course-split-divider]:focus-visible {
+  outline: 2px solid #ffbe0b;
+  outline-offset: -2px;
+  border-radius: 999px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .work-shell [data-course-split-divider]:hover [data-course-split-line] {
+    filter: brightness(1.28);
+  }
+}
+
+/* The compressed pane leans on the divider-side edge — verbatim from the
+   Course Player's Split Deck. */
+.work-shell [data-course-split-deck][data-split-axis="column"] {
+  --course-split-compress-end: inset 0 -22px 26px -22px rgba(15, 23, 42, 0.30);
+  --course-split-compress-start: inset 0 22px 26px -22px rgba(15, 23, 42, 0.30);
+}
+.work-shell [data-course-split-deck][data-split-axis="row"] {
+  --course-split-compress-end: inset -22px 0 26px -22px rgba(15, 23, 42, 0.30);
+  --course-split-compress-start: inset 22px 0 26px -22px rgba(15, 23, 42, 0.30);
+}
+.work-shell [data-course-lesson-pane],
+.work-shell [data-course-study-pane] {
+  transition: box-shadow 180ms ease;
+}
+.work-shell [data-course-split-deck][data-split-compressed="lesson"] [data-course-lesson-pane] {
+  box-shadow: var(--course-split-compress-end);
+}
+.work-shell [data-course-split-deck][data-split-compressed="study"] [data-course-study-pane] {
+  box-shadow: var(--course-split-compress-start);
+}
+.work-shell [data-course-split-deck][data-split-swapped="true"][data-split-compressed="lesson"] [data-course-lesson-pane] {
+  box-shadow: var(--course-split-compress-start);
+}
+.work-shell [data-course-split-deck][data-split-swapped="true"][data-split-compressed="study"] [data-course-study-pane] {
+  box-shadow: var(--course-split-compress-end);
+}
+
+/* Work's divider is parked on an EDGE. The original player grabs 10px on both
+   sides of a centred divider; a parked line is at the viewport edge, so extend
+   the hit strip only INWARDS (26px into the full-screen Work page). `grabInset`
+   remains configurable on SplitDeck and is stamped on the divider for QA. */
+.work-shell [data-course-split-divider]::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  pointer-events: auto;
+}
+.work-shell [data-course-split-divider][data-axis="column"]::after {
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: calc(-1 * var(--course-divider-grab-inset, var(--work-divider-grab, 26px)));
+}
+.work-shell [data-course-split-divider][data-axis="row"]::after {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: calc(-1 * var(--course-divider-grab-inset, var(--work-divider-grab, 26px)));
+}
+
+/* Only Work's visible editor surface gets the Obsidian paper. GlassSurface's
+   three decorative children are disabled in this shell: the page is an
+   opaque editor canvas and the light/dark token stays in charge. */
+.work-shell [data-course-study-pane][data-solid-panel="true"] {
+  background: var(--surface-bg);
+}
+.work-shell [data-course-study-pane][data-solid-panel="true"] [data-glass-surface] {
+  background: var(--surface-bg);
+}
+.work-shell [data-course-study-pane][data-solid-panel="true"] [data-glass-surface] > [aria-hidden] {
+  display: none !important;
+}
+
+.work-shell [data-course-split-swap] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.work-shell [data-course-peek-rail] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .work-shell [data-course-peek-rail] [data-peek-icon],
+  .work-shell [data-course-split-deck] [data-course-lesson-pane],
+  .work-shell [data-course-split-deck] [data-course-study-pane] {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* The Course Player's single keyboard state is published on this shell by
+   CourseKeyboardProvider. The Work pill steps aside while a text field is
+   active, exactly like CoursePeekDock, so the soft keyboard owns the bottom. */
+.work-shell[data-course-keyboard="open"] [data-work-footer-nav] {
+  display: none;
+}
+
+/* Footer clearance is reserved with `--dc-footer-nav-h` by the global
+   footerNavSpace observer, because WorkFooterNav carries `[data-site-footer-nav]`.
+   This host is a flex column, so the Work deck uses the remaining height and
+   the pill stays in flow at the bottom (it never covers a writing surface). */
+.work-shell [data-work-deck-host] {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+/* Phone split: only the little swap control appears on the divider. SplitDeck
+   already hides the add-pane actions below its measured 900px stage rule; keep
+   any imported page-level extra controls out of the narrow Work shell too. */
+@media (max-width: 899px) {
+  .work-shell [data-course-split-divider] [data-course-split-action] {
+    display: none !important;
+  }
+}

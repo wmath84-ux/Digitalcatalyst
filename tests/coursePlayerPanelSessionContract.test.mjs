@@ -46,7 +46,7 @@ test("the panel session stores the notes view and the mind map view", () => {
 
 test("NotesPanel restores its editor from the session and syncs it on every render", () => {
   // The mount state comes from the session (view + draft survive tab switches).
-  assert.match(notesPanel, /const sessionNotes = getCoursePanelSession\(\)\.notes/);
+  assert.match(notesPanel, /const sessionNotes = storageOnly \? \{ view: "list" as const \} : getCoursePanelSession\(\)\.notes/);
   assert.match(notesPanel, /useState\(sessionNotes\.view === "compose"\)/);
   assert.match(notesPanel, /sessionNotes\.view === "compose" \? sessionNotes\.draft : ""/);
   assert.match(notesPanel, /restoreEdit/);
@@ -73,11 +73,11 @@ test("tab switches never flush a notes draft — the editor keeps its place", ()
 
 test("the mind map restores library vs canvas from the session", () => {
   // Mount state comes from the session; the live view is written back.
-  assert.match(mindMapPanel, /getCoursePanelSession\(\)\.mindMapView !== "canvas"/);
+  assert.match(mindMapPanel, /storageOnly \|\| getCoursePanelSession\(\)\.mindMapView !== "canvas"/);
   assert.match(mindMapPanel, /setMindMapSessionView\(libraryOpen \? "library" : "canvas"\)/);
   // Reopening the sheet (same-tab toggle) restores the learner's last view
   // instead of force-resetting to the library.
-  assert.match(mindMapPanel, /const resumeCanvas = getCoursePanelSession\(\)\.mindMapView === "canvas";/);
+  assert.match(mindMapPanel, /const resumeCanvas = !storageOnly && getCoursePanelSession\(\)\.mindMapView === "canvas";/);
   assert.match(mindMapPanel, /setLibraryOpen\(!resumeCanvas\);/);
 });
 
@@ -89,7 +89,7 @@ test("the mind map theme pick is the shared persisted control, not a per-visit o
   assert.doesNotMatch(mindMapPanel, /setMindMapSessionTheme/);
   assert.doesNotMatch(mindMapPanel, /dc\.mindMapThemeOverride/);
   assert.match(mindMapPanel, /useCourseTheme\("mindMap", uid \?\? null(?:, "light")?\)/);
-  assert.match(mindMapPanel, /const mindTheme: MindMapTheme = mindThemeCtl\.theme;/);
+  assert.match(mindMapPanel, /const mindTheme: MindMapTheme = themeOverride \?\? mindThemeCtl\.theme;/);
 });
 
 test("leaving the player resets the session and preserves an open notes draft", () => {

@@ -39,7 +39,7 @@ import { captureDevicePushGate, canShowDevicePush } from "../../utils/deviceNoti
 //                              "this device is registered for
 //                              guaranteed delivery" line.
 
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, type PluginListenerHandle } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { apiFetch } from "./apiBase";
 import { LocalNotifications } from "@capacitor/local-notifications";
@@ -456,14 +456,15 @@ export async function cancelLocalAlarms(ids: number[]): Promise<void> {
 
 /** Listen for the user tapping a local notification. Wire this once
  *  in main.tsx so the app navigates to the deep link. */
-export async function onLocalAlarmTap(handler: (url: string) => void): Promise<void> {
-  if (!isAndroidNative()) return;
+export async function onLocalAlarmTap(handler: (url: string) => void): Promise<PluginListenerHandle | null> {
+  if (!isAndroidNative()) return null;
   try {
-    await LocalNotifications.addListener("localNotificationActionPerformed", (action) => {
+    return await LocalNotifications.addListener("localNotificationActionPerformed", (action) => {
       const url = (action.notification.extra?.url as string) || "/";
       handler(url);
     });
   } catch (err) {
     console.warn("[push] onLocalAlarmTap failed", err);
+    return null;
   }
 }

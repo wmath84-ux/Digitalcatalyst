@@ -76,6 +76,12 @@ export const DIVIDER_LINE = "#FFBE0B";
  * other into its peek rail (the old overlay's CLOSE_THRESHOLD idea).
  */
 export const FILL_THRESHOLD = 8;
+/**
+ * Work mode's parked edge: a divider released within 6% of either end settles
+ * all the way into that edge, without a 28px peek rail. The course player's
+ * existing FILL_THRESHOLD remains unchanged.
+ */
+export const PARK_THRESHOLD = 6;
 /** Divider strip in px — a slim 10px band carrying only the 2px yellow core
  *  line. The visible chrome is the line alone; an invisible `::after` (see
  *  src/index.css) extends the grab area so fingers still catch it without
@@ -225,12 +231,22 @@ const clampPercent = (value: number) => (Number.isFinite(value) ? Math.min(100, 
  * default instead of collapsing the deck — the same defensive read the old
  * per-tab split used.
  */
-export const loadSplitRatio = (courseId: string, axis: SplitAxis, floor: number): number => {
-  const fallback = Math.max(floor, Math.min(SPLIT_MAX, DEFAULT_SPLIT_RATIO[axis]));
+export const loadSplitRatio = (
+  courseId: string,
+  axis: SplitAxis,
+  floor: number,
+  /** Work mode opts into true edge-to-edge split ratios; all current callers
+   *  keep the Course Player's 15–85 band. */
+  maximum: number = SPLIT_MAX,
+  /** A full-range deck can park at either edge (Work's initial value is 100). */
+  fallbackRatio: number = DEFAULT_SPLIT_RATIO[axis],
+): number => {
+  const safeMaximum = Math.min(100, Math.max(floor, maximum));
+  const fallback = Math.min(safeMaximum, Math.max(floor, fallbackRatio));
   try {
     const raw = Number.parseFloat(localStorage.getItem(splitRatioKey(courseId, axis)) || "");
     if (!Number.isFinite(raw)) return fallback;
-    return Math.min(SPLIT_MAX, Math.max(floor, Math.round(raw)));
+    return Math.min(safeMaximum, Math.max(floor, Math.round(raw)));
   } catch {
     return fallback;
   }
@@ -289,8 +305,11 @@ export const saveSplitSwapped = (courseId: string, swapped: boolean): void => {
  * band. Collapse animations deliberately go outside it (0 / 100) — they call
  * `clampPercent` instead, never this.
  */
-export const clampSplitRatio = (value: number, floor: number = SPLIT_MIN): number =>
-  Math.min(SPLIT_MAX, Math.max(floor, value));
+export const clampSplitRatio = (
+  value: number,
+  floor: number = SPLIT_MIN,
+  maximum: number = SPLIT_MAX,
+): number => Math.min(maximum, Math.max(floor, value));
 
 /**
  * Phone portrait gives the study pane a 30% floor so notes stay writable on a

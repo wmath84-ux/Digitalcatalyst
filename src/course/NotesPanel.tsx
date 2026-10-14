@@ -99,6 +99,10 @@ interface NotesPanelProps {
   openMasterNoteSignal?: { id: string; count: number } | null;
   /** The signed-in learner — scopes the remembered MASTER/SELF preference. */
   uid?: string | null;
+  /** Hide course collections and keep this feature entirely on the device. */
+  storageOnly?: boolean;
+  /** Use a parent surface's theme without changing Course Player preferences. */
+  themeOverride?: CoursePlayerTheme;
 }
 
 // Older notes were stored as plain text. Render them through the same
@@ -164,12 +168,14 @@ function NoteStatus({
   tooLong,
   sync,
   dark = false,
+  storageOnly = false,
 }: {
   editing: boolean;
   dirty: boolean;
   tooLong: boolean;
   sync: NotesPanelProps["syncState"];
   dark?: boolean;
+  storageOnly?: boolean;
 }) {
   let label = "New note";
   let tone = "muted";
@@ -181,7 +187,11 @@ function NoteStatus({
     tone = "warn";
   } else if (editing) {
     tone = "ok";
-    if (sync?.status === "error") { label = "Save needs attention"; tone = "warn"; }
+    if (storageOnly) {
+      if (sync?.status === "error") { label = "Device save needs attention"; tone = "warn"; }
+      else if (sync?.status === "pending" || sync?.status === "saving") { label = "Saving on this device…"; tone = "muted"; }
+      else label = "Saved on this device";
+    } else if (sync?.status === "error") { label = "Save needs attention"; tone = "warn"; }
     else if (sync?.status === "pending") { label = "Saved on device · backup pending"; tone = "muted"; }
     else if (sync && (sync.status === "saving" || !sync.synced)) { label = "Saving…"; tone = "muted"; }
     else if (sync) label = "Synced";
@@ -261,29 +271,33 @@ export default function NotesPanel({
   syncState,
   openMasterNoteSignal,
   uid = null,
+  storageOnly = false,
+  themeOverride,
 }: NotesPanelProps) {
   // Restore the panel's place from the course-player panel SESSION on mount.
   // The session survives this panel unmounting on every tab switch, so a
   // learner who left the editor open (compose or edit) comes straight back
   // into that same editor with the same draft. An edit view whose note no
   // longer exists degrades to the list instead of resurrecting a ghost.
-  const sessionNotes = getCoursePanelSession().notes;
+  const sessionNotes = storageOnly ? { view: "list" as const } : getCoursePanelSession().notes;
   const restoreEdit =
     sessionNotes.view === "edit" && notes.some((note) => note.id === sessionNotes.noteId);
   // §16 — the MASTER/SELF choice is a remembered, per-user preference (shared
   // layer), not ephemeral state: it survives closing and reopening the player.
   const masterSelfPref = useMasterSelfPreference("notes", uid, "master");
   const [activeCollection, setActiveCollection] = useState<"master" | "self">(() =>
-    sessionNotes.view === "compose" || restoreEdit ? "self" : masterSelfPref.mode,
+    storageOnly || sessionNotes.view === "compose" || restoreEdit ? "self" : masterSelfPref.mode,
   );
   const selectCollection = (mode: "master" | "self") => {
-    setActiveCollection(mode);
-    masterSelfPref.setMode(mode);
+    const next = storageOnly ? "self" : mode;
+    setActiveCollection(next);
+    if (!storageOnly) masterSelfPref.setMode(next);
   };
-  // Note-editor Light/Dark toggle (Part 2 small update): the SAME shared theme
-  // layer the rest of the player uses (persisted per user, no inversion). The
-  // paper defaults to light; the header's compact sun/moon flips it to dark.
+  useEffect(() => { if (storageOnly) setActiveCollection("self"); }, [storageOnly]);
+  // Notes use the shared player preference by default; Work may explicitly
+  // supply its shell theme so the feature stays visually scoped to that app.
   const noteThemeCtl = useCourseTheme("notes", uid, "light");
+  const noteTheme = themeOverride ?? noteThemeCtl.theme;
   const [viewingMasterNoteId, setViewingMasterNoteId] = useState<string | null>(null);
   const viewingMasterNote = viewingMasterNoteId
     ? masterNotes.find((note) => note.id === viewingMasterNoteId) || null
@@ -349,6 +363,7 @@ export default function NotesPanel({
   // immediately available to the next mount (tab switch) and to the player's
   // exit flush — even if this component unmounts before an effect fires.
   useEffect(() => {
+    if (storageOnly) return;
     if (composing) {
       setNotesSessionView({ view: "compose", draft, title: draftTitle });
     } else if (editingId) {
@@ -369,14 +384,14 @@ export default function NotesPanel({
       if (editingId) {
         setEditDraft(next.bodyHtml);
         setEditTitle(next.title);
-        setNotesSessionView({ view: "edit", noteId: editingId, draft: next.bodyHtml, title: next.title });
+        if (!storageOnly) setNotesSessionView({ view: "edit", noteId: editingId, draft: next.bodyHtml, title: next.title });
       } else {
         setDraft(next.bodyHtml);
         setDraftTitle(next.title);
-        setNotesSessionView({ view: "compose", draft: next.bodyHtml, title: next.title });
+        if (!storageOnly) setNotesSessionView({ view: "compose", draft: next.bodyHtml, title: next.title });
       }
     },
-    [editingId],
+    [editingId, storageOnly],
   );
 
   // The overlay expands the notes sheet while the editor is open so the
@@ -588,7 +603,7 @@ export default function NotesPanel({
     return (
       <MasterNoteViewer
         note={viewingMasterNote}
-        theme={noteThemeCtl.theme}
+        theme={noteTheme}
         onClose={() => setViewingMasterNoteId(null)}
       />
     );
@@ -608,13 +623,13 @@ export default function NotesPanel({
       else { setComposing(false); setDraft(""); setDraftTitle(""); }
     };
     const empty = legacyFallback ? isEmptyRichText(combineHtml(titleValue, value)) : editorEmpty;
-    const darkNote = noteThemeCtl.theme === "dark";
+    const darkNote = noteTheme === "dark";
     return (
       <div
         className={`flex h-full flex-col overflow-hidden ${darkNote ? "bg-slate-950" : "bg-white"}`}
         data-course-notes-panel
         data-course-notes-mode={editing ? "edit" : "compose"}
-        data-notes-theme={noteThemeCtl.theme}
+        data-notes-theme={noteTheme}
         data-note-view-mode={editing && selfReadOnly ? "read" : "edit"}
         tabIndex={editing && selfReadOnly ? 0 : undefined}
         aria-label={editing && selfReadOnly ? "Saved note. Double tap or press Enter to edit. Escape returns to the library." : undefined}
@@ -627,12 +642,19 @@ export default function NotesPanel({
         {/* The pane is exactly: a slim bar (status · theme · Cancel · Save),
             then the page. No card, no frame — the page IS the pane. */}
         <div className="flex min-h-0 flex-1 flex-col" data-course-notes-composer>
-          {selfReadOnly && syncState?.status === "error" ? <StudyLibraryNotice state="error" title="Note sync needs attention" message={syncState.errorMessage || "Your local note is safe. Retry to sync."} onRetry={onRetrySync} /> : null}
+          {selfReadOnly && syncState?.status === "error" ? (
+            <StudyLibraryNotice
+              state="error"
+              title={storageOnly ? "Device save needs attention" : "Note sync needs attention"}
+              message={syncState.errorMessage || (storageOnly ? "Your note could not be saved on this device." : "Your local note is safe. Retry to sync.")}
+              onRetry={storageOnly ? undefined : onRetrySync}
+            />
+          ) : null}
           {!(editing && selfReadOnly) ? <div
             className={`flex shrink-0 items-center justify-between gap-2 border-b py-1.5 pl-[max(1.125rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] ${darkNote ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-white"}`}
             data-course-notes-bar
           >
-            <NoteStatus editing={editing} dirty={dirty} tooLong={tooLong} sync={syncState} dark={darkNote} />
+            <NoteStatus editing={editing} dirty={dirty} tooLong={tooLong} sync={syncState} dark={darkNote} storageOnly={storageOnly} />
             <div className="flex shrink-0 items-center gap-1">
               {/* Editing tools mount only after direct activation of the document. */}
               <button
@@ -661,7 +683,7 @@ export default function NotesPanel({
               fallback={
                 <div className="flex h-full min-h-0 flex-col bg-slate-950 p-3" data-course-notes-legacy-fallback>
                   {editing && selfReadOnly ? <div className="h-full overflow-auto p-4" dangerouslySetInnerHTML={{ __html: sanitizeRichText(combineHtml(titleValue, value)) }} /> : <RichTextEditor
-                    theme={noteThemeCtl.theme}
+                    theme={noteTheme}
                     value={value}
                     onChange={editing ? (html) => setEditDraft(html) : (html) => setDraft(html)}
                     heading={titleValue}
@@ -675,13 +697,13 @@ export default function NotesPanel({
                 </div>
               }
             >
-              <Suspense fallback={<div className="h-full bg-white" aria-busy="true" data-course-notes-editor-loading data-notes-theme={noteThemeCtl.theme} />}>
+              <Suspense fallback={<div className="h-full bg-white" aria-busy="true" data-course-notes-editor-loading data-notes-theme={noteTheme} />}>
                 <NoteEditor
                   key={seed.key}
                   ref={editorRef}
                   initialTitle={seed.title}
                   initialBodyHtml={seed.body}
-                  theme={noteThemeCtl.theme}
+                  theme={noteTheme}
                   // §13/§14 — the SAME BlockNote document is the view and the
                   // editor: viewing is just the document rendered read-only.
                   readOnly={Boolean(editing && selfReadOnly)}
@@ -704,7 +726,7 @@ export default function NotesPanel({
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden" data-course-notes-panel data-course-notes-mode="list" data-notes-theme={noteThemeCtl.theme}>
+    <div className="flex h-full flex-col overflow-hidden" data-course-notes-panel data-course-notes-mode="list" data-notes-theme={noteTheme}>
       {/* The library is one responsive resource-card system: the panel owns
           the add affordance; each resource card itself is the open target. */}
       <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -713,30 +735,34 @@ export default function NotesPanel({
             <div className="flex items-center justify-between gap-3" data-course-note-collections>
               <div>
                 <p className="text-xs font-black uppercase tracking-wide text-slate-700">Note library</p>
-                <p className="mt-0.5 text-[11px] text-slate-500">Master course material and your private notes stay separate.</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  {storageOnly ? "Your notes are private to this device." : "Master course material and your private notes stay separate."}
+                </p>
               </div>
-              <div className="inline-flex shrink-0 rounded-xl border border-slate-200 bg-slate-50 p-1" role="tablist" aria-label="Note collection">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeCollection === "master"}
-                  data-course-note-collection="master"
-                  onClick={() => selectCollection("master")}
-                  className={`rounded-lg px-3 py-2 text-xs font-black tracking-wide ${activeCollection === "master" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500"}`}
-                >
-                  MASTER <span className="ml-1 text-[10px]">{masterNotes.length}</span>
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeCollection === "self"}
-                  data-course-note-collection="self"
-                  onClick={() => selectCollection("self")}
-                  className={`rounded-lg px-3 py-2 text-xs font-black tracking-wide ${activeCollection === "self" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500"}`}
-                >
-                  SELF <span className="ml-1 text-[10px]">{notes.length}</span>
-                </button>
-              </div>
+              {!storageOnly ? (
+                <div className="inline-flex shrink-0 rounded-xl border border-slate-200 bg-slate-50 p-1" role="tablist" aria-label="Note collection">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeCollection === "master"}
+                    data-course-note-collection="master"
+                    onClick={() => selectCollection("master")}
+                    className={`rounded-lg px-3 py-2 text-xs font-black tracking-wide ${activeCollection === "master" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500"}`}
+                  >
+                    MASTER <span className="ml-1 text-[10px]">{masterNotes.length}</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeCollection === "self"}
+                    data-course-note-collection="self"
+                    onClick={() => selectCollection("self")}
+                    className={`rounded-lg px-3 py-2 text-xs font-black tracking-wide ${activeCollection === "self" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500"}`}
+                  >
+                    SELF <span className="ml-1 text-[10px]">{notes.length}</span>
+                  </button>
+                </div>
+              ) : null}
             </div>
 
             {activeCollection === "master" ? (
@@ -767,16 +793,18 @@ export default function NotesPanel({
             {notes.length > 0 && syncState?.status === "loading" ? (
               <StudyLibraryNotice
                 state="loading"
-                title="Checking your library"
-                message="Your saved notes are available while cloud sync finishes."
+                title={storageOnly ? "Loading device notes" : "Checking your library"}
+                message={storageOnly ? "Your notes are stored only in this browser on this device." : "Your saved notes are available while cloud sync finishes."}
               />
             ) : null}
             {notes.length > 0 && syncState?.status === "error" ? (
               <StudyLibraryNotice
                 state="error"
-                title="Cloud sync needs attention"
-                message={syncState.errorMessage || "Your notes stay saved on this device. Try syncing again when your connection is ready."}
-                onRetry={onRetrySync}
+                title={storageOnly ? "Device save needs attention" : "Cloud sync needs attention"}
+                message={syncState.errorMessage || (storageOnly
+                  ? "Your notes could not be saved locally. Export them before leaving."
+                  : "Your notes stay saved on this device. Try syncing again when your connection is ready.")}
+                onRetry={storageOnly ? undefined : onRetrySync}
               />
             ) : null}
 
@@ -802,21 +830,27 @@ export default function NotesPanel({
               <>
                 <StudyLibraryNotice
                   state="error"
-                  title="Notes could not be synced"
-                  message={syncState.errorMessage || "No cloud copy could be confirmed. Try again, or continue with notes saved on this device."}
-                  onRetry={onRetrySync}
+                  title={storageOnly ? "Device save needs attention" : "Notes could not be synced"}
+                  message={syncState.errorMessage || (storageOnly
+                    ? "The device refused this save. Check available storage and export often."
+                    : "No cloud copy could be confirmed. Try again, or continue with notes saved on this device.")}
+                  onRetry={storageOnly ? undefined : onRetrySync}
                 />
                 <StudyLibraryEmptyState
                   kind="note"
-                  title="Your course notes remain yours"
-                  description="Reconnect and try again to load your latest library. Anything already on this device stays safe."
+                  title={storageOnly ? "Start a private study note" : "Your course notes remain yours"}
+                  description={storageOnly
+                    ? "Create a note. It is saved only on this device and will not sync to your account."
+                    : "Reconnect and try again to load your latest library. Anything already on this device stays safe."}
                 />
               </>
             ) : (
               <StudyLibraryEmptyState
                 kind="note"
-                title="Start a study note"
-                description="Capture a formula, a question, or a lesson recap. Use the + button to open the Note Editor."
+                title={storageOnly ? "Start a private study note" : "Start a study note"}
+                description={storageOnly
+                  ? "Capture a formula, a question, or a lesson recap. This note stays only on this device."
+                  : "Capture a formula, a question, or a lesson recap. Use the + button to open the Note Editor."}
               />
             )}
               </>
@@ -841,7 +875,7 @@ export default function NotesPanel({
           player's clipped/overflow-hidden sheet can never cut it off, and
           it always sits above the overlay + dock on phones and tablets. */}
       <ConfirmDeleteDialog
-        theme={noteThemeCtl.theme}
+        theme={noteTheme}
         open={Boolean(pendingDeleteNote)}
         title="Delete this note?"
         message={

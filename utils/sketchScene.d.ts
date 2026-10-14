@@ -80,7 +80,7 @@ export function sanitizeSketchFiles(
   raw: unknown,
   budget?: number,
 ): { files: Record<string, SketchFile>; dropped: number };
-export function parseSketchScene(raw: unknown): SketchScene;
+export function parseSketchScene(raw: unknown, options?: { fileBudget?: number }): SketchScene;
 export function serializeSketchScene(scene: unknown): string;
 export function sanitizeSketchKey(value: unknown): string;
 export function sketchDocId(

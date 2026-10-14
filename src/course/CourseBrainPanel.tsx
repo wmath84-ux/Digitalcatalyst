@@ -85,6 +85,7 @@ import { brainFitScale, publishVar, useFitTarget } from "./panelFit";
 import { courseModuleSegments } from "./studyResourceContext";
 import type { CourseModule } from "../types/course";
 import type { MyCourseQuestion } from "../types/myCourse";
+import { loadBrainScores, saveBrainScores, type BrainPracticeScores } from "./brainScoreStorage";
 
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
 /** The score that marks the module's Brain resource complete in the player. */
@@ -98,8 +99,6 @@ const S = (px: number) => `calc(${px}px * var(--brain-scale, 1))`;
  * re-declared, so the player and the util can never drift apart.
  */
 export type BrainPracticeSet = ReturnType<typeof collectBrainPracticeSets>[number];
-
-type BrainPracticeScore = { attempts: number; best: number; last: number; at: number };
 
 export interface CourseBrainPanelProps {
   modules?: CourseModule[];
@@ -137,33 +136,12 @@ export interface CourseBrainPanelProps {
   onOpenedSet?: () => void;
   /** The signed-in learner — scopes the remembered MASTER/SELF preference. */
   uid?: string | null;
+  /** A private Work library: one flat set list, with no MASTER/SELF course chrome. */
+  workMode?: boolean;
 }
 
-/* ------------------------------------------------------------------ */
-/* Per-device practice history (no backend, no revision-bank writes)    */
-/* ------------------------------------------------------------------ */
-
-const scoreKey = (productId: string) => `dc:courseBrain:${productId}`;
-
-function loadScores(productId: string): Record<string, BrainPracticeScore> {
-  try {
-    const raw = localStorage.getItem(scoreKey(productId));
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as Record<string, BrainPracticeScore>;
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveScores(productId: string, scores: Record<string, BrainPracticeScore>) {
-  try {
-    localStorage.setItem(scoreKey(productId), JSON.stringify(scores));
-  } catch {
-    /* private mode / quota — the practice still works, only history is lost */
-  }
-}
-
+/* Score storage stays on-device. Work passes the same explicit namespace bit
+   used by the UI so a Work score can never alias a course's score key. */
 /* ------------------------------------------------------------------ */
 export default function CourseBrainPanel({
   productId,
@@ -178,8 +156,9 @@ export default function CourseBrainPanel({
   uid,
   onCreateSelfSet,
   selfSetPrompt,
+  workMode = false,
 }: CourseBrainPanelProps) {
-  const [scores, setScores] = useState<Record<string, BrainPracticeScore>>(() => loadScores(productId));
+  const [scores, setScores] = useState<BrainPracticeScores>(() => loadBrainScores(productId, workMode));
   const [composerOpen, setComposerOpen] = useState(false);
   const [activeSetId, setActiveSetId] = useState<string | null>(null);
   const [mode, setMode] = useState<"question" | "review" | "result" | "answers">("question");
@@ -223,8 +202,8 @@ export default function CourseBrainPanel({
   }, [masterSelfCtl.mode]);
 
   useEffect(() => {
-    setScores(loadScores(productId));
-  }, [productId]);
+    setScores(loadBrainScores(productId, workMode));
+  }, [productId, workMode]);
 
   // Switching lessons returns the Brain tab to that module's practice and
   // closes any half-played set — the tab is never left showing a stale module.
@@ -378,7 +357,7 @@ export default function CourseBrainPanel({
     const score = stats.score;
     const next = { ...scores, [activeSet.id]: { attempts: (scores[activeSet.id]?.attempts ?? 0) + 1, best: Math.max(score, scores[activeSet.id]?.best ?? 0), last: score, at: Date.now() } };
     setScores(next);
-    saveScores(productId, next);
+    saveBrainScores(productId, next, workMode);
     setShowSubmitConfirm(false);
     setMode("result");
     // A pass marks the module's Brain resource complete in the player — once
@@ -402,7 +381,7 @@ export default function CourseBrainPanel({
       const progress = record ? `Best ${record.best}% · ${record.attempts} attempt${record.attempts === 1 ? "" : "s"} · last ${record.last}%` : "Not attempted yet";
       const modulePath = self ? [] : courseModuleSegments(modules, set.moduleId);
       return {
-        path: modulePath.length ? modulePath : [{ key: set.moduleId || "personal", label: set.moduleTitle || (self ? "My practice sets" : "Course practice") }],
+        path: workMode ? [] : modulePath.length ? modulePath : [{ key: set.moduleId || "personal", label: set.moduleTitle || (self ? "My practice sets" : "Course practice") }],
         item: {
           value: set.id,
           label: set.title,
@@ -424,7 +403,7 @@ export default function CourseBrainPanel({
     const first = sets.find((set) => set.moduleId === activeModuleId);
     if (first) masterOpen.reveal(ancestorSectionValues(masterTree, first.id));
   }, [activeModuleId, sets]);
-  const personalLibrary = masterSelfCtl.mode === "self";
+  const personalLibrary = workMode || masterSelfCtl.mode === "self";
   const libraryTree = personalLibrary ? selfTree : masterTree;
   const libraryOpen = personalLibrary ? selfOpen : masterOpen;
 
@@ -438,27 +417,58 @@ export default function CourseBrainPanel({
         data-course-brain-panel=""
         data-brain-screen="library"
       >
-        {/* MASTER / SELF segmented control — same contract as Notes & Mind Map.
-            MASTER = admin-imported practice sets from the course tree.
-            SELF   = the learner's own sets, made here or in the Study Library. */}
-        <div className="flex items-center justify-between gap-2 pb-2" data-brain-collection="">
-          <div>
-            <p className="text-xs font-black uppercase tracking-wide text-[var(--dc-flat-ink-sub)]">Practice library</p>
-            <p className="mt-0.5 text-[11px] text-[var(--dc-flat-ink-label)]">Course practice and your own sets stay separate.</p>
-          </div>
-          <div className="flex items-center" style={{ gap: S(8) }}>
-            <MasterSelfControl
-              feature="brain"
-              ariaLabel="Brain collection"
-              mode={masterSelfCtl.mode}
-              onChange={masterSelfCtl.setMode}
-              masterCount={sets.length}
-              selfCount={selfSets.length}
-            />
-          </div>
-        </div>
+        {!workMode ? (
+          <>
+            {/* Course mode keeps its MASTER / SELF collection control. Work mode
+                renders a flat private set list instead. */}
+            <div className="flex items-center justify-between gap-2 pb-2" data-brain-collection="">
+              <div>
+                <p className="text-xs font-black uppercase tracking-wide text-[var(--dc-flat-ink-sub)]">Practice library</p>
+                <p className="mt-0.5 text-[11px] text-[var(--dc-flat-ink-label)]">Course practice and your own sets stay separate.</p>
+              </div>
+              <div className="flex items-center" style={{ gap: S(8) }}>
+                <MasterSelfControl
+                  feature="brain"
+                  ariaLabel="Brain collection"
+                  mode={masterSelfCtl.mode}
+                  onChange={masterSelfCtl.setMode}
+                  masterCount={sets.length}
+                  selfCount={selfSets.length}
+                />
+              </div>
+            </div>
+          </>
+        ) : null}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pt-1" data-brain-library-list>
-          {libraryTree.length ? (
+          {workMode ? (
+            sets.length ? (
+              <div className="space-y-2" data-work-brain-library="">
+                {sets.map((set) => {
+                  const record = scores[set.id];
+                  return (
+                    <button
+                      key={set.id}
+                      type="button"
+                      onClick={() => startSet(set.id)}
+                      className="flex w-full items-center gap-3 rounded-[18px] border border-[var(--border-color)] bg-[var(--surface-bg)] p-3 text-left shadow-sm transition hover:border-[var(--accent-color)] hover:bg-[var(--hover-bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent-color)]"
+                      data-work-brain-set={set.id}
+                    >
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--accent-bg)] text-[var(--accent-color)]"><Brain size={18} /></span>
+                      <span className="min-w-0 flex-1">
+                        <strong className="block truncate text-sm font-extrabold text-[var(--text-primary)]">{set.title}</strong>
+                        <small className="mt-0.5 block text-[11px] text-[var(--text-tertiary)]">{set.questions.length} questions{record ? ` · Best ${record.best}%` : " · Not attempted yet"}</small>
+                      </span>
+                      <span className="text-xs font-bold text-[var(--accent-color)]">Practice</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div data-brain-empty="" data-work-brain-empty="">
+                <StudyLibraryEmptyState kind="brain" title="No Brain questions yet" description="Add multiple-choice cards to this Work Revision set to practice them here." />
+              </div>
+            )
+          ) : libraryTree.length ? (
             <BranchedMenu
               items={libraryTree}
               openValues={libraryOpen.openValues}
@@ -481,7 +491,7 @@ export default function CourseBrainPanel({
             </div>
           )}
         </div>
-        {personalLibrary && onCreateSelfSet ? (
+        {!workMode && personalLibrary && onCreateSelfSet ? (
           <button type="button" onClick={() => setComposerOpen(true)}
             aria-label="Create your own practice set" title="Create your own practice set" data-brain-self-add=""
             className="absolute bottom-4 right-4 z-10 grid h-11 w-11 place-items-center rounded-full bg-indigo-600 text-white shadow-lg transition hover:bg-indigo-500 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300">

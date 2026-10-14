@@ -575,3 +575,64 @@
     transform: rotate(360deg);
   }
 }
+
+/* Work's dark palette; ordinary Course Player Quick Sketch stays unchanged. */
+.dc-qsk[data-quick-sketch-theme="dark"] {
+  background: #121212;
+  color: #e6e6e6;
+}
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-canvas,
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-loading {
+  background: #0d0d0d;
+}
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-icon-button,
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-text-button,
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-chip {
+  background-color: #18181b;
+  color: #e6e6e6;
+  text-shadow: none;
+}
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-chip {
+  box-shadow: 0 0 8px -4px rgba(0, 0, 0, 0.72);
+}
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-chip-button,
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-number,
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-select select,
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-row-button {
+  color: #e6e6e6;
+}
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-chip-status,
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-canvas-row small,
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-hint {
+  color: #a1a1aa;
+}
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-chip-status[data-state="saved"] {
+  color: #4ade80;
+}
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-chip-status[data-state="pending"],
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-chip-status[data-state="saving"] {
+  color: #fbbf24;
+}
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-chip-status[data-state="error"] {
+  color: #fb7185;
+}
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-canvas-menu,
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-panel {
+  background-color: rgba(24, 24, 27, 0.96);
+  color: #e6e6e6;
+}
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-canvas-row:hover {
+  background: #27272a;
+}
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-row-button:hover,
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-text-button:hover,
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-icon-button:hover,
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-chip-button:hover {
+  color: #a78bfa;
+}
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-hr {
+  background: #3f3f46;
+}
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-number {
+  background: #18181b;
+}

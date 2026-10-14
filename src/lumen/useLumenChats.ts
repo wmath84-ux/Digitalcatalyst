@@ -64,6 +64,8 @@ export interface UseLumenChatsInput {
   courseShort?: string;
   /** Milliseconds of quiet before pending edits are committed. */
   debounceMs?: number;
+  /** Keep chat history on this device; never subscribe to or write Firestore. */
+  storageOnly?: boolean;
 }
 
 export interface UseLumenChatsResult {
@@ -113,6 +115,7 @@ interface ChatSession {
   uid: string;
   productId: string;
   scoped: boolean;
+  storageOnly: boolean;
   chats: TrackedChat[];
   activeId: string;
   dirty: Set<string>;
@@ -142,10 +145,10 @@ const initialView = (session: ChatSession): ChatView => ({
   session,
   chats: session.chats,
   activeId: session.activeId,
-  status: session.scoped ? "loading" : "idle",
+  status: !session.scoped ? "idle" : session.storageOnly ? "ready" : "loading",
   errorMessage: null,
   lastSavedAt: null,
-  loading: session.scoped,
+  loading: session.scoped && !session.storageOnly,
 });
 
 /** Cloud/local record → the tracked chat the app renders. */
@@ -158,7 +161,7 @@ const byChatRecency = (chats: TrackedChat[]): TrackedChat[] =>
   byLumenChatRecency(chats) as TrackedChat[];
 
 export default function useLumenChats(input: UseLumenChatsInput): UseLumenChatsResult {
-  const { uid, productId, courseTitle = "", courseShort = "", debounceMs = DEFAULT_DEBOUNCE_MS } = input;
+  const { uid, productId, courseTitle = "", courseShort = "", debounceMs = DEFAULT_DEBOUNCE_MS, storageOnly = false } = input;
   const scoped = Boolean(uid) && productId != null && String(productId).length > 0;
   const uidText = String(uid || "");
   const productText = String(productId ?? "");
@@ -169,7 +172,7 @@ export default function useLumenChats(input: UseLumenChatsInput): UseLumenChatsR
     if (!scoped) {
       const chat = draftChat(title, short);
       return {
-        uid: uidText, productId: productText, scoped: false,
+        uid: uidText, productId: productText, scoped: false, storageOnly,
         chats: [chat], activeId: chat.id, dirty: new Set(), deleted: new Set(), writing: new Set(),
         timer: null, mirrorTimer: null, retry: null, attempts: 0, inFlight: false, flushWanted: false,
         disposed: false, listenerFailed: false,
@@ -179,14 +182,14 @@ export default function useLumenChats(input: UseLumenChatsInput): UseLumenChatsR
     const chats: TrackedChat[] = mirrored.length ? mirrored : [draftChat(title, short)];
     const storedActive = loadActiveChatId(uidText, productText);
     return {
-      uid: uidText, productId: productText, scoped: true,
+      uid: uidText, productId: productText, scoped: true, storageOnly,
       chats,
       activeId: storedActive && chats.some((chat) => chat.id === storedActive) ? storedActive : chats[0].id,
       dirty: new Set(), deleted: new Set(), writing: new Set(),
       timer: null, mirrorTimer: null, retry: null, attempts: 0, inFlight: false, flushWanted: false,
       disposed: false, listenerFailed: false,
     };
-  }, [uidText, productText, scoped, title, short]);
+  }, [uidText, productText, scoped, storageOnly, title, short]);
 
   const scopeRef = useRef(session);
   scopeRef.current = session;
@@ -244,6 +247,19 @@ export default function useLumenChats(input: UseLumenChatsInput): UseLumenChatsR
     if (!scope.scoped) return;
     if (scope.timer) { clearTimeout(scope.timer); scope.timer = null; }
     mirrorNow(scope);
+    if (scope.storageOnly) {
+      const changed = scope.dirty.size > 0 || scope.deleted.size > 0;
+      scope.dirty.clear();
+      scope.deleted.clear();
+      scope.writing.clear();
+      publish(scope, {
+        status: scope.chats.some(shouldPersist) ? "saved" : "ready",
+        errorMessage: null,
+        lastSavedAt: changed ? Date.now() : undefined,
+        loading: false,
+      });
+      return;
+    }
     if (scope.inFlight) { scope.flushWanted = true; return; }
     const uploads = Array.from(scope.dirty)
       .map((id) => scope.chats.find((chat) => chat.id === id && scope.deleted.has(id) === false))
@@ -348,7 +364,7 @@ export default function useLumenChats(input: UseLumenChatsInput): UseLumenChatsR
       scope.dirty.delete(id);
       // Only a chat that actually reached (or was queued for) the cloud can be
       // deleted there; an empty draft simply disappears.
-      if (scope.writing.has(id) || shouldPersist(before)) scope.deleted.add(id);
+      if (!scope.storageOnly && (scope.writing.has(id) || shouldPersist(before))) scope.deleted.add(id);
     }
     scope.chats = byChatRecency(rows.map((chat) => chat.course === title && chat.courseShort === short ? chat : { ...chat, course: title, courseShort: short }));
     if (!scope.chats.some((chat) => chat.id === scope.activeId)) {
@@ -379,7 +395,7 @@ export default function useLumenChats(input: UseLumenChatsInput): UseLumenChatsR
     const before = scope.chats.find((chat) => chat.id === chatId);
     const remaining = scope.chats.filter((chat) => chat.id !== chatId);
     scope.dirty.delete(chatId);
-    if (scope.writing.has(chatId) || shouldPersist(before)) scope.deleted.add(chatId);
+    if (!scope.storageOnly && (scope.writing.has(chatId) || shouldPersist(before))) scope.deleted.add(chatId);
     if (!remaining.length) {
       const fresh = draftChat(title, short);
       remaining.push(fresh);
@@ -400,6 +416,17 @@ export default function useLumenChats(input: UseLumenChatsInput): UseLumenChatsR
     if (!session.scoped) { setState(initialView(session)); return undefined; }
     let cancelled = false;
     session.listenerFailed = false;
+    if (session.storageOnly) {
+      mirrorNow(session);
+      publish(session, {
+        chats: session.chats,
+        activeId: session.activeId,
+        loading: false,
+        status: session.chats.some(shouldPersist) ? "saved" : "ready",
+        errorMessage: null,
+      });
+      return () => { cancelled = true; };
+    }
     publish(session, { chats: session.chats, activeId: session.activeId, loading: true, status: "loading", errorMessage: null });
     const unsubscribe = subscribeCloudChats(uidText, productText, (cloud) => {
       if (cancelled || scopeRef.current !== session) return;

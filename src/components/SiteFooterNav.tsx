@@ -3,13 +3,14 @@ import GlassDock, { type GlassDockItem } from "./glass-dock/GlassDock";
 import SitePeekFooter from "./SitePeekFooter";
 import UiverseFooterNav from "./UiverseFooterNav";
 import YoutubeFooterNav from "./YoutubeFooterNav";
+import WorkFooterNav, { workCellsFromGlassItems } from "../work/WorkFooterNav";
 import { useFooterNavigationStyle } from "../utils/footerNavigationStyle";
 
 /**
  * The ONE site footer navigation. The saved display preference chooses
- * between the edge-to-edge YouTube-style bar, four-tab Uiverse pill and the
- * preserved magnifying GlassDock. All designs share footer measurement,
- * safe-area clearance and route behavior; desktop keeps its existing navigation rail.
+ * between the edge-to-edge YouTube-style bar, four-tab Uiverse pill, preserved
+ * magnifying GlassDock and Work's six-destination pill. All designs share footer
+ * measurement and safe-area clearance; desktop keeps its existing navigation rail.
  */
 
 /** Narrow phones use 38px plates so the seven-tab dock fits without clipping. */
@@ -106,6 +107,21 @@ export default function SiteFooterNav({
         label="Primary navigation"
         purchasesBadge={purchasesBadge}
         position={position}
+        dataAttrs={dataAttrs}
+      />
+    );
+  }
+
+  if (navigationStyle === "work-pill") {
+    const activeId = items.find((item) => item.active)?.id ?? null;
+    return (
+      <WorkFooterNav
+        label={label}
+        cells={workCellsFromGlassItems(items)}
+        activeId={activeId}
+        onSelect={onSelect}
+        position={position}
+        global
         dataAttrs={dataAttrs}
       />
     );

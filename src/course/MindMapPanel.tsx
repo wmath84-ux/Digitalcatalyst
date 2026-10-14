@@ -136,6 +136,7 @@ import {
   CloudAlert,
   CloudCheck,
   CloudUpload,
+  HardDrive,
   Columns3,
   LayoutTemplate,
   Layers,
@@ -962,6 +963,16 @@ const SAVE_COPY: Record<MindMapSaveStatus, { label: string; tone: string }> = {
   error: { label: "Save retry ho raha hai", tone: "text-rose-300" },
 };
 
+const DEVICE_SAVE_COPY: Record<MindMapSaveStatus, { label: string; tone: string }> = {
+  idle: { label: "On this device", tone: "text-white/60" },
+  loading: { label: "Loading device maps…", tone: "text-white/60" },
+  ready: { label: "Ready · device only", tone: "text-white/60" },
+  pending: { label: "Saving on this device…", tone: "text-amber-300" },
+  saving: { label: "Saving on this device…", tone: "text-amber-300" },
+  saved: { label: "Saved on this device", tone: "text-emerald-300" },
+  error: { label: "Device save needs attention", tone: "text-rose-300" },
+};
+
 // ── Toolbar drop-down ─────────────────────────────────────────────────────
 
 /**
@@ -1215,6 +1226,10 @@ export interface MindMapPanelProps {
   masterMap?: { key: string; title: string; mind: MindMap | null; error?: string | null } | null;
   /** Leave the master map and return to the map library. */
   onCloseMasterMap?: () => void;
+  /** Hide course/master collections and never sync map data to cloud. */
+  storageOnly?: boolean;
+  /** Use a parent surface's theme without changing Course Player preferences. */
+  themeOverride?: MindMapTheme;
 }
 
 /** Read-only flag for every node box (hides the `+` and blocks editing). */
@@ -1247,6 +1262,8 @@ function MindMapCanvas(props: MindMapPanelProps) {
   onOpenMasterMap,
     masterMap = null,
     onCloseMasterMap,
+    storageOnly = false,
+    themeOverride,
   } = props;
   // A master map replaces the canvas content but is never written: the map is
   // the teacher's, so every mutation is a no-op and the `+`/editing are off.
@@ -1274,7 +1291,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
    *  the panel session instead, so switching tabs never yanks the learner
    *  back to the library. */
   const [libraryOpen, setLibraryOpen] = useState(
-    () => getCoursePanelSession().mindMapView !== "canvas",
+    () => storageOnly || getCoursePanelSession().mindMapView !== "canvas",
   );
   // Opening a master map shows its canvas; closing it returns to the library.
   useEffect(() => {
@@ -1330,8 +1347,9 @@ function MindMapCanvas(props: MindMapPanelProps) {
   // filter, both remembered per user through the shared preference layer
   // (never ephemeral React state, never a CSS inversion).
   const mindThemeCtl = useCourseTheme("mindMap", uid ?? null, "light"); // Mind Map defaults to Light
-  const mindTheme: MindMapTheme = mindThemeCtl.theme;
+  const mindTheme: MindMapTheme = themeOverride ?? mindThemeCtl.theme;
   const masterSelfCtl = useMasterSelfPreference("mindMap", uid ?? null, "master");
+  const collectionMode = storageOnly ? "self" : masterSelfCtl.mode;
   // ── Align-menu choices (box arrangement + how a long label fits) ───────
   // Views, not data: they are remembered per device and never written to
   // Firestore.
@@ -1382,8 +1400,8 @@ function MindMapCanvas(props: MindMapPanelProps) {
   } | null>(null);
 
   useEffect(() => {
-    setMindMapSessionView(libraryOpen ? "library" : "canvas");
-  }, [libraryOpen]);
+    if (!storageOnly) setMindMapSessionView(libraryOpen ? "library" : "canvas");
+  }, [libraryOpen, storageOnly]);
 
   useEffect(() => {
     try {
@@ -1423,7 +1441,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
   const prevOpenRef = useRef(open);
   useEffect(() => {
     if (open && !prevOpenRef.current) {
-      const resumeCanvas = getCoursePanelSession().mindMapView === "canvas";
+      const resumeCanvas = !storageOnly && getCoursePanelSession().mindMapView === "canvas";
       setLibraryOpen(!resumeCanvas);
       if (!resumeCanvas) {
         setSelectedId(null);
@@ -1446,7 +1464,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
       setSaveMenuOpen(false);
     }
     prevOpenRef.current = open;
-  }, [open]);
+  }, [open, storageOnly]);
 
   // Flush the debounced write when the panel unmounts. The overlay unmounts
   // this on a tab switch, so this is the safety net that pairs with the
@@ -1988,7 +2006,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
     return () => observer.disconnect();
   }, [open, libraryOpen, refreshWires]);
 
-  const save = SAVE_COPY[status] || SAVE_COPY.idle;
+  const save = (storageOnly ? DEVICE_SAVE_COPY[status] : SAVE_COPY[status]) || (storageOnly ? DEVICE_SAVE_COPY.idle : SAVE_COPY.idle);
   const levels = maxDepth(mind);
   const totalNodes = countNodes(mind);
   const courseHierarchy = useMemo(
@@ -2180,7 +2198,9 @@ function MindMapCanvas(props: MindMapPanelProps) {
             data-save-status={status}
             data-blink={saveBlink ? "true" : "false"}
           >
-            {status === "saving" ? <CloudUpload /> : status === "saved" ? <CloudCheck /> : status === "error" ? <CloudAlert /> : <Cloud />}
+            {storageOnly
+              ? <HardDrive />
+              : status === "saving" ? <CloudUpload /> : status === "saved" ? <CloudCheck /> : status === "error" ? <CloudAlert /> : <Cloud />}
             {saveBlink ? <span className="mm-blink" data-course-mindmap-save-blink aria-hidden="true" /> : null}
           </button>
           {/* AI / JSON import — opens the same prompt + validator the admin
@@ -2200,9 +2220,9 @@ function MindMapCanvas(props: MindMapPanelProps) {
             anchorRef={saveAnchorRef}
             onClose={() => setSaveMenuOpen(false)}
             theme={mindTheme}
-            label="Cloud save"
+            label={storageOnly ? "Device-only save" : "Cloud save"}
           >
-            <p className="mm-menu-head">Cloud save</p>
+            <p className="mm-menu-head">{storageOnly ? "Device-only save" : "Cloud save"}</p>
             <p
               className={`mm-menu-note flex items-center gap-1.5 ${save.tone}`}
               data-course-mindmap-save-label
@@ -2227,8 +2247,8 @@ function MindMapCanvas(props: MindMapPanelProps) {
               }}
               data-course-mindmap-save-now
             >
-              <CloudUpload />
-              <span>Abhi cloud par save karein</span>
+              {storageOnly ? <HardDrive /> : <CloudUpload />}
+              <span>{storageOnly ? "Save on this device now" : "Abhi cloud par save karein"}</span>
             </button>
           </ToolbarMenu>
 
@@ -2481,7 +2501,14 @@ function MindMapCanvas(props: MindMapPanelProps) {
       {/* ── Canvas ────────────────────────────────────────────────────────
           `touch-action: none` is required, not cosmetic: without it the
           browser claims the pinch for page zoom and React Flow never sees it. */}
-      {status === "error" && !libraryOpen && !readOnlyMaster ? <StudyLibraryNotice state="error" title="Mind map sync needs attention" message={errorMessage || "Your local map is safe. Retry to sync."} onRetry={onRetryMaps} /> : null}
+      {status === "error" && !libraryOpen && !readOnlyMaster ? (
+        <StudyLibraryNotice
+          state="error"
+          title={storageOnly ? "Device save needs attention" : "Mind map sync needs attention"}
+          message={errorMessage || (storageOnly ? "The map could not be saved locally." : "Your local map is safe. Retry to sync.")}
+          onRetry={storageOnly ? undefined : onRetryMaps}
+        />
+      ) : null}
       <div ref={canvasRef} className="relative min-h-0 flex-1" style={{ touchAction: "none" }} data-course-mindmap-canvas data-library-open={libraryOpen ? "true" : "false"}
         tabIndex={!libraryOpen ? 0 : undefined}
         aria-label={!libraryOpen ? (readOnlyMaster ? "Read-only master mind map" : "Mind map. Double tap or press Enter to edit. Escape returns to the library.") : undefined}
@@ -2631,22 +2658,26 @@ function MindMapCanvas(props: MindMapPanelProps) {
           <div className="absolute inset-0 z-20 flex flex-col bg-[var(--dc-chrome-glass)] [backdrop-filter:var(--dc-chrome-glass-blur)]" data-course-mindmap-library>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 pb-16" data-course-mindmap-map-list>
               <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
-                {/* Part 1 §10/§11 — MASTER/SELF filter, remembered per user. */}
+                {/* Course collection controls stay out of Work mode: its library is private to this device. */}
                 <div className="flex items-center justify-between gap-3" data-course-mindmap-collections>
                   <div>
                     <p className="text-xs font-black uppercase tracking-wide text-[var(--dc-flat-ink-sub)]">Map library</p>
-                    <p className="mt-0.5 text-[11px] text-[var(--dc-flat-ink-label)]">Course maps and your own maps stay separate.</p>
+                    <p className="mt-0.5 text-[11px] text-[var(--dc-flat-ink-label)]">
+                      {storageOnly ? "Your maps stay on this device only." : "Course maps and your own maps stay separate."}
+                    </p>
                   </div>
-                  <MasterSelfControl
-                    feature="mindMap"
-                    ariaLabel="Mind map collection"
-                    mode={masterSelfCtl.mode}
-                    onChange={masterSelfCtl.setMode}
-                    masterCount={masterMaps.length}
-                    selfCount={maps.length}
-                  />
+                  {!storageOnly ? (
+                    <MasterSelfControl
+                      feature="mindMap"
+                      ariaLabel="Mind map collection"
+                      mode={collectionMode}
+                      onChange={masterSelfCtl.setMode}
+                      masterCount={masterMaps.length}
+                      selfCount={maps.length}
+                    />
+                  ) : null}
                 </div>
-                {masterSelfCtl.mode === "master" ? (
+                {collectionMode === "master" ? (
                   masterMaps.length > 0 ? (
                     <BranchedMenu
                       items={masterTree}
@@ -2681,9 +2712,11 @@ function MindMapCanvas(props: MindMapPanelProps) {
                 {status === "error" ? (
                   <StudyLibraryNotice
                     state="error"
-                    title="Mind map sync needs attention"
-                    message={errorMessage || "Your local map copy stays available. Try again when your connection is ready."}
-                    onRetry={onRetryMaps}
+                    title={storageOnly ? "Device save needs attention" : "Mind map sync needs attention"}
+                    message={errorMessage || (storageOnly
+                      ? "This map could not be saved on the device. Export it before leaving."
+                      : "Your local map copy stays available. Try again when your connection is ready.")}
+                    onRetry={storageOnly ? undefined : onRetryMaps}
                   />
                 ) : null}
 
@@ -2708,8 +2741,10 @@ function MindMapCanvas(props: MindMapPanelProps) {
                 ) : status === "error" ? (
                   <StudyLibraryEmptyState
                     kind="mind-map"
-                    title="No cloud map could be confirmed"
-                    description="Retry sync to load your latest mind maps. Local copies remain safe on this device."
+                    title={storageOnly ? "No saved map found" : "No cloud map could be confirmed"}
+                    description={storageOnly
+                      ? "Start a new map. Your changes stay on this device."
+                      : "Retry sync to load your latest mind maps. Local copies remain safe on this device."}
                   />
                 ) : (
                   <StudyLibraryEmptyState
@@ -2722,7 +2757,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
                 )}
               </div>
             </div>
-            {masterSelfCtl.mode === "self" ? (
+            {collectionMode === "self" ? (
             <button
               type="button"
               onClick={() => {

@@ -292,7 +292,7 @@ test("submit creates immediately through the parent's writer", () => {
 // ---------------------------------------------------------------------------
 
 test("the library '+' renders only in SELF mode and opens the overlay", () => {
-  assert.match(panel, /\{personalLibrary && onCreateSelfSet \? \(/);
+  assert.match(panel, /\{!workMode && personalLibrary && onCreateSelfSet \? \(/);
   assert.match(panel, /data-brain-self-add=""/);
   assert.match(panel, /aria-label="Create your own practice set"/);
   assert.match(panel, /composerOpen && onCreateSelfSet \? \(/);
