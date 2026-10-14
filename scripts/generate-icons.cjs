@@ -59,10 +59,16 @@ const COVERAGE = {
   maskable: 0.56,
   /** Legacy Android launcher (square + round PNG) — 0.62 → tips at 0.438. */
   launcher: 0.62,
-  /** Adaptive-icon foreground — tips measured at 0.62 of the half-canvas
-   *  (≈32 dp of the 108 dp layer), inside BOTH the 36 dp circular mask and the
-   *  33 dp "always visible" safe circle. */
-  adaptiveForeground: 0.44,
+  /**
+   * Adaptive-icon foreground. The invariant is `coverage × √2 ≤ mask radius in
+   * half-canvas units`, because a glyph that reaches the CORNERS of its own
+   * bounding box puts its tips at `coverage × √2` of the half-canvas. Android's
+   * guaranteed "always visible" circle is 33 dp of the 108 dp layer = 0.611, so
+   * 0.42 → tips at 0.594 (the old 0.44 reached 0.622 and was only safe for a
+   * glyph whose bbox corners happened to carry no ink — the live brand logo's
+   * do, and its tips were being shaved).
+   */
+  adaptiveForeground: 0.42,
   /** Notification badge — near full-bleed on purpose (rendered ~24 dp). */
   badge: 0.86,
 };
@@ -80,6 +86,16 @@ const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
 /** The app's white theme — the adaptive background is #FFFFFF, so a maskable
  *  icon with the same plate looks identical on both install paths. */
 const BRAND_PLATE = { r: 255, g: 255, b: 255, alpha: 1 };
+/**
+ * The fallback plate for a LIGHT logo. An admin-uploaded brand mark is very
+ * often white artwork on transparency (it is designed to sit on the app's dark
+ * chrome), and white artwork composited on the white plate is a BLANK icon —
+ * the launcher shows an empty white square. So the plate follows the artwork:
+ * a near-white glyph gets the app's dark slate, everything else keeps white.
+ */
+const DARK_PLATE = { r: 15, g: 23, b: 42, alpha: 1 };
+/** Mean luminance at/above which the artwork counts as "light". */
+const LIGHT_ARTWORK_LUMINANCE = 200;
 
 // ---------------------------------------------------------------- PNG encode
 function crc32(buf) {
@@ -143,6 +159,31 @@ function opaqueBounds(data, width, height, alphaFloor = 16) {
   return { left: minX, top: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
 }
 
+/**
+ * Mean luminance (0–255) of the artwork's OWN opaque pixels — the number that
+ * decides which plate it is composited on. Sampled over the glyph's bounding
+ * box only, so the transparent padding cannot drag a dark logo down or a light
+ * one up.
+ */
+function glyphLuminance(data, width, bounds, alphaFloor = 16) {
+  let total = 0;
+  let counted = 0;
+  for (let y = bounds.top; y < bounds.top + bounds.height; y += 1) {
+    for (let x = bounds.left; x < bounds.left + bounds.width; x += 1) {
+      const i = (y * width + x) * 4;
+      if (data[i + 3] < alphaFloor) continue;
+      total += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+      counted += 1;
+    }
+  }
+  return counted ? total / counted : 0;
+}
+
+/** The plate a logo of this luminance must sit on to stay visible. */
+function plateFor(luminance) {
+  return luminance >= LIGHT_ARTWORK_LUMINANCE ? DARK_PLATE : BRAND_PLATE;
+}
+
 /** The master logo, cropped to its own glyph so padding is decided here. */
 async function readGlyph(source = SRC_MASTER) {
   const { data, info } = await sharp(source).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -152,7 +193,7 @@ async function readGlyph(source = SRC_MASTER) {
     .extract({ left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height })
     .png()
     .toBuffer();
-  return { glyph, bounds, masterSize: info.width };
+  return { glyph, bounds, masterSize: info.width, luminance: glyphLuminance(data, info.width, bounds) };
 }
 
 /**
@@ -220,14 +261,14 @@ function targets() {
   return list;
 }
 
-async function build(glyph, target) {
+async function build(glyph, target, plate = BRAND_PLATE) {
   const coverage = COVERAGE[target.kind];
   if (target.kind === 'badge') return makeBadge(glyph, target.size, coverage);
   // "any" stays transparent (a mark, not a tile). Everything Android shows on
   // its own launcher plate — maskable, legacy launcher, adaptive foreground —
-  // is made to match the white adaptive background so both install paths look
-  // like the same app.
-  const background = target.kind === 'any' ? TRANSPARENT : BRAND_PLATE;
+  // is composited on `plate`: white for a dark logo, the app's dark slate for a
+  // light one (a white logo on a white plate is a blank icon).
+  const background = target.kind === 'any' ? TRANSPARENT : plate;
   return composeIcon(glyph, target.size, coverage, background);
 }
 
@@ -239,16 +280,18 @@ async function main() {
     process.exit(1);
   }
 
-  const { glyph, bounds, masterSize } = await readGlyph();
+  const { glyph, bounds, masterSize, luminance } = await readGlyph();
+  const plate = plateFor(luminance);
   const measured = (bounds.width / masterSize) * 100;
   console.log(
     `Master ${masterSize}×${masterSize}: glyph ${bounds.width}×${bounds.height} ` +
-      `(${measured.toFixed(1)}% of the canvas) — cropped, then re-placed per mask.`,
+      `(${measured.toFixed(1)}% of the canvas, luminance ${luminance.toFixed(0)}) — ` +
+      `cropped, then re-placed per mask on a ${plate === DARK_PLATE ? 'dark' : 'white'} plate.`,
   );
 
   let drift = 0;
   for (const target of targets()) {
-    const bytes = await build(glyph, target);
+    const bytes = await build(glyph, target, plate);
     const rel = path.relative(ROOT, target.file);
     if (checkOnly) {
       const current = fs.existsSync(target.file) ? fs.readFileSync(target.file) : null;
@@ -275,7 +318,22 @@ async function main() {
 }
 
 // Exported for scripts/sync-android-icon.mjs (live branding → APK icon).
-module.exports = { COVERAGE, DENSITIES, TRANSPARENT, BRAND_PLATE, opaqueBounds, readGlyph, composeIcon, makeBadge, targets, build };
+module.exports = {
+  COVERAGE,
+  DENSITIES,
+  TRANSPARENT,
+  BRAND_PLATE,
+  DARK_PLATE,
+  LIGHT_ARTWORK_LUMINANCE,
+  opaqueBounds,
+  glyphLuminance,
+  plateFor,
+  readGlyph,
+  composeIcon,
+  makeBadge,
+  targets,
+  build,
+};
 
 if (require.main === module) {
   main().catch((e) => {

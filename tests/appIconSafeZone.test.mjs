@@ -79,12 +79,36 @@ function decodePng(file) {
 }
 
 /**
- * Opaque, non-white ink — the white plate of a maskable icon is background.
- * `whiteIsInk` flips that for the notification badge, which is a WHITE
- * silhouette on transparent (the OS renders only its alpha).
+ * The artwork of a committed icon, measured against the plate it sits on.
+ *
+ * What counts as "ink" is derived from the icon itself, never hardcoded — a
+ * fixed "white is background" rule broke twice: once for a WHITE brand mark on
+ * a transparent plate (it measured anti-aliasing noise and reported a centred
+ * icon as off-centre by 1.58 px), and again when the generator started giving a
+ * light logo a DARK plate (the plate itself read as "glyph" and reached the
+ * corners). So: sample the corners to find the plate, then measure everything
+ * that is not the plate.
+ *
+ *   · a transparent plate ("any", the notification badge) — every opaque pixel
+ *     is artwork, whatever its colour;
+ *   · an opaque plate (maskable, Android launcher, adaptive foreground) — the
+ *     plate is background and the artwork is whatever differs from it.
  */
-function inkStats(file, { whiteIsInk = false } = {}) {
+function inkStats(file) {
   const { width, height, channels, data } = decodePng(file);
+  const at = (x, y) => (y * width + x) * channels;
+  const corners = [at(0, 0), at(width - 1, 0), at(0, height - 1), at(width - 1, height - 1)];
+  const plateAlpha = corners.map((i) => (channels === 4 ? data[i + 3] : 255)).sort((a, b) => a - b)[1];
+  const transparentPlate = plateAlpha < 32;
+  const plate = corners[0];
+  const plateRgb = [data[plate], data[plate + 1], data[plate + 2]];
+  /** Within 40/255 of the plate on every channel = plate, not artwork. */
+  const isPlate = (i) =>
+    !transparentPlate &&
+    Math.abs(data[i] - plateRgb[0]) <= 40 &&
+    Math.abs(data[i + 1] - plateRgb[1]) <= 40 &&
+    Math.abs(data[i + 2] - plateRgb[2]) <= 40;
+
   let ink = 0;
   let minX = width;
   let minY = height;
@@ -94,13 +118,10 @@ function inkStats(file, { whiteIsInk = false } = {}) {
   const radius = (width - 1) / 2;
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
-      const i = (y * width + x) * channels;
+      const i = at(x, y);
       const alpha = channels === 4 ? data[i + 3] : 255;
-      const r = channels >= 3 ? data[i] : data[i];
-      const g = channels >= 3 ? data[i + 1] : data[i];
-      const b = channels >= 3 ? data[i + 2] : data[i];
       if (alpha < 32) continue;
-      if (!whiteIsInk && r >= 240 && g >= 240 && b >= 240) continue;
+      if (isPlate(i)) continue;
       ink += 1;
       if (x < minX) minX = x;
       if (x > maxX) maxX = x;
@@ -114,9 +135,10 @@ function inkStats(file, { whiteIsInk = false } = {}) {
     width,
     height,
     ink,
+    transparentPlate,
     box: { minX, minY, maxX, maxY },
-    coverage: (maxX - minX + 1) / width,
-    centreOffsetPx: Math.hypot((minX + maxX) / 2 - radius, (minY + maxY) / 2 - radius),
+    coverage: maxX < 0 ? 0 : (maxX - minX + 1) / width,
+    centreOffsetPx: maxX < 0 ? 0 : Math.hypot((minX + maxX) / 2 - radius, (minY + maxY) / 2 - radius),
     maxRadius,
   };
 }
@@ -141,7 +163,7 @@ const MASK_RADIUS = {
 
 test("every shipped icon keeps its glyph inside the mask that will be applied", () => {
   for (const target of targets()) {
-    const stats = inkStats(target.file, { whiteIsInk: target.kind === "badge" });
+    const stats = inkStats(target.file);
     const rel = path.relative(process.cwd(), target.file);
     const mask = MASK_RADIUS[target.kind];
     assert.ok(
@@ -178,7 +200,7 @@ test("the master logo is cropped to its glyph, not pasted 1:1", () => {
   assert.match(source, /const COVERAGE = \{/);
   assert.match(source, /maskable: 0\.56/);
   assert.match(source, /any: 0\.68/);
-  assert.match(source, /adaptiveForeground: 0\.44/);
+  assert.match(source, /adaptiveForeground: 0\.42/);
 
   // …and the PWA "any" icon really is ~0.68, not the master's 0.85.
   const stats = inkStats("public/icons/icon-512x512.png");
@@ -196,5 +218,61 @@ test("the Android adaptive foreground fits the 66 dp safe circle", () => {
     // Never smaller than ~55 % of the canvas either: the mark must still read
     // at launcher size on a 108 dp layer.
     assert.ok(stats.coverage >= 0.40, `${file} coverage ${stats.coverage.toFixed(3)}`);
+  }
+});
+
+test("a light logo is never composited on a plate it disappears into", () => {
+  // The regression this guards: the shipped brand mark is WHITE artwork on
+  // transparency. Composited on the generator's old always-white plate it became
+  // a blank square — the launcher showed an empty white tile and the maskable
+  // PWA icon showed nothing. The plate must follow the artwork's luminance.
+  const { BRAND_PLATE, DARK_PLATE, LIGHT_ARTWORK_LUMINANCE, plateFor } = icons;
+  assert.equal(plateFor(255), DARK_PLATE, "white artwork gets the dark plate");
+  assert.equal(plateFor(LIGHT_ARTWORK_LUMINANCE), DARK_PLATE, "the threshold itself counts as light");
+  assert.equal(plateFor(40), BRAND_PLATE, "dark artwork keeps the white plate");
+  const source = fs.readFileSync("scripts/generate-icons.cjs", "utf8");
+  assert.match(source, /glyphLuminance\(/, "the plate is measured, not assumed");
+  assert.match(source, /plateFor\(luminance\)/, "main() picks the plate from the master");
+
+  for (const target of targets()) {
+    const rel = path.relative(process.cwd(), target.file);
+    const stats = inkStats(target.file);
+    // Whatever the plate, an icon must contain artwork: a single flat colour is
+    // the blank-tile bug this test exists for.
+    assert.ok(stats.ink > 100, `${rel}: no artwork found — the logo is invisible on its plate`);
+    if (target.kind === "any" || target.kind === "badge") {
+      assert.ok(stats.transparentPlate, `${rel}: a mark/badge keeps its transparent plate`);
+      continue;
+    }
+    assert.ok(!stats.transparentPlate, `${rel}: a launcher icon is a full-bleed tile`);
+
+    // THE visibility check: the artwork's own mean colour must sit far from the
+    // plate it was composited on. White artwork on a white plate scores ~0 here.
+    const { width, height, channels, data } = decodePng(target.file);
+    const plate = [data[0], data[1], data[2]];
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    let n = 0;
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const i = (y * width + x) * channels;
+        if ((channels === 4 ? data[i + 3] : 255) < 32) continue;
+        if (
+          Math.abs(data[i] - plate[0]) <= 40 &&
+          Math.abs(data[i + 1] - plate[1]) <= 40 &&
+          Math.abs(data[i + 2] - plate[2]) <= 40
+        ) {
+          continue;
+        }
+        r += data[i];
+        g += data[i + 1];
+        b += data[i + 2];
+        n += 1;
+      }
+    }
+    assert.ok(n > 100, `${rel}: no artwork pixels to measure`);
+    const contrast = Math.hypot(r / n - plate[0], g / n - plate[1], b / n - plate[2]);
+    assert.ok(contrast > 100, `${rel}: the artwork averages only ${contrast.toFixed(0)}/441 away from its plate — it would be invisible`);
   }
 });

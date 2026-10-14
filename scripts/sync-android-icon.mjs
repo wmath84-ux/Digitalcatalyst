@@ -154,8 +154,14 @@ async function main() {
     skip(`the downloaded file is not a raster image sharp can read (${error instanceof Error ? error.message : error})`);
   }
 
-  const { glyph, bounds } = await icons.readGlyph(normalised);
-  log(`logo ${bounds.width}×${bounds.height} px glyph measured from ${url}`);
+  const { glyph, bounds, luminance } = await icons.readGlyph(normalised);
+  // A light (near-white) logo must NOT be composited on the white plate — that
+  // is a blank launcher icon. Same rule the dev generator uses.
+  const plate = icons.plateFor(luminance);
+  log(
+    `logo ${bounds.width}×${bounds.height} px glyph measured from ${url} ` +
+      `(luminance ${luminance.toFixed(0)} → ${plate === icons.DARK_PLATE ? "dark" : "white"} plate)`,
+  );
   if (bounds.width < 64 || bounds.height < 64) {
     skip("the saved logo is too small (under 64 px) to build a launcher icon from");
   }
@@ -165,7 +171,7 @@ async function main() {
   if (await writeIfChanged(RESOURCES_ICON, normalised)) changed.push(path.relative(ROOT, RESOURCES_ICON));
 
   for (const target of icons.targets()) {
-    const built = await icons.build(glyph, target);
+    const built = await icons.build(glyph, target, plate);
     if (await writeIfChanged(target.file, built)) changed.push(path.relative(ROOT, target.file));
   }
 
