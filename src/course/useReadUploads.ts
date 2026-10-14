@@ -31,6 +31,8 @@
 //   · Page/activity writes are debounced and coalesced, so scrolling a 300
 //     page PDF cannot cost 300 writes.
 
+import { liveQuery } from "dexie";
+import { listLocalReadUploads, storeLocalReadPdf, patchLocalReadPdf, removeLocalReadPdf, saveLocalReadAnnotations, localReadError } from "./localReadDb";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { collection, deleteDoc, doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db, getFirebaseStorage } from "../../firebase";
@@ -137,6 +139,9 @@ export interface UseReadUploadsResult {
   uploadPdf: (file: File, module?: string, submodule?: string) => Promise<ReadUpload | null>;
   /** Upload many PDFs into the same module / submodule. */
   uploadPdfs: (files: File[], module?: string, submodule?: string) => Promise<ReadUpload[]>;
+  uploadLocalPdfs: (files: File[], module?: string, submodule?: string) => Promise<ReadUpload[]>;
+  localUploading: boolean;
+  localError: string | null;
   removeUpload: (uploadId: string) => Promise<boolean>;
   renameUpload: (uploadId: string, name: string) => Promise<boolean>;
   setUploadModule: (uploadId: string, module: string) => Promise<boolean>;
@@ -275,7 +280,48 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
   const uid = String(uidHint || sessionUser || "").trim() || null;
 
   const [state, setState] = useState<ReadUploadsState>(uid ? "loading" : "idle");
-  const [uploads, setUploads] = useState<ReadUpload[]>([]);
+  const [cloudUploads, setUploads] = useState<ReadUpload[]>([]);
+  const [localShelf, setLocalShelf] = useState<{ uid: string | null; rows: ReadUpload[] }>({ uid: null, rows: [] });
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [localUploading, setLocalUploading] = useState(false);
+  const localBusyRef = useRef(false);
+  const uploads = useMemo(() => sortReadUploads([...cloudUploads.filter((row) => row.uid === uid), ...(localShelf.uid === uid ? localShelf.rows : [])]), [cloudUploads, localShelf, uid]);
+  useEffect(() => {
+    setLocalError(null);
+    if (!uid) return;
+    const subscription = liveQuery(() => listLocalReadUploads(uid)).subscribe({
+      next: (rows) => setLocalShelf({ uid, rows }),
+      error: (failure) => setLocalError(localReadError(failure)),
+    });
+    return () => subscription.unsubscribe();
+  }, [uid]);
+
+  const uploadLocalPdfs = useCallback<UseReadUploadsResult["uploadLocalPdfs"]>(async (files, module, submodule) => {
+    const owner = sessionUid(uid);
+    if (!owner) { setLocalError("Sign in before adding PDFs to your local library."); return []; }
+    if (localBusyRef.current) return [];
+    localBusyRef.current = true;
+    setLocalUploading(true);
+    setLocalError(null);
+    const stored: ReadUpload[] = [];
+    try {
+      for (const file of files) {
+        if (sessionUid(uid) !== owner) break;
+        stored.push(await storeLocalReadPdf(owner, file, module, submodule));
+      }
+    } catch (failure) {
+      setLocalError(localReadError(failure));
+    } finally {
+      localBusyRef.current = false;
+      setLocalUploading(false);
+    }
+    return stored;
+  }, [uid]);
+
+  const runLocalEdit = useCallback(async (work: () => Promise<void>) => {
+    try { await work(); setLocalError(null); return true; }
+    catch (failure) { setLocalError(localReadError(failure)); return false; }
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState<ReadUploadProgress | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -293,6 +339,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
       setError(null);
       return undefined;
     }
+    setUploads([]);
     setState((current) => (current === "ready" ? current : "loading"));
     const unsubscribe = onSnapshot(
       collection(db, "users", uid, READ_UPLOAD_COLLECTION),
@@ -728,6 +775,9 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
     async (uploadId, name) => {
       const owner = sessionUid(uid);
       if (!owner || !isReadUploadId(uploadId)) return false;
+      if (uploads.some((row) => row.id === uploadId && row.storageKind === "local")) {
+        return runLocalEdit(() => patchLocalReadPdf(owner, uploadId, { name }));
+      }
       try {
         await updateDoc(doc(db, "users", owner, READ_UPLOAD_COLLECTION, uploadId), {
           name: sanitizeReadUploadName(name),
@@ -739,13 +789,16 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
         return false;
       }
     },
-    [uid],
+    [uid, uploads, runLocalEdit],
   );
 
   const setUploadModule = useCallback<UseReadUploadsResult["setUploadModule"]>(
     async (uploadId, module) => {
       const owner = sessionUid(uid);
       if (!owner || !isReadUploadId(uploadId)) return false;
+      if (uploads.some((row) => row.id === uploadId && row.storageKind === "local")) {
+        return runLocalEdit(() => patchLocalReadPdf(owner, uploadId, { module }));
+      }
       try {
         await updateDoc(doc(db, "users", owner, READ_UPLOAD_COLLECTION, uploadId), {
           module: sanitizeReadUploadModule(module),
@@ -757,7 +810,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
         return false;
       }
     },
-    [uid],
+    [uid, uploads, runLocalEdit],
   );
 
   const removeUpload = useCallback<UseReadUploadsResult["removeUpload"]>(
@@ -765,6 +818,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
       const owner = sessionUid(uid);
       if (!owner || !isReadUploadId(uploadId)) return false;
       const row = uploads.find((item) => item.id === uploadId) || null;
+      if (row?.storageKind === "local") return runLocalEdit(() => removeLocalReadPdf(owner, uploadId));
       try {
         // The document first: a file without its row is invisible, while a row
         // without its file would open as a broken viewer.
@@ -785,7 +839,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
       }
       return true;
     },
-    [uid, uploads],
+    [uid, uploads, runLocalEdit],
   );
 
   // ── Annotation saves ───────────────────────────────────────────────────
@@ -794,6 +848,7 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
       const owner = sessionUid(uid);
       if (!owner || !isReadUploadId(uploadId)) return false;
       const row = uploads.find((item) => item.id === uploadId);
+      if (row?.storageKind === "local") return runLocalEdit(() => saveLocalReadAnnotations(owner, uploadId, bytes, meta));
       if (!row || !isOwnedReadUploadPath(row.storagePath, owner)) return false;
       if (!bytes || typeof bytes.byteLength !== "number" || bytes.byteLength <= 0) return false;
       try {
@@ -820,10 +875,12 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
         return false;
       }
     },
-    [uid, uploads],
+    [uid, uploads, runLocalEdit],
   );
 
   // ── Activity ("continue where you left off") ───────────────────────────
+  const shelfRef = useRef(uploads);
+  shelfRef.current = uploads;
   const activity = activityRef.current;
   const flushActivity = useCallback(
     (uploadId: string) => {
@@ -836,12 +893,16 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
       const now = Date.now();
       const patch: Record<string, unknown> = { lastPage: Math.trunc(page), lastOpenedAt: now };
       if (pageCount > 0) patch.pageCount = Math.trunc(pageCount);
+      if (shelfRef.current.some((row) => row.id === uploadId && row.storageKind === "local")) {
+        void runLocalEdit(() => patchLocalReadPdf(owner, uploadId, { lastPage: Math.trunc(page), lastOpenedAt: now, ...(pageCount > 0 ? { pageCount } : {}) }));
+        return;
+      }
       void updateDoc(doc(db, "users", owner, READ_UPLOAD_COLLECTION, uploadId), patch).catch(() => {
         // Reading position is not precious enough to interrupt the reader; the
         // device copy (localStorage) still remembers it for this session.
       });
     },
-    [uid, activity],
+    [uid, activity, runLocalEdit],
   );
 
   const recordActivity = useCallback<UseReadUploadsResult["recordActivity"]>(
@@ -906,6 +967,9 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
       retryableName,
       uploadPdf,
       uploadPdfs,
+      uploadLocalPdfs,
+      localUploading,
+      localError,
       removeUpload,
       renameUpload,
       setUploadModule,
@@ -926,6 +990,9 @@ export function useReadUploads(uidHint?: string | null): UseReadUploadsResult {
       retryableName,
       uploadPdf,
       uploadPdfs,
+      uploadLocalPdfs,
+      localUploading,
+      localError,
       removeUpload,
       renameUpload,
       setUploadModule,

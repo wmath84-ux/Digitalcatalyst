@@ -34,6 +34,7 @@
 // "Add to My Module" dialog — the same one the Player settings use — so it
 // lands in a My Study Library module and reopens there in this very viewer.
 
+import { parseLocalReadReference } from "../../utils/localReadReference.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -300,6 +301,7 @@ export default function ReadLibraryPanel({
   const [copyState, setCopyState] = useState<"idle" | "saving" | "error">("idle");
   const [copyError, setCopyError] = useState("");
   const [libraryMode, setLibraryMode] = useState<"course" | "mine">("course");
+  const [composeStorage, setComposeStorage] = useState<"cloud" | "local">("cloud");
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeModule, setComposeModule] = useState("");
   const [composeSubmodule, setComposeSubmodule] = useState("");
@@ -319,8 +321,10 @@ export default function ReadLibraryPanel({
 
   const activeKind = kindOf(activeId);
   const activeEntry = activeKind === "course" ? entries.find((entry) => entry.id === bareId(activeId)) || null : null;
-  const activeUpload =
-    activeKind === "learner" ? readUploads.uploads.find((row) => row.id === bareId(activeId)) || null : null;
+  const localEntry = parseLocalReadReference(activeEntry?.presentation.sourceUrl);
+  const activeUpload = activeKind === "learner"
+    ? readUploads.uploads.find((row) => row.id === bareId(activeId)) || null
+    : localEntry?.uid === user?.id ? readUploads.uploads.find((row) => row.id === localEntry?.id && row.storageKind === "local") || null : null;
   const activeUploadRef = useRef<ReadUpload | null>(null);
   activeUploadRef.current = activeUpload;
 
@@ -344,7 +348,7 @@ export default function ReadLibraryPanel({
 
   const filteredUploads = useMemo(() => {
     if (!needle) return readUploads.uploads;
-    return readUploads.uploads.filter((row) => [row.name, row.module].filter(Boolean).join(" ").toLocaleLowerCase().includes(needle));
+    return readUploads.uploads.filter((row) => [row.name, row.module, row.submodule].filter(Boolean).join(" ").toLocaleLowerCase().includes(needle));
   }, [readUploads.uploads, needle]);
 
   const uploadGroups = useMemo(() => groupReadUploads(filteredUploads), [filteredUploads]);
@@ -372,7 +376,7 @@ export default function ReadLibraryPanel({
       const upload = activeUploadRef.current;
       if (!upload) return;
       writePageToStorage(productId, `mine-${upload.id}`, page);
-      readUploadsRef.current.recordActivity(upload.id, page, upload.pageCount);
+      readUploadsRef.current.recordActivity(upload.id, page, annotationApiRef.current?.pageCount() || upload.pageCount);
     },
     [productId],
   );
@@ -398,6 +402,7 @@ export default function ReadLibraryPanel({
         pageCount: api.pageCount(),
         annotationCount: api.annotationCount(),
       });
+      if (ok) api.markSaved(bytes);
       setAnnotationState(ok ? "saved" : "error");
       return ok;
     } catch {
@@ -417,14 +422,14 @@ export default function ReadLibraryPanel({
   // is deliberately not React state (the viewer owns it), so the chrome polls
   // the cheap boolean rather than the viewer re-rendering the panel.
   useEffect(() => {
-    if (activeKind !== "learner") return undefined;
+    if (!activeUpload) return undefined;
     const timer = setInterval(() => {
       const api = annotationApiRef.current;
       if (!api) return;
       setAnnotationState((current) => (current === "saving" ? current : api.isDirty() ? "dirty" : current));
     }, 1200);
     return () => clearInterval(timer);
-  }, [activeKind, activeId]);
+  }, [Boolean(activeUpload), activeId]);
 
   /**
    * The failure net: if the annotated bytes cannot reach Storage (offline, a
@@ -491,14 +496,14 @@ export default function ReadLibraryPanel({
   }, []);
 
   const leaveReader = useCallback(async () => {
-    if (activeKind !== "learner") {
+    if (!activeUpload) {
       closeReader();
       return;
     }
     const saved = await saveAnnotationsNow();
     if (saved) closeReader();
     else setLeaveBlocked(true);
-  }, [activeKind, closeReader, saveAnnotationsNow]);
+  }, [activeUpload, closeReader, saveAnnotationsNow]);
 
   // A tab switch / panel unmount must not eat unsaved marks: best-effort save
   // with the bridge that is still alive at cleanup time.
@@ -591,7 +596,8 @@ export default function ReadLibraryPanel({
     urlAbortRef.current = null;
   }, [urlDraft]);
 
-  const openUploadPicker = useCallback(() => {
+  const openUploadPicker = useCallback((storage: "cloud" | "local" = "cloud") => {
+    setComposeStorage(storage);
     readUploadsRef.current.clearUploadError();
     setLibraryMode("mine");
     setComposeOpen(true);
@@ -604,19 +610,24 @@ export default function ReadLibraryPanel({
       return;
     }
     setNotice(null);
-    const stored = await readUploadsRef.current.uploadPdfs(files, composeModule, composeSubmodule);
+    const stored = await (composeStorage === "local"
+      ? readUploadsRef.current.uploadLocalPdfs(files, composeModule, composeSubmodule)
+      : readUploadsRef.current.uploadPdfs(files, composeModule, composeSubmodule));
     // Nothing stored (cancelled, or the only file failed): keep the sheet and
     // the picked files, so Upload / Retry is one tap away.
     if (!stored.length) return;
-    setComposeFiles([]);
-    setComposeOpen(false);
+    // Keep failed/unprocessed files available for retry; do not duplicate successful imports.
+    setComposeFiles(composeStorage === "local" ? files.slice(stored.length) : []);
+    setComposeOpen(composeStorage === "local" && stored.length < files.length);
     setNotice(
-      stored.length === 1
+      composeStorage === "local"
+        ? `${stored.length} PDF${stored.length === 1 ? "" : "s"} saved on this device. Annotations stay local.`
+        : stored.length === 1
         ? `“${stored[0].name}” is in Your annotations — annotate it and it saves to your account.`
         : `${stored.length} PDFs are in Your annotations.`,
     );
     setActiveId(withKind("learner", stored[0].id));
-  }, [composeFiles, composeModule, composeSubmodule]);
+  }, [composeFiles, composeModule, composeSubmodule, composeStorage]);
 
   const handleDelete = useCallback(async () => {
     const target = confirmDelete;
@@ -636,7 +647,7 @@ export default function ReadLibraryPanel({
     await readUploadsRef.current.setUploadModule(target, moduleDraft);
   }, [editingModuleId, moduleDraft]);
 
-  const uploadBusy = Boolean(readUploads.uploading);
+  const uploadBusy = Boolean(readUploads.uploading) || readUploads.localUploading;
 
   return (
     <section
@@ -649,7 +660,7 @@ export default function ReadLibraryPanel({
           scroll position survive opening a PDF and returning with Back. */}
       <div className={`flex h-full min-h-0 flex-col ${activeId ? "hidden" : ""}`} aria-hidden={Boolean(activeId)} data-course-read-library>
         <div className="shrink-0 border-b border-white/10 px-3 pb-3 pt-3 sm:px-4">
-          <div className="mb-2 flex items-center gap-2">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
             <BookOpenText size={17} className="shrink-0 text-violet-300" aria-hidden="true" />
             <h2 className="text-sm font-bold text-white">Read library</h2>
             <div
@@ -688,15 +699,25 @@ export default function ReadLibraryPanel({
             {/* The library grows here: a learner's own PDF, in one tap. */}
             <button
               type="button"
-              onClick={openUploadPicker}
+              onClick={() => openUploadPicker("cloud")}
               disabled={uploadBusy}
-              aria-label="Upload your own PDF"
-              title="Upload your own PDF"
+              aria-label="Cloud upload"
+              title="Cloud upload — save and sync PDFs to your account"
               className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-violet-300/30 bg-violet-400/15 px-2.5 text-[11px] font-bold text-violet-100 transition-colors hover:bg-violet-400/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 disabled:cursor-not-allowed disabled:opacity-50"
               data-course-read-upload
             >
               {uploadBusy ? <LoaderCircle size={15} className="animate-spin" aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}
-              <span className="hidden sm:inline">Upload PDF</span>
+              <span>Cloud upload</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => openUploadPicker("local")}
+              disabled={uploadBusy}
+              title="Upload local — save PDFs on this device, without Firebase Storage"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-emerald-300/30 bg-emerald-400/15 px-2.5 text-[11px] font-bold text-emerald-100 hover:bg-emerald-400/25 disabled:opacity-50"
+              data-course-read-upload-local
+            >
+              <FileText size={15} aria-hidden="true" /> Upload local
             </button>
             <input
               ref={fileInputRef}
@@ -750,6 +771,7 @@ export default function ReadLibraryPanel({
           </div>
         </div>
 
+        {readUploads.localError ? <p role="alert" className="mx-3 my-2 rounded-xl bg-amber-400/10 p-3 text-xs text-amber-200" data-course-read-local-error>{readUploads.localError}</p> : null}
         {/* Upload progress + failures: one honest line, never a silent wait. */}
         <UploadStatus
           uploading={readUploads.uploading}
@@ -784,7 +806,7 @@ export default function ReadLibraryPanel({
               </span>
             </div>
             <p className="mb-2 text-[10px] leading-4 text-slate-400">
-              Your own PDFs open in the same viewer as course PDFs — annotate them and the marks save to your account.
+              Cloud PDFs sync to your account. Local PDFs and annotations stay on this device — they do not use Firebase Storage. Clearing site data removes local files; download a backup to keep them.
             </p>
 
             {uploadGroups.every((group) => group.items.length === 0) ? (
@@ -796,11 +818,11 @@ export default function ReadLibraryPanel({
                 <p className="mt-1 text-[10px] text-slate-500">Create a module, add a submodule, and upload one or more PDFs.</p>
                 <button
                   type="button"
-                  onClick={openUploadPicker}
+                  onClick={() => openUploadPicker("cloud")}
                   disabled={uploadBusy}
                   className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-violet-300/30 bg-violet-400/15 px-3 py-1.5 text-[11px] font-bold text-violet-100 hover:bg-violet-400/25 disabled:opacity-50"
                 >
-                  <Plus size={13} aria-hidden="true" /> Upload a PDF
+                  <Plus size={13} aria-hidden="true" /> Cloud upload
                 </button>
               </div>
             ) : (
@@ -818,7 +840,7 @@ export default function ReadLibraryPanel({
                   ) : null}
                   <ul className="space-y-2" aria-label={group.module ? `${group.module} PDFs` : "Your uploaded PDFs"}>
                     {bucket.items.map((row) => {
-                      const meta = [readUploadMetaLabel(row), readUploadPageLabel(row)].filter(Boolean).join(" · ");
+                      const meta = [row.storageKind === "local" ? "Local · this device" : "Cloud", readUploadMetaLabel(row), readUploadPageLabel(row)].filter(Boolean).join(" · ");
                       return (
                         <li key={row.id} className="rounded-2xl border border-white/10 bg-white/[0.045]" data-course-read-mine-row={row.id}>
                           <div className="flex items-center gap-2 p-2.5">
@@ -844,7 +866,7 @@ export default function ReadLibraryPanel({
                                 type="button"
                                 onClick={() => onAddToModule(row)}
                                 aria-label={`Save ${row.name} to one of my modules`}
-                                title="Save to my module (My Study Library)"
+                                title={row.storageKind === "local" ? "Save to my module (My Study Library) — this PDF only opens on this device" : "Save to my module (My Study Library)"}
                                 className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-violet-200"
                                 data-course-read-add-to-module={row.id}
                               >
@@ -983,6 +1005,13 @@ export default function ReadLibraryPanel({
                   {activeEntry ? activeEntry.modulePath.join(" / ") : [activeUpload?.module, readUploadMetaLabel(activeUpload || undefined)].filter(Boolean).join(" · ")}
                 </p>
               </div>
+              {activeUpload?.storageKind === "local" ? (
+                <button type="button" onClick={() => void downloadAnnotatedCopy()}
+                  className="rounded-xl border border-white/10 px-3 py-2 text-[11px] font-bold text-white hover:bg-white/10"
+                  title="Download a backup including your annotations" data-course-read-local-download>
+                  Download PDF
+                </button>
+              ) : null}
               {activeUpload ? (
                 <>
                   <span
@@ -997,7 +1026,7 @@ export default function ReadLibraryPanel({
                     }`}
                     data-course-read-annotation-state={annotationState}
                   >
-                    {annotationState === "idle" ? "Annotations save to your account" : readUploadSyncLabel(annotationState)}
+                    {annotationState === "idle" ? (activeUpload.storageKind === "local" ? "Annotations save on this device" : "Annotations save to your account") : readUploadSyncLabel(annotationState)}
                   </span>
                   {annotationState === "dirty" || annotationState === "error" ? (
                     <button
@@ -1031,7 +1060,7 @@ export default function ReadLibraryPanel({
                       <span className="hidden sm:inline">Open in Drive</span>
                     </a>
                   ) : null}
-                  {activeEntry?.presentation.kind === "pdfjs" ? (
+                  {activeEntry?.presentation.kind === "pdfjs" && !localEntry ? (
                     <button
                       type="button"
                       onClick={() => void saveCourseCopy()}
@@ -1051,7 +1080,7 @@ export default function ReadLibraryPanel({
             {/* A failed save never traps the learner — and never lies about it. */}
             {leaveBlocked && activeUpload ? (
               <div className="z-10 flex shrink-0 flex-wrap items-center gap-2 border-b border-amber-400/25 bg-amber-400/10 px-3 py-2 text-[11px] font-semibold text-amber-100 sm:px-4" role="alert" data-course-read-save-blocked>
-                <span className="min-w-0 flex-1">Annotations have not reached your account yet.</span>
+                <span className="min-w-0 flex-1">{activeUpload.storageKind === "local" ? "Annotations have not been saved on this device yet." : "Annotations have not reached your account yet."}</span>
                 <button
                   type="button"
                   onClick={() => void saveAnnotationsNow().then((ok) => ok && closeReader())}
@@ -1155,13 +1184,28 @@ export default function ReadLibraryPanel({
 
       {composeOpen ? (
         <div className="absolute inset-0 z-20 flex items-end justify-center bg-black/50 p-3 sm:items-center" data-course-read-compose>
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-4 shadow-2xl">
+          <div className="max-h-full w-full max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-slate-900 p-4 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white">Create your module</h3>
+              <h3 className="text-sm font-bold text-white">{composeStorage === "local" ? "Upload local" : "Cloud upload"} · My module</h3>
               <button type="button" onClick={() => setComposeOpen(false)} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white" aria-label="Close">
                 <X size={16} />
               </button>
             </div>
+            <div className="mb-3 flex gap-2" role="group" aria-label="PDF storage destination">
+              {(["cloud", "local"] as const).map((storage) => (
+                <button key={storage} type="button" disabled={uploadBusy} aria-pressed={composeStorage === storage}
+                  onClick={() => { setComposeStorage(storage); if (storage === "local") readUploadsRef.current.clearUploadError(); }}
+                  className={`rounded-lg px-3 py-2 text-xs font-bold ${composeStorage === storage ? "bg-emerald-500 text-white" : "bg-white/10 text-slate-300"}`}>
+                  {storage === "local" ? "Upload local" : "Cloud upload"}
+                </button>
+              ))}
+            </div>
+            <p className="mb-3 text-[11px] leading-relaxed text-slate-400">
+              {composeStorage === "local"
+                ? "Stored in this browser/device database, not the cloud. PDF.js annotations and reading position are saved here. Files won't sync and are removed if site data is cleared. Download a backup."
+                : "Uploads to Firebase Storage and saves library metadata to your account. Requires working cloud storage, rules and billing configuration."}
+            </p>
+            {readUploads.localError ? <p role="alert" className="mb-3 text-xs text-amber-200">{readUploads.localError}</p> : null}
             <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
               Module name
               <input
@@ -1272,7 +1316,7 @@ export default function ReadLibraryPanel({
               className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 text-xs font-black text-white hover:bg-emerald-400 disabled:opacity-50"
             >
               {uploadBusy ? <LoaderCircle size={15} className="animate-spin" /> : <CloudUpload size={15} />}
-              Upload to my module
+              {composeStorage === "local" ? (readUploads.localUploading ? "Saving locally…" : "Upload local to my module") : "Cloud upload to my module"}
             </button>
           </div>
         </div>

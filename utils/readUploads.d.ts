@@ -19,6 +19,8 @@ export interface ReadUpload {
   module: string;
   /** "" = no submodule; otherwise a folder under `module`. */
   submodule: string;
+  /** Absent on legacy cloud rows. Local rows never go to Firestore. */
+  storageKind?: "local" | "cloud";
   storagePath: string;
   url: string;
   sizeBytes: number;
@@ -83,7 +85,7 @@ export function readUploadModuleDraft(row: Partial<ReadUpload> | null | undefine
   type: "read";
   url: string;
   description: string;
-  readSourceKind: "upload";
+  readSourceKind: "upload" | "pdf_url";
   readStoragePath: string;
   readFileName: string;
   readFileSize: number;

@@ -1,3 +1,4 @@
+import { parseLocalReadReference } from "./localReadReference.js";
 // First-class Read resources shared by the admin editor, course mapper and player.
 // This module deliberately has no Firebase / browser dependency so its URL,
 // ownership and access rules can be tested directly in Node.
@@ -241,6 +242,8 @@ export const normalizeReadResourceUrl = (value, sourceKind, options = {}) => {
     if (!Number.isFinite(size) || size <= 0 || size >= READ_PDF_MAX_BYTES) return "";
     return String(value).trim();
   }
+  // Device-only references are resolved by PDF.js, never embedded or fetched remotely.
+  if (kind === "pdf_url" && parseLocalReadReference(value)) return String(value);
   if (kind === "gdrive") {
     const id = googleDriveFileId(value);
     return id ? `https://drive.google.com/file/d/${id}/view` : "";
@@ -321,7 +324,7 @@ export const getReadResourcePresentation = (resource, options = {}) => {
     sourceKind,
     sourceUrl,
     originalUrl: sourceUrl,
-    label: readSourceLabel(sourceKind === "embed_url" ? "pdf_url" : sourceKind),
+    label: parseLocalReadReference(sourceUrl) ? "Local PDF · this device" : readSourceLabel(sourceKind === "embed_url" ? "pdf_url" : sourceKind),
   };
 };
 
