@@ -106,16 +106,29 @@ export default function PdfJsGenericViewer({
   onPageChange,
   onAnnotationApi,
   originalUrl,
+  onOpenBasicViewer,
 }: {
   src: string;
   title: string;
-  productId: string;
-  resourceId: string;
+  /**
+   * Read tab: the document's own identity, used for the per-document page
+   * memory. The Course Player's lesson viewer has no read-resource ids — its
+   * page lives in the player's playback store instead — so both are optional.
+   */
+  productId?: string;
+  resourceId?: string;
   initialPage?: number;
   onPageChange: (page: number) => void;
   onAnnotationApi?: (api: PdfAnnotationApi | null) => void;
   /** The link the learner can open in a new tab when the viewer cannot read the file. */
   originalUrl?: string;
+  /**
+   * Offered ONLY when the source could not be read (CORS / network). The host
+   * may still let the browser's own PDF viewer render it inside a plain frame,
+   * so the learner gets an explicit escape hatch instead of a dead end — never
+   * a silent switch away from PDF.js.
+   */
+  onOpenBasicViewer?: () => void;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const initialPageRef = useRef(initialPage);
@@ -132,7 +145,9 @@ export default function PdfJsGenericViewer({
   // never remount the viewer (a remount would drop unsaved annotations).
   const pageChangeRef = useRef(onPageChange);
   pageChangeRef.current = onPageChange;
-  const storageKey = `digitalcatalyst:read-page:${encodeURIComponent(productId)}:${encodeURIComponent(resourceId)}`;
+  const storageKey = productId && resourceId
+    ? `digitalcatalyst:read-page:${encodeURIComponent(productId)}:${encodeURIComponent(resourceId)}`
+    : "";
 
   useEffect(() => {
     let cancelled = false;
@@ -177,7 +192,9 @@ export default function PdfJsGenericViewer({
         element.setAttribute("wasm-url", localUrl("wasm/"));
         element.setAttribute("viewer-css-theme", "DARK");
         const savedPage = Number(initialPageRef.current);
-        const initialPage = Number.isInteger(savedPage) && savedPage > 1 ? savedPage : readPageFromStorage(storageKey);
+        const initialPage = Number.isInteger(savedPage) && savedPage > 1
+          ? savedPage
+          : storageKey ? readPageFromStorage(storageKey) : 1;
         if (initialPage > 1) element.setAttribute("page", String(initialPage));
         element.style.cssText = "display:block;width:100%;height:100%;min-height:0;background:#111827";
         hostRef.current.replaceChildren(element);
@@ -323,6 +340,17 @@ export default function PdfJsGenericViewer({
                   data-read-pdf-retry
                 >
                   Retry
+                </button>
+              ) : null}
+              {onOpenBasicViewer && problem.kind === "network" ? (
+                <button
+                  type="button"
+                  onClick={onOpenBasicViewer}
+                  className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20"
+                  data-read-pdf-basic-viewer
+                  title="The host refused the read. The browser's own PDF viewer may still show it."
+                >
+                  Try the basic viewer
                 </button>
               ) : null}
               {originalUrl ? (

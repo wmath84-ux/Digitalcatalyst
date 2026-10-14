@@ -10,6 +10,15 @@ export function buildReadStoragePath(productId: string, resourceId: string, uplo
 export function isOwnedReadUploadPath(value: unknown, productId?: string | null, resourceId?: string | null): boolean;
 /** The learner's own Memory tree: `userReadUploads/{uid}/{uploadId}-{slug}.pdf`. */
 export function isOwnedLearnerReadUploadPath(value: unknown): boolean;
+/**
+ * `github.com/<o>/<r>/blob|raw/<ref>/<file>.pdf` → `raw.githubusercontent.com/…`,
+ * the one GitHub address that answers with the bytes and allows a cross-origin
+ * read. Anything else (non-PDF path, other host, credentials, http) returns "".
+ */
+export function githubRawPdfUrl(value: unknown): string;
+/** True when the URL's own path ends in `.pdf` (query/hash ignored). */
+export function isPdfSourceUrl(value: unknown): boolean;
+
 /** PDF bytes URL for a Drive file — downloads/exports only (never the reader). */
 export function googleDrivePdfUrl(value: unknown): string;
 /** Drive's embeddable `/preview` viewer URL, used by the Read reader. */

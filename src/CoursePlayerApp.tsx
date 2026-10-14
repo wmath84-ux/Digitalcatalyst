@@ -1862,8 +1862,18 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     // The board is unmounted the instant its tab loses focus, so the last
     // stroke has to be written on the way out, not on the next debounce.
     if (previous === "sketch" && dockTab !== "sketch") sketch.flush();
-    // `mindMap.flush` / `sketch.flush` are stable callbacks, so only the tab
-    // is watched.
+    // ── Opening a cloud-backed tab re-reads it ─────────────────────────────
+    // "Doosre device par likha hua yahan nahi dikhta" was reported for BOTH the
+    // Notes and the Mind Map tabs: the panel painted the device mirror and then
+    // kept it for the rest of the session, so work done elsewhere only appeared
+    // after closing and reopening the panel. Opening the tab IS the reopen
+    // signal, so it now repeats the (single, one-shot) cloud read. The hooks
+    // refuse the read while this device still has unacknowledged edits, so a
+    // refresh can never race a save of the learner's own work.
+    if (previous !== "notes" && dockTab === "notes") notesCtl.reload();
+    if (previous !== "mindmap" && dockTab === "mindmap") mindMap.reload();
+    // `mindMap.flush` / `sketch.flush` / the reload callbacks are stable, so
+    // only the tab is watched.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dockTab]);
 

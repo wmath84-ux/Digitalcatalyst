@@ -31,10 +31,19 @@
 //
 // Like Notes, this also mirrors the latest local state so a temporary
 // Firestore failure never strands the learner's work.
+//
+// FRESHNESS (no live listener, by design — the owner removed realtime sync in
+// favour of saved/storage-backed updates): the module library is re-read when
+// the learner comes back to the tab/app after LIST_READ_STALE_MS, and whenever
+// the Mind Map tab is opened again. A map drawn on another device therefore
+// appears on return instead of "panel kholte hi purani list". Reads never touch
+// this device's outbox (`uploads` / `deletes`) and local-newer summaries always
+// win the merge, so freshness can never overwrite unsaved work.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
 import { auth, db } from "../../firebase";
+import { shouldRefreshMapList } from "./cloudFreshness";
 import {
   MAX_MAPS_PER_MODULE,
   MIND_MAP_DEFAULT_KEY,
@@ -49,6 +58,9 @@ import {
   toFirestoreMindMap,
   type MindMap,
 } from "../../utils/mindMapTree";
+
+/** The freshness rule lives in its own module so it can be tested directly. */
+export { LIST_READ_STALE_MS, shouldRefreshMapList } from "./cloudFreshness";
 
 export type MindMapSaveStatus = "idle" | "loading" | "ready" | "pending" | "saving" | "saved" | "error";
 
@@ -266,6 +278,8 @@ interface MapSession extends MapOutbox {
   listReadFailed: boolean;
   listAttempts: number;
   listRetry: ReturnType<typeof setTimeout> | null;
+  /** Epoch ms of the last settled library read (0 = never read this session). */
+  lastListReadAt: number;
   disposed: boolean;
 }
 
@@ -345,7 +359,7 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
       summaries: rows.length ? sortSummaries(rows) : scoped ? [seedSummary(rootTopic || "Central idea")] : [],
       drafts: new Map(), deletions: new Map(), retiredKeys: new Set(outbox.deletes),
       mapsLoading: scoped, listError: null, listReadFailed: false,
-      listAttempts: 0, listRetry: null, disposed: false,
+      listAttempts: 0, listRetry: null, lastListReadAt: 0, disposed: false,
     };
     // rootTopic only seeds a new scope; changing a title must not reload a diagram.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -598,6 +612,7 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
       }
       session.summaries = sortSummaries([...byKey.values()]).slice(0, MAX_MAPS_PER_MODULE);
       persistIndex(session);
+      session.lastListReadAt = Date.now();
       session.listReadFailed = false;
       session.listAttempts = 0;
       if (!session.deletes.size) session.listError = null;
@@ -606,6 +621,7 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
       }
     }).catch((thrown: unknown) => {
       if (cancelled || session.disposed) return;
+      session.lastListReadAt = Date.now();
       session.listReadFailed = true;
       session.listError = describeMapError(thrown);
       if (session.listAttempts < 8) {
@@ -671,7 +687,19 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
     for (const key of scope.deletes) deleteRef.current(scope, key);
   }, [session, retryReads]);
 
-  const reload = useCallback(() => retryReads(session), [session, retryReads]);
+  /**
+   * Re-read the module library (and retry any failed document read). Used by the
+   * panels' "Try again" AND whenever the Mind Map tab is (re)opened, so a map
+   * saved on another device is never hidden behind a stale list.
+   */
+  const reload = useCallback(() => {
+    const scope = session;
+    retryReads(scope);
+    if (!scope.scoped || scope.disposed) return;
+    scope.listAttempts = 0;
+    if (scope.listRetry) { clearTimeout(scope.listRetry); scope.listRetry = null; }
+    if (scopeRef.current === scope) setListReloadToken((token) => token + 1);
+  }, [session, retryReads]);
 
   const selectMap = useCallback((mapKey: string) => {
     const scope = session;
@@ -763,11 +791,18 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
       for (const key of session.deletes) deleteRef.current(session, key);
     };
     // Both hiding the page and returning to it are flush opportunities.
+    const refreshIfStale = () => {
+      if (session.listReadFailed) { retryReads(session); return; }
+      if (shouldRefreshMapList({
+        uploads: session.uploads.size, deletes: session.deletes.size,
+        mapsLoading: session.mapsLoading, lastListReadAt: session.lastListReadAt,
+      })) reload();
+    };
     const onVisible = () => {
-      if (document.visibilityState === "visible") retryReads(session);
+      if (document.visibilityState === "visible") refreshIfStale();
       maybeFlush();
     };
-    const onOnline = () => { retryReads(session); maybeFlush(); };
+    const onOnline = () => { refreshIfStale(); maybeFlush(); };
     window.addEventListener("online", onOnline);
     window.addEventListener("pagehide", maybeFlush);
     document.addEventListener("visibilitychange", onVisible);
@@ -783,7 +818,7 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
       for (const job of session.deletions.values()) if (job.retry) clearTimeout(job.retry);
       maybeFlush();
     };
-  }, [session, retryReads]);
+  }, [session, retryReads, reload]);
 
   const maps = useMemo(() => session.summaries.map((row) => row.mapKey === session.activeMapKey ? {
     ...row, title: mindMapDisplayTitle(active.mind, row.title || "Untitled map"),

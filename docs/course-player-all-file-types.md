@@ -52,8 +52,18 @@ Every course in the app now includes a comprehensive demo module system with **a
 - **Demo URL**: W3Schools horse sound OGG
 
 ### 4. PDF (`type: "pdf"`)
-- **Embed URL**: Direct URL rendered in iframe (Chrome built-in PDF viewer)
-- **Viewer**: Sandboxed iframe
+- **Viewer**: the **bundled Mozilla PDF.js Generic Viewer** — the same locally
+  packaged viewer the Read tab uses (toolbar, thumbnails, search, page resume).
+  The viewer script is fetched only when a PDF is opened.
+- A **GitHub** `blob`/`raw` link is rewritten to `raw.githubusercontent.com`
+  first (the only GitHub address that answers with bytes and allows a
+  cross-origin read).
+- A **Google Drive** file keeps Drive's own `/preview` frame: its byte URL
+  redirects through a host with no CORS header, so PDF.js could never read it
+  (see `docs/read-resources.md`).
+- If a host refuses the cross-origin read, the learner gets the reason plus a
+  **"Try the basic viewer"** button (the browser's own in-frame viewer) — a
+  deliberate choice, never a silent fallback.
 - **Demo URLs**: W3C test PDF, Mozilla TraceMonkey technical paper
 
 ### 5. Doc (`type: "doc"`)
@@ -75,7 +85,7 @@ Every course in the app now includes a comprehensive demo module system with **a
 - **Demo**: Google Slides template + PDF as direct slides
 
 ### 8. E-book (`type: "ebook"`)
-- **PDF e-book**: Renders natively via Chrome's built-in PDF viewer
+- **PDF e-book**: opens in the bundled PDF.js viewer (same path as PDF above)
 - **EPUB/other**: Falls back to `https://docs.google.com/gview?embedded=1&url={encoded_url}`
 - **Viewer**: Sandboxed iframe
 - **Demo URLs**: Archive.org open book, W3C sample PDF
@@ -139,7 +149,7 @@ These modules have `accessLevel: "paidUpdate"` and appear locked in the Course P
 - ✅ YouTube no-cookie embed with a strictly contained, full-height mobile player surface for usable settings menus
 - ✅ Native video player with controls
 - ✅ Native audio player with controls
-- ✅ PDF iframe rendering
+- ✅ PDF rendering through the bundled PDF.js viewer (Drive stays in Drive's frame)
 - ✅ Google Doc preview
 - ✅ Google Sheet preview
 - ✅ Google Slides embed

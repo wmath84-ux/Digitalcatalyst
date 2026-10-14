@@ -55,7 +55,7 @@ fs.writeFileSync(
   `
 export const store = new Map();          // "users/u1/notes/<id>" -> document data
 export const commits = [];               // every op that reached the "server"
-export const state = { failWrites: null, failReads: null, writeDelayMs: 0, activeWrites: 0, maxActiveWrites: 0 };
+export const state = { failWrites: null, failReads: null, writeDelayMs: 0, activeWrites: 0, maxActiveWrites: 0, reads: 0 };
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const listeners = [];
 
@@ -131,6 +131,7 @@ export function onSnapshot(q, onData, onError) {
 }
 
 export async function getDocs(q) {
+  state.reads += 1;
   if (state.failReads) throw fail(state.failReads);
   return snapshotOf(q);
 }
@@ -188,6 +189,7 @@ export const reset = () => {
   state.writeDelayMs = 0;
   state.activeWrites = 0;
   state.maxActiveWrites = 0;
+  state.reads = 0;
 };
 export const noteDoc = (uid, id) => store.get(\`users/\${uid}/notes/\${id}\`);
 export const noteIds = (uid, productId) =>
@@ -368,6 +370,34 @@ function seedCloudNote(uid, productId, note) {
   fsx.store.set(`users/${uid}/notes/${payload.id}`, payload);
   return payload;
 }
+
+/**
+ * The freshness rule is deliberately time-based, so the tests move the clock
+ * instead of sleeping for a minute. Every `Date.now()` in the bundle reads the
+ * same patched constructor.
+ */
+const realNow = Date.now;
+let clockOffset = 0;
+const withClock = async (fn) => {
+  const previousOffset = clockOffset;
+  const previousNow = Date.now;
+  clockOffset = 0;
+  Date.now = () => realNow() + clockOffset;
+  try {
+    return await fn();
+  } finally {
+    clockOffset = previousOffset;
+    Date.now = previousNow;
+  }
+};
+const advanceClock = (ms) => { clockOffset += ms; };
+/** The learner leaves the app (or switches tabs) and comes back. */
+const returnToApp = async () => {
+  await act(async () => {
+    window.document.dispatchEvent(new window.Event("visibilitychange"));
+    await sleep(30);
+  });
+};
 
 /** Let the listener's microtask + any debounce settle. */
 async function settle(ms = 30) {
@@ -858,4 +888,63 @@ test("default saving lands on device before the batched cloud backup", async () 
   await settle();
   assert.equal(fsx.noteDoc(UID, note.id).text, "Local first");
   notesController.unmount();
+});
+
+/* ── freshness (owner report: "notes kabhi sync nahi hote") ───────────────── */
+
+test("coming back to the tab re-reads the cloud once the read has gone stale", async () => {
+  await withClock(async () => {
+    const notesController = fixture.mount(freshWorld(), { uid: UID, productId: PRODUCT, debounceMs: 60_000 });
+    await settle();
+    const atMount = fsx.state.reads;
+    assert.ok(atMount >= 1, "the notes hook never read the cloud");
+
+    // Another device writes. There is no listener, so this device cannot see
+    // it until the read is repeated — the reported "occasionally not synced".
+    await act(async () => { seedCloudNote(UID, PRODUCT, {
+      id: "from-the-tablet", text: "Written on the tablet", html: "<p>Written on the tablet</p>", createdAt: 3000,
+    }); await sleep(0); });
+    assert.equal(text("count"), "0");
+
+    advanceClock(61_000);
+    await returnToApp();
+    await settle();
+    assert.ok(fsx.state.reads > atMount, "the stale cloud read was not repeated");
+    assert.equal(el("note-from-the-tablet")?.getAttribute("data-text"), "Written on the tablet",
+      "a note written on another device is still invisible after returning to the app");
+
+    notesController.unmount();
+  });
+});
+
+test("a read that is still fresh is not repeated on every focus", async () => {
+  await withClock(async () => {
+    const notesController = fixture.mount(freshWorld(), { uid: UID, productId: PRODUCT, debounceMs: 60_000 });
+    await settle();
+    const atMount = fsx.state.reads;
+    await returnToApp();
+    await settle();
+    assert.equal(fsx.state.reads, atMount, "returning within the freshness window must not cost a query");
+    notesController.unmount();
+  });
+});
+
+test("freshness never races an unsaved note: a pending local edit blocks the repeat read", async () => {
+  await withClock(async () => {
+    // Every write fails, so the edit this device just made stays queued.
+    const notesController = fixture.mount(freshWorld(), { uid: UID, productId: PRODUCT, debounceMs: 5 });
+    await settle();
+    fsx.state.failWrites = { code: "unavailable", message: "offline" };
+    act(() => { fixture.latest.ctl.add("<p>Draft only here</p>"); });
+    await settle(60);
+    const afterFailedWrite = fsx.state.reads;
+    assert.equal(text("synced"), "false", "the draft must still be queued");
+
+    advanceClock(61_000);
+    await returnToApp();
+    await settle();
+    assert.equal(fsx.state.reads, afterFailedWrite, "a read may not run while this device still has an unacknowledged note");
+    assert.match(text("notes"), /Draft only here/, "the unsaved note must survive the return");
+    notesController.unmount();
+  });
 });
