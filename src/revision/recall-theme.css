@@ -185,93 +185,96 @@
 
 /* ── Dark theme (upstream `.dark`) ─────────────────────────────────────── */
 [data-recall-root][data-recall-theme="dark"] {
-  --rc-surface: #111827;
-  --rc-surface-dim: #1f2937;
-  --rc-surface-bright: #0b1120;
-  --rc-surface-container-lowest: #0b1120;
-  --rc-surface-container-low: #1f2937;
-  --rc-surface-container: #1f2937;
-  --rc-surface-container-high: #334155;
-  --rc-surface-container-highest: #334155;
-  --rc-surface-variant: #334155;
-  --rc-surface-raised: #1f2937;
+  /* Website palette (index.css canvas #0a0c12, dashboard cards #0c1220,
+     accent indigo #4f46e5 / #6366f1). Every Revision page — sub-pages,
+     buttons, dialogs — reads these, so they all match the website. */
+  --rc-surface: #0c1220;
+  --rc-surface-dim: #070b14;
+  --rc-surface-bright: #151c2e;
+  --rc-surface-container-lowest: #0a0c12;
+  --rc-surface-container-low: #0c1220;
+  --rc-surface-container: #111827;
+  --rc-surface-container-high: #1a2236;
+  --rc-surface-container-highest: #222b40;
+  --rc-surface-variant: #1a2236;
+  --rc-surface-raised: #111827;
 
-  --rc-on-surface: #f8fafc;
-  --rc-on-surface-variant: #94a3b8;
+  --rc-on-surface: #ffffff;
+  --rc-on-surface-variant: #b4bac6;
   --rc-inverse-surface: #eff1f3;
   --rc-inverse-on-surface: #2d3133;
 
-  --rc-outline: #475569;
-  --rc-outline-variant: #334155;
-  --rc-border-strong: #475569;
-  --rc-surface-tint: #60a5fa;
+  --rc-outline: #3b4358;
+  --rc-outline-variant: #262e42;
+  --rc-border-strong: #3b4358;
+  --rc-surface-tint: #818cf8;
 
-  --rc-primary: #60a5fa;
-  --rc-on-primary: #06111f;
-  --rc-primary-container: #1e3a8a;
-  --rc-on-primary-container: #dbeafe;
-  --rc-primary-soft: #172554;
-  --rc-inverse-primary: #004ac6;
+  --rc-primary: #818cf8;
+  --rc-on-primary: #ffffff;
+  --rc-primary-container: #4f46e5;
+  --rc-on-primary-container: #ffffff;
+  --rc-primary-soft: rgba(99, 102, 241, 0.16);
+  --rc-inverse-primary: #4f46e5;
 
-  --rc-secondary: #fbbf24;
+  --rc-secondary: #fcd34d;
   --rc-on-secondary: #111827;
   --rc-secondary-container: #78350f;
-  --rc-on-secondary-container: #fbbf24;
+  --rc-on-secondary-container: #fde68a;
 
   --rc-tertiary: #34d399;
   --rc-on-tertiary: #052e16;
   --rc-tertiary-container: #064e3b;
-  --rc-on-tertiary-container: #bdffdc;
+  --rc-on-tertiary-container: #a7f3d0;
 
-  --rc-error: #f87171;
+  --rc-error: #fb7185;
   --rc-on-error: #111827;
   --rc-error-container: #7f1d1d;
   --rc-on-error-container: #ffdad6;
 
-  --rc-primary-fixed: #1e3a8a;
-  --rc-primary-fixed-dim: #172554;
-  --rc-on-primary-fixed: #dbeafe;
-  --rc-on-primary-fixed-variant: #60a5fa;
+  --rc-primary-fixed: #312e81;
+  --rc-primary-fixed-dim: #1e1b4b;
+  --rc-on-primary-fixed: #e0e7ff;
+  --rc-on-primary-fixed-variant: #a5b4fc;
   --rc-secondary-fixed: #78350f;
   --rc-secondary-fixed-dim: #684000;
-  --rc-on-secondary-fixed: #fbbf24;
-  --rc-on-secondary-fixed-variant: #fbbf24;
+  --rc-on-secondary-fixed: #fde68a;
+  --rc-on-secondary-fixed-variant: #fde68a;
   --rc-tertiary-fixed: #064e3b;
   --rc-tertiary-fixed-dim: #052e16;
-  --rc-on-tertiary-fixed: #bdffdc;
+  --rc-on-tertiary-fixed: #a7f3d0;
   --rc-on-tertiary-fixed-variant: #34d399;
 
-  --rc-background: #0b1120;
-  --rc-on-background: #f8fafc;
+  --rc-background: #0a0c12;
+  --rc-on-background: #ffffff;
 
-  --rc-text-primary: #f8fafc;
-  --rc-text-secondary: #cbd5e1;
+  --rc-text-primary: #ffffff;
+  --rc-text-secondary: #c7cbd4;
 
-  --rc-review-again: #f87171;
+  --rc-review-again: #fb7185;
   --rc-review-hard: #fbbf24;
-  --rc-review-good: #60a5fa;
+  --rc-review-good: #818cf8;
   --rc-review-easy: #34d399;
 
-  --rc-shad-background: 222 47% 7%;
-  --rc-shad-foreground: 0 0% 94%;
-  --rc-shad-card: 240 9% 7%;
-  --rc-shad-card-foreground: 0 0% 94%;
-  --rc-shad-primary: 240 6% 96%;
-  --rc-shad-primary-foreground: 240 10% 4%;
-  --rc-shad-secondary: 240 6% 12%;
-  --rc-shad-secondary-foreground: 0 0% 94%;
-  --rc-shad-muted: 240 6% 12%;
-  --rc-shad-muted-foreground: 240 5% 70%;
-  --rc-shad-accent: 240 6% 14%;
-  --rc-shad-accent-foreground: 0 0% 96%;
+  --rc-shad-background: 240 33% 4%;
+  --rc-shad-foreground: 0 0% 100%;
+  --rc-shad-card: 222 47% 7%;
+  --rc-shad-card-foreground: 0 0% 100%;
+  --rc-shad-primary: 239 84% 67%;
+  --rc-shad-primary-foreground: 0 0% 100%;
+  --rc-shad-secondary: 225 30% 14%;
+  --rc-shad-secondary-foreground: 0 0% 100%;
+  --rc-shad-muted: 225 30% 14%;
+  --rc-shad-muted-foreground: 220 12% 72%;
+  --rc-shad-accent: 225 30% 16%;
+  --rc-shad-accent-foreground: 0 0% 100%;
   --rc-shad-destructive: 0 72% 51%;
   --rc-shad-destructive-foreground: 0 0% 100%;
-  --rc-shad-border: 240 6% 16%;
-  --rc-shad-input: 240 6% 18%;
-  --rc-shad-ring: 240 6% 96%;
+  --rc-shad-border: 226 25% 20%;
+  --rc-shad-input: 226 25% 22%;
+  --rc-shad-ring: 239 84% 67%;
 
-  --rc-accent-zinc: #f4f4f5;
-  --rc-accent-blue: #60a5fa;
+  --rc-accent-zinc: #ffffff;
+  --rc-accent-blue: #818cf8;
   --rc-accent-green: #4ade80;
   --rc-accent-rose: #fb7185;
   --rc-accent-amber: #fbbf24;

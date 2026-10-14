@@ -514,6 +514,7 @@ export default function RevisionApp({ uidOverride }: RevisionAppProps = {}) {
       <div
         ref={rootRef}
         data-recall-root
+        data-recall-theme="dark"
         data-revision-app
         data-revision-frame
         className="min-h-dvh bg-background font-body text-on-surface antialiased"
