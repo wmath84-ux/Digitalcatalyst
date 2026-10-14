@@ -291,8 +291,8 @@ test("submit creates immediately through the parent's writer", () => {
 // 4. The “+” exists only while SELF is the open filter, wired end to end
 // ---------------------------------------------------------------------------
 
-test("the header '+' renders only in SELF mode and opens the overlay", () => {
-  assert.match(panel, /\{masterSelfCtl\.mode === "self" && onCreateSelfSet \? \(/);
+test("the library '+' renders only in SELF mode and opens the overlay", () => {
+  assert.match(panel, /\{personalLibrary && onCreateSelfSet \? \(/);
   assert.match(panel, /data-brain-self-add=""/);
   assert.match(panel, /aria-label="Create your own practice set"/);
   assert.match(panel, /composerOpen && onCreateSelfSet \? \(/);
@@ -312,5 +312,5 @@ test("the player feeds the panel the SELF list, the writer and the CMD seeds", (
   assert.match(panel, /onCreateSelfSet\?: \(input: \{ title: string; questions: MyCourseQuestion\[\] \}\) => Promise<\{ ok: boolean; message\?: string \}>;/);
   assert.match(panel, /selfSetPrompt\?: \{ topic\?: string; level\?: string; defaultName\?: string \};/);
   // The empty SELF state now teaches the “+”, not a trip to the library.
-  assert.match(panel, /Tap \+ in the header to create your own set/);
+  assert.match(panel, /Use \+ to create a practice set/);
 });

@@ -317,6 +317,9 @@ export default function useLumenChats(input: UseLumenChatsInput): UseLumenChatsR
     const scope = session;
     if (scope.disposed) return;
     const raw = typeof next === "function" ? next(scope.chats) : next;
+    // No-op edits (including course hydration) must not clone every chat or
+    // schedule another whole-history mirror write.
+    if (raw === scope.chats || (Array.isArray(raw) && raw.length === scope.chats.length && raw.every((chat, index) => chat === scope.chats[index]))) return;
     const now = Date.now();
     const previous = new Map(scope.chats.map((chat) => [chat.id, chat]));
     const seen = new Set<string>();
@@ -332,10 +335,10 @@ export default function useLumenChats(input: UseLumenChatsInput): UseLumenChatsR
         || before.title !== (chat as Chat).title
         || before.pinned !== (chat as Chat).pinned
         || before.messages !== (chat as Chat).messages;
-      rows.push({
+      rows.push(!changed && before ? before : {
         ...(chat as Chat),
         id,
-        updatedAt: changed ? Math.max(now, (before?.updatedAt || 0) + 1) : (before?.updatedAt || now),
+        updatedAt: Math.max(now, (before?.updatedAt || 0) + 1),
       });
       if (changed && shouldPersist(chat as Chat)) scope.dirty.add(id);
       scope.deleted.delete(id);
@@ -347,7 +350,7 @@ export default function useLumenChats(input: UseLumenChatsInput): UseLumenChatsR
       // deleted there; an empty draft simply disappears.
       if (scope.writing.has(id) || shouldPersist(before)) scope.deleted.add(id);
     }
-    scope.chats = byChatRecency(rows.map((chat) => ({ ...chat, course: title, courseShort: short })));
+    scope.chats = byChatRecency(rows.map((chat) => chat.course === title && chat.courseShort === short ? chat : { ...chat, course: title, courseShort: short }));
     if (!scope.chats.some((chat) => chat.id === scope.activeId)) {
       scope.activeId = scope.chats[0]?.id || "";
       persistActiveChatId(scope.uid, scope.productId, scope.activeId);

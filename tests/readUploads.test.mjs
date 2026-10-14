@@ -331,11 +331,13 @@ test("the Read library wears the header '+' and the separate Your annotations se
   assert.match(panel, /Your annotations/);
   assert.match(panel, /data-course-read-mine/);
   // The upload control lives in the header row itself — after the source
-  // switch and the count badge, as a labelled "Upload PDF" pill (it used to be
+  // switch and the count badge, as a labelled "Cloud upload" pill (it used to be
   // a bare "+" pushed right with ml-auto; the label replaced the alignment).
   const header = panel.slice(panel.indexOf("Read library"), panel.indexOf("course-read-search"));
   assert.match(header, /data-course-read-upload\b/);
-  assert.match(header, /Upload PDF/);
+  assert.match(header, /Cloud upload/);
+  assert.match(header, /Upload local/);
+  assert.match(header, /data-course-read-upload-local/);
   assert.ok(
     header.indexOf("data-course-read-mode-switch") < header.indexOf("data-course-read-upload"),
     "the source switch comes before the upload control",

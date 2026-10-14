@@ -575,7 +575,7 @@ test("selecting a brain resource opens the Brain tab instead of the viewer stack
 
 test("passing a set marks its resource complete exactly once and stays inside the progress maths", () => {
   assert.match(playerApp, /const markFileComplete = useCallback\(async \(fileId: string\) => \{/);
-  assert.match(playerApp, /completedFileIds: arrayUnion\(fileId\)/);
+  assert.match(playerApp, /progressCtl\.store\.complete\(fileId, true\)/);
   assert.match(brainPanel, /if \(score >= BRAIN_PASS_SCORE && scoredRef\.current !== passKey\)/, "a pass is scored once per attempt, not per render");
   assert.match(brainPanel, /onPass\?\.\(activeSet\.id, score\);/);
   // The denominator includes the brain sets the learner can actually complete,
@@ -628,19 +628,13 @@ test("the Brain tab follows the module of the lesson being watched", () => {
   assert.match(playerApp, /const activeBrainModuleId = selectedFile \? moduleIdByFileId\[String\(selectedFile\.id\)\] \?\? null : null;/);
   assert.match(playerApp, /activeModuleId=\{activeBrainModuleId\}/);
   assert.match(brainPanel, /activeModuleId\?: string \| null;/);
-  // A module with no practice of its own shows that module's empty state (plus
-  // the way out) — never another module's questions.
-  assert.match(brainPanel, /const target = moduleOverride === ALL_MODULES \? null : moduleOverride \?\? activeModuleId;/);
-  assert.match(brainPanel, /return sets\.filter\(\(set\) => set\.moduleId === target\);/);
-  assert.match(brainPanel, /No practice sets in this module yet\./);
-  assert.match(brainPanel, /Show all practice sets/);
-  // Switching lessons re-scopes the tab and closes a half-played set.
+  // The hierarchy shows all accessible modules, and reveals the active lesson's branch.
+  assert.match(brainPanel, /courseModuleSegments\(modules, set.moduleId\)/);
+  assert.match(brainPanel, /masterOpen.reveal\(ancestorSectionValues/);
   assert.match(brainPanel, /\}, \[activeModuleId\]\);/);
-  assert.match(brainPanel, /setModuleOverride\(null\);/);
-  // The chip row is how a learner moves between modules' practice by hand.
-  assert.match(brainPanel, /data-brain-module-row/);
-  assert.match(brainPanel, /data-brain-module-chip=/);
-  assert.match(brainPanel, /label="All modules"/);
+  assert.match(brainPanel, /setActiveSetId\(null\);/);
+  assert.match(brainPanel, /data-brain-module/);
+  assert.doesNotMatch(brainPanel, /data-brain-module-chip|label="All modules"/);
 });
 
 test("a Brain resource is reachable from the Modules list, resume and a deep link", () => {

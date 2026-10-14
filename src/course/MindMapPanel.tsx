@@ -176,6 +176,7 @@ import {
   type MindNodeStyle,
 } from "../../utils/mindMapTree";
 import type { MindMapSaveStatus, MindMapSummary } from "./useCourseMindMap";
+import { useDoubleTapToEdit } from "./useDoubleTapToEdit";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import MindMapJsonImportDialog from "./MindMapJsonImport";
 import type { CourseModule } from "../types/course";
@@ -1218,7 +1219,6 @@ export interface MindMapPanelProps {
 
 /** Read-only flag for every node box (hides the `+` and blocks editing). */
 const MindReadOnlyContext = createContext(false);
-const NOOP_MIND_CHANGE = (): void => undefined;
 
 function MindMapCanvas(props: MindMapPanelProps) {
   const {
@@ -1251,11 +1251,20 @@ function MindMapCanvas(props: MindMapPanelProps) {
   // A master map replaces the canvas content but is never written: the map is
   // the teacher's, so every mutation is a no-op and the `+`/editing are off.
   const readOnlyMaster = Boolean(masterMap);
+  const [editMode, setEditMode] = useState(false);
+  const readOnlyCanvas = readOnlyMaster || !editMode;
   const emptyMind = useMemo(() => createMindMap(), []);
   const mind: MindMap = masterMap ? (masterMap.mind ?? emptyMind) : selfMind;
-  const onMindChange = readOnlyMaster ? NOOP_MIND_CHANGE : onSelfMindChange;
-  const readOnlyRef = useRef(readOnlyMaster);
-  readOnlyRef.current = readOnlyMaster;
+  const readOnlyRef = useRef(readOnlyCanvas);
+  readOnlyRef.current = readOnlyCanvas;
+  const onMindChange = useCallback<typeof onSelfMindChange>((update) => {
+    if (!readOnlyRef.current) onSelfMindChange(update);
+  }, [onSelfMindChange]);
+  const creatingMapRef = useRef(false);
+  useEffect(() => {
+    if (creatingMapRef.current) { creatingMapRef.current = false; return; }
+    setEditMode(false);
+  }, [activeMapKey]);
   const masterKey = masterMap?.key ?? null;
   const prevMasterKey = useRef<string | null>(null);
   /** The map library sheet (grid of this module's maps) is the HOME screen:
@@ -1273,6 +1282,13 @@ function MindMapCanvas(props: MindMapPanelProps) {
     else if (prevMasterKey.current) setLibraryOpen(true);
     prevMasterKey.current = masterKey;
   }, [masterKey]);
+  const editGesture = useDoubleTapToEdit(!readOnlyMaster && !libraryOpen && !editMode, () => {
+    readOnlyRef.current = false;
+    setEditMode(true);
+  });
+  // Changing course module must not carry edit permissions to another map.
+  useEffect(() => { setEditMode(false); }, [moduleId]);
+  useEffect(() => { if (masterMap) setEditMode(false); }, [masterMap]);
   // AI / JSON import: the dialog is closed by default. `undoSnapshot` holds the
   // map that was on the canvas before a JSON replacement, so it can be restored.
   const [jsonImportOpen, setJsonImportOpen] = useState(false);
@@ -1300,6 +1316,12 @@ function MindMapCanvas(props: MindMapPanelProps) {
   // over the player after the sheet is gone.
   useEffect(() => {
     if (!open) {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && active.dataset.mindNodeInput) active.blur();
+      onFlush?.();
+      setEditMode(false);
+      setEditingId(null);
+      setSelectedId(null);
       setDeleteTargetId(null);
       setDeleteMapKey(null);
     }
@@ -1326,6 +1348,13 @@ function MindMapCanvas(props: MindMapPanelProps) {
   // to the body so the clipped status strip cannot cut them in half.
   const [alignMenuOpen, setAlignMenuOpen] = useState(false);
   const [saveMenuOpen, setSaveMenuOpen] = useState(false);
+  useEffect(() => {
+    if (!readOnlyCanvas && !libraryOpen) return;
+    setSaveMenuOpen(false);
+    setAlignMenuOpen(false);
+    setStyleMenuOpen(false);
+    setJsonImportOpen(false);
+  }, [readOnlyCanvas, libraryOpen]);
   // The status strip measures ITSELF: a landscape split panel can be far
   // narrower than the screen, so media queries alone cannot know when to
   // drop to the compact tile (and hide the map name).
@@ -1439,7 +1468,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [libraryOpen, readOnlyCanvas]);
 
   // ── The save beacon ───────────────────────────────────────────────────
   // The cloud tile replaced a text label, so the message lives in a tooltip +
@@ -1575,6 +1604,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
   // FIRST step of branch deletion: open the confirmation overlay. The node is
   // only removed when the learner taps the red confirm button (`performDelete`).
   const requestDelete = useCallback((id: string) => {
+    if (readOnlyRef.current) return;
     setDeleteMapKey(null);
     setDeleteTargetId(id);
   }, []);
@@ -1675,6 +1705,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
       if (mapKey !== activeMapKey) onSelectMap?.(mapKey);
       onCloseMasterMap?.();
       setLibraryOpen(false);
+      setEditMode(false);
       setSelectedId(null);
       setEditingId(null);
       setDeleteTargetId(null);
@@ -1771,7 +1802,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
           childCount: placed.childCount,
           isRoot: placed.isRoot,
           selected: selectedId === placed.id,
-          editing: editingId === placed.id,
+          editing: !readOnlyCanvas && editingId === placed.id,
           theme: mindTheme,
           textFit,
           look,
@@ -1794,6 +1825,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
     mind.rootTopic,
     selectedId,
     editingId,
+    readOnlyCanvas,
     mindTheme,
     textFit,
     look,
@@ -2039,6 +2071,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
       className="course-mindmap-shell relative flex h-full w-full flex-col overflow-hidden"
       data-course-mindmap
       data-mindmap-theme={mindTheme}
+      data-mindmap-mode={readOnlyCanvas ? "read" : "edit"}
     >
       <MindMapJsonImportDialog
         open={jsonImportOpen}
@@ -2068,7 +2101,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
           or clipping. Any stale offset a browser hands it (soft keyboard,
           orientation flip, reopen) is reset when the sheet opens, so the
           bar always paints from its left edge. */}
-      {undoSnapshot ? (
+      {undoSnapshot && !readOnlyCanvas ? (
         <div
           role="status"
           className="flex shrink-0 items-center gap-2 border-b border-violet-200 bg-violet-50 px-3 py-1.5 text-xs text-violet-900"
@@ -2102,7 +2135,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
           </button>
         </div>
       ) : null}
-      {libraryOpen || readOnlyMaster ? null : (
+      {libraryOpen || readOnlyCanvas ? null : (
       <div
         ref={statusRef}
         className="flex shrink-0 items-center overflow-x-auto border-b border-[var(--mm-border)] px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -2110,6 +2143,18 @@ function MindMapCanvas(props: MindMapPanelProps) {
         data-course-mindmap-status
         data-compact={toolbarCompact ? "true" : "false"}
       >
+        <button type="button" className="mm-tool mm-tool-violet" aria-label="Save and read mind map" title="Save and read mind map" data-course-mindmap-done
+          onClick={() => {
+            const active = document.activeElement;
+            if (active instanceof HTMLElement) active.blur();
+            onFlush?.();
+            setEditingId(null);
+            setSelectedId(null);
+            setSaveMenuOpen(false);
+            setAlignMenuOpen(false);
+            setStyleMenuOpen(false);
+            setEditMode(false);
+          }}><Check size={16} /></button>
         {/* ── Left cluster: cloud save + which map is open ─────────────── */}
         <div className="flex min-w-max flex-1 items-center" style={{ gap: "var(--mm-tool-gap)" }}>
           {/* ── Cloud save ──────────────────────────────────────────────
@@ -2436,8 +2481,17 @@ function MindMapCanvas(props: MindMapPanelProps) {
       {/* ── Canvas ────────────────────────────────────────────────────────
           `touch-action: none` is required, not cosmetic: without it the
           browser claims the pinch for page zoom and React Flow never sees it. */}
-      <div ref={canvasRef} className="relative min-h-0 flex-1" style={{ touchAction: "none" }} data-course-mindmap-canvas data-library-open={libraryOpen ? "true" : "false"}>
-        <MindReadOnlyContext.Provider value={readOnlyMaster}>
+      {status === "error" && !libraryOpen && !readOnlyMaster ? <StudyLibraryNotice state="error" title="Mind map sync needs attention" message={errorMessage || "Your local map is safe. Retry to sync."} onRetry={onRetryMaps} /> : null}
+      <div ref={canvasRef} className="relative min-h-0 flex-1" style={{ touchAction: "none" }} data-course-mindmap-canvas data-library-open={libraryOpen ? "true" : "false"}
+        tabIndex={!libraryOpen ? 0 : undefined}
+        aria-label={!libraryOpen ? (readOnlyMaster ? "Read-only master mind map" : "Mind map. Double tap or press Enter to edit. Escape returns to the library.") : undefined}
+        {...editGesture}
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && event.target === event.currentTarget) { onFlush?.(); setEditMode(false); setLibraryOpen(true); }
+          else editGesture.onKeyDown(event);
+        }}>
+        {!libraryOpen && !readOnlyMaster && !editMode ? <button type="button" className="sr-only focus:not-sr-only focus:absolute focus:z-20 focus:bg-white focus:p-2" onClick={() => setLibraryOpen(true)}>Back to mind map library</button> : null}
+        <MindReadOnlyContext.Provider value={readOnlyCanvas}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -2450,7 +2504,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
           fitViewOptions={{ padding: 0.18 }}
           minZoom={0.15}
           maxZoom={2.5}
-          nodesDraggable={!readOnlyMaster}
+          nodesDraggable={!readOnlyCanvas}
           // Deletion goes through the confirmation overlay only.
           deleteKeyCode={null}
           nodesConnectable={false}
@@ -2673,7 +2727,9 @@ function MindMapCanvas(props: MindMapPanelProps) {
               type="button"
               onClick={() => {
                 onCloseMasterMap?.();
+                creatingMapRef.current = true;
                 onCreateMap?.();
+                setEditMode(true);
                 setLibraryOpen(false);
                 setSelectedId(null);
                 setEditingId(null);

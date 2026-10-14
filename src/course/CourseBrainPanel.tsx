@@ -75,18 +75,20 @@ import { CheckIcon, MinusIcon, XIcon } from "../revision/components/icons";
 import { collectBrainPracticeSets } from "../../utils/practiceSet.js";
 import { BRAIN, BrainBadge, BrainPill, BrainProgress, BrainSurface } from "./BrainCards";
 import BrainQuestionDeck, { type BrainDeckItem } from "./BrainQuestionDeck";
+import BranchedMenu, { useBranchedOpen } from "../components/branched-menu/BranchedMenu";
+import { ancestorSectionValues, buildBranchTree } from "../components/branched-menu/branchedTree";
+import { StudyLibraryEmptyState } from "./StudyLibraryStates";
 import MasterSelfControl from "./MasterSelfControl";
 import SelfPracticeSetComposer from "./SelfPracticeSetComposer";
 import { useMasterSelfPreference } from "./playerPreferences";
 import { brainFitScale, publishVar, useFitTarget } from "./panelFit";
+import { courseModuleSegments } from "./studyResourceContext";
+import type { CourseModule } from "../types/course";
 import type { MyCourseQuestion } from "../types/myCourse";
 
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
 /** The score that marks the module's Brain resource complete in the player. */
 export const BRAIN_PASS_SCORE = 60;
-
-/** Chip-row sentinel: "show every practice set in the course", not one module. */
-const ALL_MODULES = "__all__";
 
 const S = (px: number) => `calc(${px}px * var(--brain-scale, 1))`;
 
@@ -100,6 +102,7 @@ export type BrainPracticeSet = ReturnType<typeof collectBrainPracticeSets>[numbe
 type BrainPracticeScore = { attempts: number; best: number; last: number; at: number };
 
 export interface CourseBrainPanelProps {
+  modules?: CourseModule[];
   productId: string;
   /** Every practice set this learner may open, across the whole course. */
   sets: BrainPracticeSet[];
@@ -162,55 +165,9 @@ function saveScores(productId: string, scores: Record<string, BrainPracticeScore
 }
 
 /* ------------------------------------------------------------------ */
-/* Module chip — how a learner moves between modules' practice         */
-/* ------------------------------------------------------------------ */
-
-function ModuleChip({
-  label,
-  count,
-  active = false,
-  onClick,
-}: {
-  label: string;
-  count: number;
-  active?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      data-brain-module-chip=""
-      data-brain-module-chip-active={active ? "true" : undefined}
-      onClick={onClick}
-      className="inline-flex shrink-0 items-center gap-1.5 rounded-full font-semibold transition"
-      style={{
-        fontSize: S(11),
-        padding: `${S(5)} ${S(11)}`,
-        border: active ? "none" : "1px solid rgba(255,255,255,0.22)",
-        background: active ? BRAIN.pill : "transparent",
-        color: active ? BRAIN.pillInk : BRAIN.hint,
-        cursor: "pointer",
-      }}
-    >
-      <span className="max-w-[9rem] truncate">{label}</span>
-      <span
-        className="rounded-full px-1.5"
-        style={{
-          fontSize: S(10),
-          background: active ? "rgba(245,241,232,0.22)" : "rgba(255,255,255,0.10)",
-          color: active ? BRAIN.pillInk : BRAIN.hint,
-        }}
-      >
-        {count}
-      </span>
-    </button>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-
 export default function CourseBrainPanel({
   productId,
+  modules = [],
   sets,
   selfSets = [],
   activeModuleId = null,
@@ -237,12 +194,7 @@ export default function CourseBrainPanel({
    */
   const [deck, setDeck] = useState<BrainDeckItem[]>([]);
   const dealRef = useRef(0);
-  /**
-   * The module whose practice is on screen. It FOLLOWS the lesson the learner
-   * is watching; picking another module in the chip row pins it until the
-   * lesson changes again (which clears the pin below).
-   */
-  const [moduleOverride, setModuleOverride] = useState<string | null>(null);
+  /** A passing attempt reports course completion only once. */
   const scoredRef = useRef<string | null>(null);
 
   /**
@@ -277,7 +229,6 @@ export default function CourseBrainPanel({
   // Switching lessons returns the Brain tab to that module's practice and
   // closes any half-played set — the tab is never left showing a stale module.
   useEffect(() => {
-    setModuleOverride(null);
     setActiveSetId(null);
     setMode("question");
     setSelections({});
@@ -285,28 +236,6 @@ export default function CourseBrainPanel({
     setShowSubmitConfirm(false);
     setPassedNow(false);
   }, [activeModuleId]);
-
-  /** Modules that actually have practice to show, in curriculum order. */
-  const practiceModules = useMemo(() => {
-    const seen = new Map<string, { id: string; title: string; count: number }>();
-    for (const set of sets) {
-      const entry = seen.get(set.moduleId) ?? { id: set.moduleId, title: set.moduleTitle, count: 0 };
-      entry.count += 1;
-      seen.set(set.moduleId, entry);
-    }
-    return [...seen.values()];
-  }, [sets]);
-
-  /** The set list the tab is showing: the pinned module, else the lesson's. */
-  const moduleSets = useMemo(() => {
-    // "*" is the explicit "show me the whole course" pick from the chip row;
-    // null means "follow the lesson I am watching".
-    const target = moduleOverride === ALL_MODULES ? null : moduleOverride ?? activeModuleId;
-    if (!target) return sets;
-    // A module with no practice of its own still shows the module chip row and
-    // the honest empty state below — never another module's questions.
-    return sets.filter((set) => set.moduleId === target);
-  }, [sets, moduleOverride, activeModuleId]);
 
   const activeSet = useMemo(
     () => sets.find((set) => set.id === activeSetId) ?? selfSets.find((set) => set.id === activeSetId) ?? null,
@@ -364,14 +293,13 @@ export default function CourseBrainPanel({
 
   /**
    * A Brain resource tapped in the Modules list (or a deep link) opens its set.
-   * The tapped set also PINS its own module, so the set opens even when the
+   * The tapped set opens directly from any module, even when the
    * learner was watching a lesson in another module.
    */
   useEffect(() => {
     if (!openSetId) return;
     const pinned = sets.find((set) => set.id === openSetId);
     if (!pinned) return;
-    setModuleOverride(pinned.moduleId);
     openSet(pinned.id);
     onOpenedSet?.();
     // `sets`/`onOpenedSet` are intentionally not dependencies: opening a pinned
@@ -465,44 +393,60 @@ export default function CourseBrainPanel({
     }
   }
 
+  // Same hierarchy, row geometry and expansion controls as Notes / Mind Maps.
+  // Both trees stay mounted in hooks so switching collection never changes hook order.
+  const makeLibraryTree = (librarySets: BrainPracticeSet[], self: boolean) => buildBranchTree(
+    librarySets.map((set) => {
+      const record = scores[set.id];
+      const done = !self && (completedFileIds?.has(set.id) ?? false);
+      const progress = record ? `Best ${record.best}% · ${record.attempts} attempt${record.attempts === 1 ? "" : "s"} · last ${record.last}%` : "Not attempted yet";
+      const modulePath = self ? [] : courseModuleSegments(modules, set.moduleId);
+      return {
+        path: modulePath.length ? modulePath : [{ key: set.moduleId || "personal", label: set.moduleTitle || (self ? "My practice sets" : "Course practice") }],
+        item: {
+          value: set.id,
+          label: set.title,
+          icon: <Brain size={16} />,
+          tag: { label: self ? "SELF" : "MASTER", color: self ? "#4f46e5" : "#7c3aed" },
+          meta: <span className="brain-library-meta">{set.questions.length} Q{done ? " · Done" : ""}{record ? ` · Best ${record.best}%` : ""}</span>,
+          description: `${set.title} · ${set.questions.length} questions · ${progress}${done ? " · Done" : ""}. Start practice`,
+          dataAttrs: { "data-brain-set": set.id, "data-brain-self-set": self ? "true" : undefined, "data-brain-set-module": set.moduleId },
+        },
+      };
+    }),
+    { sectionMeta: ({ count }) => <span>{count}</span>, sectionDataAttrs: ({ key }) => ({ "data-brain-module": key }) },
+  );
+  const masterTree = makeLibraryTree(sets, false);
+  const selfTree = makeLibraryTree(selfSets, true);
+  const masterOpen = useBranchedOpen(masterTree);
+  const selfOpen = useBranchedOpen(selfTree);
+  useEffect(() => {
+    const first = sets.find((set) => set.moduleId === activeModuleId);
+    if (first) masterOpen.reveal(ancestorSectionValues(masterTree, first.id));
+  }, [activeModuleId, sets]);
+  const personalLibrary = masterSelfCtl.mode === "self";
+  const libraryTree = personalLibrary ? selfTree : masterTree;
+  const libraryOpen = personalLibrary ? selfOpen : masterOpen;
+
   /* ── library — every practice set the admin imported for this course ─── */
 
   if (!activeSet) {
     return (
       <div
         ref={fitRef}
-        className="relative flex h-full min-h-0 flex-col px-3 py-3"
+        className="relative flex h-full min-h-0 flex-col overflow-hidden p-3 pb-16"
         data-course-brain-panel=""
         data-brain-screen="library"
-        style={{ fontSize: S(16) }}
       >
         {/* MASTER / SELF segmented control — same contract as Notes & Mind Map.
             MASTER = admin-imported practice sets from the course tree.
             SELF   = the learner's own sets, made here or in the Study Library. */}
         <div className="flex items-center justify-between gap-2 pb-2" data-brain-collection="">
           <div>
-            <p className="brain-library-eyebrow">YOUR PRACTICE SPACE</p>
-            <h2 className="brain-library-title">Brain</h2>
+            <p className="text-xs font-black uppercase tracking-wide text-[var(--dc-flat-ink-sub)]">Practice library</p>
+            <p className="mt-0.5 text-[11px] text-[var(--dc-flat-ink-label)]">Course practice and your own sets stay separate.</p>
           </div>
           <div className="flex items-center" style={{ gap: S(8) }}>
-            {/* The “+” exists ONLY while SELF is the open filter (owner brief,
-                2026-10-07) — MASTER sets are the admin's, not the learner's to
-                extend. It opens the creation overlay; the set it makes lands in
-                “My practice sets” on the Study Library shelf and shows up in
-                this very list. */}
-            {masterSelfCtl.mode === "self" && onCreateSelfSet ? (
-              <button
-                type="button"
-                onClick={() => setComposerOpen(true)}
-                aria-label="Create your own practice set"
-                title="Create your own practice set"
-                data-brain-self-add=""
-                className="grid shrink-0 place-items-center rounded-lg transition hover:bg-black/[0.06] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
-                style={{ height: S(34), width: S(34), color: BRAIN.ink, boxShadow: `inset 0 0 0 1px ${BRAIN.line}` }}
-              >
-                <Plus style={{ height: S(16), width: S(16) }} />
-              </button>
-            ) : null}
             <MasterSelfControl
               feature="brain"
               ariaLabel="Brain collection"
@@ -513,196 +457,37 @@ export default function CourseBrainPanel({
             />
           </div>
         </div>
-        {masterSelfCtl.mode === "master" && practiceModules.length > 0 ? (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1" data-brain-module-row>
-            {practiceModules.length > 1 ? (
-              <>
-                <ModuleChip
-                  label="All modules"
-                  count={sets.length}
-                  active={moduleOverride === ALL_MODULES}
-                  onClick={() => {
-                    setModuleOverride(ALL_MODULES);
-                    setActiveSetId(null);
-                  }}
-                />
-                {practiceModules.map((entry) => (
-                  <ModuleChip
-                    key={entry.id}
-                    label={entry.title}
-                    count={entry.count}
-                    active={(moduleOverride === ALL_MODULES ? null : moduleOverride ?? activeModuleId) === entry.id}
-                    onClick={() => {
-                      setModuleOverride(entry.id);
-                      setActiveSetId(null);
-                    }}
-                  />
-                ))}
-              </>
-            ) : (
-              <ModuleChip label={practiceModules[0].title} count={practiceModules[0].count} active />
-            )}
-          </div>
-        ) : null}
-        <div className="min-h-0 flex-1 overflow-y-auto" style={{ marginTop: practiceModules.length > 0 ? S(10) : 0 }}>
-          <div data-brain-library-intro>
-            <div>
-              <h3>A little practice. A stronger recall.</h3>
-              <p>Pick a set, test what you know, and learn from each answer.</p>
-            </div>
-            <div className="brain-library-summary" aria-label="Available practice">
-              <span><strong>{(masterSelfCtl.mode === "self" ? selfSets : moduleSets).length}</strong> sets</span>
-              <span><strong>{(masterSelfCtl.mode === "self" ? selfSets : moduleSets).reduce((total, set) => total + set.questions.length, 0)}</strong> questions</span>
-            </div>
-          </div>
-          {/* In SELF mode, show the learner's own practice sets (from the personal
-              library) instead of the module-filtered MASTER sets. */}
-          {masterSelfCtl.mode === "self" ? (
-            selfSets.length === 0 ? (
-              <BrainSurface data-brain-empty="" data-brain-self-empty="" style={{ padding: S(16) }}>
-                <div className="flex flex-col items-center gap-2 py-6 text-center">
-                  <span
-                    className="flex items-center justify-center rounded-full"
-                    style={{ height: S(56), width: S(56), background: BRAIN.pill, color: BRAIN.pillInk }}
-                  >
-                    <Brain style={{ height: S(26), width: S(26) }} />
-                  </span>
-                  <p className="font-bold" style={{ fontSize: S(15), color: BRAIN.ink }}>
-                    Your Practice Sets
-                  </p>
-                  <p className="font-semibold" style={{ fontSize: S(11), color: BRAIN.inkSoft }}>
-                    {onCreateSelfSet
-                      ? "Tap + in the header to create your own set — let an AI write the questions or write them yourself. It is saved to My Study Library and appears here for quick practice."
-                      : "Create practice sets in your Study Library and they'll appear here for quick practice."}
-                  </p>
-                </div>
-              </BrainSurface>
-            ) : (
-              <div className="brain-library-grid">
-                {selfSets.map((set) => {
-                  const record = scores[set.id];
-                  return (
-                    <BrainSurface key={set.id} data-brain-set={set.id} data-brain-self-set="" style={{ padding: S(16) }}>
-                      <div className="flex flex-wrap items-center" style={{ gap: S(8), marginBottom: S(10) }}>
-                        <BrainBadge tone="module">{set.moduleTitle || "My set"}</BrainBadge>
-                        <BrainBadge tone="count">
-                          {set.questions.length} question{set.questions.length === 1 ? "" : "s"}
-                        </BrainBadge>
-                      </div>
-                      <h2 className="font-semibold leading-snug" style={{ fontSize: S(19), color: BRAIN.ink }}>
-                        {set.title}
-                      </h2>
-                      {record ? (
-                        <div className="flex items-center" style={{ gap: S(10), marginTop: S(10) }}>
-                          <BrainProgress value={record.best} style={{ flex: 1 }} />
-                          <span className="shrink-0 font-bold" style={{ fontSize: S(12), color: BRAIN.ink }}>
-                            Best {record.best}%
-                          </span>
-                        </div>
-                      ) : (
-                        <p className="font-medium" style={{ marginTop: S(6), fontSize: S(12), color: BRAIN.inkSoft }}>
-                          Not attempted yet.
-                        </p>
-                      )}
-                      <div style={{ marginTop: S(14) }}>
-                        <BrainPill
-                          onClick={() => startSet(set.id)}
-                          style={{ fontSize: S(13), padding: `${S(9)} ${S(18)}` }}
-                        >
-                          {record ? "Practice again" : "Start practice"}
-                        </BrainPill>
-                      </div>
-                    </BrainSurface>
-                  );
-                })}
-              </div>
-            )
-          ) : moduleSets.length === 0 ? (
-            <BrainSurface data-brain-empty="" style={{ padding: S(16) }}>
-              <div className="flex flex-col items-center gap-2 py-6 text-center">
-                <span
-                  className="flex items-center justify-center rounded-full"
-                  style={{ height: S(56), width: S(56), background: BRAIN.pill, color: BRAIN.pillInk }}
-                >
-                  <Brain style={{ height: S(26), width: S(26) }} />
-                </span>
-                <p className="font-bold" style={{ fontSize: S(15), color: BRAIN.ink }}>
-                  Brain
-                </p>
-                <p className="font-semibold" style={{ fontSize: S(11), color: BRAIN.inkSoft }}>
-                  {sets.length === 0
-                    ? "Practice sets for this course will appear here as soon as your teacher adds them."
-                    : "No practice sets in this module yet. Open another module, or browse everything your teacher has added."}
-                </p>
-                {sets.length > 0 ? (
-                  <div style={{ marginTop: S(12) }}>
-                    <BrainPill
-                      onClick={() => {
-                        setModuleOverride(ALL_MODULES);
-                        setActiveSetId(null);
-                      }}
-                      style={{ fontSize: S(13), padding: `${S(9)} ${S(18)}` }}
-                    >
-                      Show all practice sets
-                    </BrainPill>
-                  </div>
-                ) : null}
-              </div>
-            </BrainSurface>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pt-1" data-brain-library-list>
+          {libraryTree.length ? (
+            <BranchedMenu
+              items={libraryTree}
+              openValues={libraryOpen.openValues}
+              onToggle={libraryOpen.toggle}
+              onSelect={(value) => startSet(value)}
+              ariaLabel={personalLibrary ? "Your practice sets" : "Course practice sets"}
+              fullWidth
+              rowHeight={40}
+              className="brain-library-menu"
+              dataAttrs={{ "data-listing": personalLibrary ? "brain-self" : "brain-master" }}
+            />
           ) : (
-            <div className="brain-library-grid">
-              {moduleSets.map((set) => {
-                const record = scores[set.id];
-                const done = completedFileIds?.has(set.id) ?? false;
-                return (
-                  <BrainSurface key={set.id} data-brain-set={set.id} style={{ padding: S(16) }}>
-                    <div className="flex flex-wrap items-center" style={{ gap: S(8), marginBottom: S(10) }}>
-                      <BrainBadge tone="module">{set.moduleTitle}</BrainBadge>
-                      <BrainBadge tone="count">
-                        {set.questions.length} question{set.questions.length === 1 ? "" : "s"}
-                      </BrainBadge>
-                      {done ? (
-                        <span className="ml-auto inline-flex">
-                          <BrainBadge tone="done">
-                            <CheckIcon style={{ height: S(12), width: S(12) }} /> Done
-                          </BrainBadge>
-                        </span>
-                      ) : null}
-                    </div>
-                    <h2 className="font-semibold leading-snug" style={{ fontSize: S(19), color: BRAIN.ink }}>
-                      {set.title}
-                    </h2>
-                    {record ? (
-                      <div className="flex items-center" style={{ gap: S(10), marginTop: S(10) }}>
-                        <BrainProgress value={record.best} style={{ flex: 1 }} />
-                        <span className="shrink-0 font-bold" style={{ fontSize: S(12), color: BRAIN.ink }}>
-                          Best {record.best}%
-                        </span>
-                      </div>
-                    ) : (
-                      <p className="font-medium" style={{ marginTop: S(6), fontSize: S(12), color: BRAIN.inkSoft }}>
-                        Not attempted yet.
-                      </p>
-                    )}
-                    {record ? (
-                      <p className="font-medium" style={{ marginTop: S(6), fontSize: S(11), color: BRAIN.inkFaint }}>
-                        {record.attempts} attempt{record.attempts === 1 ? "" : "s"} · last {record.last}%
-                      </p>
-                    ) : null}
-                    <div style={{ marginTop: S(14) }}>
-                      <BrainPill
-                        onClick={() => startSet(set.id)}
-                        style={{ fontSize: S(13), padding: `${S(9)} ${S(18)}` }}
-                      >
-                        {record ? "Practice again" : "Start practice"}
-                      </BrainPill>
-                    </div>
-                  </BrainSurface>
-                );
-              })}
+            <div data-brain-empty="" data-brain-self-empty={personalLibrary ? "true" : undefined}>
+              <StudyLibraryEmptyState kind="brain"
+                title={personalLibrary ? "Your practice sets" : "No course practice sets yet"}
+                description={personalLibrary
+                  ? (onCreateSelfSet ? "Use + to create a practice set with AI or write your own questions. Your set is saved to My Study Library." : "Practice sets you create in your Study Library appear here.")
+                  : "Practice sets for this course will appear here as soon as your teacher adds them."}
+              />
             </div>
           )}
         </div>
+        {personalLibrary && onCreateSelfSet ? (
+          <button type="button" onClick={() => setComposerOpen(true)}
+            aria-label="Create your own practice set" title="Create your own practice set" data-brain-self-add=""
+            className="absolute bottom-4 right-4 z-10 grid h-11 w-11 place-items-center rounded-full bg-indigo-600 text-white shadow-lg transition hover:bg-indigo-500 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300">
+            <Plus size={19} strokeWidth={2.8} />
+          </button>
+        ) : null}
         {/* The creation overlay (SELF mode's “+”), mounted inside this screen
             so it dims the practice list exactly like the Read page's compose
             sheet dims its library — not the whole split deck. */}

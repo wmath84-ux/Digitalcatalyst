@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { auth } from "../../firebase";
+import { useAuth } from "../context/AuthContext";
+import { openLocalReadPdf } from "./localReadDb";
+import { parseLocalReadReference } from "../../utils/localReadReference.js";
 import { READ_PDFJS_VERSION } from "../../utils/readResources.js";
 import { checkPdfSource, type PdfSourceCheck } from "./pdfSourceCheck";
 
@@ -46,6 +50,8 @@ export interface PdfAnnotationApi {
    * is a normal annotated PDF any reader can open.
    */
   saveAnnotatedBytes: () => Promise<Uint8Array>;
+  /** Acknowledge only AFTER the database/cloud write succeeds, not on export. */
+  markSaved: (bytes: Uint8Array) => void;
   /** 1-based page the learner is on. */
   currentPage: () => number;
   /** How many annotations the viewer currently holds. */
@@ -130,6 +136,8 @@ export default function PdfJsGenericViewer({
    */
   onOpenBasicViewer?: () => void;
 }) {
+  const { user } = useAuth();
+  const localOwner = parseLocalReadReference(src) ? user?.id ?? null : null;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const initialPageRef = useRef(initialPage);
   const [error, setError] = useState("");
@@ -151,6 +159,7 @@ export default function PdfJsGenericViewer({
 
   useEffect(() => {
     let cancelled = false;
+    let localBlobUrl: string | null = null;
     let element: PdfjsElement | null = null;
     let eventBus: PdfViewerEventBus | undefined;
     let pageHandler: ((event: unknown) => void) | undefined;
@@ -162,7 +171,13 @@ export default function PdfJsGenericViewer({
         // Refuse a source that is not a readable PDF BEFORE the viewer starts,
         // so the learner gets a specific reason and a way out — never a blank
         // or silently different viewer.
-        const verdict = await checkPdfSource(src);
+        let viewerSrc = src;
+        if (parseLocalReadReference(src)) {
+          viewerSrc = await openLocalReadPdf(src, auth.currentUser?.uid ?? null);
+          if (cancelled) { URL.revokeObjectURL(viewerSrc); return; }
+          localBlobUrl = viewerSrc;
+        }
+        const verdict = await checkPdfSource(viewerSrc);
         if (cancelled) return;
         if (!verdict.ok) {
           setProblem(verdict);
@@ -180,7 +195,7 @@ export default function PdfJsGenericViewer({
         if (cancelled || !hostRef.current) return;
 
         element = document.createElement("pdfjs-viewer-element") as PdfjsElement;
-        element.setAttribute("src", src);
+        element.setAttribute("src", viewerSrc);
         element.setAttribute("iframe-title", `${title} — PDF.js viewer`);
         element.setAttribute("assets-base", viewerBase);
         element.setAttribute("worker-src", new URL("pdf.worker.min.mjs", viewerBase).toString());
@@ -227,6 +242,8 @@ export default function PdfJsGenericViewer({
           // same bytes: the safety net below only ever *adds* dirtiness, it
           // never clears it (a save is what clears it).
           let savedSize = 0;
+          let revision = 0;
+          const serialized = new WeakMap<Uint8Array, { revision: number; size: number }>();
           const doc = () => viewerApp.pdfDocument || null;
           const annotationStorage = () => doc()?.annotationStorage || null;
           const attach = () => {
@@ -241,6 +258,7 @@ export default function PdfJsGenericViewer({
               } catch {
                 /* the viewer's own handler must never break the save path */
               }
+              revision += 1;
               dirty = true;
             };
             const previousReset = storage.onResetModified;
@@ -250,7 +268,8 @@ export default function PdfJsGenericViewer({
               } catch {
                 /* see above */
               }
-              dirty = false;
+              // PDF.js resets its flag when exporting/downloading bytes.
+              // That is not an acknowledgement from our persistence backend.
             };
           };
           // The document can arrive after `initPromise` (the element resolves
@@ -264,10 +283,17 @@ export default function PdfJsGenericViewer({
             saveAnnotatedBytes: async () => {
               const target = doc();
               if (!target?.saveDocument) throw new Error("The PDF is still loading — try saving again in a moment.");
+              const snapshot = { revision, size: Number(annotationStorage()?.size || 0) };
               const bytes = await target.saveDocument();
-              dirty = false;
-              savedSize = Number(annotationStorage()?.size || 0);
+              serialized.set(bytes, snapshot);
               return bytes;
+            },
+            markSaved: (bytes) => {
+              const snapshot = serialized.get(bytes);
+              if (!snapshot) return;
+              savedSize = snapshot.size;
+              dirty = revision !== snapshot.revision;
+              serialized.delete(bytes);
             },
             currentPage: () => {
               const page = Number(viewerApp.pageNumber || viewerApp.pdfViewer?.currentPageNumber || 1);
@@ -320,8 +346,9 @@ export default function PdfJsGenericViewer({
       if (eventBus && pageHandler) eventBus.off("pagechanging", pageHandler);
       annotationApiRef.current?.(null);
       element?.remove();
+      if (localBlobUrl) URL.revokeObjectURL(localBlobUrl);
     };
-  }, [src, title, storageKey, attempt]);
+  }, [src, title, storageKey, attempt, localOwner]);
 
   return (
     <div className="relative h-full min-h-0 w-full overflow-hidden bg-slate-950" data-read-pdfjs-viewer>
@@ -353,7 +380,7 @@ export default function PdfJsGenericViewer({
                   Try the basic viewer
                 </button>
               ) : null}
-              {originalUrl ? (
+              {originalUrl && !parseLocalReadReference(originalUrl) ? (
                 <a
                   href={originalUrl}
                   target="_blank"

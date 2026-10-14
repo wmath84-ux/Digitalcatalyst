@@ -196,6 +196,13 @@ function pasteIntoEditor(html: string, editor: NoteEditorInstance, asBlocks = fa
   if (!clean) return false;
   const { blocks } = importLegacyHtml(clean);
   if (!blocks.length) return false;
+  // The native math schema is already imported losslessly. Sending it back
+  // through the DOM paste parser can swallow the text after an atom.
+  const single = blocks[0];
+  if (blocks.length === 1 && single.type === "paragraph" && clean.includes("data-note-math=") && Array.isArray(single.content)) {
+    editor.insertInlineContent(single.content);
+    return true;
+  }
   const selection = editor.getSelection();
   // A snippet of formatted text, or a selection to overwrite: BlockNote's own
   // inline paste does this best (marks survive, the caret stays in the block).
@@ -558,6 +565,12 @@ function NoteEditorSession({
       return {
         load: replaceWith,
         read: flushNow,
+        markSaved: () => {
+          const draft = flushNow();
+          baseline.current = { body: draft.bodyHtml, title: draft.title };
+          flags.current.dirty = false;
+          callbacks.current.onDirtyChange?.(false);
+        },
         isEmpty: () => !currentTitle() && isNoteBodyEmpty(editor),
         focusTitle: () => titleRef.current?.focus(),
         focusBody: (position = "end") => focusNoteBody(editor, position),

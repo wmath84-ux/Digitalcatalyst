@@ -70,7 +70,7 @@ before(async () => {
     base: "./",
     plugins: [react(), tailwindcss()],
     resolve: { alias: { "@": path.join(ROOT, "src") } },
-    build: { outDir: OUT, emptyOutDir: true, minify: false, cssMinify: false, rollupOptions: { input: [FIXTURE, HANDLE_FIXTURE] } },
+    build: { outDir: OUT, emptyOutDir: true, minify: false, cssMinify: false, rollupOptions: { input: [FIXTURE, HANDLE_FIXTURE, path.join(ROOT, "tests/fixtures/noteEditorHarness/mindmap.html")] } },
     css: { lightningcss: { errorRecovery: true } },
   });
   server = http.createServer((req, res) => {
@@ -119,6 +119,26 @@ async function open({ width = 1100, height = 760, touch = false, init, pagePath 
   return { page, context, problems, press, editorReady };
 }
 
+/** Library selection reads; only a second, direct document gesture edits. */
+async function openSavedNote(page, press, id) {
+  if (await page.locator('[data-note-view-mode="read"]').count()) {
+    await page.locator('[data-note-view-mode="read"]').focus();
+    await page.keyboard.press("Escape");
+  }
+  await press(`[data-note-id="${id}"]`);
+  await page.waitForSelector('[data-note-editor] .bn-editor');
+  assert.equal(await page.locator('[data-course-notes-bar]').count(), 0);
+  assert.equal(await page.locator('.bn-editor[contenteditable="true"]').count(), 0);
+  const title = page.locator('.dc-note-title');
+  if (await page.evaluate(() => navigator.maxTouchPoints > 0)) {
+    const box = await title.boundingBox();
+    await page.touchscreen.tap(box.x + 12, box.y + 12);
+    await page.touchscreen.tap(box.x + 12, box.y + 12);
+  } else await title.dblclick();
+  await page.waitForSelector('[data-course-note-edit-save]');
+  await page.waitForSelector('.bn-editor[contenteditable="true"]');
+}
+
 const html = (page) => page.evaluate(() => document.querySelector(".bn-editor")?.innerHTML || "");
 const bodyText = (page) => page.evaluate(() => document.querySelector(".bn-editor")?.textContent || "");
 const firstVisibleRect = (page, selector) =>
@@ -160,14 +180,18 @@ browserTest("create: title → body → slash command → bold → Save stores t
     await page.evaluate(() => window.__notes[0].html),
     '<h1>Cell biology</h1><hr><p>Plain then <strong>bold</strong> after</p><ul><li data-checked="false">revise chapter 4</li></ul>',
   );
-  assert.equal(await page.locator("[data-course-note]").count(), 7, "the new note is in the list");
+  await page.waitForSelector('[data-note-view-mode="read"]');
+  assert.equal(await page.locator('[data-course-notes-bar]').count(), 0, "a new save goes straight to the headerless document");
+  await page.locator('[data-note-view-mode="read"]').focus();
+  await page.keyboard.press("Escape");
+  assert.equal(await page.locator("[data-course-note-open]").count(), 7, "the new note is in the list");
   assert.deepEqual(problems, []);
   await context.close();
 });
 
 browserTest("edit: every block round-trips; Cancel discards; Save keeps the rest of the note", async () => {
   const { page, press, editorReady, problems, context } = await open();
-  await press('[data-note-id="n1"] [data-course-note-edit]');
+  await openSavedNote(page, press, "n1");
   await editorReady();
   assert.equal(await page.$eval(".dc-note-title", (el) => el.value), "Photosynthesis");
   assert.equal(await status(page), "Synced", "an untouched note is not 'Unsaved'");
@@ -178,7 +202,7 @@ browserTest("edit: every block round-trips; Cancel discards; Save keeps the rest
   await page.waitForTimeout(250);
   assert.doesNotMatch(await noteHtml(page, "n1"), /SHOULD NOT/);
 
-  await press('[data-note-id="n1"] [data-course-note-edit]');
+  await openSavedNote(page, press, "n1");
   await editorReady();
   await page.keyboard.type(" — appended");
   await page.waitForTimeout(350);
@@ -197,13 +221,13 @@ browserTest("edit: every block round-trips; Cancel discards; Save keeps the rest
 
 browserTest("delete is a two-step act: the card button only asks; Cancel keeps the note; confirm removes it", async () => {
   const { page, press, context } = await open();
-  await press('[data-note-id="n5"] [data-course-note-delete]');
+  await press('.branched-menu__row:has([data-note-id="n5"]) [data-branched-delete]');
   await page.waitForSelector("[data-course-confirm-delete]");
   assert.equal(await page.evaluate(() => window.__log.length), 0, "the first tap deletes nothing");
   await press("[data-course-confirm-cancel]");
   await page.waitForTimeout(200);
   assert.equal(await page.locator('[data-note-id="n5"]').count(), 1);
-  await press('[data-note-id="n5"] [data-course-note-delete]');
+  await press('.branched-menu__row:has([data-note-id="n5"]) [data-branched-delete]');
   await press("[data-course-confirm-delete]");
   await page.waitForFunction(() => window.__log.includes("delete:n5"));
   assert.equal(await page.locator('[data-note-id="n5"]').count(), 0);
@@ -212,7 +236,7 @@ browserTest("delete is a two-step act: the card button only asks; Cancel keeps t
 
 browserTest("legacy notes open intact: table preserved verbatim, checklist / quote / code are real blocks", async () => {
   const { page, press, editorReady, context } = await open();
-  await press('[data-note-id="n3"] [data-course-note-edit]');
+  await openSavedNote(page, press, "n3");
   await editorReady();
   assert.deepEqual(await page.$$eval(".bn-block-content", (n) => n.map((x) => x.getAttribute("data-content-type"))), ["paragraph", "legacyHtml", "paragraph"]);
   assert.equal(await page.locator(".dc-note-legacy table").count(), 1);
@@ -220,7 +244,7 @@ browserTest("legacy notes open intact: table preserved verbatim, checklist / quo
   await page.waitForFunction(() => window.__log.some((l) => l.startsWith("edit:")));
   assert.match(await noteHtml(page, "n3"), /<table><tbody><tr><th>Term<\/th><th>Meaning<\/th><\/tr><tr><td>ATP<\/td><td>Energy<\/td><\/tr><\/tbody><\/table>/, "saving an untouched note must not alter the table");
 
-  await press('[data-note-id="n4"] [data-course-note-edit]');
+  await openSavedNote(page, press, "n4");
   await editorReady();
   assert.deepEqual(await page.$$eval(".bn-block-content", (n) => n.map((x) => x.getAttribute("data-content-type"))), ["checkListItem", "checkListItem", "quote", "codeBlock"]);
   assert.deepEqual(await page.$$eval('[data-content-type="checkListItem"] input', (n) => n.map((x) => x.checked)), [true, false]);
@@ -229,7 +253,7 @@ browserTest("legacy notes open intact: table preserved verbatim, checklist / quo
 
 browserTest("a plain-text-only legacy note (no html field) opens with its words in the body and saves as paragraphs", async () => {
   const { page, press, editorReady, context } = await open();
-  await press('[data-note-id="n5"] [data-course-note-edit]');
+  await openSavedNote(page, press, "n5");
   await editorReady();
   assert.equal(await bodyText(page), "Plain only");
   assert.equal(await page.$eval(".dc-note-title", (el) => el.value), "", "no heading → no title; the words stay in the body");
@@ -277,7 +301,7 @@ browserTest("undo / redo and a clean history boundary per note", async () => {
   assert.equal(await bodyText(page), before, "Ctrl+Y redoes");
   // A freshly opened note starts with an EMPTY history: undo can never reach the previous note.
   await press("[data-course-notes-cancel]");
-  await press('[data-note-id="n2"] [data-course-note-edit]');
+  await openSavedNote(page, press, "n2");
   await editorReady();
   const opened = await bodyText(page);
   await page.keyboard.press("Control+KeyZ");
@@ -470,6 +494,7 @@ browserTest("inline formulas stay editable source: replace LaTeX, type around it
   await page.keyboard.press("Enter");
   await paste("Before $x^2$ after");
   await page.waitForSelector(".dc-note-math-inline-trigger .katex");
+  await page.keyboard.press("Control+End");
   await page.keyboard.type(" end");
   await page.keyboard.press("Control+Home");
   await page.keyboard.type("start ");
@@ -483,13 +508,13 @@ browserTest("inline formulas stay editable source: replace LaTeX, type around it
   assert.match(await html(page), /data-note-math-node="inline"/);
   assert.match(await html(page), /<annotation encoding="application\/x-tex">x\^3<\/annotation>/);
   assert.match(await bodyText(page), /start Before/);
-  assert.match(await bodyText(page), /after end/);
+  assert.match(await bodyText(page), /after\s*end/, "the text following an inline math atom survives source replacement");
   await page.click("[data-course-notes-save]");
   await page.waitForFunction(() => window.__log.includes("add"));
   const saved = await page.evaluate(() => window.__notes[0].html);
   assert.match(saved, /data-note-math="inline"/);
   assert.match(saved, /data-latex="x\^3"/);
-  assert.equal(await page.locator("[data-course-note-preview] .katex").count() > 0, true, "the saved card uses the shared KaTeX preview path");
+  assert.equal(await page.locator('[data-note-view-mode="read"] .katex').count() > 0, true, "the saved document uses the shared KaTeX path");
   assert.deepEqual(problems, []);
   await context.close();
 });
@@ -537,13 +562,11 @@ browserTest("links: created from the selection toolbar with safe attributes; cli
 
 browserTest("desktop: the selection toolbar floats ABOVE the words, never steals the selection, and Bold works", async () => {
   const { page, press, editorReady, context } = await open();
-  await press('[data-note-id="n4"] [data-course-note-edit]');
+  await openSavedNote(page, press, "n4");
   await editorReady();
-  const box = await page.$eval('[data-content-type="quote"] .bn-inline-content', (e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, h: r.height }; });
-  await page.mouse.move(box.x + 6, box.y + box.h / 2);
-  await page.mouse.down();
-  await page.mouse.move(box.x + 40, box.y + box.h / 2, { steps: 4 });
-  await page.mouse.up();
+  await page.locator('[data-content-type="quote"] .bn-inline-content').click();
+  await page.keyboard.press("Home");
+  await page.keyboard.press("Shift+End");
   await page.waitForSelector(".bn-formatting-toolbar");
   const selected = await page.evaluate(() => window.getSelection().toString());
   const selectionRect = await page.evaluate(() => { const r = window.getSelection().getRangeAt(0).getBoundingClientRect(); return { top: r.top }; });
@@ -564,7 +587,7 @@ browserTest("desktop: the selection toolbar floats ABOVE the words, never steals
 
 browserTest("desktop: hovering a block reveals insert + handle; the handle menu moves or deletes the block", async () => {
   const { page, press, editorReady, context } = await open();
-  await press('[data-note-id="n4"] [data-course-note-edit]');
+  await openSavedNote(page, press, "n4");
   await editorReady();
   const point = await page.$eval('[data-content-type="quote"]', (e) => { const r = e.getBoundingClientRect(); return { x: r.x + 60, y: r.y + r.height / 2 }; });
   await page.mouse.move(point.x, point.y);
@@ -649,6 +672,7 @@ const overlayKeyboardInit = () => {
   const fake = new EventTarget();
   Object.assign(fake, { width: 390, height: window.innerHeight, offsetTop: 0, offsetLeft: 0, pageTop: 0, pageLeft: 0, scale: 1 });
   Object.defineProperty(window, "visualViewport", { value: fake, configurable: true });
+  window.addEventListener("DOMContentLoaded", () => { fake.height = window.innerHeight; fake.width = window.innerWidth; });
   window.__setVV = (height) => { fake.height = height; fake.dispatchEvent(new Event("resize")); };
 };
 
@@ -674,7 +698,7 @@ for (const engine of ["resize", "overlay"]) {
     // floating window never saw it at all.)
     assert.equal(await page.locator("[data-note-dock]").count(), 1, "the toolbar is up for the caret alone");
     const beforeKeyboard = await firstVisibleRect(page, "[data-note-dock]");
-    assert.ok(Math.abs(beforeKeyboard.bottom - (await visible()).bottom) <= 1.5, "flush with the bottom while nothing else is down there");
+    assert.ok(Math.abs(beforeKeyboard.bottom - (await visible()).bottom) <= 1.5, `flush with the bottom while nothing else is down there: dock ${JSON.stringify(beforeKeyboard)}, visual ${JSON.stringify(await visible())}`);
     assert.equal(await page.evaluate(() => window.__kb.visible), false, "and no keyboard is open");
 
     await keyboard(320);
@@ -815,7 +839,7 @@ for (const width of [320, 360, 375, 390, 412, 430, 768, 1024]) {
       });
     let o = await overflow();
     assert.ok(o.doc <= 0 && o.panel <= 0, `list overflow ${JSON.stringify(o)}`);
-    await press('[data-note-id="n6"] [data-course-note-edit]');
+    await openSavedNote(page, press, "n6");
     await editorReady();
     assert.equal(await page.locator(".dc-note-math-inline-trigger .katex").count(), 1, "inline math renders with KaTeX in the actual editor");
     assert.equal(await page.locator(".dc-note-math-block-trigger .katex-display").count(), 1, "display math renders with KaTeX in the actual editor");
@@ -862,5 +886,101 @@ browserTest("the page is white and flat; the title is a bold serif; the focus ri
   assert.equal(style.titleBorder, "0px");
   assert.equal(style.titleBg, "rgba(0, 0, 0, 0)");
   assert.equal(style.scheme, "light");
+  await context.close();
+});
+
+browserTest("saved note is headerless, single tap cannot edit, and a second edit after Save is not discarded", async () => {
+  const { page, press, editorReady, context } = await open();
+  await press('[data-note-id="n1"]');
+  await editorReady();
+  assert.equal(await page.locator('[data-course-notes-bar], [data-note-dock]').count(), 0);
+  await page.click('.dc-note-title');
+  await page.keyboard.type('MUST NOT WRITE');
+  assert.equal(await page.locator('.bn-editor[contenteditable="true"]').count(), 0);
+  assert.doesNotMatch(await noteHtml(page, 'n1'), /MUST NOT WRITE/);
+  await page.locator('.dc-note-title').dblclick();
+  await page.waitForFunction(() => document.activeElement?.classList.contains('bn-editor'));
+  await page.keyboard.type(' first edit');
+  await press('[data-course-note-edit-save]');
+  await page.waitForSelector('[data-note-view-mode="read"]');
+  assert.equal(await page.locator('[data-course-notes-bar]').count(), 0);
+  await page.locator('.dc-note-title').dblclick();
+  await page.waitForFunction(() => document.activeElement?.classList.contains('bn-editor'));
+  await page.keyboard.type(' second edit');
+  await page.waitForTimeout(400);
+  assert.equal(await status(page), 'Unsaved');
+  await press('[data-course-note-edit-save]');
+  assert.match(await noteHtml(page, 'n1'), /first edit second edit/);
+  await context.close();
+});
+
+async function openMindMap({ touch = false } = {}) {
+  const context = await browser.newContext({ viewport: { width: touch ? 390 : 1100, height: 760 }, hasTouch: touch, isMobile: touch });
+  const page = await context.newPage();
+  const problems = [];
+  page.on('pageerror', error => problems.push(error.message));
+  await page.goto(`${origin}/tests/fixtures/noteEditorHarness/mindmap.html`);
+  await page.waitForSelector('[data-course-mindmap-library]');
+  await page.getByRole('tab', { name: /SELF/ }).click();
+  return { page, context, problems };
+}
+
+browserTest("saved mind map reads without tools; double-click unlocks, Done commits and locks, errors remain recoverable", async () => {
+  const { page, context, problems } = await openMindMap();
+  await page.locator('[data-course-mindmap-map-grid] [data-branched-leaf]').click();
+  await page.waitForSelector('[data-mindmap-mode="read"]');
+  assert.equal(await page.locator('[data-course-mindmap-status]').count(), 0);
+  const root = page.locator('[data-mind-node="root"]');
+  await root.click();
+  assert.equal(await page.locator('[data-mind-node-input]').count(), 0);
+  await root.dblclick();
+  await page.waitForSelector('[data-course-mindmap-status]');
+  assert.equal(await page.locator('[data-course-confirm-delete]').count(), 0, 'the unlocking gesture must not delete');
+  await root.click();
+  const input = page.locator('[data-mind-node-input="root"]');
+  await input.focus();
+  await page.keyboard.press('Control+A');
+  await page.keyboard.type('Edited root');
+  await page.locator('[data-course-mindmap-done]').click();
+  await page.waitForSelector('[data-mindmap-mode="read"]');
+  assert.equal(await page.locator('[data-course-mindmap-status]').count(), 0);
+  assert.equal(await page.evaluate(() => window.__mind.rootTopic), 'Edited root');
+  await page.evaluate(() => window.__syncError());
+  await page.waitForSelector('[data-study-library-notice="error"]');
+  await page.locator('[data-study-library-retry]').click();
+  await page.waitForSelector('[data-study-library-notice="error"]', { state: 'detached' });
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+browserTest("touch double tap unlocks a saved mind map, while new maps start with tools", async () => {
+  const { page, context, problems } = await openMindMap({ touch: true });
+  await page.locator('[data-course-mindmap-map-grid] [data-branched-leaf]').tap();
+  await page.waitForSelector('[data-mind-node="root"]');
+  const root = await page.locator('[data-mind-node="root"]').boundingBox();
+  await page.touchscreen.tap(root.x + root.width / 2, root.y + root.height / 2);
+  assert.equal(await page.locator('[data-course-mindmap-status]').count(), 0);
+  await page.touchscreen.tap(root.x + root.width / 2, root.y + root.height / 2);
+  await page.waitForSelector('[data-course-mindmap-status]');
+  await page.locator('[data-course-mindmap-done]').tap();
+  await page.locator('[data-course-mindmap-canvas]').focus();
+  await page.keyboard.press('Escape');
+  await page.locator('[data-course-mindmap-new]').tap();
+  await page.waitForSelector('[data-course-mindmap-status]');
+  assert.equal(await page.locator('[data-mindmap-mode="edit"]').count(), 1);
+  assert.deepEqual(problems, []);
+  await context.close();
+});
+
+browserTest("MASTER mind map cannot unlock via mouse, touch or keyboard", async () => {
+  const { page, context, problems } = await openMindMap({ touch: true });
+  await page.evaluate(() => window.__master());
+  await page.waitForSelector('[data-course-mindmap-master-banner]');
+  await page.locator('[data-mind-node="root"]').dblclick();
+  await page.locator('[data-course-mindmap-canvas]').focus();
+  await page.keyboard.press('Enter');
+  assert.equal(await page.locator('[data-course-mindmap-status], [data-mind-node-input]').count(), 0);
+  assert.equal(await page.locator('[data-mindmap-mode="read"]').count(), 1);
+  assert.deepEqual(problems, []);
   await context.close();
 });

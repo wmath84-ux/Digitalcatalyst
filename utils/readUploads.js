@@ -1,3 +1,4 @@
+import { parseLocalReadReference } from "./localReadReference.js";
 // utils/readUploads.js
 //
 // Course Player → READ LIBRARY — the learner's OWN PDFs: the pure half.
@@ -350,7 +351,9 @@ export const readUploadModuleDraft = (row) => {
   const uid = text(upload.uid);
   const storagePath = text(upload.storagePath);
   const name = sanitizeReadUploadName(upload.name, "My PDF");
-  if (!uid || !isOwnedReadUploadPath(storagePath, uid)) return null;
+  const local = upload.storageKind === "local" ? parseLocalReadReference(upload.url) : null;
+  if (upload.storageKind === "local" && !local) return null;
+  if (!uid || (local ? local.uid !== uid || local.id !== upload.id : !isOwnedReadUploadPath(storagePath, uid))) return null;
   const url = text(upload.url).slice(0, READ_UPLOAD_URL_MAX);
   if (!url) return null;
   return {
@@ -358,7 +361,7 @@ export const readUploadModuleDraft = (row) => {
     type: "read",
     url,
     description: sanitizeReadUploadModule(upload.module),
-    readSourceKind: "upload",
+    readSourceKind: local ? "pdf_url" : "upload",
     readStoragePath: storagePath,
     readFileName: name,
     readFileSize: clampInt(upload.sizeBytes, 1, READ_UPLOAD_MAX_BYTES, 1),

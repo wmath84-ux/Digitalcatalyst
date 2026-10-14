@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Tier } from "./types";
-import { PERF } from "./perf";
+
 
 /**
  * Container-aware responsiveness.
@@ -24,28 +24,40 @@ export function tierLte(a: Tier, b: Tier): boolean {
   return ORDER.indexOf(a) <= ORDER.indexOf(b);
 }
 
-export function useElementWidth<T extends HTMLElement>(): [RefObject<T | null>, number] {
+/** All width decisions made by the chat, including bridge viewport modes. */
+export const CHAT_FRAME_BREAKPOINTS = [520, 900] as const;
+export const CHAT_COLUMN_BREAKPOINTS = [272, 400, 580, 700, 820, 1020, 1120] as const;
+
+/** A representative width for this layout bucket (not every measured pixel). */
+export function breakpointWidth(width: number, breakpoints: readonly number[]): number {
+  return breakpoints.reduce((bucket, point) => width >= point ? point : bucket, 1);
+}
+
+export function useElementBreakpoint<T extends HTMLElement>(breakpoints: readonly number[]): [RefObject<T | null>, number] {
   const ref = useRef<T | null>(null);
   const [width, setWidth] = useState(0);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const quantize = (w: number) => Math.round(w / PERF.RESIZE_EPSILON) * PERF.RESIZE_EPSILON;
-    const ro = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect.width;
-      if (typeof w !== "number") return;
-      // Quantized updates: sub-threshold resizes (text zoom, fractional
-      // dpr drift) no longer churn React state on every pixel.
-      setWidth((prev) => {
-        const q = quantize(w);
-        return q === prev ? prev : q;
-      });
+    let lastBucket = 0;
+    const publish = (measured: number) => {
+      // Hidden tabs report zero: keep the last layout instead of collapsing
+      // the entire history into the narrowest tier while it is offscreen.
+      if (!Number.isFinite(measured) || measured <= 0) return;
+      const next = breakpointWidth(measured, breakpoints);
+      if (next === lastBucket) return; // no React update on same-tier pixels
+      lastBucket = next;
+      setWidth(next);
+    };
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver((entries) => {
+      const measured = entries[0]?.contentRect.width;
+      if (typeof measured === "number") publish(measured);
     });
-    ro.observe(el);
-    setWidth(quantize(el.getBoundingClientRect().width));
-    return () => ro.disconnect();
-  }, []);
+    ro?.observe(el);
+    publish(el.getBoundingClientRect().width);
+    return () => ro?.disconnect();
+  }, [breakpoints]);
 
   return [ref, width];
 }

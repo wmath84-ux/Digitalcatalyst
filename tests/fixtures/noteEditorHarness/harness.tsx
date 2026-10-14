@@ -61,7 +61,12 @@ function Harness() {
   // reads the panel session while the editor below it is unmounting.
   useEffect(() => () => { window.__exitSession = JSON.stringify(getCoursePanelSession().notes); }, []);
   const handlers = useMemo(() => ({
-    onAdd: (html: string) => { window.__log.push("add"); setNotes((list) => [{ id: `new-${list.length}`, text: html.replace(/<[^>]*>/g, " "), html, createdAt: Date.now() }, ...list]); },
+    onAdd: (html: string) => {
+      window.__log.push("add");
+      const note = { id: `new-${Date.now()}`, text: html.replace(/<[^>]*>/g, " "), html, createdAt: Date.now() };
+      setNotes((list) => [note, ...list]);
+      return note;
+    },
     onEdit: (id: string, html: string) => { window.__log.push(`edit:${id}`); setNotes((list) => list.map((note) => (note.id === id ? { ...note, html, text: html.replace(/<[^>]*>/g, " ") } : note))); },
     onDelete: (id: string) => { window.__log.push(`delete:${id}`); setNotes((list) => list.filter((note) => note.id !== id)); },
   }), []);

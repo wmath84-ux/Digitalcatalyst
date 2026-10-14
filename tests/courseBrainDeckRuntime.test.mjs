@@ -48,10 +48,10 @@ import { createRoot } from "react-dom/client";
 import { act } from "react";
 import CourseBrainPanel from ${JSON.stringify(path.join(ROOT, "src/course/CourseBrainPanel.tsx"))};
 
-export function mountBrain(host, sets) {
+export function mountBrain(host, sets, props = {}) {
   const root = createRoot(host);
   act(() => {
-    root.render(<CourseBrainPanel productId="p1" sets={sets} />);
+    root.render(<CourseBrainPanel productId="p1" sets={sets} {...props} />);
   });
   return { unmount: () => act(() => root.unmount()) };
 }
@@ -239,8 +239,8 @@ const mountAndStart = async () => {
   host.innerHTML = "";
   const mounted = fixture.mountBrain(host, SETS);
   resize(panel(), 390, 640);
-  const start = actionNamed(/Start practice/);
-  assert.ok(start, "the library offers a Start practice action");
+  const start = window.document.querySelector("[data-brain-set]");
+  assert.ok(start, "the shared library row starts practice");
   await tap(start);
   assert.equal(screen(), "question", "the practice deck is open");
   return mounted;
@@ -478,7 +478,7 @@ test("the practice header back icon returns to the Brain library", async () => {
   assert.ok(back.closest(".brain-practice-header"));
   await tap(back);
   assert.equal(deck(), null);
-  assert.ok(actionNamed(/Start practice/), "the Brain library is available again");
+  assert.ok(window.document.querySelector("[data-brain-set]"), "the Brain library is available again");
   mounted.unmount();
 });
 
@@ -491,5 +491,35 @@ test("advancing the stack preserves each question's own colour", async () => {
   await settle(900);
   assert.equal(queue(), "1");
   assert.equal(cardOf("1").getAttribute("data-brain-card-tone"), secondTone);
+  mounted.unmount();
+});
+
+
+test("shared Brain library retains hierarchy, question counts, scores, completion and SELF creation", async () => {
+  window.localStorage.setItem("dc:courseBrain:p1", JSON.stringify({ "set-1": { attempts: 2, best: 80, last: 60, at: Date.now() } }));
+  const host = window.document.getElementById("brain");
+  host.innerHTML = "";
+  const self = { ...SETS[0], id: "self-1", title: "My own practice" };
+  const mounted = fixture.mountBrain(host, SETS, {
+    selfSets: [self], completedFileIds: new Set(["set-1"]),
+    modules: [{ id: "parent", title: "Parent module", files: [], modules: [{ id: "m1", title: "Nested module", files: [] }] }],
+    activeModuleId: "m1", onCreateSelfSet: async () => ({ ok: true }),
+  });
+  await settle();
+  const row = window.document.querySelector('[data-brain-set="set-1"]');
+  assert.ok(window.document.querySelector('[data-listing="brain-master"]'));
+  assert.match(host.textContent, /Parent module/);
+  assert.match(host.textContent, /Nested module/);
+  assert.match(row.textContent, /3 Q.*Done.*Best 80%/);
+  assert.match(row.getAttribute("aria-label"), /2 attempts.*last 60%/);
+  assert.equal(window.document.querySelector('[data-brain-self-add]'), null);
+  const selfTab = [...host.querySelectorAll('[role="tab"]')].find(button => /SELF/.test(button.textContent));
+  await tap(selfTab);
+  assert.ok(window.document.querySelector('[data-listing="brain-self"] [data-brain-set="self-1"]'));
+  assert.equal(window.document.querySelector('[data-brain-set="set-1"]'), null);
+  const add = window.document.querySelector('[data-brain-self-add]');
+  assert.ok(add);
+  await tap(add);
+  assert.ok(window.document.querySelector('[data-brain-self-composer]'));
   mounted.unmount();
 });

@@ -11,8 +11,8 @@ export const PERF = {
   CHAT_PAGE_SIZE: 10,
   /** How far above the list top the prefetch sentinel arms itself. */
   CHAT_PREFETCH_MARGIN: 420,
-  /** Simulated fetch latency for a page of history (ms). */
-  PAGE_LATENCY_MS: 240,
+  /** Yield once before appending in-memory history; no artificial network wait. */
+  PAGE_LATENCY_MS: 0,
   /** Stream UI commits — batch tokens so React renders ≤ ~20×/s. */
   STREAM_COMMIT_MS: 55,
   /** Words revealed per streamed commit (alternated ±1 for a natural pace). */
@@ -42,7 +42,7 @@ export function throttle<A extends unknown[]>(fn: (...args: A) => void, ms: numb
     lastArgs = null;
     if (args) fn(...args);
   };
-  return (...args: A) => {
+  const run = (...args: A) => {
     lastArgs = args;
     const now = performance.now();
     if (now - last >= ms) {
@@ -52,6 +52,11 @@ export function throttle<A extends unknown[]>(fn: (...args: A) => void, ms: numb
       timer = window.setTimeout(invoke, ms - (now - last));
     }
   };
+  return Object.assign(run, { cancel: () => {
+    window.clearTimeout(timer);
+    timer = 0;
+    lastArgs = null;
+  } });
 }
 
 /** rAF-coalesced runner — collapses bursts into one call per frame. */

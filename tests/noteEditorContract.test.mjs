@@ -214,7 +214,7 @@ test("math rendering stays bounded while row identity uses safe text", () => {
   assert.match(noteMath, /MAX_NOTE_MATH_SOURCE_LENGTH = 4096/);
   assert.match(notesPanel, /firstRichTextBlock\(html\)/);
   assert.match(notesPanel, /const noteCardTitle = \(note: CoursePlayerNote\)/);
-  assert.doesNotMatch(notesPanel, /dangerouslySetInnerHTML/);
+  assert.match(notesPanel, /__html: sanitizeRichText\(combineHtml\(titleValue, value\)\)/, "the locked legacy fallback renders sanitized static HTML, never an editable fallback");
   assert.doesNotMatch(mathRendering, /renderMathInElement|renderMathInDocument/);
 });
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { Chat, Message } from "./types";
 import { PERF } from "./perf";
 
@@ -37,12 +37,20 @@ export function usePagedMessages(chat: Chat, listRef: RefObject<HTMLDivElement |
   const anchorRef = useRef<{ height: number; top: number } | null>(null);
   const prevFirstId = useRef<string | null>(null);
   const prevChatId = useRef(chat.id);
+  const timerRef = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    genRef.current += 1;
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+  }, []);
 
   // Reset pagination when the conversation changes identity.
   useEffect(() => {
     if (prevChatId.current !== chat.id) {
       prevChatId.current = chat.id;
       genRef.current += 1;
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+      timerRef.current = null;
       pendingRef.current = false;
       anchorRef.current = null;
       prevFirstId.current = null;
@@ -54,11 +62,11 @@ export function usePagedMessages(chat: Chat, listRef: RefObject<HTMLDivElement |
 
   // Keep the page window honest as history grows (new messages append
   // to the tail — the window always tracks the latest N+count messages).
-  const visible = messages.slice(Math.max(0, total - count));
+  const visible = useMemo(() => messages.slice(Math.max(0, total - count)), [messages, total, count]);
   const hasMore = visible.length < total;
 
   const loadMore = useCallback(() => {
-    if (pendingRef.current || loadError) return;
+    if (pendingRef.current || loadError || !hasMore) return;
     const el = listRef.current;
     const gen = ++genRef.current;
     pendingRef.current = true;
@@ -68,9 +76,10 @@ export function usePagedMessages(chat: Chat, listRef: RefObject<HTMLDivElement |
     if (el) anchorRef.current = { height: el.scrollHeight, top: el.scrollTop };
 
     const cursor = visible[0]?.id ?? null; // cursor-based, not offset
-    window.setTimeout(() => {
-      pendingRef.current = false;
-      if (gen !== genRef.current) return; // stale (chat switched / reset)
+    timerRef.current = window.setTimeout(() => {
+      if (gen !== genRef.current) return;
+      timerRef.current = null;
+      pendingRef.current = false; // stale (chat switched / reset)
       try {
         setCount((c) => c + PERF.CHAT_PAGE_SIZE);
       } catch {
@@ -81,7 +90,7 @@ export function usePagedMessages(chat: Chat, listRef: RefObject<HTMLDivElement |
       void cursor;
     }, PERF.PAGE_LATENCY_MS);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadError, visible[0]?.id, listRef]);
+  }, [loadError, hasMore, visible[0]?.id, listRef]);
 
   const retry = useCallback(() => {
     setLoadError(false);
