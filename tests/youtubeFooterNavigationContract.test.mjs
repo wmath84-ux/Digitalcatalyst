@@ -47,7 +47,7 @@ test("the center quick-action menu retains secondary app destinations and keyboa
   assert.match(footer, /aria-haspopup="menu"/);
   assert.match(footer, /aria-expanded=\{menuOpen\}/);
   assert.match(footer, /event.key !== "Escape"/);
-  assert.match(footer, /onSelect\(item.id\)/);
+  assert.match(footer, /window\.location\.hash = item\.route/);
 });
 
 test("Settings shows a preview of the new five-slot navigation", () => {
