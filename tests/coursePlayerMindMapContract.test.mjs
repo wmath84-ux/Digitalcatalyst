@@ -162,7 +162,9 @@ test("a refused or failed cloud write never strands the learner's map", () => {
 });
 
 test("saves are debounced so a burst of taps is one write", () => {
-  assert.match(hook, /const DEFAULT_DEBOUNCE_MS = 700;/);
+  // 30 s, matching the Notes tab: saves are storage-backed one-shot writes, not
+  // a realtime stream, so a burst of taps coalesces into ONE write.
+  assert.match(hook, /const DEFAULT_DEBOUNCE_MS = 30000;/);
   assert.match(hook, /draft\.timer = setTimeout\(/);
 });
 
@@ -409,19 +411,24 @@ test("every node opens the inline editor on a single tap (no separate pencil)", 
   assert.match(panel, /if \(dragMovedRef\.current[\s\S]{0,40}return;/);
 });
 
-test("the mind map has a persisted light/dark pick and a genuine light palette", () => {
-  // Part 1 §8/§9: the map is no longer dark-only. A compact sun/moon control
-  // flips it between two real palettes, and the choice is the SAME shared,
-  // per-user theme layer the rest of the player uses (persisted, never a
-  // per-visit session override and never a CSS inversion).
+test("the mind map has a genuine light palette and exposes no dead theme switch", () => {
+  // Part 1 §8/§9 made the map light-capable; the app then went LIGHT-ONLY
+  // (src/lib/theme.ts: "Legacy dark preferences and callers are normalized").
+  // So what still has to hold is the LIGHT half of that brief: the map wears a
+  // real light palette from the SAME shared theme layer (persisted per user,
+  // never a per-visit session override and never a CSS inversion) — but it
+  // exposes no dark action, because a switch that cannot change anything is
+  // worse than no switch.
   assert.match(panel, /export type MindMapTheme = "dark" \| "light";/);
   assert.match(panel, /useCourseTheme\("mindMap", uid \?\? null(?:, "light")?\)/);
   assert.match(panel, /const mindTheme: MindMapTheme = mindThemeCtl\.theme;/);
   assert.match(panel, /data-mindmap-theme=\{mindTheme\}/);
   assert.match(panel, /course-mindmap-shell/);
-  // The toggle is on the bar, exposes its state, and reuses the shared hook.
-  assert.match(panel, /data-course-mindmap-theme-toggle=\{mindTheme\}/);
-  assert.match(panel, /mindThemeCtl\.toggleTheme/);
+  // Light-only: no dark/light control on the bar, and no dark action wired to
+  // the shared hook. (The hook stays — it is how the map reads its palette and
+  // how the light default is pinned.)
+  assert.doesNotMatch(panel, /data-course-mindmap-theme-toggle/, "no dead theme switch on the bar");
+  assert.doesNotMatch(panel, /mindThemeCtl\.toggleTheme/, "no dark action is exposed");
   // The old per-visit / per-device override keys never came back, and the map
   // still owns its own theme (it is not handed the player shell's theme prop).
   assert.doesNotMatch(panel, /setThemeOverride/);
@@ -545,8 +552,8 @@ test("the toolbar is icon-only: every control is a single glyph tile, no caption
   assert.match(toolbar, /data-course-mindmap-save/);
   assert.match(toolbar, /data-course-mindmap-align/);
   assert.match(toolbar, /data-course-mindmap-fit/);
-  // The light/dark tile is back on the bar (Part 1 §9): one sun/moon glyph.
-  assert.match(toolbar, /data-course-mindmap-theme-toggle/);
+  // …and no theme tile: appearance is light-only, so there is nothing to flip.
+  assert.doesNotMatch(toolbar, /data-course-mindmap-theme-toggle/, "no dead theme switch on the bar");
   assert.match(toolbar, /data-course-mindmap-delete/);
   assert.doesNotMatch(toolbar, /data-course-mindmap-dbl-delete/, "double-tap arm switch is gone (§7)");
   assert.doesNotMatch(toolbar, /data-course-mindmap-close/, "no close button on the bar");

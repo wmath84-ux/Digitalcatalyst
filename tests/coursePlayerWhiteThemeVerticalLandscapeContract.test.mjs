@@ -49,7 +49,15 @@ test("Light is the fallback while feature- and UID-scoped saved themes remain au
   assert.match(playerPanel, /Light appearance/);
   assert.match(playerPanel, /playerTheme = "light"/);
   assert.match(preferences, /fallback: CoursePlayerTheme = "light"/);
-  assert.match(preferences, /stored === "light" \|\| stored === "dark" \? stored : fallback/);
+  // Appearance is LIGHT-ONLY app-wide (src/lib/theme.ts: "Legacy dark
+  // preferences and callers are normalized"), so loadCourseTheme does not hand
+  // back a stored "dark" — it normalizes every legacy pick to light. Pinning
+  // the whole function keeps a re-introduced read of dark from sneaking in.
+  assert.match(
+    preferences,
+    /export const loadCourseTheme = \([\s\S]*?\): CoursePlayerTheme => \{\s*return "light";\s*\};/,
+    "a stored theme pick is normalized to light, never honoured as dark",
+  );
   assert.match(preferences, /prefKey\("courseTheme", feature, uid\)/);
   assert.match(preferences, /uid \? `dc\.\$\{kind\}\.\$\{feature\}\.\$\{uid\}`/);
   assert.match(coursePlayer, /style=\{\{ colorScheme: playerThemeCtl\.theme \}\}/);
