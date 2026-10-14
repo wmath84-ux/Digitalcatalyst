@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Plus } from "lucide-react";
-import { UserIcon } from "./icons";
+import { Library, Plus } from "lucide-react";
+import { BagIcon, CalendarIcon, FlowPathIcon, HomeIcon, SparkBookIcon, StoreIcon, UserIcon } from "./icons";
 import type { GlassDockItem } from "./glass-dock/GlassDock";
 import "./youtube-footer-nav.css";
 
@@ -9,12 +9,23 @@ type FooterPosition = "absolute" | "fixed";
 type Props = {
   label?: string;
   items: GlassDockItem[];
-  onSelect: (id: string) => void;
   position?: FooterPosition;
   dataAttrs?: Record<string, string | undefined>;
 };
 
-const QUICK_ACTION_IDS = ["myday", "study-library", "revision", "flowpath"] as const;
+const QUICK_ACTIONS = [
+  { id: "myday", label: "My Day", route: "#/my-day", Icon: CalendarIcon },
+  { id: "study-library", label: "My Study Library", route: "#/study-library", Icon: Library },
+  { id: "revision", label: "Revision", route: "#/revision", Icon: SparkBookIcon },
+  { id: "flowpath", label: "FlowPath", route: "#/flowpath", Icon: FlowPathIcon },
+] as const;
+
+const PRIMARY_TABS = [
+  { id: "home", label: "Home", route: "#/home", Icon: HomeIcon },
+  { id: "store", label: "Store", route: "#/store", Icon: StoreIcon },
+  { id: "purchases", label: "Purchases", route: "#/store/purchases", Icon: BagIcon },
+  { id: "profile", label: "You", route: "#/profile", Icon: UserIcon },
+] as const;
 
 function activeFromHash(hash: string): string | null {
   if (hash.startsWith("#/store/purchases")) return "purchases";
@@ -49,13 +60,12 @@ function formatBadge(badge: number | undefined): string | null {
 
 /**
  * Full-bleed, edge-attached mobile navigation inspired by YouTube's bottom bar.
- * The center action exposes the app's secondary destinations so none of the
- * existing routes are removed when the five-slot layout is selected.
+ * Primary destinations are stable on every screen, including nested revision
+ * and cart pages. The center action preserves access to the app's quick routes.
  */
 export default function YoutubeFooterNav({
   label = "Primary navigation",
   items,
-  onSelect,
   position = "absolute",
   dataAttrs,
 }: Props) {
@@ -118,40 +128,35 @@ export default function YoutubeFooterNav({
   const active = activeFromHash(currentHash);
   const activeShortcut = shortcutFromHash(currentHash);
   const positionClass = position === "fixed" ? "dc-youtube-footer-nav--fixed" : "dc-youtube-footer-nav--absolute";
+  const storeBadge = formatBadge(items.find((item) => item.id === "store")?.badge);
+  const purchasesBadge = formatBadge(items.find((item) => item.id === "purchases")?.badge);
 
-  const primaryItem = (id: string) => items.find((item) => item.id === id);
-  const renderTab = (id: string, labelText: string) => {
-    const item = primaryItem(id);
-    if (!item) return null;
-    const Icon = item.icon;
-    const badge = formatBadge(item.badge);
-    const isActive = active === id;
+  const renderTab = (tab: (typeof PRIMARY_TABS)[number]) => {
+    const Icon = tab.Icon;
+    const badge = tab.id === "store" ? storeBadge : tab.id === "purchases" ? purchasesBadge : null;
+    const isActive = active === tab.id;
     return (
       <button
-        key={id}
+        key={tab.id}
         type="button"
         className="dc-youtube-footer-tab"
-        data-youtube-tab={id}
-        aria-label={badge ? labelText + ", " + badge + " items" : labelText}
+        data-youtube-tab={tab.id}
+        aria-label={badge ? tab.label + ", " + badge + " items" : tab.label}
         aria-current={isActive ? "page" : undefined}
-        title={labelText}
+        title={tab.label}
         onClick={() => {
           setMenuOpen(false);
-          onSelect(id);
+          window.location.hash = tab.route;
         }}
       >
         <span className="dc-youtube-footer-icon" aria-hidden="true">
-          <Icon size={22} />
+          <Icon />
           {badge ? <span className="dc-youtube-footer-badge">{badge}</span> : null}
         </span>
-        <span className="dc-youtube-footer-label">{labelText}</span>
+        <span className="dc-youtube-footer-label">{tab.label}</span>
       </button>
     );
   };
-
-  const quickActions = QUICK_ACTION_IDS
-    .map((id) => items.find((item) => item.id === id))
-    .filter((item): item is GlassDockItem => Boolean(item));
 
   return (
     <nav
@@ -164,8 +169,8 @@ export default function YoutubeFooterNav({
       aria-label={label}
     >
       <div data-site-footer className="dc-youtube-footer">
-        {renderTab("home", "Home")}
-        {renderTab("store", "Store")}
+        {renderTab(PRIMARY_TABS[0])}
+        {renderTab(PRIMARY_TABS[1])}
         <div className="dc-youtube-footer-action-anchor">
           <button
             ref={triggerRef}
@@ -198,8 +203,8 @@ export default function YoutubeFooterNav({
             aria-label="Quick actions"
             aria-hidden={!menuOpen}
           >
-            {quickActions.map((item) => {
-              const Icon = item.icon;
+            {QUICK_ACTIONS.map((item) => {
+              const Icon = item.Icon;
               const selected = activeShortcut === item.id;
               return (
                 <button
@@ -211,32 +216,18 @@ export default function YoutubeFooterNav({
                   className="dc-youtube-footer-quick-item"
                   onClick={() => {
                     setMenuOpen(false);
-                    onSelect(item.id);
+                    window.location.hash = item.route;
                   }}
                 >
-                  <span className="dc-youtube-footer-quick-icon" aria-hidden="true"><Icon size={21} /></span>
+                  <span className="dc-youtube-footer-quick-icon" aria-hidden="true"><Icon /></span>
                   <span>{item.label}</span>
                 </button>
               );
             })}
           </div>
         </div>
-        {renderTab("purchases", "Purchases")}
-        <button
-          type="button"
-          className="dc-youtube-footer-tab"
-          data-youtube-tab="profile"
-          aria-label="Profile"
-          aria-current={active === "profile" ? "page" : undefined}
-          title="Profile"
-          onClick={() => {
-            setMenuOpen(false);
-            onSelect("profile");
-          }}
-        >
-          <span className="dc-youtube-footer-icon" aria-hidden="true"><UserIcon /></span>
-          <span className="dc-youtube-footer-label">You</span>
-        </button>
+        {renderTab(PRIMARY_TABS[2])}
+        {renderTab(PRIMARY_TABS[3])}
       </div>
     </nav>
   );
