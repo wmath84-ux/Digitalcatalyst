@@ -8,21 +8,19 @@ export type ProductImage = {
   isPrimary: boolean;
 };
 
+import type { MyCourseQuestion } from "../../types/myCourse";
+
 /**
- * One practice question inside a `brain` resource. Kept in step with
- * `utils/practiceSet.js` (the runtime normaliser the admin panel and the
- * Course Player both use) — this is only its TypeScript projection.
+ * One practice question inside a `brain` resource — ALL eight Brain question
+ * types (MCQ, Fill in the Blank, Label the Diagram, Assertion and Reason,
+ * One-Word, Match, Drag and Drop, Hotspot), not just MCQs. This is the same
+ * record the learner-facing creator writes: `utils/practiceSet.js` is the
+ * runtime normaliser/validator both sides read, and this alias keeps the
+ * admin projection from ever drifting from the canonical shape
+ * (`MyCourseQuestion` in src/types/myCourse.ts). Legacy records without a
+ * `questionType` are MCQs and keep working untouched.
  */
-export type ProductPracticeQuestion = {
-  id: string;
-  prompt: string;
-  options: string[];
-  /** -1 = no answer marked yet (the panel lists these as not publish-ready). */
-  correctIndex: number;
-  explanation: string;
-  difficulty: "easy" | "medium" | "hard";
-  topic: string;
-};
+export type ProductPracticeQuestion = MyCourseQuestion;
 
 export type ProductResource = {
   id: string;
@@ -43,7 +41,7 @@ export type ProductResource = {
     | "whimsical"
     | "iframe"
     /**
-     * Brain · practice set — the ONE resource type without a URL. Its content
+     * Brain Practice Set — the ONE resource type without a URL. Its content
      * is `practiceQuestions` below (bulk-imported / hand-written in the
      * product editor) and it renders in the Course Player's Brain tab.
      */

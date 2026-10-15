@@ -138,10 +138,19 @@ test("Owned, already-in-cart and unavailable items retain navigation/favorites w
     [{ availableForSale: false }, {}, "Not for sale"],
   ]) {
     const doc = render(product, state);
-    assert.equal(
-      doc.querySelector(".dc-marketplace-purchase-state").textContent,
-      label
-    );
+    if (state.purchased) {
+      // Owned items say so on the eyebrow status badge and render no
+      // purchase-state row at all.
+      assert.equal(doc.querySelector(".dc-marketplace-purchase-state"), null);
+      const badge = doc.querySelector(".dc-marketplace-status");
+      assert.equal(badge.getAttribute("data-status"), "purchased");
+      assert.equal(badge.textContent.trim(), label);
+    } else {
+      assert.equal(
+        doc.querySelector(".dc-marketplace-purchase-state").textContent,
+        label
+      );
+    }
     assert.equal(doc.querySelector(".dc-marketplace-buy"), null);
     assert.equal(
       doc.querySelector(".dc-marketplace-open").getAttribute("aria-label"),
@@ -173,8 +182,14 @@ test("Image fallback and favorites keep an honest identity and accessible action
 const storeCss = fs.readFileSync("src/components/store-marketplace.css", "utf8");
 const favoriteCardSource = fs.readFileSync("src/cartWishlist/components/FavoriteCard.tsx", "utf8");
 
-test("Desktop Store grid uses compact catalogue cards instead of full-width editorial cards", () => {
-  assert.match(storeCss, /@media \(min-width: 1024px\)\s*\{[\s\S]*?\.dc-desktop-shell \[data-store-marketplace\] \[data-store-grid\]\s*\{[\s\S]*?grid-template-columns:\s*repeat\(auto-fill, minmax\(min\(100%, 270px\), 1fr\)\)/);
+test("Store grid is a responsive multi-column catalogue instead of full-width editorial cards", () => {
+  // Columns follow the marketplace container in EVERY shell: 2 on a phone,
+  // then 3 / 4 / 5 across as the space widens — never one full-width column.
+  assert.match(storeCss, /\[data-store-marketplace\] \.dc-marketplace-grid\[data-store-grid\] \{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\) !important;/);
+  assert.match(storeCss, /@container dc-marketplace \(min-width: 700px\) \{\s*\[data-store-marketplace\] \.dc-marketplace-grid\[data-store-grid\] \{\s*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\) !important;/);
+  assert.match(storeCss, /@container dc-marketplace \(min-width: 1024px\) \{\s*\[data-store-marketplace\] \.dc-marketplace-grid\[data-store-grid\] \{\s*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\) !important;/);
+  assert.match(storeCss, /@container dc-marketplace \(min-width: 1440px\) \{\s*\[data-store-marketplace\] \.dc-marketplace-grid\[data-store-grid\] \{\s*grid-template-columns: repeat\(5, minmax\(0, 1fr\)\) !important;/);
+  assert.match(storeCss, /\[data-store-grid\] > \.dc-marketplace-card\.is-large \.dc-marketplace-open \{\s*display: flex;\s*flex-direction: column;/);
   assert.match(storeCss, /\.dc-desktop-shell \[data-store-marketplace\] \[data-store-grid\] > \.dc-marketplace-card\.is-large \.dc-marketplace-open\s*\{[\s\S]*?flex-direction:\s*column/);
   assert.match(storeCss, /\.dc-desktop-shell \[data-store-marketplace\] \[data-store-grid\] > \.dc-marketplace-card\.is-large:hover[\s\S]*?box-shadow:\s*0 1px 3px rgba\(15, 23, 42, 0\.055\)/);
   assert.match(storeCss, /html\[data-theme="dark"\] \.dc-desktop-shell \[data-store-marketplace\] \[data-store-grid\] > \.dc-marketplace-card\.is-large/);

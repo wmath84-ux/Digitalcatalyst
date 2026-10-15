@@ -1,8 +1,9 @@
 // src/course/ExperimentComposer.tsx
 //
-// The Course Player's “create your own 2D experiment” sheet — what the
-// Experiment page's “+” opens (behind its dropdown), in the same clean sheet
-// language as the Read page's compose overlay and the Brain page's “+”.
+// The Course Player's “create your own 2D experiment” page — what the
+// Experiment page's “+” menu opens. It is a nested PAGE inside the study
+// pane: it replaces the experiment listing (no modal, no dimmed backdrop),
+// and Back returns to the listing with its state intact.
 //
 // It is deliberately NOT a second builder: the body is the VERY SAME editor My
 // Study Library uses (src/personal-library/MyCourseExperimentEditor.tsx), so
@@ -20,10 +21,10 @@
 // What this file adds is only what the player surface needs: an experiment
 // NAME, the optional hosted link, a Create button that is refused until the
 // draft is runnable (`selfExperimentIssues`), and the promise that a created
-// experiment is already saved when the sheet closes.
+// experiment is already saved when the page closes.
 
 import { useEffect, useMemo, useState } from "react";
-import { FlaskConical, LoaderCircle, Sparkles, X } from "lucide-react";
+import { ArrowLeft, FlaskConical, LoaderCircle, Sparkles, X } from "lucide-react";
 import MyCourseExperimentEditor from "../personal-library/MyCourseExperimentEditor";
 import { createMyResource } from "../lib/myCourseClient";
 import { selfExperimentIssues } from "../utils/selfExperiments";
@@ -55,20 +56,35 @@ export default function ExperimentComposer({
   }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Back with unsaved work asks first — a stray tap must not lose a draft. */
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   const html = draft.interactiveHtml || "";
   const url = draft.url || "";
+
+  const hasUnsavedWork =
+    draft.name.trim() !== defaultName.trim() || html.trim() !== initialHtml.trim() || url.trim() !== "";
+
+  const requestClose = () => {
+    if (hasUnsavedWork && !confirmDiscard) {
+      setConfirmDiscard(true);
+      return;
+    }
+    onClose();
+  };
   const issues = useMemo(() => selfExperimentIssues(html, url), [html, url]);
   const canCreate = Boolean(draft.name.trim()) && issues.length === 0 && !busy;
 
-  // A sheet is dismissed with Escape, exactly like the Read compose overlay.
+  // Back (or Escape) leaves the page — through the discard guard below when
+  // the draft holds unsaved work.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") requestClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasUnsavedWork, confirmDiscard]);
 
   const status = !html.trim() && !url.trim()
     ? "No experiment yet — copy the CMD above, or start from a template."
@@ -96,27 +112,60 @@ export default function ExperimentComposer({
 
   return (
     <div
-      className="absolute inset-0 z-20 flex items-end justify-center bg-black/60 p-3 sm:items-center"
+      className="flex h-full min-h-0 flex-col bg-slate-900"
       data-experiment-self-composer=""
-      role="dialog"
-      aria-modal="true"
       aria-label="Create your own experiment"
     >
-      <div className="flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
-        <div className="flex shrink-0 items-center justify-between px-4 pb-2 pt-4">
-          <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-            <FlaskConical size={15} className="text-[#FF6BF5]" aria-hidden="true" /> Create your own experiment
+        <div className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-4">
+          <button
+            type="button"
+            onClick={requestClose}
+            aria-label="Back to experiments"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-300 ring-1 ring-white/10 transition hover:bg-white/10 hover:text-white"
+            data-experiment-self-composer-back=""
+          >
+            <ArrowLeft size={16} />
+          </button>
+          <h3 className="flex min-w-0 flex-1 items-center gap-2 text-sm font-bold text-white">
+            <FlaskConical size={15} className="shrink-0 text-[#FF6BF5]" aria-hidden="true" /> Create your own experiment
           </h3>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             aria-label="Close"
-            className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white"
             data-experiment-self-composer-close
           >
             <X size={16} />
           </button>
         </div>
+
+        {confirmDiscard ? (
+          <div
+            className="flex shrink-0 flex-wrap items-center gap-2 border-b border-amber-400/25 bg-amber-400/10 px-4 py-2"
+            data-experiment-self-discard=""
+            role="alert"
+          >
+            <p className="min-w-0 flex-1 text-[11px] font-semibold text-amber-100">
+              Discard this unfinished experiment? It has not been saved.
+            </p>
+            <button
+              type="button"
+              onClick={() => setConfirmDiscard(false)}
+              className="rounded-lg px-2.5 py-1 text-[11px] font-black text-white ring-1 ring-white/25 hover:bg-white/10"
+            >
+              Keep writing
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg bg-amber-400 px-2.5 py-1 text-[11px] font-black text-amber-950 hover:bg-amber-300"
+              data-experiment-self-discard-confirm=""
+            >
+              Discard
+            </button>
+          </div>
+        ) : null}
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-4">
           <label className="block">
@@ -177,7 +226,6 @@ export default function ExperimentComposer({
             {busy ? "Creating…" : "Create experiment"}
           </button>
         </div>
-      </div>
     </div>
   );
 }

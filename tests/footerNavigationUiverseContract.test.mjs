@@ -16,9 +16,9 @@ const notificationsButton = read("src/components/HeaderNotificationsButton.tsx")
 const notificationsCss = read("src/components/header-navigation.css");
 const chromeCss = read("src/light-theme-pages.css");
 
-test("the new footer is the default and the existing magnifying dock remains selectable", () => {
+test("the Workspace pill is the default and the existing magnifying dock remains selectable", () => {
   assert.match(preference, /type FooterNavigationStyle = "youtube" \| "uiverse" \| "glass-dock" \| "work-pill"/);
-  assert.match(preference, /DEFAULT_STYLE: FooterNavigationStyle = "youtube"/);
+  assert.match(preference, /DEFAULT_STYLE: FooterNavigationStyle = "work-pill"/);
   assert.match(preference, /localStorage\.getItem\(STORAGE_KEY\)/);
   assert.match(preference, /localStorage\.setItem\(STORAGE_KEY, next\)/);
   assert.match(sharedFooter, /useFooterNavigationStyle\(\)/);

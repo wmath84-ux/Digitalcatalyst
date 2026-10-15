@@ -351,7 +351,7 @@ test("the rules tie every map document id to its own map key", () => {
 
 test("both mind-map collections and the notes list share the branched menu", () => {
   assert.match(notesPanel, /data-course-notes-grid": "true"|data-course-notes-grid="true"/);
-  assert.equal((panel.match(/<BranchedMenu\b/g) || []).length, 2, "SELF and MASTER maps each render one menu");
+  assert.equal((panel.match(/<BranchedMenu\b/g) || []).length, 4, "library + side-panel drawer share the SELF and MASTER trees");
   assert.match(panel, /data-course-mindmap-map-grid": "true"|data-course-mindmap-map-grid="true"/);
   assert.match(resourceCardStyles, /overflow-wrap: anywhere/);
   assert.doesNotMatch(resourceCardStyles, /text-overflow: ellipsis/);

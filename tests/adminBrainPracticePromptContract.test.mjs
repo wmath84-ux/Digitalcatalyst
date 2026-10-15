@@ -164,7 +164,7 @@ test("the admin surfaces all read the same rule", () => {
   assert.match(panel, /const questionIssues = \(question: ProductPracticeQuestion\): string\[\] => practiceQuestionIssues\(question\);/);
   assert.match(productEditor, /import \{[^}]*practiceQuestionsExplained[^}]*\} from "\.\.\/\.\.\/\.\.\/\.\.\/utils\/practiceSet\.js";/);
   assert.match(productEditor, /\} else if \(!practiceQuestionsReady\(questions\) \|\| !practiceQuestionsExplained\(questions\)\) \{/);
-  assert.match(productEditor, /two options, a marked answer and an explanation\./);
+  assert.match(productEditor, /each question must be complete for its type, with its answer key filled in and an explanation\./);
   assert.match(productEditor, /countIncompletePracticeQuestions\(questions\)/);
   // The resource card shows the stricter state, naming what is left to fix.
   assert.match(modulesEditor, /const brainExplained = brainReady && practiceQuestionsExplained\(resource\.practiceQuestions\);/);

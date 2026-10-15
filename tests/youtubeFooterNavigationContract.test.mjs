@@ -10,9 +10,9 @@ const preference = read("src/utils/footerNavigationStyle.ts");
 const settings = read("src/settings/SettingsPage.tsx");
 const settingsCss = read("src/settings/settings.css");
 
-test("edge-to-edge footer is the default while both previous footer designs remain selectable", () => {
+test("the Workspace pill is the default while edge-to-edge and the other designs remain selectable", () => {
   assert.match(preference, /type FooterNavigationStyle = "youtube" \| "uiverse" \| "glass-dock" \| "work-pill"/);
-  assert.match(preference, /DEFAULT_STYLE: FooterNavigationStyle = "youtube"/);
+  assert.match(preference, /DEFAULT_STYLE: FooterNavigationStyle = "work-pill"/);
   assert.match(shared, /navigationStyle === "youtube"/);
   assert.match(shared, /<YoutubeFooterNav/);
   assert.match(shared, /navigationStyle === "uiverse"/);

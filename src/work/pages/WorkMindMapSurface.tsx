@@ -3,7 +3,15 @@ import MindMapPanel from "../../course/MindMapPanel";
 import { WORK_DEVICE_UID, WORK_MODULE_ID, WORK_PRODUCT_ID } from "../workIdentity";
 import type { WorkTheme } from "../storage/workPrefs";
 
-export default function WorkMindMapSurface({ theme, orientation }: { theme: WorkTheme; orientation: "row" | "column" }) {
+export default function WorkMindMapSurface({
+  theme,
+  orientation,
+  onEditorOpenChange,
+}: {
+  theme: WorkTheme;
+  orientation: "row" | "column";
+  onEditorOpenChange?: (open: boolean) => void;
+}) {
   const maps = useCourseMindMap({
     uid: WORK_DEVICE_UID,
     productId: WORK_PRODUCT_ID,
@@ -35,6 +43,7 @@ export default function WorkMindMapSurface({ theme, orientation }: { theme: Work
       masterMaps={[]}
       storageOnly
       themeOverride={theme}
+      onEditorOpenChange={onEditorOpenChange}
     />
   );
 }

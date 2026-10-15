@@ -27,6 +27,7 @@ import {
 } from "../../utils/practiceSet.js";
 import type { MyCourseQuestion } from "../types/myCourse";
 import { createMyQuestion } from "../lib/myCourseClient";
+import BrainQuestionEditor from "../course/BrainQuestionEditor";
 
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
 const DIFFICULTIES: Array<{ id: MyCourseQuestion["difficulty"]; label: string }> = [
@@ -65,9 +66,11 @@ interface MyCourseBrainEditorProps {
   questions: MyCourseQuestion[];
   title: string;
   onChange: (next: { questions: MyCourseQuestion[]; title: string }) => void;
+  /** Uploads a diagram/hotspot image and resolves its stored URL. */
+  onUploadQuestionImage?: (file: File) => Promise<string>;
 }
 
-export default function MyCourseBrainEditor({ questions, title, onChange }: MyCourseBrainEditorProps) {
+export default function MyCourseBrainEditor({ questions, title, onChange, onUploadQuestionImage }: MyCourseBrainEditorProps) {
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasted, setPasted] = useState("");
   const [importNote, setImportNote] = useState<string | null>(null);
@@ -79,6 +82,14 @@ export default function MyCourseBrainEditor({ questions, title, onChange }: MyCo
     onChange({
       title,
       questions: questions.map((question) => (question.id === id ? { ...question, ...patch } : question)),
+    });
+  };
+
+  /** A question-type switch replaces the question wholesale (typed fields rebuild). */
+  const replaceQuestion = (id: string, next: MyCourseQuestion) => {
+    onChange({
+      title,
+      questions: questions.map((question) => (question.id === id ? next : question)),
     });
   };
 
@@ -254,6 +265,8 @@ export default function MyCourseBrainEditor({ questions, title, onChange }: MyCo
                 </div>
               </div>
 
+              {(question.questionType ?? "mcq") === "mcq" ? (
+                <>
               <textarea
                 value={question.prompt}
                 onChange={(event) => patchQuestion(question.id, { prompt: event.target.value })}
@@ -352,6 +365,20 @@ export default function MyCourseBrainEditor({ questions, title, onChange }: MyCo
                   className={inputClass}
                 />
               </div>
+                </>
+              ) : (
+                /* A saved non-MCQ question reopens in the SAME type editor
+                   the Course Player composer uses — typed fields, image and
+                   coordinates intact, never flattened into MCQ fields. */
+                <BrainQuestionEditor
+                  question={question}
+                  index={index}
+                  onPatch={(patch) => patchQuestion(question.id, patch)}
+                  onReplace={(next) => replaceQuestion(question.id, next)}
+                  onRemove={() => removeQuestion(question.id)}
+                  onUploadImage={onUploadQuestionImage}
+                />
+              )}
             </article>
           );
         })}

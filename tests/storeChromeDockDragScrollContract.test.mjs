@@ -396,8 +396,9 @@ test("the store's own surfaces wear the plate", () => {
 
 test("the Store header copy is seamless and the marketplace starts with search", () => {
   const native = read("src/components/store-marketplace.css");
-  assert.match(storeApp, /title=\{activeTab === "store" \? "Explore the Store" : undefined\}/);
-  assert.match(storeApp, /subtitle=\{activeTab === "store" \? "Courses, notes and resources for your next step\." : undefined\}/);
+  // Header copy is a single word now; the long title/subtitle pair is gone.
+  assert.match(storeApp, /title=\{activeTab === "store" \? "Store" : "Purchases"\}/);
+  assert.doesNotMatch(storeApp, /subtitle=\{activeTab|Explore the Store|Courses, notes and resources for your next step/);
   assert.match(storeApp, /seamless=\{activeTab === "store"\}/);
   assert.match(sharedHeader, /data-header-seamless=\{seamless \? "true" : undefined\}/);
   assert.match(storePage, /data-store-search-trigger/);

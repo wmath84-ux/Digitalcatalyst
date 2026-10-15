@@ -43,10 +43,48 @@
 .work-myday-strip button:focus-visible,
 .work-myday-drawer button:focus-visible,
 .work-myday-drawer input:focus-visible,
-.work-myday-editor-meta :is(input, select):focus-visible {
+.work-myday-editor-boxes :is(input, select):focus-visible {
   outline: 2px solid var(--accent-color);
   outline-offset: 2px;
 }
+
+/* The editor's ONE header wears the page's own background (no surface band,
+   no divider): the page is the header's background, only the selectable
+   boxes sit on it as visible boxes. */
+.work-myday-editor-header {
+  background: transparent;
+  border-bottom: none;
+}
+.work-myday-editor-boxes {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 0.4rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.work-myday-editor-boxes::-webkit-scrollbar { display: none; }
+.work-myday-box {
+  min-width: 0;
+  min-height: 2rem;
+  padding: 0.28rem 0.45rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.55rem;
+  color: var(--text-primary);
+  background: var(--surface-bg);
+  font-size: 0.67rem;
+}
+.work-myday-box:disabled {
+  opacity: 1;
+  color: var(--text-secondary);
+}
+.work-myday-box-type { flex: 0 0 auto; }
+.work-myday-box-notebook { flex: 1 1 7rem; }
+.work-myday-due-box { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 0.4rem; }
+.work-myday-due-box input[type="datetime-local"] { width: 10.7rem; }
+.work-myday-due-box input[type="date"] { width: 8.6rem; }
+.work-myday-box-repeat { flex: 0 0 auto; }
 
 .work-myday-filter-rail {
   display: flex;
@@ -297,34 +335,8 @@
 }
 
 .work-myday-editor-body { display: flex; min-height: 0; min-width: 0; flex: 1 1 auto; flex-direction: column; overflow: hidden; }
-.work-myday-editor-meta {
-  display: flex;
-  flex: 0 0 auto;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.45rem 0.65rem;
-  border-bottom: 1px solid var(--border-color);
-  background: var(--workspace-bg);
-}
-.work-myday-editor-meta label { display: flex; min-width: 0; align-items: center; gap: 0.35rem; }
-.work-myday-editor-meta label > span { color: var(--text-tertiary); font-size: 0.62rem; font-weight: 650; white-space: nowrap; }
-.work-myday-editor-meta :is(select, input) {
-  min-width: 0;
-  min-height: 1.95rem;
-  padding: 0.28rem 0.45rem;
-  border: 1px solid var(--border-color);
-  border-radius: 0.55rem;
-  color: var(--text-primary);
-  background: var(--surface-bg);
-  font-size: 0.67rem;
-}
-.work-myday-editor-meta input[type="datetime-local"] { width: 10.7rem; }
-.work-myday-editor-meta .work-myday-all-day { min-height: 1.95rem; padding: 0 0.55rem; border: 1px solid var(--border-color); border-radius: 0.55rem; background: var(--surface-bg); }
-.work-myday-editor-meta .work-myday-all-day input[type="checkbox"] { width: 0.9rem; height: 0.9rem; min-height: 0; accent-color: var(--accent-color); }
-.work-myday-editor-readmeta { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: 0.35rem; padding: 0.45rem 0.75rem; border-bottom: 1px solid var(--border-color); color: var(--text-tertiary); font-size: 0.65rem; }
-.work-myday-editor-readmeta > span { padding: 0.28rem 0.5rem; border: 1px solid var(--border-color); border-radius: 999px; background: var(--surface-bg); }
-.work-myday-editor-readmeta .work-myday-kind-tag { color: var(--accent-color); background: var(--active-bg); }
+.work-myday-editor-boxes .work-myday-all-day { display: inline-flex; min-height: 2rem; align-items: center; gap: 0.3rem; padding: 0 0.55rem; border: 1px solid var(--border-color); border-radius: 0.55rem; background: var(--surface-bg); color: var(--text-secondary); font-size: 0.67rem; white-space: nowrap; }
+.work-myday-editor-boxes .work-myday-all-day input[type="checkbox"] { width: 0.9rem; height: 0.9rem; min-height: 0; accent-color: var(--accent-color); }
 .work-myday-note-surface { position: relative; min-height: 0; min-width: 0; flex: 1 1 auto; overflow: hidden; }
 .work-myday-note-surface > .dc-note { width: 100%; height: 100%; }
 .work-myday-note-surface .dc-note .dc-note-shell { min-height: 0; }

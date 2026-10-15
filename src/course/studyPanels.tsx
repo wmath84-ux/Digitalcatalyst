@@ -40,15 +40,14 @@ import {
   useMemo,
   useRef,
   useState,
-  type ComponentType,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
   type RefObject,
 } from "react";
-import { AnimatePresence, animate, motion, useMotionValue, useMotionValueEvent, useReducedMotion, type AnimationPlaybackControls, type MotionValue } from "framer-motion";
-import { ArrowLeftRight, ArrowUpDown, PanelBottom, PanelLeft, PanelRight, PanelTop, PlayCircle, X } from "lucide-react";
+import { AnimatePresence, animate, motion, useMotionValue, useMotionValueEvent, type AnimationPlaybackControls, type MotionValue } from "framer-motion";
+import { ArrowLeftRight, ArrowUpDown, PanelBottom, PanelLeft, PanelRight, PanelTop, X } from "lucide-react";
 import { GlassSurface } from "../components/ui/glass";
 import {
   DEFAULT_SPLIT_RATIO,
@@ -106,21 +105,6 @@ const CHROME_GLASS: CSSProperties = {
   boxShadow: "var(--dc-chrome-glass-rim)",
 };
 
-/** Coarse pointers get a cheap scale-only deck (no rail breathing). */
-const useCoarsePointer = (): boolean => {
-  const [coarse, setCoarse] = useState(
-    () => typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches),
-  );
-  useEffect(() => {
-    const media = window.matchMedia?.("(pointer: coarse)");
-    if (!media) return undefined;
-    const update = () => setCoarse(media.matches);
-    media.addEventListener?.("change", update);
-    return () => media.removeEventListener?.("change", update);
-  }, []);
-  return coarse;
-};
-
 /**
  * Soft-keyboard awareness for the study pane (the old overlay's behaviour,
  * ported): while an editable field INSIDE the deck has focus and the visual
@@ -175,9 +159,7 @@ function PeekRail({
   glowSide,
   axis,
   accent,
-  icon: Icon,
   label,
-  breathe,
   onRestore,
 }: {
   side: SplitSide;
@@ -186,9 +168,7 @@ function PeekRail({
   glowSide: SplitSide;
   axis: SplitAxis;
   accent: string;
-  icon: ComponentType<{ size?: number; className?: string; style?: CSSProperties }>;
   label: string;
-  breathe: boolean;
   onRestore: () => void;
 }) {
   return (
@@ -206,18 +186,11 @@ function PeekRail({
       animate={{ opacity: 1 }}
       transition={{ duration: 0.18, ease: EASE_OUT_MOTION }}
     >
+      {/* The rail carries NO icon (owner: the small glyph that appeared when
+          the divider reached the very top/bottom was unwanted). Only the 2px
+          accent glow on the divider-facing edge marks the collapsed pane;
+          the whole strip stays the tap target that restores it. */}
       <span aria-hidden style={railGlowStyle(axis, glowSide, accent)} data-peek-glow="" />
-      {/* Gentle breathing — transform only, and never on a coarse pointer. */}
-      <motion.span
-        aria-hidden
-        data-peek-icon=""
-        className="flex items-center justify-center"
-        style={{ color: accent }}
-        animate={breathe ? { scale: [1, 1.06, 1] } : { scale: 1 }}
-        transition={breathe ? { duration: 2.4, ease: "easeInOut", repeat: Infinity } : { duration: 0.2 }}
-      >
-        <Icon size={15} />
-      </motion.span>
     </motion.button>
   );
 }
@@ -243,15 +216,27 @@ export interface SplitDividerAction {
   onPress: () => void;
 }
 
-/** The small round button every divider control is drawn as. */
+/** One button of the divider's floating glass toolbar: a plain 36px target
+ *  (the glass material lives on the pill around it), icon-only, carrying its
+ *  name in the aria-label + tooltip. No fill of its own — hover/active washes
+ *  come from the split-cluster rules in src/index.css, so the buttons read as
+ *  one calm toolbar in every shell instead of dark chips with a yellow glow. */
 const WAKE_BUTTON_STYLE: CSSProperties = {
   width: SWAP_BUTTON_PX,
   height: SWAP_BUTTON_PX,
-  background: "rgba(10, 12, 18, 0.88)",
-  border: `1px solid ${DIVIDER_LINE}`,
-  color: DIVIDER_LINE,
-  boxShadow: `0 0 12px ${DIVIDER_LINE}55`,
+  background: "transparent",
+  border: "none",
+  color: "inherit",
   touchAction: "manipulation",
+};
+
+/** The toolbar's one glass pill — the same chrome glass as the peek rails,
+ *  a clean rim border and a restrained shadow. The ONLY yellow on a divider
+ *  stays the 2px core line itself. */
+const CLUSTER_GLASS: CSSProperties = {
+  ...CHROME_GLASS,
+  border: "1px solid color-mix(in srgb, currentColor 16%, transparent)",
+  boxShadow: "var(--dc-chrome-glass-rim), 0 10px 30px rgba(2, 6, 16, 0.25)",
 };
 
 /**
@@ -382,6 +367,24 @@ function SplitDivider({
   const dividerRef = useRef<HTMLDivElement | null>(null);
   const row = axis === "row"; // landscape → a vertical divider
 
+  // The toolbar floats CENTRED on the line — except when the divider hugs a
+  // deck edge (a collapsed pane; Work's parked edge): a centred pill would
+  // stick half outside the deck and be clipped by the deck's overflow, so it
+  // steps fully inside, just past the line. Read at render time: the cluster
+  // only ever appears on a tap, when the ratio is where the learner left it.
+  const firstShare = swapped ? ratio.get() : 100 - ratio.get();
+  const clusterShift = row
+    ? firstShare <= 10
+      ? "translate(calc(50% + 8px), -50%)"
+      : firstShare >= 90
+        ? "translate(calc(-150% - 8px), -50%)"
+        : "translate(-50%, -50%)"
+    : firstShare <= 10
+      ? "translate(-50%, calc(50% + 8px))"
+      : firstShare >= 90
+        ? "translate(-50%, calc(-150% - 8px))"
+        : "translate(-50%, -50%)";
+
   // ── The control cluster ─────────────────────────────────────────────────
   // At rest the divider is what it has always been: a bare 2px yellow line.
   // TAP the line and the tiny controls appear on it; tap it again and they
@@ -469,18 +472,23 @@ function SplitDivider({
         transition={{ duration: 0.24, ease: EASE_OUT_MOTION }}
       />
 
-      {/* The cluster: revealed by a tap on the line, centred ON the line, and
-          deliberately tiny. Its own pointer events never reach the divider, so
-          pressing a control can never start a resize drag. */}
+      {/* The cluster: revealed by a tap on the line — one floating glass pill
+          of honest 36px targets (Swap, then the split/merge actions). It is
+          always a compact horizontal row, so a vertical landscape divider
+          gets the same calm toolbar as a horizontal one. Its own pointer
+          events never reach the divider, so pressing a control can never
+          start a resize drag. */}
       <span
         aria-hidden={swapVisible ? undefined : true}
-        className="pointer-events-none absolute left-1/2 top-1/2 z-40 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+        className="pointer-events-none absolute left-1/2 top-1/2 z-40 flex items-center justify-center"
+        style={{ transform: clusterShift }}
       >
         <AnimatePresence initial={false}>
           {swapVisible ? (
             <motion.span
               data-course-split-cluster={kind}
-              className={`pointer-events-auto flex items-center justify-center gap-1.5 ${row ? "flex-col" : "flex-row"}`}
+              className="pointer-events-auto flex items-center justify-center gap-1 rounded-full p-1"
+              style={CLUSTER_GLASS}
               initial={{ opacity: 0, scale: 0.5 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.5 }}
@@ -618,12 +626,18 @@ function ExtraPaneRegion({
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     const box = containerRef.current?.getBoundingClientRect();
     if (!box) return;
+    event.preventDefault();
     dragRef.current = {
       pointerId: event.pointerId,
       start: row ? box.left : box.top,
       size: row ? box.width : box.height,
     };
-    containerRef.current?.setPointerCapture?.(event.pointerId);
+    // Capture belongs to the DIVIDER — the element that owns the move/up
+    // handlers (they are this divider's props). Capturing on the region
+    // container instead retargets every move/up to the container, so the
+    // child divider's handlers never fire and the drag (and the tap that
+    // reveals the toolbar) silently dies in a real browser.
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* fine without capture */ }
     setDragging(true);
   };
 
@@ -631,22 +645,35 @@ function ExtraPaneRegion({
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId || drag.size <= 0) return;
     const pointer = row ? event.clientX : event.clientY;
-    percentMv.set(clampExtraPercent(((pointer - drag.start) / drag.size) * 100));
+    // `percent` is the ADDED pane's share. Measured from the region's start
+    // edge the pointer reads the FIRST pane's share — which is the added
+    // pane's own only once the pair is swapped. Orient exactly like the
+    // deck's own divider, so the line follows the finger both ways round.
+    const raw = ((pointer - drag.start) / drag.size) * 100;
+    percentMv.set(clampExtraPercent(swapped ? raw : 100 - raw));
   };
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     dragRef.current = null;
     setDragging(false);
+    try { event.currentTarget.releasePointerCapture?.(event.pointerId); } catch { /* ignore */ }
     if (!drag || drag.pointerId !== event.pointerId) return;
     const settled = Math.round(percentMv.get());
     setAriaNow(Math.round(100 - settled));
     onPercent(settled);
   };
 
-  const handlePointerCancel = () => {
+  const handlePointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
+    // A cancelled drag commits nothing: the pair returns to the share it had
+    // when the press began (the persisted `percent`), so the DOM, the a11y
+    // read-out and storage never drift apart.
     dragRef.current = null;
     setDragging(false);
+    try { event.currentTarget.releasePointerCapture?.(event.pointerId); } catch { /* ignore */ }
+    const restored = clampExtraPercent(percent);
+    percentMv.set(restored);
+    setAriaNow(Math.round(100 - restored));
   };
 
   const setPercent = useCallback(
@@ -683,7 +710,11 @@ function ExtraPaneRegion({
   return (
     <div
       ref={containerRef}
-      className={`relative ${className}`}
+      // `flex` is the region's own, always: the caller's classes only choose
+      // the direction (flex-row / flex-col) and the sizing. Without an
+      // explicit display:flex the two panes stack as blocks, their flexGrow
+      // shares go inert and the pair overflows its region.
+      className={`relative flex ${className}`}
       data-course-region={region}
       data-region-split="on"
       data-region-swapped={swapped ? "true" : "false"}
@@ -776,8 +807,6 @@ export interface SplitDeckProps {
    * keyboard closes.
    */
   keyboardExpandEnabled?: boolean;
-  /** The active study tab's icon (the study peek rail). */
-  studyIcon: ComponentType<{ size?: number; className?: string; style?: CSSProperties }>;
   /** The player's lossless viewer stack — never unmounted, only resized. */
   lesson: ReactNode;
   /** <CourseOverlay /> — tabs + footer dock inside the pane. */
@@ -839,7 +868,6 @@ export function SplitDeck({
   orientation,
   courseId,
   accent,
-  studyIcon,
   lesson,
   study,
   solid = false,
@@ -858,11 +886,6 @@ export function SplitDeck({
   const lessonRef = useRef<HTMLDivElement | null>(null);
   const studyRef = useRef<HTMLDivElement | null>(null);
 
-  const coarse = useCoarsePointer();
-  // Reduced motion keeps the deck fully usable — it only loses the decorative
-  // pulse ring and the peek rail's breathing.
-  const reduceMotion = useReducedMotion() === true;
-  const cheap = coarse || reduceMotion;
   // Phones raise the study pane's floor so notes stay writable (30% in portrait).
   const [phone, setPhone] = useState(matchesPhoneViewport);
   useEffect(() => {
@@ -1500,9 +1523,7 @@ export function SplitDeck({
             glowSide={swapped ? "study" : "lesson"}
             axis={axis}
             accent={accent}
-            icon={PlayCircle}
             label="Show the lesson pane"
-            breathe={!cheap}
             onRestore={restore}
           />
         ) : null}
@@ -1596,9 +1617,7 @@ export function SplitDeck({
             glowSide={swapped ? "lesson" : "study"}
             axis={axis}
             accent={accent}
-            icon={studyIcon}
             label="Show the study pane"
-            breathe={!cheap}
             onRestore={restore}
           />
         ) : null}

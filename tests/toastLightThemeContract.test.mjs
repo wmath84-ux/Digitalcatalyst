@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const css = fs.readFileSync("src/light-theme-pages.css", "utf8");
-const rules = css.slice(css.indexOf("/* Shared toast surfaces:"));
+// Bound the slice to the toast section itself — later sections (glass bars,
+// PDP, ...) are not toast rules.
+const toastStart = css.indexOf("/* Shared toast surfaces:");
+const rules = css.slice(toastStart, css.indexOf("/*", toastStart + 10));
 
 test("both toast renderers expose shared surface, copy and dismiss hooks", () => {
   for (const path of ["src/components/ui/glass-toast.tsx", "src/revision/recall/shims/toast.tsx"]) {

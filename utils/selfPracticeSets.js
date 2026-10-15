@@ -80,6 +80,7 @@ const cloneCourse = (course) =>
  */
 export const selfPracticeEmptyQuestion = (index = 0) => ({
   id: `q${index + 1}`,
+  questionType: "mcq",
   prompt: "",
   options: ["", "", "", ""],
   correctIndex: -1,
@@ -87,6 +88,34 @@ export const selfPracticeEmptyQuestion = (index = 0) => ({
   difficulty: "medium",
   topic: "",
 });
+
+/**
+ * A blank question of ANY supported type — the composer's “add question”
+ * starts here, with the new type's own empty fields (never another type's
+ * data carried over). Switching a question's type in the editor rebuilds it
+ * from this shape, keeping only the shared core the caller passes in.
+ */
+export const selfPracticeEmptyQuestionOfType = (type, index = 0) => {
+  const base = { ...selfPracticeEmptyQuestion(index), questionType: type };
+  switch (type) {
+    case "fill_blank":
+      return { ...base, options: [], blankAnswers: [[]] };
+    case "one_word":
+      return { ...base, options: [], acceptedAnswers: [] };
+    case "assertion_reason":
+      return { ...base, options: [], assertion: "", reason: "" };
+    case "match":
+      return { ...base, options: [], matchPairs: [{ left: "", right: "" }, { left: "", right: "" }] };
+    case "drag_drop":
+      return { ...base, options: [], dragItems: [], dragTargets: [{ id: "t1", label: "", answer: "" }] };
+    case "label_diagram":
+      return { ...base, options: [], imageUrl: "", labelTargets: [], labelOptions: [] };
+    case "hotspot":
+      return { ...base, options: [], imageUrl: "", hotspots: [], correctHotspotIds: [] };
+    default:
+      return { ...selfPracticeEmptyQuestion(index), questionType: "mcq" };
+  }
+};
 
 /**
  * The bulk parser's output (`parseQuestionText`, src/revision/engine/
@@ -115,6 +144,7 @@ export const selfPracticeQuestionsFromParsed = (parsed, options = {}) => {
     const index = Number(raw.correctIndex);
     out.push({
       id: `q${startIndex + out.length + 1}`,
+      questionType: "mcq",
       prompt,
       options: optionsList,
       correctIndex: Number.isFinite(index) && index >= 0 && index < optionsList.length ? Math.trunc(index) : -1,

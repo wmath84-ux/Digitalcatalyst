@@ -12,18 +12,21 @@
 //     (`selfExperimentsFromCourses`, src/utils/selfExperiments.ts), so one
 //     created here is on every device and editable in the library.
 //
-// The “+” exists ONLY while SELF is the open filter (the Brain page's rule,
-// owner brief 2026-10-07): MASTER experiments are the teacher's, not the
-// learner's to extend. It opens a small dropdown first — the ways in, plus the
-// four starter templates one tap away — and each way in opens the composer
-// (src/course/ExperimentComposer.tsx), which is the Study Library's own builder:
-// AI prompt with Copy CMD, paste / upload / template, the live preview, and
-// Create that saves the experiment to the library immediately.
+// The “+” — a circular pink button anchored bottom-right of the pane —
+// exists ONLY while SELF is the open filter (the Brain page's rule, owner
+// brief 2026-10-07): MASTER experiments are the teacher's, not the learner's
+// to extend. It opens a small dropdown first — the ways in, plus the four
+// starter templates one tap away — and each way in opens the composer page
+// (src/course/ExperimentComposer.tsx), a nested page that replaces the
+// listing: the Study Library's own builder (AI prompt with Copy CMD, paste /
+// upload / template, the live preview, problems named) plus a Create that
+// saves the experiment to the library immediately.
 
 import { useEffect, useState } from "react";
 import { FlaskConical, Hammer, LockKeyhole, Network, Plus, Sparkles } from "lucide-react";
 import SelfMindMapComposer from "./SelfMindMapComposer";
 import MasterSelfControl from "./MasterSelfControl";
+import CoursePageHeader from "./CoursePageHeader";
 import ExperimentComposer from "./ExperimentComposer";
 import { useMasterSelfPreference } from "./playerPreferences";
 import { EXPERIMENT_TEMPLATES, templateBytes } from "../personal-library/experimentTemplates";
@@ -156,39 +159,36 @@ export default function ExperimentPanel({
 
   return (
     <div
-      className="relative flex h-full min-h-0 flex-col bg-white px-3 py-3 text-slate-900"
+      className="relative flex h-full min-h-0 flex-col bg-white text-slate-900"
       data-course-experiment-panel=""
       data-course-theme-surface="light"
-      data-experiment-screen="library"
+      data-experiment-screen={composerOpen ? "create" : "library"}
     >
-      {/* MASTER / SELF segmented control — the same contract as Notes, Mind Map
+      {composerOpen && onCreateSelfExperiment ? (
+        /* The creator is a nested PAGE of this pane: it replaces the listing
+           outright, and its Back returns here with the listing's filter and
+           scroll state untouched. */
+        <ExperimentComposer
+          defaultName={selfExperimentSeed?.name || "My experiment"}
+          initialHtml={seedHtml}
+          onClose={() => {
+            setComposerOpen(false);
+            setSeedHtml("");
+          }}
+          onCreate={onCreateSelfExperiment}
+        />
+      ) : (
+        <>
+      {/* The shared page header (the Resource Library header's size): the
+          page name, bold with its icon, and the MASTER / SELF segmented
+          control inside the header — the same contract as Notes, Mind Map
           and Brain. MASTER = the course's experiments from the course tree.
           SELF = the learner's own, made here or in the Study Library. */}
-      <div className="flex items-center justify-between gap-2 pb-2" data-experiment-collection="">
-        <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">Live experiments</p>
-        <div className="flex items-center gap-2">
-          {/* The “+” — the owner brief asks for it ON this page (2026-10-07:
-              “experiment page per plus icon add karo jis per click karne per
-              drop down badhiya sa dikhe”), so unlike the Brain page's it is
-              always here. Made experiments are the learner's OWN, so tapping
-              it from MASTER first opens the SELF filter — the list behind the
-              dropdown is then exactly where the new experiment will land. */}
-          {onCreateSelfExperiment || onCreateSelfMindMap ? (
-            <button
-              type="button"
-              onClick={() => {
-                masterSelfCtl.setMode("self");
-                setMenuOpen((open) => !open);
-              }}
-              aria-label="Create your own experiment"
-              aria-expanded={menuOpen}
-              title="Create your own experiment"
-              data-experiment-self-add=""
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-700 ring-1 ring-slate-300 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
-            >
-              <Plus size={16} />
-            </button>
-          ) : null}
+      <CoursePageHeader
+        title="Live Experiment"
+        icon={<FlaskConical size={20} aria-hidden="true" />}
+        dataAttrs={{ "data-experiment-collection": "" }}
+      >
           <MasterSelfControl
             feature="experiment"
             ariaLabel="Experiment collection"
@@ -197,10 +197,10 @@ export default function ExperimentPanel({
             masterCount={masterExperiments.length}
             selfCount={selfExperiments.length}
           />
-        </div>
-      </div>
+      </CoursePageHeader>
 
-      {/* The dropdown: a clean little sheet under the “+”. */}
+      {/* The dropdown: a clean little sheet opening UP from the “+”, so the
+          button it belongs to stays visible underneath it. */}
       {menuOpen ? (
         <>
           <div className="absolute inset-0 z-20" data-experiment-self-menu-backdrop="" onClick={() => setMenuOpen(false)} />
@@ -209,7 +209,7 @@ export default function ExperimentPanel({
             aria-label="Create your own experiment"
             data-experiment-self-menu=""
             className="absolute right-3 z-30 w-[19rem] rounded-2xl border border-slate-200 bg-white/95 p-2 text-slate-900 shadow-2xl backdrop-blur"
-            style={{ top: 52 }}
+            style={{ bottom: 76 }}
           >
             <p className="px-2 pb-1 pt-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-500">
               Create your own
@@ -274,7 +274,7 @@ export default function ExperimentPanel({
         </>
       ) : null}
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pt-1">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3 pb-20">
         {/* In SELF mode the learner's own experiments replace the course list. */}
         {selfMode ? (
           selfExperiments.length === 0 ? (
@@ -288,7 +288,7 @@ export default function ExperimentPanel({
               <p className="text-sm font-black text-[var(--dc-flat-ink)]">Your Experiments</p>
               <p className="mx-auto mt-1 max-w-[22rem] text-[11px] font-semibold leading-relaxed text-[var(--dc-flat-ink-sub)]">
                 {onCreateSelfExperiment
-                  ? "Tap + in the header to create your own 2D experiment — an AI writes the code, you paste it, preview it and Create. It is saved to My Study Library and plays right here."
+                  ? "Tap the + button below to create your own 2D experiment — an AI writes the code, you paste it, preview it and Create. It is saved to My Study Library and plays right here."
                   : "Create experiments in your Study Library and they will appear here."}
               </p>
             </div>
@@ -318,23 +318,32 @@ export default function ExperimentPanel({
         )}
       </div>
 
+      {/* The ONE create affordance: a circular pink “+” anchored bottom-right
+          of the pane, in SELF mode only (never over the MASTER list) and only
+          when a save callback exists. Raised above the list so it is never
+          clipped or hidden behind the pane's own chrome. */}
+      {selfMode && (onCreateSelfExperiment || onCreateSelfMindMap) ? (
+        <button
+          type="button"
+          onClick={() => setMenuOpen((open) => !open)}
+          aria-label="Create your own experiment"
+          aria-expanded={menuOpen}
+          title="Create your own experiment"
+          data-experiment-self-add=""
+          className="absolute bottom-4 right-4 z-30 grid h-12 w-12 place-items-center rounded-full text-white shadow-[0_10px_24px_rgba(134,25,143,0.45)] transition hover:brightness-110 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fuchsia-300"
+          style={{ background: "#FF6BF5" }}
+        >
+          <Plus size={20} strokeWidth={2.6} />
+        </button>
+      ) : null}
+        </>
+      )}
+
       {mindMapOpen && onCreateSelfMindMap ? (
         <SelfMindMapComposer
           defaultName={selfExperimentSeed?.name || "My mind map"}
           onClose={() => setMindMapOpen(false)}
           onCreate={onCreateSelfMindMap}
-        />
-      ) : null}
-
-      {composerOpen && onCreateSelfExperiment ? (
-        <ExperimentComposer
-          defaultName={selfExperimentSeed?.name || "My experiment"}
-          initialHtml={seedHtml}
-          onClose={() => {
-            setComposerOpen(false);
-            setSeedHtml("");
-          }}
-          onCreate={onCreateSelfExperiment}
         />
       ) : null}
     </div>

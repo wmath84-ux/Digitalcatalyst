@@ -131,10 +131,12 @@ test("the peek dock hides completely while the keyboard is open", () => {
   assert.match(peekDock, /import \{ useCourseKeyboard \} from '\.\/useCourseKeyboard'/);
   assert.match(peekDock, /const \{ keyboardVisible \} = useCourseKeyboard\(\)/);
   // The compact study strip is unmounted while the keyboard is open, so no
-  // footer surface or spacer can remain above the keyboard.
-  assert.match(peekDock, /if \(keyboardVisible\) return null/);
+  // footer surface or spacer can remain above the keyboard. (The immersive
+  // pages share the same unmount — see coursePlayerImmersivePagesContract.)
+  assert.match(peekDock, /if \(keyboardVisible \|\| immersivePage\) return null/);
   assert.match(peekDock, /<nav ref=\{navRef\} data-course-strip-nav/);
-  assert.match(peekDock, /<div className="course-strip-track">/);
+  // The footer is now the Workspace pill's own row inside the strip.
+  assert.match(peekDock, /<div data-work-nav-row="">/);
   assert.match(peekDock, /data-course-strip=\{item\.key\}/);
 });
 
@@ -143,7 +145,7 @@ test("the legacy in-pane dock carries the same rule", () => {
   assert.match(overlay, /const \{ keyboardVisible \} = useCourseKeyboard\(\);/);
   assert.match(
     overlay,
-    /className=\{`relative z-50 shrink-0 px-3 pb-\[max\(env\(safe-area-inset-bottom\),10px\)\] pt-0 \$\{keyboardVisible \? "hidden" : ""\}`\}/,
+    /className=\{`relative z-50 shrink-0 px-3 pb-\[max\(env\(safe-area-inset-bottom\),10px\)\] pt-0 \$\{keyboardVisible \|\| immersivePage \? "hidden" : ""\}`\}/,
   );
   // Both of the footer's homes, one rule, no per-feature duplication: the
   // peek dock and the in-pane dock read the SAME state.

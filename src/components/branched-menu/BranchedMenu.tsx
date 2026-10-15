@@ -48,7 +48,7 @@ export interface BranchedMenuItem {
   /** Unique within the whole tree — it is the open/active key. */
   value: string;
   label: string;
-  /** Leaf icon. Any React node (lucide icons work directly). */
+  /** Row icon, before the label — leaves and section heads alike. Any React node (lucide icons work directly). */
   icon?: ReactNode;
   /** Presence makes this node a section that folds. */
   children?: BranchedMenuItem[];
@@ -394,6 +394,11 @@ export default function BranchedMenu({
             onClick={() => { if (kids.length > 0) onToggle(item.value, !open); }}
             {...headAttrs}
           >
+            {item.icon ? (
+              <span className="branched-menu__icon" aria-hidden="true">
+                {isValidElement(item.icon) ? item.icon : null}
+              </span>
+            ) : null}
             <span className="branched-menu__head-label">{item.label}</span>
             {item.meta ? <span className="branched-menu__meta">{item.meta}</span> : null}
             {kids.length > 0 ? (

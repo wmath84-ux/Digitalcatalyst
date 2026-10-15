@@ -64,7 +64,18 @@ const installFetch = () => {
 };
 
 /** A whole-video payload shaped exactly like the Data API's. */
-const video = (id, title, channel) => ({ id: { videoId: id }, snippet: { title, channelTitle: channel } });
+const video = (id, title, channel) => ({
+  id: { videoId: id },
+  snippet: {
+    title,
+    channelTitle: channel,
+    thumbnails: {
+      default: { url: `https://i.ytimg.com/vi/${id}/default.jpg` },
+      medium: { url: `https://i.ytimg.com/vi/${id}/mqdefault.jpg` },
+      high: { url: `https://i.ytimg.com/vi/${id}/hqdefault.jpg` },
+    },
+  },
+});
 
 const resetWorld = () => {
   calls = [];
@@ -178,6 +189,7 @@ test('results become library rows that play in the same embed the lessons use', 
     rows[0].embedUrl,
     'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0&modestbranding=1&playsinline=1&controls=1&fs=1&enablejsapi=1',
   );
+  assert.equal(rows[0].thumbnailUrl, 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg');
   // The same video twice (a search and a paste) is ONE row — the id is stable.
   assert.equal(rows[0].id, load('src/course/musicLibrary.ts').parseMusicLink('https://youtu.be/dQw4w9WgXcQ').id);
 });
@@ -206,6 +218,7 @@ test('malformed rows are dropped, never rendered as dead buttons', async () => {
   // An empty title falls back, and an empty channel becomes the platform's name.
   assert.equal(rows[1].title, 'YouTube video');
   assert.equal(rows[1].subtitle, 'YouTube');
+  assert.equal(rows[1].thumbnailUrl, 'https://i.ytimg.com/vi/9bZkp7q19f0/hqdefault.jpg');
 });
 
 test('a refused or broken search is an empty list — never a throw', async () => {

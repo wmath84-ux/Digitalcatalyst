@@ -35,7 +35,8 @@ test("home and store no longer switch filters on left/right swipe", () => {
   // admin-managed (settings/storeFilters), so the props carry filter objects
   // and the selected filter id instead of plain label strings.
   assert.match(store, /chips\.map\(\(filter\)/);
-  assert.match(store, /onClick=\{\(\) => setActiveFilterId\(filter\.id\)\}/);
+  // Chips are radio inputs now, so the tap arrives as onChange.
+  assert.match(store, /onChange=\{\(\) => setActiveFilterId\(filter\.id\)\}/);
 });
 
 test("leaderboard is reached from the home header while the footer hosts Revision", () => {

@@ -67,7 +67,7 @@ test("Light is the fallback while feature- and UID-scoped saved themes remain au
 test("portaled confirmation dialogs carry their owning feature's persisted theme", () => {
   assert.match(confirmDialog, /data-course-confirm-theme=\{theme\}/);
   assert.match(readPanel, /theme=\{readThemeCtl\.theme\}/);
-  assert.match(notesPanel, /theme=\{noteThemeCtl\.theme\}/);
+  assert.match(notesPanel, /theme=\{noteTheme\}/);
   assert.match(sketchPanel, /theme=\{playerTheme\}/);
   assert.match(coursePlayer, /playerTheme=\{playerThemeCtl\.theme\}/);
 });
@@ -101,5 +101,5 @@ test("the Course Player light palette is comprehensive, feature-scoped, and impo
   assert.ok(themeStyles.includes('.course-player-shell [data-course-notes-panel][data-notes-theme="light"] .course-rich-surface'), "the legacy Notes editor overrides dark Player chrome");
   assert.ok(themeStyles.includes("--course-text: #0f172a;"), "Notes Light owns its text token even inside a Dark Player");
   assert.match(themeStyles, /\[data-course-ai-panel\]\[data-course-ai-theme="dark"\][\s\S]*background: #0b0b16;/);
-  assert.match(notesPanel, /data-course-notes-editor-loading data-notes-theme=\{noteThemeCtl\.theme\}/);
+  assert.match(notesPanel, /data-course-notes-editor-loading data-notes-theme=\{noteTheme\}/);
 });

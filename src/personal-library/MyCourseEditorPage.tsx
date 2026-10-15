@@ -1423,6 +1423,7 @@ function ResourceEditor({
           <MyCourseBrainEditor
             questions={questions}
             title={resource.practiceTitle || ""}
+            onUploadQuestionImage={async (file) => (await uploadMyCourseResourceFile(uid, courseId, file)).url}
             onChange={({ questions: next, title }) =>
               onUpdate((current) => ({
                 ...current,

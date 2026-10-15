@@ -18,11 +18,13 @@ test("Settings gets decorative section art while keeping its saved controls inta
   assert.match(settingsCss, /\[data-settings-page\]:not\(\[data-public-profile\]\)/);
 });
 
-test("only the three below-card auth trust badges are removed", () => {
+test("the below-card auth trust badges stay removed", () => {
   for (const badge of ["Instant Access", "Firebase Secured", "Multi-Device Sync"]) {
     assert.doesNotMatch(auth, new RegExp(badge));
   }
   assert.match(auth, /<AuthForm/);
-  assert.match(auth, />Open dashboard</);
-  assert.match(auth, /Firebase Security/);
+  // The "Open dashboard" hint and the "Firebase Security" line were later
+  // removed from the learner auth page as well; neither may return.
+  assert.doesNotMatch(auth, />Open dashboard</);
+  assert.doesNotMatch(auth, /Firebase Security/);
 });

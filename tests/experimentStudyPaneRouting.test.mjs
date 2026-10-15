@@ -43,7 +43,7 @@ test('module selection, personal selection, initial/deep-link and resume paths r
   assert.match(player, /openStudyExperiment\(match,/);
   assert.match(player, /openStudyExperiment\(file, true\)/);
   assert.match(player, /openStudyExperiment\(experiment.file, source === "self"\)/);
-  assert.match(player, /experimentPanel=\{studyExperiment \?/);
+  assert.match(player, /experimentPanel=\{opts\.extra \? undefined : studyExperiment \?/);
   assert.match(player, /!studyExperiment.personal && !completedIds.has/);
   assert.match(player, /Back to experiments/);
 });

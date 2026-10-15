@@ -218,9 +218,9 @@ test("the schema carries the tag through a Firestore round trip", () => {
 // ---------------------------------------------------------------------------
 
 test("the composer reuses the admin's CMD and the shared paste parser", () => {
-  assert.match(composer, /PRACTICE_PROMPT_RULES,\s*buildPracticeAiPrompt,\s*\} from "@\/utils\/practicePrompt";/);
-  assert.match(composer, /import \{ parsePracticeImport, type PracticeImportResult \} from "\.\.\/utils\/practiceImport\.ts";/);
-  assert.match(composer, /buildPracticeAiPrompt\(\{ topic: aiTopic, level: aiLevel, count: Number\(aiCount\), language: aiLanguage \}\)/);
+  assert.match(composer, /PRACTICE_QUESTION_TYPE_OPTIONS,\s*buildPracticeAiPrompt,\s*practicePromptRulesFor,\s*\} from "@\/utils\/practicePrompt";/);
+  assert.match(composer, /import \{\s*parsePracticeImport,\s*parseTypedPracticeImport,\s*type PracticeImportResult,\s*type TypedPracticeImportResult,\s*\} from "\.\.\/utils\/practiceImport\.ts";/);
+  assert.match(composer, /buildPracticeAiPrompt\(\{\s*topic: aiTopic,\s*level: aiLevel,\s*count: Number\(aiCount\),\s*language: aiLanguage,\s*questionType,\s*\}\)/);
   assert.match(composer, /data-brain-self-topic/);
   assert.match(composer, /data-brain-self-level/);
   assert.match(composer, /data-brain-self-prompt-text/);

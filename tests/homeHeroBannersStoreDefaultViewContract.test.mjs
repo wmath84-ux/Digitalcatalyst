@@ -37,8 +37,11 @@ const rules = read("firestore.rules");
 /* 1. Store page default view = the square glass grid                 */
 /* ------------------------------------------------------------------ */
 
-test("native Store view options remain Grid, List, Mixed", () => {
-  assert.match(storePage, /<option value="grid">Grid<\/option>[\s\S]*<option value="list">List<\/option>[\s\S]*<option value="mixed">Mixed<\/option>/);
+test("Store view options remain Grid, List, Mixed", () => {
+  // The native <select> became the Store's own option popover; the three
+  // choices and their order are unchanged.
+  assert.match(storePage, /\{ value: "grid", label: "Grid" \},\s*\{ value: "list", label: "List" \},\s*\{ value: "mixed", label: "Mixed" \},/);
+  assert.match(storePage, /<StoreOptionPopover\s*kind="view"\s*value=\{viewMode\}\s*options=\{STORE_VIEW_OPTIONS\}/);
 });
 
 test("store page defaults to the grid, while list and mixed remain available", () => {
@@ -140,7 +143,7 @@ test("course player starts at the linked module when accessible", () => {
   // (the resume effect bails whenever a deep-link target is present, and the
   // first-lesson effect prefers the deep-linked file).
   assert.match(coursePlayer, /const deep = deepLinkFileId \? files\.find/);
-  assert.match(coursePlayer, /if \(!lastOpenedFileId \|\| deepLinkFileId \|\| userSelectedRef\.current\) return/);
+  assert.match(coursePlayer, /if \(!lastOpenedFileId \|\| deepLinkFileId \|\| userSelectedRef\.current \|\| experimentOpenedRef\.current\) return/);
 });
 
 /* ------------------------------------------------------------------ */

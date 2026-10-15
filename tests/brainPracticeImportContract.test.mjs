@@ -28,6 +28,7 @@ import {
 
 const read = (path) => readFileSync(path, "utf8");
 const composer = read("src/course/SelfPracticeSetComposer.tsx");
+const editor = read("src/course/BrainQuestionEditor.tsx");
 const player = read("src/CoursePlayerApp.tsx");
 
 const VALID = `1. What is 2 + 2?
@@ -364,16 +365,20 @@ test("Parse is an explicit button; nothing is parsed while the learner is still 
   assert.match(composer, /data-brain-self-stale/);
 });
 
-test("the preview lists every question's options, correct answer and explanation", () => {
+test("the review lists every parsed question in its type editor, correctable before Create", () => {
   assert.match(composer, /data-brain-self-preview-list/);
   assert.match(composer, /data-brain-self-preview-question/);
-  assert.match(composer, /data-correct=\{correct \? "true" : "false"\}/);
-  assert.match(composer, /<span className="font-bold text-slate-200">Explanation: <\/span>/);
+  // Parsed questions open in the SAME type-specific editors the manual mode
+  // uses, so a wrong answer or a bad mapping is fixed here, never re-pasted.
+  assert.match(composer, /<BrainQuestionEditor/);
+  assert.match(editor, /data-brain-question-editor/);
+  assert.match(editor, /data-brain-editor-explanation/);
+  assert.match(editor, /data-brain-question-issues/);
   assert.match(composer, /data-brain-self-parse-errors/);
 });
 
 test("Create is enabled only from a fresh, valid Parse and cannot double-submit", () => {
-  assert.match(composer, /const createReady = mode === "ai" \? Boolean\(parseResult\?\.createReady\) && pasteQuestions\.length > 0 : summary\.createReady;/);
+  assert.match(composer, /const createReady = mode === "ai" \? parseFresh && summary\.createReady : summary\.createReady;/);
   assert.match(composer, /disabled=\{!canCreate\}/);
   assert.match(composer, /if \(submitting\.current\) return;/);
   assert.match(composer, /submitting\.current = true;/);
@@ -383,7 +388,7 @@ test("Create is enabled only from a fresh, valid Parse and cannot double-submit"
 test("the CMD asks for the chosen count and language, like the admin panel", () => {
   assert.match(composer, /data-brain-self-count/);
   assert.match(composer, /data-brain-self-language/);
-  assert.match(composer, /count: Number\(aiCount\), language: aiLanguage/);
+  assert.match(composer, /count: Number\(aiCount\),\s*language: aiLanguage,\s*questionType,/);
 });
 
 test("the library refuses the write when it cannot be read, instead of saving over it", () => {

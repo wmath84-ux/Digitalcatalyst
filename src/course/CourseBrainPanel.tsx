@@ -72,11 +72,21 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import "./study-light-surfaces.css";
 import { ArrowLeft, Brain, Plus, RotateCcw } from "lucide-react";
 import { CheckIcon, MinusIcon, XIcon } from "../revision/components/icons";
-import { collectBrainPracticeSets } from "../../utils/practiceSet.js";
+import {
+  collectBrainPracticeSets,
+  evaluatePracticeAnswer,
+  practiceAnswerSummary,
+} from "../../utils/practiceSet.js";
 import { BRAIN, BrainBadge, BrainPill, BrainProgress, BrainSurface } from "./BrainCards";
 import BrainQuestionDeck, { type BrainDeckItem } from "./BrainQuestionDeck";
+import BrainTypedPlayer from "./BrainTypedPlayer";
+import {
+  PRACTICE_QUESTION_TYPE_OPTIONS,
+} from "@/utils/practicePrompt";
+import { BRAIN_QUESTION_TYPE_LABELS, type BrainQuestionType } from "../types/myCourse";
 import { StudyLibraryEmptyState } from "./StudyLibraryStates";
 import MasterSelfControl from "./MasterSelfControl";
+import CoursePageHeader from "./CoursePageHeader";
 import SelfPracticeSetComposer from "./SelfPracticeSetComposer";
 import { useMasterSelfPreference } from "./playerPreferences";
 import { brainFitScale, publishVar, useFitTarget } from "./panelFit";
@@ -84,6 +94,7 @@ import { courseModuleSegments } from "./studyResourceContext";
 import type { CourseModule } from "../types/course";
 import type { MyCourseQuestion } from "../types/myCourse";
 import { loadBrainScores, saveBrainScores, type BrainPracticeScores } from "./brainScoreStorage";
+import { setBrainSessionView } from "./coursePanelSession";
 
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
 /** The score that marks the module's Brain resource complete in the player. */
@@ -116,6 +127,8 @@ export interface CourseBrainPanelProps {
    * stays read-only.
    */
   onCreateSelfSet?: (input: { title: string; questions: MyCourseQuestion[] }) => Promise<{ ok: boolean; message?: string }>;
+  /** Uploads a diagram/hotspot image for the composer and resolves its URL. */
+  onUploadSelfSetImage?: (file: File) => Promise<string>;
   /** Seeds for the composer's CMD and name field (module being watched, class). */
   selfSetPrompt?: { topic?: string; level?: string; defaultName?: string };
   /**
@@ -136,6 +149,19 @@ export interface CourseBrainPanelProps {
   uid?: string | null;
   /** A private Work library: one flat set list, with no MASTER/SELF course chrome. */
   workMode?: boolean;
+  /**
+   * Reports the Brain Card answer viewer (an open set in question mode).
+   * Parent-owned chrome signal only: Work uses it to hide its own header and
+   * footer without publishing Work state into the course panel session.
+   */
+  onAnsweringChange?: (answering: boolean) => void;
+  /**
+   * One optional host control rendered at the very top-left of the question
+   * (answer) header, before the back button. The Course Player passes
+   * nothing, so its header is unchanged; Work passes its test-panel button
+   * so a learner can switch tests mid-answer without leaving the viewer.
+   */
+  headerLeadingAction?: ReactNode;
 }
 
 /* Score storage stays on-device. Work passes the same explicit namespace bit
@@ -153,14 +179,27 @@ export default function CourseBrainPanel({
   onOpenedSet,
   uid,
   onCreateSelfSet,
+  onUploadSelfSetImage,
   selfSetPrompt,
   workMode = false,
+  onAnsweringChange,
+  headerLeadingAction,
 }: CourseBrainPanelProps) {
   const [scores, setScores] = useState<BrainPracticeScores>(() => loadBrainScores(productId, workMode));
   const [composerOpen, setComposerOpen] = useState(false);
   const [activeSetId, setActiveSetId] = useState<string | null>(null);
   const [mode, setMode] = useState<"question" | "review" | "result" | "answers">("question");
-  const [selections, setSelections] = useState<Record<number, number>>({});
+  /**
+   * Answers by question index, in the shapes `evaluatePracticeAnswer`
+   * scores: an option index (MCQ / Assertion-and-Reason), typed strings
+   * (fill-in-the-blank, one-word), placement maps (match, drag-and-drop,
+   * label-the-diagram) or a hotspot id.
+   */
+  const [selections, setSelections] = useState<Record<number, unknown>>({});
+  /** Where the typed-question player opens (a review-grid jump lands here). */
+  const [typedStart, setTypedStart] = useState(0);
+  /** The SELF listing's question-type filter ("all" or a BrainQuestionType). */
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [passedNow, setPassedNow] = useState(false);
   /**
@@ -171,6 +210,16 @@ export default function CourseBrainPanel({
    */
   const [deck, setDeck] = useState<BrainDeckItem[]>([]);
   const dealRef = useRef(0);
+  /** The listing scroller + its parked offset, so the creator page can
+   *  replace the listing and hand it back exactly where it was. */
+  const libraryScrollRef = useRef<HTMLDivElement | null>(null);
+  const savedLibraryScroll = useRef(0);
+
+  useEffect(() => {
+    if (!composerOpen && libraryScrollRef.current) {
+      libraryScrollRef.current.scrollTop = savedLibraryScroll.current;
+    }
+  }, [composerOpen]);
   /** A passing attempt reports course completion only once. */
   const scoredRef = useRef<string | null>(null);
 
@@ -218,9 +267,41 @@ export default function CourseBrainPanel({
     () => sets.find((set) => set.id === activeSetId) ?? selfSets.find((set) => set.id === activeSetId) ?? null,
     [sets, selfSets, activeSetId],
   );
+  // The Brain Card / Brain Practice answer page (the question deck) is one
+  // of the player's immersive pages: while it is up the footer navigation
+  // hides; the library, review, result and answers screens keep it (see
+  // isFooterHiddenPage). Work mode has no course footer, so it never
+  // publishes into the course session.
+  useEffect(() => {
+    if (!workMode) setBrainSessionView(activeSet && mode === "question" ? "answer" : "home");
+  }, [workMode, activeSet, mode]);
+
+  // The same answer-viewer boundary drives parent-owned chrome. This stays
+  // independent from the course session so Work can react in workMode too.
+  useEffect(() => {
+    onAnsweringChange?.(Boolean(activeSet && mode === "question"));
+  }, [activeSet, mode, onAnsweringChange]);
+  useEffect(() => () => {
+    onAnsweringChange?.(false);
+  }, [onAnsweringChange]);
+
   const questions = activeSet?.questions ?? [];
   const total = questions.length;
   const unansweredCount = total - questions.filter((_, index) => selections[index] !== undefined).length;
+  /**
+   * A set containing any non-MCQ question plays in the typed player (each
+   * question with its own interaction); a pure-MCQ set keeps the sliding
+   * card deck exactly as before.
+   */
+  const typedSet = questions.some((question) => (question.questionType ?? "mcq") !== "mcq");
+  /** The deck reads option indexes only — the MCQ slice of the answers. */
+  const deckSelections = useMemo(() => {
+    const out: Record<number, number> = {};
+    for (const [key, value] of Object.entries(selections)) {
+      if (typeof value === "number") out[Number(key)] = value;
+    }
+    return out;
+  }, [selections]);
 
   /** Deal a fresh deck from `from` to the end of the set. */
   const openDeck = useCallback(
@@ -248,8 +329,13 @@ export default function CourseBrainPanel({
    */
   const resumeDeck = useCallback(() => {
     const firstUnanswered = questions.findIndex((_, index) => selections[index] === undefined);
+    if (typedSet) {
+      setTypedStart(firstUnanswered < 0 ? 0 : firstUnanswered);
+      setMode("question");
+      return;
+    }
     openDeck(firstUnanswered < 0 ? 0 : firstUnanswered);
-  }, [questions, selections, openDeck]);
+  }, [questions, selections, openDeck, typedSet]);
 
   /** Every state change that starts a set from scratch, in one place. */
   const openSet = useCallback(
@@ -257,6 +343,7 @@ export default function CourseBrainPanel({
       setActiveSetId(setId);
       setMode("question");
       setSelections({});
+      setTypedStart(0);
       setShowSubmitConfirm(false);
       setPassedNow(false);
       dealRef.current += 1;
@@ -291,12 +378,12 @@ export default function CourseBrainPanel({
     let skipped = 0;
     const topics = new Map<string, { correct: number; total: number }>();
     questions.forEach((item, index) => {
-      const picked = selections[index];
+      const verdict = evaluatePracticeAnswer(item, selections[index]);
       const topic = item.topic || "Practice";
       const bucket = topics.get(topic) ?? { correct: 0, total: 0 };
       bucket.total += 1;
-      if (picked === undefined) skipped += 1;
-      else if (picked === item.correctIndex) {
+      if (verdict === "unanswered") skipped += 1;
+      else if (verdict === "correct") {
         correct += 1;
         bucket.correct += 1;
       } else wrong += 1;
@@ -326,9 +413,20 @@ export default function CourseBrainPanel({
     setActiveSetId(null);
     setMode("question");
     setSelections({});
+    setTypedStart(0);
     setDeck([]);
     setShowSubmitConfirm(false);
     setPassedNow(false);
+  }
+
+  /** A review-grid tile: back into the deck, or into the typed player. */
+  function jumpToQuestion(index: number) {
+    if (typedSet) {
+      setTypedStart(index);
+      setMode("question");
+      return;
+    }
+    openDeck(index);
   }
 
   /** An answer tapped on the top card. Recorded at once — the card then leaves. */
@@ -374,6 +472,11 @@ export default function CourseBrainPanel({
   // set, with its module path and progress kept visible without a fold tree.
   const personalLibrary = workMode || masterSelfCtl.mode === "self";
   const librarySets = personalLibrary ? selfSets : sets;
+  // SELF's question-type filter (under the header): a set shows when it holds
+  // at least one question of the chosen type. Legacy questions are MCQs.
+  const setsWithType = (value: string) =>
+    librarySets.filter((set) => set.questions.some((question) => (question.questionType ?? "mcq") === value));
+  const shownLibrarySets = typeFilter === "all" ? librarySets : setsWithType(typeFilter);
 
   /* ── library — every practice set the admin imported for this course ─── */
 
@@ -381,34 +484,82 @@ export default function CourseBrainPanel({
     return (
       <div
         ref={fitRef}
-        className="relative flex h-full min-h-0 flex-col overflow-hidden p-3 pb-16"
+        className="relative flex h-full min-h-0 flex-col overflow-hidden"
         data-course-brain-panel=""
-        data-brain-screen="library"
+        data-brain-screen={composerOpen ? "create" : "library"}
         style={!workMode ? { fontSize: S(16) } : undefined}
       >
-        {!workMode ? (
+        {composerOpen && onCreateSelfSet ? (
+          /* The creator is a nested PAGE of this pane: it replaces the
+             listing outright (no dimmed backdrop, no small dialog), and its
+             Back returns here with the listing's state untouched. */
+          <SelfPracticeSetComposer
+            topic={selfSetPrompt?.topic || ""}
+            level={selfSetPrompt?.level || ""}
+            defaultName={selfSetPrompt?.defaultName || "Practice set"}
+            onClose={() => setComposerOpen(false)}
+            onCreate={onCreateSelfSet}
+            onUploadImage={onUploadSelfSetImage}
+          />
+        ) : (
           <>
-            {/* Course mode keeps its MASTER / SELF collection control. Work mode
-                renders a flat private set list instead. */}
-            <div className="flex items-center justify-between gap-2 pb-2" data-brain-collection="">
-              <div>
-                <p className="text-xs font-black uppercase tracking-wide text-[var(--dc-flat-ink-sub)]">Practice library</p>
-                <p className="mt-0.5 text-[11px] text-[var(--dc-flat-ink-label)]">Course practice and your own sets stay separate.</p>
-              </div>
-              <div className="flex items-center" style={{ gap: S(8) }}>
-                <MasterSelfControl
-                  feature="brain"
-                  ariaLabel="Brain collection"
-                  mode={masterSelfCtl.mode}
-                  onChange={masterSelfCtl.setMode}
-                  masterCount={sets.length}
-                  selfCount={selfSets.length}
-                />
-              </div>
-            </div>
-          </>
+        {!workMode ? (
+          /* The shared page header (the Resource Library header's size):
+             the page name, bold with its icon, and the MASTER / SELF control
+             inside the header. Course mode keeps its collection control;
+             Work mode renders a flat private set list instead. */
+          <CoursePageHeader
+            title="Brain"
+            icon={<Brain size={20} aria-hidden="true" />}
+            dataAttrs={{ "data-brain-collection": "" }}
+          >
+            <MasterSelfControl
+              feature="brain"
+              ariaLabel="Brain collection"
+              mode={masterSelfCtl.mode}
+              onChange={masterSelfCtl.setMode}
+              masterCount={sets.length}
+              selfCount={selfSets.length}
+            />
+          </CoursePageHeader>
         ) : null}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pt-1" data-brain-library-list>
+        {!workMode && personalLibrary ? (
+          /* The question-type filter, directly under the header (SELF only):
+             chips for every type the creator can make, each counting the
+             sets that hold at least one question of that type. */
+          <div className="shrink-0 px-3 pt-3" data-brain-type-filter="">
+            <div className="flex gap-1.5 overflow-x-auto pb-1" role="group" aria-label="Filter practice sets by question type">
+              {[
+                { value: "all", label: "All types" },
+                ...PRACTICE_QUESTION_TYPE_OPTIONS.map((option) => ({ value: option.value as string, label: option.label })),
+              ].map((option) => {
+                const count = option.value === "all" ? librarySets.length : setsWithType(option.value).length;
+                const selected = typeFilter === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setTypeFilter(option.value)}
+                    className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black transition ${
+                      selected
+                        ? "bg-[var(--dc-brand,#4f46e5)] text-white"
+                        : "bg-white/[0.07] text-slate-300 ring-1 ring-white/10 hover:bg-white/[0.13]"
+                    }`}
+                    data-brain-type-filter-option={option.value}
+                  >
+                    {option.label} · {count}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+        <div
+          ref={libraryScrollRef}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-16 pt-3"
+          data-brain-library-list
+        >
           {workMode ? (
             sets.length ? (
               <div className="space-y-2" data-work-brain-library="">
@@ -437,14 +588,14 @@ export default function CourseBrainPanel({
                 <StudyLibraryEmptyState kind="brain" title="No Brain questions yet" description="Add multiple-choice cards to this Work Revision set to practice them here." />
               </div>
             )
-          ) : librarySets.length ? (
+          ) : shownLibrarySets.length ? (
             <ul
               className="space-y-2"
               aria-label={personalLibrary ? "Your practice sets" : "Course practice sets"}
               data-listing={personalLibrary ? "brain-self" : "brain-master"}
               data-brain-library-rows
             >
-              {librarySets.map((set) => {
+              {shownLibrarySets.map((set) => {
                 const record = scores[set.id];
                 const done = !personalLibrary && (completedFileIds?.has(set.id) ?? false);
                 const modulePath = personalLibrary
@@ -485,6 +636,18 @@ export default function CourseBrainPanel({
                 );
               })}
             </ul>
+          ) : librarySets.length && typeFilter !== "all" ? (
+            <div
+              className="grid place-items-center gap-1.5 rounded-xl bg-white/[0.04] px-4 py-8 text-center ring-1 ring-white/10"
+              data-brain-filter-empty=""
+            >
+              <p className="text-[12px] font-bold text-slate-200">
+                No {BRAIN_QUESTION_TYPE_LABELS[typeFilter as BrainQuestionType] ?? " matching"} practice sets yet
+              </p>
+              <p className="text-[10px] font-medium text-slate-400">
+                Create one with the + button below, or pick a different filter.
+              </p>
+            </div>
           ) : (
             <div data-brain-empty="" data-brain-self-empty={personalLibrary ? "true" : undefined}>
               <StudyLibraryEmptyState kind="brain"
@@ -497,24 +660,17 @@ export default function CourseBrainPanel({
           )}
         </div>
         {!workMode && personalLibrary && onCreateSelfSet ? (
-          <button type="button" onClick={() => setComposerOpen(true)}
+          <button type="button" onClick={() => {
+              savedLibraryScroll.current = libraryScrollRef.current?.scrollTop ?? 0;
+              setComposerOpen(true);
+            }}
             aria-label="Create your own practice set" title="Create your own practice set" data-brain-self-add=""
             className="absolute bottom-4 right-4 z-10 grid h-11 w-11 place-items-center rounded-full bg-indigo-600 text-white shadow-lg transition hover:bg-indigo-500 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300">
             <Plus size={19} strokeWidth={2.8} />
           </button>
         ) : null}
-        {/* The creation overlay (SELF mode's “+”), mounted inside this screen
-            so it dims the practice list exactly like the Read page's compose
-            sheet dims its library — not the whole split deck. */}
-        {composerOpen && onCreateSelfSet ? (
-          <SelfPracticeSetComposer
-            topic={selfSetPrompt?.topic || ""}
-            level={selfSetPrompt?.level || ""}
-            defaultName={selfSetPrompt?.defaultName || "Practice set"}
-            onClose={() => setComposerOpen(false)}
-            onCreate={onCreateSelfSet}
-          />
-        ) : null}
+          </>
+        )}
       </div>
     );
   }
@@ -538,7 +694,7 @@ export default function CourseBrainPanel({
                     type="button"
                     data-brain-review-tile={index + 1}
                     data-brain-answered={answered ? "true" : "false"}
-                    onClick={() => openDeck(index)}
+                    onClick={() => jumpToQuestion(index)}
                     className="font-bold"
                     style={{
                       height: S(48),
@@ -754,7 +910,10 @@ export default function CourseBrainPanel({
         <div className="space-y-4">
           {questions.map((item, index) => {
             const picked = selections[index];
-            const status = picked === undefined ? "skipped" : picked === item.correctIndex ? "correct" : "wrong";
+            const verdict = evaluatePracticeAnswer(item, picked);
+            const status = verdict === "unanswered" ? "skipped" : verdict;
+            const itemType = (item.questionType ?? "mcq") as BrainQuestionType;
+            const answerLines = itemType === "mcq" ? null : practiceAnswerSummary(item, picked);
             return (
               <BrainSurface key={`${item.id}-${index}`} style={{ padding: S(16) }}>
                 <div className="mb-2 flex flex-wrap items-center" style={{ gap: S(8) }}>
@@ -779,9 +938,69 @@ export default function CourseBrainPanel({
                     )}
                   </span>
                 </div>
-                <p className="font-semibold leading-snug" style={{ fontSize: S(15), color: BRAIN.ink }}>
-                  {item.prompt}
-                </p>
+                {itemType === "assertion_reason" ? (
+                  <div style={{ display: "grid", gap: S(8) }}>
+                    <p className="font-semibold leading-snug" style={{ fontSize: S(15), color: BRAIN.ink }}>
+                      <span style={{ color: BRAIN.inkFaint }}>Assertion: </span>
+                      {item.assertion}
+                    </p>
+                    <p className="font-semibold leading-snug" style={{ fontSize: S(15), color: BRAIN.ink }}>
+                      <span style={{ color: BRAIN.inkFaint }}>Reason: </span>
+                      {item.reason}
+                    </p>
+                    {item.prompt ? (
+                      <p className="font-medium leading-snug" style={{ fontSize: S(13), color: BRAIN.inkSoft }}>
+                        {item.prompt}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="font-semibold leading-snug" style={{ fontSize: S(15), color: BRAIN.ink }}>
+                    {item.prompt}
+                  </p>
+                )}
+                {answerLines ? (
+                  <div style={{ marginTop: S(12), display: "grid", gap: S(8) }} data-brain-answer-lines="">
+                    <div
+                      className="rounded-xl font-medium"
+                      style={{
+                        fontSize: S(14),
+                        padding: `${S(10)} ${S(12)}`,
+                        borderRadius: S(14),
+                        background: status === "correct" ? "rgba(31, 122, 84, 0.16)" : "rgba(178, 58, 72, 0.10)",
+                        border: `1px solid ${status === "correct" ? "rgba(31, 122, 84, 0.45)" : "rgba(178, 58, 72, 0.30)"}`,
+                        color: BRAIN.ink,
+                      }}
+                    >
+                      <span className="font-bold">Your answer: </span>
+                      {answerLines.yours}
+                    </div>
+                    <div
+                      className="rounded-xl font-medium"
+                      style={{
+                        fontSize: S(14),
+                        padding: `${S(10)} ${S(12)}`,
+                        borderRadius: S(14),
+                        background: "rgba(31, 122, 84, 0.16)",
+                        border: "1px solid rgba(31, 122, 84, 0.45)",
+                        color: "#12543A",
+                      }}
+                    >
+                      <span className="font-bold">Correct answer: </span>
+                      {answerLines.correct}
+                    </div>
+                    {itemType === "label_diagram" || itemType === "hotspot" ? (
+                      item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt="Question"
+                          className="w-full rounded-xl"
+                          style={{ border: `1px solid ${BRAIN.line}` }}
+                        />
+                      ) : null
+                    ) : null}
+                  </div>
+                ) : (
                 <div style={{ marginTop: S(12), display: "grid", gap: S(8) }}>
                   {item.options.map((option, optionIndex) => {
                     const isCorrect = optionIndex === item.correctIndex;
@@ -810,6 +1029,7 @@ export default function CourseBrainPanel({
                     );
                   })}
                 </div>
+                )}
                 {item.explanation ? (
                   <div
                     style={{
@@ -869,6 +1089,7 @@ export default function CourseBrainPanel({
   return (
     <div ref={fitRef} className="flex h-full min-h-0 flex-col" data-course-brain-panel="" data-brain-screen="question" style={{ fontSize: S(16) }}>
       <header className="brain-practice-header">
+        {headerLeadingAction}
         <button
           type="button"
           onClick={backToLibrary}
@@ -882,21 +1103,41 @@ export default function CourseBrainPanel({
         <div className="brain-practice-heading">
           <p className="brain-practice-eyebrow">Brain · Practice</p>
           <h3 title={activeSet.title}>{activeSet.title}</h3>
-          <p data-brain-deck-hint="">Tap an answer to submit · flick the card away to skip</p>
+          <p data-brain-deck-hint="">
+            {typedSet
+              ? "Answer each question, then Check — Skip moves on without answering"
+              : "Tap an answer to submit · flick the card away to skip"}
+          </p>
         </div>
       </header>
 
-      {/* The deck owns the rest of the pane: no action bar, no Next, no Skip —
-          the answers ARE the controls, and the swipe IS the skip. */}
-      <BrainQuestionDeck
-        items={deck}
-        questions={questions}
-        total={total}
-        selections={selections}
-        onAnswer={answerQuestion}
-        onFlick={dismissTopCard}
-        onEmpty={finishDeck}
-      />
+      {typedSet ? (
+        /* Mixed and non-MCQ sets: each question with its own interaction
+           (typing, matching, placing, tapping the image) — no card swipe,
+           so an input or a drag can never be mistaken for a skip. */
+        <BrainTypedPlayer
+          key={`${activeSet.id}:${typedStart}`}
+          questions={questions}
+          responses={selections}
+          onAnswer={(questionIndex, response) =>
+            setSelections((previous) => ({ ...previous, [questionIndex]: response }))
+          }
+          onDone={finishDeck}
+          startIndex={typedStart}
+        />
+      ) : (
+        /* The deck owns the rest of the pane: no action bar, no Next, no Skip —
+           the answers ARE the controls, and the swipe IS the skip. */
+        <BrainQuestionDeck
+          items={deck}
+          questions={questions}
+          total={total}
+          selections={deckSelections}
+          onAnswer={answerQuestion}
+          onFlick={dismissTopCard}
+          onEmpty={finishDeck}
+        />
+      )}
     </div>
   );
 }

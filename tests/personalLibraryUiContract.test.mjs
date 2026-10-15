@@ -49,11 +49,10 @@ test("Study Library uses one readable course row per course and one create actio
   assert.match(study, /<MyCourseCard\s+minimal/);
   for (const action of ["play", "edit", "delete"])
     assert.match(myCard, new RegExp(`data-my-course-${action}`));
-  assert.equal((study.match(/data-my-course-create\b/g) || []).length, 1);
-  assert.doesNotMatch(
-    study,
-    /data-my-course-create-fab|data-my-course-create-empty|Saved for Later/
-  );
+  // One always-visible header action; the empty state gets its own CTA.
+  assert.equal((study.match(/data-my-course-create(?![\w-])/g) || []).length, 1);
+  assert.equal((study.match(/data-my-course-create-empty/g) || []).length, 1);
+  assert.doesNotMatch(study, /data-my-course-create-fab|Saved for Later/);
   assert.match(study, /myCoursePlayHash\(course\.id\)/);
   assert.match(study, /myCourseEditHash\(course\.id\)/);
 });

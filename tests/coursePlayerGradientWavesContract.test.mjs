@@ -73,9 +73,11 @@ test("the switch drives the background live — one state, no reload", () => {
   assert.match(player, /const gradientWavesOn = isModernModuleListing\(moduleListingStyleCtl\.style\);/);
   assert.match(player, /\{gradientWavesOn \? <CourseGradientWavesBackground \/> : null\}/);
   assert.match(player, /data-course-waves=\{gradientWavesOn \? "on" : "off"\}/);
-  // The Player settings row still flips the very same preference.
-  assert.match(player, /onModuleListingStyleChange=\{moduleListingStyleCtl\.setStyle\}/);
-  assert.match(panel, /settingsRow\("Modern module listing", moduleListingStyle === "modern", \(next\) => onModuleListingStyleChange\(next \? "modern" : "classic"\), "moduleStyle"\)/);
+  // The same preference value flows one-way into the shell (app → overlay →
+  // listing): one state, still no reload — the settings toggle was retired
+  // when "modern" became the default listing design.
+  assert.match(player, /moduleListingStyle=\{moduleListingStyleCtl\.style\}/);
+  assert.match(player, /DEFAULT_MODULE_LISTING_STYLE/);
 });
 
 test("the layer sits behind the content area only, click-through, under every overlay", () => {

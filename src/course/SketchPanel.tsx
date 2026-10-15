@@ -56,7 +56,7 @@ import { useHandleLibrary } from "@excalidraw/excalidraw";
 // group — GitHub / Follow Us / Discord — per Part 1 §24).
 import { MainMenu, Sidebar } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
-import { BookMarked, Check, ChevronDown, Layers, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { BookMarked, Check, ChevronDown, Layers, PanelLeft, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import type { SketchBoardSummary, SketchSaveStatus } from "./useCourseSketch";
 import type { CoursePlayerTheme } from "./playerPreferences";
 import type { SketchScene } from "../../utils/sketchScene";
@@ -430,6 +430,71 @@ function SketchBoards({
 }
 
 /**
+ * The sketch pages tray — every canvas (page) of this module as one
+ * horizontally scrolling row of chips, directly under the Full Editor's
+ * header. Tapping a chip opens that page; the active page reads lit. This
+ * is the page switcher the header used to hide inside a dropdown, laid out
+ * where a learner can see all pages at once (the switcher dropdown itself
+ * still lives in the side panel / Clean sidebar for delete + create).
+ */
+function SketchPagesTray({
+  boards,
+  activeBoardKey,
+  onSelectBoard,
+  light = false,
+}: {
+  boards: SketchBoardSummary[];
+  activeBoardKey: string;
+  onSelectBoard?: (sketchKey: string) => void;
+  /** Work's light chrome (storageOnly + light player theme). */
+  light?: boolean;
+}) {
+  return (
+    <div
+      className={`flex shrink-0 items-center gap-1.5 overflow-x-auto border-b px-3 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+        light ? "border-slate-200 bg-white" : "border-white/10"
+      }`}
+      data-course-sketch-pages-tray={boards.length}
+      role="tablist"
+      aria-label="Sketch pages"
+    >
+      {boards.map((board) => {
+        const active = board.sketchKey === activeBoardKey;
+        return (
+          <button
+            key={board.sketchKey}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            aria-current={active ? "page" : undefined}
+            onClick={() => {
+              if (!active) onSelectBoard?.(board.sketchKey);
+            }}
+            data-course-sketch-page={board.sketchKey}
+            data-active={active ? "true" : "false"}
+            title={board.title}
+            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${
+              active
+                ? light
+                  ? "border-orange-400 bg-orange-50 text-orange-700"
+                  : "border-orange-400/60 bg-orange-500/15 text-orange-200"
+                : light
+                  ? "border-slate-300 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  : "border-white/15 text-white/70 hover:bg-white/[0.07] hover:text-white"
+            }`}
+          >
+            <span className="max-w-32 truncate">{board.title}</span>
+            <span className={`shrink-0 text-[9px] tabular-nums ${light ? "text-slate-400" : "text-white/40"}`}>
+              {board.elementCount > 0 ? `${board.elementCount} item${board.elementCount === 1 ? "" : "s"}` : "Blank"}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
  * The canvas-colour cluster (theme swatch, white swatch, pencil → full RGB).
  * Extracted so the SAME controls live in the normal save line AND in the Clean
  * Look's left sidebar without a second implementation (Part 1 §26C).
@@ -691,6 +756,31 @@ export default function SketchPanel({
   /** §30 deletion is a two-step act: the trash opens this confirmation, which
    *  names the actual canvas, and only the red confirm removes it. */
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  /** The Full Editor's side panel (pages & options): opened from the header
+   *  button, dismissed by any click outside it (or Escape). */
+  const [sidePanelOpen, setSidePanelOpen] = useState(false);
+  const sidePanelRef = useRef<HTMLDivElement | null>(null);
+  const sideToggleRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (!sidePanelOpen) return undefined;
+    const onDocumentClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (sidePanelRef.current?.contains(target)) return;
+      if (sideToggleRef.current?.contains(target)) return;
+      setSidePanelOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSidePanelOpen(false);
+    };
+    document.addEventListener("mousedown", onDocumentClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocumentClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [sidePanelOpen]);
+  // A different board (or mode) never inherits an open side panel.
+  useEffect(() => { setSidePanelOpen(false); }, [sceneKey, activeBoardKey]);
   /**
    * Quick Sketch mode (perfect-freehand) vs Full Editor (Excalidraw). The
    * two coexist: switching to Quick Sketch hides the editor but keeps its
@@ -848,7 +938,7 @@ export default function SketchPanel({
   const modeToggle = (
     <button
       type="button"
-      onClick={() => setMode(quickMode ? "editor" : "quick-sketch")}
+      onClick={() => { setSidePanelOpen(false); setMode(quickMode ? "editor" : "quick-sketch"); }}
       className={`flex h-9 w-[5.5rem] shrink-0 items-center justify-center whitespace-nowrap rounded-lg px-1 text-[11px] font-bold transition-colors ${
         quickMode
           ? "bg-orange-500 text-white"
@@ -870,6 +960,106 @@ export default function SketchPanel({
       className={`flex h-9 w-[5.5rem] shrink-0 items-center justify-center whitespace-nowrap rounded-lg border px-2 text-xs font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${storageOnly && playerTheme === "dark" ? "border-zinc-700 bg-zinc-900 text-white" : "border-slate-300 bg-white text-black"}`}>
       {editing ? "Done" : "Edit sketch"}
     </button>
+  );
+
+  /**
+   * "+ New canvas" — the Quick Sketch chip's standalone create button, now
+   * in the Full Editor's header too (it used to live only inside the canvas
+   * dropdown, §29). The hook's double-tap guard makes a repeated tap safe.
+   */
+  const newCanvasButton = scoped ? (
+    <button
+      type="button"
+      onClick={() => onCreateBoard?.()}
+      disabled={!canCreateBoard}
+      className={`flex h-9 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2.5 text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-40 ${
+        storageOnly && playerTheme === "light"
+          ? "border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+          : "border-white/15 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white"
+      }`}
+      data-course-sketch-new-canvas
+      title={canCreateBoard ? "New canvas" : "Canvas limit reached for this module"}
+      aria-label="New canvas"
+    >
+      <Plus aria-hidden size={14} /> New canvas
+    </button>
+  ) : null;
+
+  /** The header's side-panel button: pages & options live behind it. */
+  const sidePanelToggle = scoped ? (
+    <button
+      type="button"
+      ref={sideToggleRef}
+      onClick={() => setSidePanelOpen((open) => !open)}
+      aria-expanded={sidePanelOpen}
+      aria-label={sidePanelOpen ? "Hide sketch pages and options" : "Show sketch pages and options"}
+      title={sidePanelOpen ? "Hide pages & options" : "Pages & options"}
+      data-course-sketch-side-panel-toggle
+      className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${
+        sidePanelOpen
+          ? "border-orange-400/60 bg-orange-500/15 text-orange-200"
+          : storageOnly && playerTheme === "light"
+            ? "border-slate-300 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            : "border-white/15 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+      }`}
+    >
+      <PanelLeft aria-hidden size={16} />
+    </button>
+  ) : null;
+
+  /**
+   * The side content shared by the Clean Look's docked Excalidraw sidebar
+   * and the Full Editor's own side panel (below): canvas switcher + delete,
+   * mode switch, library read-out, colour cluster, save state. One
+   * implementation, two homes (Part 1 §26C).
+   */
+  const sketchSidebarContent = (
+    <div className="flex flex-col gap-2 p-2 text-white" data-course-sketch-clean-sidebar>
+      {scoped ? (
+        <SketchBoards
+          boards={boards}
+          activeBoardKey={activeBoardKey}
+          activeBoardTitle={activeBoardTitle}
+          onSelectBoard={onSelectBoard}
+          onCreateBoard={onCreateBoard}
+          canCreateBoard={canCreateBoard}
+          canDeleteActive={canDeleteActive}
+          onDeleteActive={() => setConfirmDeleteOpen(true)}
+        />
+      ) : null}
+
+      {modeToggle}
+      {quickMode ? null : (
+        <>
+          <SketchLibraryPill library={library} storageOnly={storageOnly} />
+          <SketchColourCluster canvasColour={canvasColour} onPick={applyCanvasColour} />
+        </>
+      )}
+      <span
+        role="status"
+        aria-live="polite"
+        className="text-[11px] font-semibold text-white/60"
+        data-course-sketch-clean-status={status}
+        title={errorMessage ?? undefined}
+      >
+        {storageOnly
+          ? status === "saving" || status === "pending" ? "Saving on this device…" : status === "error" ? "Device save needs attention" : status === "saved" ? "Saved on this device" : "Device only · ready"
+          : !scoped
+            ? "Kept on this device"
+            : status === "saving" ? "Saving…" : status === "pending" ? "Unsaved changes…" : status === "error" ? "Sync paused" : status === "saved" ? "Saved" : "Ready"}
+      </span>
+      {status === "error" && onRetry ? (
+        <button
+          type="button"
+          onClick={onRetry}
+          title={errorMessage ?? (storageOnly ? "Retry saving on this device" : "Retry saving to your account")}
+          data-course-sketch-retry
+          className="flex items-center gap-1 rounded-md border border-amber-400/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-200 transition-colors hover:bg-amber-400/10"
+        >
+          <RotateCcw aria-hidden size={10} /> Retry
+        </button>
+      ) : null}
+    </div>
   );
 
   return (
@@ -911,29 +1101,61 @@ export default function SketchPanel({
         boardName={boardName}
         deviceSaved={deviceSaved}
         onRetry={onRetry}
-        leading={scoped ? (
-          <SketchBoards
-            boards={boards}
-            activeBoardKey={activeBoardKey}
-            activeBoardTitle={activeBoardTitle}
-            onSelectBoard={onSelectBoard}
-            onCreateBoard={onCreateBoard}
-            canCreateBoard={canCreateBoard}
-            canDeleteActive={canDeleteActive}
-            onDeleteActive={() => setConfirmDeleteOpen(true)}
-          />
-        ) : null}
+        leading={sidePanelToggle}
       >
+        {newCanvasButton}
         {editToggle}
         {modeToggle}
         {quickMode ? null : <SketchColourCluster canvasColour={canvasColour} onPick={applyCanvasColour} />}
       </SketchStatus>
       )}
 
+      {/* The sketch pages tray: every page of this module in one horizontal
+          row, directly under the Full Editor's header. (Clean Look keeps
+          its docked sidebar list instead; Quick Sketch has its own chip.) */}
+      {!quickMode && !cleanLook && scoped && boards.length > 0 ? (
+        <SketchPagesTray
+          boards={boards}
+          activeBoardKey={activeBoardKey}
+          onSelectBoard={onSelectBoard}
+          light={storageOnly && playerTheme === "light"}
+        />
+      ) : null}
+
       {/* A saved clean layout must still expose a way out of view mode,
           even if Excalidraw hides its custom sidebar while viewing. */}
       {cleanLook && !quickMode ? (
         <div className="absolute left-3 top-14 z-50" data-course-sketch-edit-access>{editToggle}</div>
+      ) : null}
+
+      {/* The Full Editor's side panel: pages & options behind the header
+          button. Any click outside it (canvas included) hides it — see the
+          document listener above; no scrim, so the canvas stays live. */}
+      {sidePanelOpen && !quickMode && !cleanLook ? (
+        <div
+          ref={sidePanelRef}
+          className="absolute inset-y-0 left-0 z-40 flex w-[280px] max-w-[85%] flex-col border-r border-white/10 bg-[#141419] shadow-2xl"
+          data-course-sketch-side-panel
+          role="complementary"
+          aria-label="Sketch pages and options"
+        >
+          <div className="flex h-11 shrink-0 items-center justify-between border-b border-white/10 px-3">
+            <span className="text-xs font-bold text-white/80">Pages & options</span>
+            <button
+              type="button"
+              onClick={() => setSidePanelOpen(false)}
+              aria-label="Hide sketch pages and options"
+              title="Hide pages & options"
+              data-course-sketch-side-panel-close
+              className="grid h-8 w-8 place-items-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+            >
+              <X aria-hidden size={15} />
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {sketchSidebarContent}
+          </div>
+        </div>
       ) : null}
 
       {/* The canvas host: a positioned, flex-sized box. The editor is its
@@ -1009,52 +1231,7 @@ export default function SketchPanel({
                    library read-out and the colour cluster. No socials, no
                    duplicate toolbar. */
                 <Sidebar docked name="course-sketch-clean">
-                  <div className="flex flex-col gap-2 p-2 text-white" data-course-sketch-clean-sidebar>
-                    {scoped ? (
-                      <SketchBoards
-                        boards={boards}
-                        activeBoardKey={activeBoardKey}
-                        activeBoardTitle={activeBoardTitle}
-                        onSelectBoard={onSelectBoard}
-                        onCreateBoard={onCreateBoard}
-                        canCreateBoard={canCreateBoard}
-                        canDeleteActive={canDeleteActive}
-                        onDeleteActive={() => setConfirmDeleteOpen(true)}
-                      />
-                    ) : null}
-
-                    {modeToggle}
-                    {quickMode ? null : (
-                      <>
-                        <SketchLibraryPill library={library} storageOnly={storageOnly} />
-                        <SketchColourCluster canvasColour={canvasColour} onPick={applyCanvasColour} />
-                      </>
-                    )}
-                    <span
-                      role="status"
-                      aria-live="polite"
-                      className="text-[11px] font-semibold text-white/60"
-                      data-course-sketch-clean-status={status}
-                      title={errorMessage ?? undefined}
-                    >
-                      {storageOnly
-                        ? status === "saving" || status === "pending" ? "Saving on this device…" : status === "error" ? "Device save needs attention" : status === "saved" ? "Saved on this device" : "Device only · ready"
-                        : !scoped
-                          ? "Kept on this device"
-                          : status === "saving" ? "Saving…" : status === "pending" ? "Unsaved changes…" : status === "error" ? "Sync paused" : status === "saved" ? "Saved" : "Ready"}
-                    </span>
-                    {status === "error" && onRetry ? (
-                      <button
-                        type="button"
-                        onClick={onRetry}
-                        title={errorMessage ?? (storageOnly ? "Retry saving on this device" : "Retry saving to your account")}
-                        data-course-sketch-retry
-                        className="flex items-center gap-1 rounded-md border border-amber-400/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-200 transition-colors hover:bg-amber-400/10"
-                      >
-                        <RotateCcw aria-hidden size={10} /> Retry
-                      </button>
-                    ) : null}
-                  </div>
+                  {sketchSidebarContent}
                 </Sidebar>
               ) : null}
             </Excalidraw>

@@ -12,7 +12,7 @@ const menuCss = fs.readFileSync("src/components/branched-menu/BranchedMenu.css",
 const statesCss = fs.readFileSync("src/course/study-library-states.css", "utf8");
 
 test("both mind-map collections render through the shared branched menu", () => {
-  assert.equal((panel.match(/<BranchedMenu\b/g) || []).length, 2, "SELF and MASTER each render one menu");
+  assert.equal((panel.match(/<BranchedMenu\b/g) || []).length, 4, "library + side-panel drawer share the SELF and MASTER trees");
   assert.match(panel, /data-course-mindmap-map-grid": "true"|data-course-mindmap-map-grid="true"/);
   assert.match(panel, /data-course-mindmap-master-grid/);
 });

@@ -42,7 +42,6 @@ import * as React from "react";
 import { createRoot } from "react-dom/client";
 import { act } from "react";
 import { SplitDeck } from ${JSON.stringify(path.join(ROOT, "src/course/studyPanels.tsx"))};
-import { BookOpen } from "lucide-react";
 
 export function mountDeck(host, options = {}) {
   const axis = options.axis || "column";
@@ -54,7 +53,6 @@ export function mountDeck(host, options = {}) {
         orientation={axis === "row" ? "landscape" : "portrait"}
         courseId={options.courseId || "course-1"}
         accent="#FFBE0B"
-        studyIcon={BookOpen}
         lesson={<div data-fake-lesson="" />}
         study={<div data-fake-study="" />}
       />,
@@ -243,7 +241,7 @@ test("a tap on the divider reveals the switch, a second tap hides it", async () 
   assert.equal(swapShown(), true, "the switch appeared on the line");
   assert.equal(button.tagName, "BUTTON", "it is a real button");
   assert.match(button.getAttribute("aria-label") || "", /swap/i);
-  assert.equal(button.style.width, "22px", "and it is deliberately tiny");
+  assert.equal(button.style.width, "36px", "and it is a real touch target now, not a tiny chip");
 
   await pressDivider();
   await settleHint();

@@ -304,7 +304,11 @@ test("nodes are hand-positionable — drag and drop anywhere, persisted per node
   // was never dragged.
   assert.match(panel, /nodesDraggable\b/);
   assert.doesNotMatch(panel, /nodesDraggable=\{false\}/);
-  assert.match(panel, /draggable: true/);
+  // Dragging is an EDIT-mode privilege: the per-node flag follows the
+  // canvas gate, so in read/preview mode a press-drag pans the view and
+  // can never move (or persist) a node.
+  assert.match(panel, /draggable: !readOnlyCanvas/);
+  assert.doesNotMatch(panel, /draggable: true,/);
   assert.match(panel, /nodesConnectable=\{false\}/);
   // The layout runs in the arrangement + text rule the toolbar picked.
   assert.match(
@@ -595,18 +599,22 @@ test("the toolbar stays hidden until a SELF map is explicitly unlocked", () => {
   assert.match(panel, /\{libraryOpen \|\| readOnlyCanvas \? null : \(/);
 });
 
-test("the toolbar rides at the top of the sheet, like the notes editor", () => {
-  // Owner (2026-09-29): the strip moved from the bottom to the top — canvas
-  // below it, exactly the notes editor's arrangement.
-  const stripAt = panel.indexOf("Status strip — the mind map's toolbar");
-  const canvasAt = panel.indexOf("── Canvas ─");
-  assert.ok(stripAt !== -1 && canvasAt !== -1 && stripAt < canvasAt, "the strip must render above the canvas");
-  // Its divider faces the canvas below it now.
-  assert.match(toolbar, /overflow-x-auto border-b border-\[var\(--mm-border\)\]/);
-  // …and the drop-downs hang downward from their triggers instead of upward.
-  assert.match(panel, /const spaceBelow = Math\.max\(120, window\.innerHeight - anchor\.bottom - 16\);/);
-  assert.match(panel, /style=\{\{ left, width, maxHeight, top: anchor\.bottom \+ 8 \}\}/);
-  assert.doesNotMatch(panel, /spaceAbove/);
+test("the toolbar rides at the bottom of the sheet as the note editor's pill", () => {
+  // Owner: the strip moved to the BOTTOM of the screen and wears the note
+  // editor's toolbar design — one floating, opaque, fully-rounded pill at
+  // the bottom-left, so panned/zoomed content sliding underneath it never
+  // shows through.
+  assert.match(styles, /\[data-course-mindmap-status\] \{[^}]*position: absolute;[^}]*left: 0\.5rem;/);
+  assert.match(styles, /\[data-course-mindmap-status\] \{[^}]*bottom: calc\(max\(0\.5rem, env\(safe-area-inset-bottom\)\) \+ var\(--dc-note-footer-inset, 0px\)\);/);
+  assert.match(styles, /\[data-course-mindmap-status\] \{[^}]*border-radius: 999px;[^}]*background: var\(--mm-pill-bg\);/);
+  assert.match(styles, /--mm-pill-bg: #0d1424;/, "the dark pill surface is a solid colour, not glass");
+  assert.match(styles, /\[data-mindmap-theme="light"\] \{[^}]*--mm-pill-bg: #ffffff;/);
+  assert.match(toolbar, /className="absolute flex items-center overflow-x-auto/, "the strip itself floats — no in-flow top bar");
+  assert.doesNotMatch(toolbar, /data-course-mindmap-status[\s\S]{0,220}?border-b/, "no top-strip divider on the pill");
+  // …and the drop-downs hang upward from their triggers instead of downward.
+  assert.match(panel, /const spaceAbove = Math\.max\(120, anchor\.top - 16\);/);
+  assert.match(panel, /style=\{\{ left, width, maxHeight, bottom: window\.innerHeight - anchor\.top \+ 8 \}\}/);
+  assert.doesNotMatch(panel, /spaceBelow/);
 });
 
 test("the warning text lives in the save drop-down, not in a persistent bar", () => {
@@ -626,23 +634,22 @@ test("the empty-map hint is gone — an empty map shows just the root", () => {
   assert.doesNotMatch(panel, /data-course-mindmap-dbl-delete-hint/);
 });
 
-test("the toolbar measures itself and sizes its tiles for phone, tablet and desktop", () => {
+test("the toolbar measures itself, and its tiles are the note pill's 36px everywhere", () => {
   // A landscape split panel is narrower than the screen it sits on, so the
-  // strip watches its OWN width (not the viewport) and drops to the compact
-  // tile — that is what keeps every tool on the bar everywhere.
+  // strip still watches its OWN width (not the viewport) — but the tile
+  // geometry no longer follows it: the pill is the note editor's toolbar,
+  // whose buttons are 36px on every screen, so only the row's scrolling
+  // absorbs a narrow sheet.
   assert.match(panel, /const \[toolbarCompact, setToolbarCompact\] = useState\(false\);/);
   assert.match(panel, /const MIN_FULL_TOOLBAR_WIDTH_PX = 360;/);
   assert.match(panel, /setToolbarCompact\(width < MIN_FULL_TOOLBAR_WIDTH_PX\);/);
   assert.match(panel, /data-compact=\{toolbarCompact \? "true" : "false"\}/);
-  // The tile size is one custom property that steps up with the screen…
-  assert.match(styles, /\[data-course-mindmap-status\] \{\s*--mm-tool-size: 30px;/);
-  assert.match(styles, /@media \(min-width: 640px\) \{\s*\[data-course-mindmap-status\] \{\s*--mm-tool-size: 34px;/);
-  assert.match(styles, /@media \(min-width: 1024px\) \{\s*\[data-course-mindmap-status\] \{\s*--mm-tool-size: 38px;/);
-  // …and drops (with the map name) when the sheet itself is narrow.
-  assert.match(styles, /\[data-course-mindmap-status\]\[data-compact="true"\] \{\s*--mm-tool-size: 28px;/);
-  assert.match(styles, /\[data-course-mindmap-status\]\[data-compact="true"\] \[data-mm-map-name\] \{\s*display: none;/);
-  // The glyph is sized from the tile, so it stays proportional at every step.
-  assert.match(styles, /\.mm-tool > svg \{\s*width: 58%;/);
+  // One constant tile size — no viewport stepping, no compact shrink.
+  assert.match(styles, /\[data-course-mindmap-status\] \{\s*--mm-tool-size: 36px;/);
+  assert.match(styles, /--mm-tool-radius: 999px;/);
+  assert.doesNotMatch(styles, /--mm-tool-size: (30|34|38|28)px;/);
+  // The glyphs ride at the note pill's icon size.
+  assert.match(styles, /\.mm-tool > svg \{\s*width: 1rem;/);
 });
 
 test("cloud save is an icon with a blinking beacon, and the words moved to its menu", () => {

@@ -765,9 +765,8 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   }
 
   /* Cards scale.
-     `[data-store-grid]` stays out of this list: its editorial cards use one
-     full-width track, so applying `--tablet-scale` would shrink the artwork and
-     copy together and leave unused space beside the card. */
+     `[data-store-grid]` stays out of this list: scaling grid children would
+     distort the catalogue tracks the marketplace container lays out. */
   [data-home-grid] > *,
   [data-pdp-grid] > * {
     transform: scale(var(--tablet-scale));
@@ -1801,23 +1800,46 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* The divider's floating glass toolbar (Swap + split/merge): the pill carries
+   the glass material inline; its buttons are plain 36px targets that wash
+   with the surrounding ink on hover/press, so the toolbar stays calm in the
+   Course Player, Work Mode and My Study Library alike — the divider line is
+   the only yellow. The pressed swap reads as the active state. */
+[data-course-split-cluster] button {
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 140ms ease;
+}
+[data-course-split-cluster] button:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+[data-course-split-cluster] button:active {
+  background: color-mix(in srgb, currentColor 20%, transparent);
+}
+[data-course-split-cluster] [data-course-split-swap][data-swapped="true"] {
+  background: color-mix(in srgb, currentColor 16%, transparent);
+}
+[data-course-split-cluster] button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-course-split-cluster] button {
+    transition: none;
+  }
+}
+
 /* Notes + Mind map sit on a deeper plate in the study pane too, exactly like
    the sheet's `data-solid-panel` treatment, so the writing surface reads the
    same in both homes (a touch less opaque: nothing overlaps it here). */
 .course-player-shell [data-course-study-pane][data-solid-panel="true"] {
   background: rgba(13, 15, 24, 0.9);
 }
-/* The collapsed pane's 28px glass strip: a 2px edge glow in the tab colour
-   (painted inline) plus the breathing icon framer-motion drives. Coarse
-   pointers and reduced-motion users get the strip without the breathing. */
+/* The collapsed pane's 28px glass strip: just the 2px edge glow in the tab
+   colour (painted inline) — the strip carries no icon. */
 [data-course-peek-rail] {
   -webkit-tap-highlight-color: transparent;
 }
 @media (prefers-reduced-motion: reduce) {
-  [data-course-peek-rail] [data-peek-icon] {
-    animation: none !important;
-    transition: none !important;
-  }
   [data-course-split-deck] [data-course-lesson-pane],
   [data-course-split-deck] [data-course-study-pane] {
     transition: none !important;
@@ -1989,6 +2011,10 @@ body.eduvora-razorpay-open .razorpay-container iframe {
      0.5 — the same `--dc-chrome-glass` token the store header and the course
      toolbar use). Ink is white. */
   --mm-bg: transparent;
+  /* The bottom toolbar pill and the side panels are SOLID — zoomed or
+     panned map content must never show through them (no glass there). */
+  --mm-pill-bg: #0d1424;
+  --mm-panel-bg: #0c1222;
   --mm-surface: var(--dc-chrome-glass);
   --mm-surface-blur: var(--dc-chrome-glass-blur);
   --mm-surface-rim: var(--dc-chrome-glass-rim);
@@ -2009,6 +2035,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    colour inversion; node borders, toolbar tiles and edge strokes all follow. */
 .course-mindmap-shell[data-mindmap-theme="light"] {
   --mm-bg: #ffffff;
+  --mm-pill-bg: #ffffff;
+  --mm-panel-bg: #ffffff;
   --mm-surface: rgb(255 255 255 / 0.9);
   --mm-surface-blur: blur(14px) saturate(140%);
   --mm-surface-rim:
@@ -2578,50 +2606,46 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     0 0 0 2px var(--dc-bd-base),
     0 0 8px rgb(139 92 246 / 0.55);
 }
-/* ── Mind map toolbar — one icon per control, sized per screen ───────────
+/* ── Mind map toolbar — one icon per control, the note pill's size ──────
    Every control in the status strip is a single icon tile (no words), so the
    whole bar reads the same on a 320px phone and on a desktop split view.
-   The tile size is a custom property that steps up with the viewport
-   (phone → tablet → desktop) and drops to the compact tile when the sheet
-   itself is narrow — a landscape split panel can be narrower than the
-   screen it sits on, so the strip measures ITSELF rather than guessing
-   from media queries alone.
+   The tiles no longer step with the viewport: the pill is the NOTE EDITOR's
+   toolbar, so its buttons are the note pill's 36px circles everywhere, and
+   the row scrolls sideways inside the pill on a narrow sheet instead of
+   shrinking (the strip still measures itself — see data-compact — but the
+   geometry no longer depends on it).
 
-   The strip deliberately does NOT scroll sideways any more. It used to be
-   `overflow-x-auto`, and a scrollable bar is what made the toolbar look
-   "khisak gaya" (shifted left): any focused tile is scrolled into view by
-   the browser when the layout changes — the soft keyboard opening for a
+   A scrollable bar can look "khisak gaya" (shifted left): any focused tile
+   is scrolled into view by the browser when the layout changes — the soft
+   keyboard opening for a
    node rename, an orientation flip, the sheet reopening — and the browser
    never hands that scroll position back. With the strip clipped instead of
    scrolled there is no scroll offset to lose, and the map-name pill shrinks
    (then collapses to its icon) so the tiles always fit. */
+/* The status strip is the editing toolbar, and it wears the NOTE EDITOR's
+   toolbar design: one floating pill at the bottom-left of the canvas —
+   fully rounded, hairline border, solid (opaque) surface, soft shadow —
+   with 36px round buttons at the note pill's exact size and gaps on every
+   screen. The pill floats OVER the canvas, so its surface can never be
+   glass: panned / zoomed map content sliding underneath stays hidden.
+   The measured footer lift (--dc-note-footer-inset, published on the
+   strip by useCourseFooterInset) raises it clear of the player's footer
+   navigation exactly like the note editor's pill. */
 [data-course-mindmap-status] {
-  --mm-tool-size: 30px;
-  --mm-tool-gap: 4px;
-  --mm-tool-radius: 10px;
+  --mm-tool-size: 36px;
+  --mm-tool-gap: 2px;
+  --mm-tool-radius: 999px;
+  position: absolute;
+  left: 0.5rem;
+  bottom: calc(max(0.5rem, env(safe-area-inset-bottom)) + var(--dc-note-footer-inset, 0px));
+  z-index: 30;
+  max-width: calc(100% - 1rem);
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--mm-border);
+  border-radius: 999px;
+  background: var(--mm-pill-bg);
+  box-shadow: 0 10px 25px rgb(2 6 23 / 0.18);
   scroll-behavior: auto;
-}
-
-@media (min-width: 640px) {
-  [data-course-mindmap-status] {
-    --mm-tool-size: 34px;
-    --mm-tool-gap: 6px;
-    --mm-tool-radius: 12px;
-  }
-}
-
-@media (min-width: 1024px) {
-  [data-course-mindmap-status] {
-    --mm-tool-size: 38px;
-    --mm-tool-gap: 8px;
-    --mm-tool-radius: 14px;
-  }
-}
-
-/* Measured-narrow (split panel / small phone): tighter tiles, no map name. */
-[data-course-mindmap-status][data-compact="true"] {
-  --mm-tool-size: 28px;
-  --mm-tool-gap: 3px;
 }
 [data-course-mindmap-status][data-compact="true"] [data-mm-map-name] {
   display: none;
@@ -2633,8 +2657,10 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   padding-right: 0.3rem;
 }
 
-/* One icon tile. `svg { width: 58% }` keeps the glyph proportional to
-   the tile, so the same markup looks right at 28px and at 38px. */
+/* One icon tile — the note editor pill's button: a 36px circle, ghost
+   until hovered, with the mind map's own glyphs at the note pill's 16px
+   icon size. The glyphs (and their status colours below) are unchanged;
+   only the tile's material moved from glass to the opaque pill. */
 .mm-tool {
   position: relative;
   display: grid;
@@ -2643,11 +2669,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   width: var(--mm-tool-size);
   height: var(--mm-tool-size);
   border-radius: var(--mm-tool-radius);
-  /* Wave 9: the tile is the pack GlassSurface material (tint, blur, rim). */
-  background: var(--mm-soft);
-  -webkit-backdrop-filter: var(--mm-surface-blur);
-  backdrop-filter: var(--mm-surface-blur);
-  box-shadow: var(--mm-surface-rim);
+  background: transparent;
   color: var(--mm-text);
   transition:
     background-color 140ms ease,
@@ -2666,8 +2688,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   opacity: 0.32;
 }
 .mm-tool > svg {
-  width: 58%;
-  height: 58%;
+  width: 1rem;
+  height: 1rem;
   stroke-width: 2.6;
 }
 .mm-tool-violet,
@@ -6877,31 +6899,18 @@ html[data-android-edge-to-edge="true"]::after {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
- * STORE PRODUCT GRID · large single-column product cards
+ * STORE PRODUCT GRID · responsive catalogue grid
  * ──────────────────────────────────────────────────────────────────────────
- * Store Grid is deliberately one roomy column on phone, tablet and desktop.
- * The product cards use the same full-width track at every breakpoint; card
- * geometry and the responsive image/copy split live in store-marketplace.css.
+ * Store Grid grows with the space it gets: two cards per row on a phone,
+ * then 3 / 4 / 5 across as the marketplace widens. The column steps live in
+ * store-marketplace.css as container queries on [data-store-marketplace],
+ * so the grid answers the rail + content width in every shell, not just
+ * the raw viewport. This block owns only the shared track behaviour.
  * ══════════════════════════════════════════════════════════════════════════ */
 [data-store-grid] {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: clamp(14px, 1.6vw, 24px);
+  gap: clamp(12px, 1.6vw, 20px);
   align-items: stretch;
-}
-
-@media (min-width: 640px) and (max-width: 959px) {
-  [data-store-grid] {
-    grid-template-columns: minmax(0, 1fr) !important;
-    gap: 18px !important;
-  }
-}
-
-@media (min-width: 960px) {
-  [data-store-grid] {
-    grid-template-columns: minmax(0, 1fr) !important;
-    gap: 24px !important;
-  }
 }
 
 /* ════════════════════════════════════════════════════════════════════════

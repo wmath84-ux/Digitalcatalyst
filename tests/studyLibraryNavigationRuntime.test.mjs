@@ -25,7 +25,8 @@ test("existing shared dock exposes Library, preserves routes and marks active de
   const changes=[];
   React.act(() => root.render(React.createElement(BottomNav,{active:"study-library",onChange:tab=>changes.push(tab)})));
   const buttons = [...document.querySelectorAll("nav button")];
-  assert.equal(buttons.length,7);
+  assert.equal(buttons.length,8);
+  assert.ok(buttons.find(b=>b.getAttribute("aria-label")==="Work"),"Work destination is present");
   const library = buttons.find(b=>b.getAttribute("aria-label")==="My Study Library");
   assert.ok(library);
   assert.equal(library.getAttribute("aria-current"),"page");

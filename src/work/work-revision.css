@@ -84,7 +84,20 @@
   --dc-brand: var(--accent-color);
 }
 
+/* The test switcher slides over the current Revision view from the left;
+   the view underneath (a half-answered card included) never unmounts. */
+@keyframes work-revision-panel-in {
+  from { transform: translateX(-14px); opacity: 0.35; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.work-revision-panel-aside {
+  animation: work-revision-panel-in 160ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .work-revision-panel-aside {
+    animation: none;
+  }
   .work-revision-strip,
   .work-revision-action-card {
     transition: none !important;

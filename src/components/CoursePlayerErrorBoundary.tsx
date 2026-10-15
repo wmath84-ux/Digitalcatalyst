@@ -60,7 +60,7 @@ export class CoursePlayerErrorBoundary extends Component<
 
     return (
       <main
-        className="fixed inset-0 z-[10000] grid min-h-[100dvh] place-items-center overflow-y-auto bg-slate-50 px-5 py-8 text-slate-900"
+        className="fixed inset-0 z-[10000] grid min-h-[100dvh] place-items-center overflow-y-auto bg-white/70 px-5 py-8 text-slate-900 backdrop-blur-xl"
         data-course-player-error=""
       >
         <section className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-2xl sm:p-8">

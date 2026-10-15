@@ -1,7 +1,7 @@
 // Work's page-local chrome plus device-only Work feature surfaces, including
 // the Phase 4 Revision dashboard and local review library.
 
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { ArrowLeft, LoaderCircle, Moon, Sun } from "lucide-react";
 import type { UseCourseNotesResult } from "../../course/useCourseNotes";
 import { WORK_DEVICE_UID } from "../workIdentity";
@@ -24,6 +24,14 @@ interface WorkPageSurfaceProps {
   notes: UseCourseNotesResult;
   onExit: () => void;
   onToggleTheme: () => void;
+  /**
+   * Work-shell immersive signal for THIS split slot: true while this slot is
+   * showing a headless surface (Note editor, Mind Map canvas, Sketch editor,
+   * or the Revision page, which is headless as a whole page). WorkApp
+   * aggregates every slot and hides only the shared Work footer; the state
+   * is Work-local and never published to the Course Player session.
+   */
+  onImmersiveChange?: (slotKey: string, immersive: boolean) => void;
   myDay?: Omit<WorkMyDayPageProps, "slotKey" | "theme" | "orientation" | "onExit" | "onToggleTheme">;
 }
 
@@ -45,7 +53,36 @@ function WorkPageLoading({ page }: { page: WorkPageId }) {
   );
 }
 
-export default function WorkPageSurface({ page, slotKey, theme, orientation, notes, onExit, onToggleTheme, myDay }: WorkPageSurfaceProps) {
+export default function WorkPageSurface({ page, slotKey, theme, orientation, notes, onExit, onToggleTheme, onImmersiveChange, myDay }: WorkPageSurfaceProps) {
+  // ── Headless editor/viewer state (Work-local) ──────────────────────────
+  // Each reused Course surface reports its own editor boundary; Work only
+  // mirrors it into shell chrome. Library/page states keep the Work header,
+  // editor/viewer states drop it so the surface gets the full slot, exactly
+  // like the Course Player's updated headless pages.
+  const [notesEditorOpen, setNotesEditorOpen] = useState(false);
+  const [mindMapEditorOpen, setMindMapEditorOpen] = useState(false);
+  // The Revision page is headless as a page (like the Sketch page): every
+  // Revision view carries its own chrome, so the outer Work header never
+  // sits over it and the shared Work footer stays hidden while the page is
+  // up. Leaving the page for another Work page restores both.
+  const immersive =
+    page === "sketch" ||
+    page === "revision" ||
+    (page === "notes" && notesEditorOpen) ||
+    (page === "mindmap" && mindMapEditorOpen);
+  // The AI page carries no Work header at all (owner brief): the chat
+  // surface gets the full slot. It is NOT immersive — the shared Work
+  // footer stays up so pages can still be switched, and the theme keeps
+  // flowing to the surface (and to every other page's theme toggle)
+  // exactly as before.
+  const showHeader = !immersive && page !== "ai";
+  useEffect(() => {
+    onImmersiveChange?.(slotKey, immersive);
+  }, [immersive, onImmersiveChange, slotKey]);
+  useEffect(() => () => {
+    onImmersiveChange?.(slotKey, false);
+  }, [onImmersiveChange, slotKey]);
+
   if (page === "myday") {
     return myDay ? (
       <Suspense fallback={<WorkPageLoading page="myday" />}>
@@ -70,7 +107,10 @@ export default function WorkPageSurface({ page, slotKey, theme, orientation, not
       data-work-page-surface={page}
       data-work-slot={slotKey}
       data-work-surface-theme={theme}
+      data-work-immersive={immersive ? "true" : "false"}
+      data-work-headless={immersive ? "true" : undefined}
     >
+      {showHeader ? (
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-[var(--border-color)] bg-[var(--surface-bg)] px-2 sm:px-3" data-work-header-area={page}>
         <button
           type="button"
@@ -104,6 +144,7 @@ export default function WorkPageSurface({ page, slotKey, theme, orientation, not
           {dark ? <Sun size={15} aria-hidden="true" /> : <Moon size={15} aria-hidden="true" />}
         </button>
       </header>
+      ) : null}
 
       {page === "notes" ? (
         <div className="min-h-0 min-w-0 flex-1" data-work-page-body="notes">
@@ -122,13 +163,14 @@ export default function WorkPageSurface({ page, slotKey, theme, orientation, not
               uid={WORK_DEVICE_UID}
               storageOnly
               themeOverride={theme}
+              onEditorOpenChange={setNotesEditorOpen}
             />
           </Suspense>
         </div>
       ) : page === "mindmap" ? (
         <div className="min-h-0 min-w-0 flex-1" data-work-page-body="mindmap">
           <Suspense fallback={<WorkPageLoading page={page} />}>
-            <WorkMindMapSurface theme={theme} orientation={orientation} />
+            <WorkMindMapSurface theme={theme} orientation={orientation} onEditorOpenChange={setMindMapEditorOpen} />
           </Suspense>
         </div>
       ) : page === "sketch" ? (
@@ -146,7 +188,7 @@ export default function WorkPageSurface({ page, slotKey, theme, orientation, not
       ) : (
         <div className="min-h-0 min-w-0 flex-1" data-work-page-body="revision">
           <Suspense fallback={<WorkPageLoading page={page} />}>
-            <WorkRevisionApp notes={notes.notes} />
+            <WorkRevisionApp notes={notes.notes} onExit={onExit} />
           </Suspense>
         </div>
       )}

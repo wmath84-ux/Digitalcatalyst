@@ -48,6 +48,16 @@ export default function WorkApp() {
   const [myDayView, setMyDayView] = useState<"library" | "editor">("library");
   const [myDayItemId, setMyDayItemId] = useState<string | null>(null);
   const [myDayEditing, setMyDayEditing] = useState(false);
+  // Per-slot editor/viewer state reported by WorkPageSurface (Notes editor,
+  // Mind Map canvas, Sketch editor, Revision card viewers). Any visible
+  // immersive slot hides the shared Work footer; returning every slot to a
+  // library/page state restores it. This is Work-local state only — Work
+  // never publishes into the Course Player's panel session.
+  const [immersiveSlots, setImmersiveSlots] = useState<Record<string, boolean>>({});
+  const reportImmersive = useCallback((slotKey: string, immersive: boolean) => {
+    setImmersiveSlots((previous) => (previous[slotKey] === immersive ? previous : { ...previous, [slotKey]: immersive }));
+  }, []);
+  const anyImmersive = Object.values(immersiveSlots).some(Boolean);
   const [hash, setHash] = useState(() => typeof window === "undefined" ? "#/work" : window.location.hash);
   const [orientation, setOrientation] = useState(readOrientation);
   const routePage = workPageFromHash(hash);
@@ -144,6 +154,7 @@ export default function WorkApp() {
         notes={notes}
         onExit={leaveWork}
         onToggleTheme={toggleTheme}
+        onImmersiveChange={reportImmersive}
         myDay={id === "myday" ? {
           controller: myDay,
           view: myDayView,
@@ -161,7 +172,7 @@ export default function WorkApp() {
     [
       backFromMyDayEditor, createMyDayItem, deleteCurrentMyDayItem, leaveWork,
       myDay, myDayEditing, myDayItemId, myDayView, notes, openMyDayItem,
-      orientation, page, theme, toggleTheme,
+      orientation, page, reportImmersive, theme, toggleTheme,
     ],
   );
 
@@ -177,12 +188,13 @@ export default function WorkApp() {
           data-work-theme={theme}
           data-work-page={page}
           data-work-orientation={orientation}
+          data-work-immersive={anyImmersive ? "true" : "false"}
           role="application"
           aria-label="Work mode workspace"
         >
           <WorkDeck page={page} axis={orientation} renderPage={renderPage} />
 
-          {page === "myday" && myDayView === "editor" ? null : (
+          {(page === "myday" && myDayView === "editor") || anyImmersive ? null : (
             <WorkFooterNav
               label="Work mode pages"
               cells={footerCells}

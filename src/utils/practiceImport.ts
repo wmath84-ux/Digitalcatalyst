@@ -14,7 +14,10 @@ import { parseQuestionTextDetailed, type ParsedQuestion } from "../revision/engi
 import {
   MAX_PRACTICE_QUESTIONS,
   MIN_PRACTICE_OPTIONS,
+  PRACTICE_QUESTION_TYPES,
+  normalizePracticeQuestion,
   practiceQuestionIssues,
+  type NormalizedPracticeQuestion,
 } from "../../utils/practiceSet.js";
 
 export interface PracticeImportResult {
@@ -108,4 +111,116 @@ export const parsePracticeImport = (text: string): PracticeImportResult => {
     warnings,
     createReady: questions.length > 0 && errors.length === 0,
   };
+}
+
+/* ── the structured (JSON) import — every non-MCQ type ─────────────────── */
+
+export interface TypedPracticeImportResult {
+  /** The parsed questions, normalised to their own type — ready to review. */
+  questions: NormalizedPracticeQuestion[];
+  /** Human-readable reasons, each naming the question it is about. */
+  errors: string[];
+  /** Non-blocking notes (a repeated question text). */
+  warnings: string[];
+  /** True only when there is at least one question and no error at all. */
+  createReady: boolean;
+}
+
+const NOT_JSON =
+  "No JSON found. For this question type the AI must reply with the JSON the CMD asks for — paste that reply, or switch the type to MCQ for the plain-text format.";
+
+/** Find and parse the JSON object/array inside a pasted AI reply. */
+const extractJson = (text: string): unknown => {
+  const trimmed = String(text ?? "").trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    /* fall through to the substring search */
+  }
+  const start = Math.min(
+    ...["{", "["].map((mark) => {
+      const at = trimmed.indexOf(mark);
+      return at === -1 ? Number.POSITIVE_INFINITY : at;
+    }),
+  );
+  if (!Number.isFinite(start)) return undefined;
+  const end = Math.max(trimmed.lastIndexOf("}"), trimmed.lastIndexOf("]"));
+  if (end <= start) return undefined;
+  try {
+    return JSON.parse(trimmed.slice(start, end + 1));
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Parse a structured AI reply (the JSON the typed CMDs prescribe) into typed
+ * question objects. Every question keeps its OWN declared type; a missing
+ * type falls back to the type the learner selected in the creator (their
+ * explicit choice, not a guess), an unrecognised type is reported — never
+ * silently converted into an MCQ — and valid questions are never dropped
+ * without a named error.
+ */
+export const parseTypedPracticeImport = (
+  text: string,
+  fallbackType: string = "mcq",
+): TypedPracticeImportResult => {
+  if (!String(text ?? "").trim()) {
+    return { questions: [], errors: [EMPTY_PASTE], warnings: [], createReady: false };
+  }
+  const parsed = extractJson(text);
+  const entries: unknown[] = Array.isArray(parsed)
+    ? parsed
+    : Array.isArray((parsed as { questions?: unknown })?.questions)
+      ? ((parsed as { questions: unknown[] }).questions as unknown[])
+      : [];
+  if (entries.length === 0) {
+    return { questions: [], errors: [NOT_JSON], warnings: [], createReady: false };
+  }
+
+  const errors: string[] = [];
+  if (entries.length > MAX_PRACTICE_QUESTIONS) {
+    errors.push(
+      `A set holds at most ${MAX_PRACTICE_QUESTIONS} questions — remove ${entries.length - MAX_PRACTICE_QUESTIONS} to continue.`,
+    );
+  }
+
+  const questions: NormalizedPracticeQuestion[] = [];
+  const warnings: string[] = [];
+  const seenPrompts = new Map<string, number>();
+  entries.slice(0, MAX_PRACTICE_QUESTIONS).forEach((entry, index) => {
+    const label = `Q${index + 1}`;
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      errors.push(`${label}: not a question object — check the JSON shape.`);
+      return;
+    }
+    const record = entry as Record<string, unknown>;
+    const declared = String(record.questionType ?? record.type ?? "").trim().toLowerCase();
+    if (declared && !(PRACTICE_QUESTION_TYPES as string[]).includes(declared)) {
+      errors.push(`${label}: unsupported question type "${declared}" — it was not converted into an MCQ.`);
+    }
+    const question = normalizePracticeQuestion(
+      { ...record, questionType: declared || fallbackType },
+      questions.length,
+    );
+    if (!question) {
+      errors.push(`${label}: could not be read as a question — give it its prompt and required fields.`);
+      return;
+    }
+    questions.push(question);
+    for (const issue of practiceQuestionIssues(question)) errors.push(`${label}: ${issue}`);
+
+    const key = normalizePrompt(question.prompt);
+    if (key) {
+      const firstSeen = seenPrompts.get(key);
+      if (firstSeen !== undefined) {
+        warnings.push(`${label}: repeats Q${firstSeen}'s question text — remove one if it is a copy`);
+      } else {
+        seenPrompts.set(key, index + 1);
+      }
+    }
+  });
+
+  if (questions.length === 0 && errors.length === 0) errors.push(NOT_JSON);
+  return { questions, errors, warnings, createReady: questions.length > 0 && errors.length === 0 };
 };

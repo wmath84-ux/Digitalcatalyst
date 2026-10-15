@@ -24,6 +24,8 @@ const repoRoot = path.join(__dirname, "..");
 const readSource = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const coursePlayer = readSource("src/CoursePlayerApp.tsx");
+const progressHook = readSource("src/course/useLocalCourseProgress.ts");
+const accessHook = readSource("src/hooks/useCourseAccess.ts");
 const overlay = readSource("src/course/CourseOverlay.tsx");
 const playerPanel = readSource("src/course/PlayerPanel.tsx");
 const audioPlayer = readSource("src/course/AudioPlayer.tsx");
@@ -123,8 +125,11 @@ test("CoursePlayer keeps the Part 10 hook + resolver as the source of truth", ()
   assert.match(coursePlayer, /resolution\.ownedUpdateIds/);
   assert.match(coursePlayer, /resolution\.previewModuleIds/);
   assert.match(coursePlayer, /resolution\.lockedModuleIds/);
-  assert.match(coursePlayer, /resolution\.hasFullProductAccess/);
-  assert.match(coursePlayer, /resolution\.ownedModuleIds/);
+  // The resolver (not local state) produces the resolution the player reads.
+  assert.match(coursePlayer, /if \(!isMine\) return initialAccess && accessState\.loading \? initialAccess : accessState\.resolution;/);
+  assert.match(coursePlayer, /const accessState = useCourseAccess\(\{ product, skip: isMine \}\);/);
+  assert.match(accessHook, /ownedModuleIds: stringSet\(value\.ownedModuleIds\)/);
+  assert.match(accessHook, /hasFullProductAccess: value\.hasFullProductAccess/);
   assert.match(coursePlayer, /hasActiveSubscription/);
 });
 
@@ -166,11 +171,16 @@ test("CoursePlayerNote is exported from src/types/course.ts", () => {
 // ---------------------------------------------------------------------------
 
 test("Last opened file is persisted on every select", () => {
-  assert.match(coursePlayer, /setDoc\(progressRef, \{ productId: storageProductId, lastOpenedFileId: file\.id, lastOpenedAt: serverTimestamp\(\) \}, \{ merge: true \}\)/);
+  // The select path reports the open; the progress hook's batched write
+  // persists it with its timestamp.
+  assert.match(coursePlayer, /progressCtl\.store\.open\(file\.id\)/);
+  assert.match(progressHook, /\.\.\.\(batch\.opened \? \{ lastOpenedFileId: batch\.opened\.id, lastOpenedAt: serverTimestamp\(\) \} : \{\}\)/);
 });
 
 test("Completed files are persisted via arrayUnion and un-completed via arrayRemove", () => {
-  assert.match(coursePlayer, /completedFileIds: completing \? arrayUnion\(selectedFile\.id\) : arrayRemove\(selectedFile\.id\)/);
+  assert.match(coursePlayer, /progressCtl\.store\.complete\(selectedFile\.id, completing\)/);
+  assert.match(progressHook, /if \(added\.length\) await setDoc\(ref, \{ \.\.\.base, completedFileIds: arrayUnion\(\.\.\.added\) \}, \{ merge: true \}\);/);
+  assert.match(progressHook, /if \(removed\.length\) await setDoc\(ref, \{ \.\.\.base, completedFileIds: arrayRemove\(\.\.\.removed\) \}, \{ merge: true \}\);/);
 });
 
 // ---------------------------------------------------------------------------
@@ -178,7 +188,13 @@ test("Completed files are persisted via arrayUnion and un-completed via arrayRem
 // ---------------------------------------------------------------------------
 
 test("The progress write records the active access source", () => {
-  assert.match(coursePlayer, /accessSource: resolution\.hasFullProductAccess \? "full_product" : \(resolution\.ownedModuleIds\.size > 0 \? "module_purchase" : \(resolution\.subscriptionGrantedModuleIds\.size > 0 \? "subscription" : "locked"\)\)/);
+  // The progress document write is the progress hook's; access provenance
+  // itself is recorded by the resolver as per-module / per-resource sources
+  // (richer than the old single string, and what the server round-trips).
+  assert.match(progressHook, /doc\(db, 'users', uid, 'courseProgress', productId\)/);
+  assert.match(accessHook, /moduleAccessSources: stringRecord\(value\.moduleAccessSources\)/);
+  assert.match(accessHook, /resourceAccessSources: stringRecord\(value\.resourceAccessSources\)/);
+  assert.match(accessHook, /subscriptionGrantedModuleIds/);
 });
 
 // ---------------------------------------------------------------------------

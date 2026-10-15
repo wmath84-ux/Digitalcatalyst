@@ -12,6 +12,7 @@ import {
   findSelfPracticeCourse,
   placeSelfPracticeSet,
   selfPracticeSetsFromCourses,
+  SELF_PRACTICE_SETS_COURSE_ID,
 } from "../utils/selfPracticeSets.js";
 // SELF experiments — the Experiment page's own “+” writes into the Study
 // Library through the same `myCourses` shelf (src/utils/selfExperiments.ts).
@@ -59,7 +60,7 @@ import { usePersonalModules } from "./hooks/usePersonalModules";
 // now write into the learner-owned course shelf (`users/{uid}/myCourses`),
 // not the old server-backed personal-modules tree.
 import { useMyCourses } from "./hooks/useMyCourses";
-import { createMyCourse, createMyModule, createMyResource, fetchMyCourses } from "./lib/myCourseClient";
+import { createMyCourse, createMyModule, createMyResource, fetchMyCourses, uploadMyCourseResourceFile } from "./lib/myCourseClient";
 import type { AddOfficialSaveInput, OfficialResourceDraft } from "./personal-library/AddOfficialResourceDialog";
 import type { MyCourse, MyCourseModule, MyCourseQuestion, MyCourseResource } from "./types/myCourse";
 import useCourseMindMap from "./course/useCourseMindMap";
@@ -68,7 +69,7 @@ import useCourseSketch from "./course/useCourseSketch";
 import useCourseNotes from "./course/useCourseNotes";
 import { appendCloudNote, patchCloudNote } from "./course/cloudNotes";
 import { combineHtml } from "./course/notesStore";
-import { getCoursePanelSession, resetCoursePanelSession } from "./course/coursePanelSession";
+import { getCoursePanelSession, resetCoursePanelSession, setExperimentSessionView } from "./course/coursePanelSession";
 import { useCourseTheme, usePersistedBooleanPreference, useModuleListingStyle, isModernModuleListing, DEFAULT_MODULE_LISTING_STYLE } from "./course/playerPreferences";
 import CourseGradientWavesBackground from "./course/CourseGradientWavesBackground";
 import type { Product } from "./data/products";
@@ -529,6 +530,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     setStudyExperiment(null);
     experimentOpenedRef.current = false;
   }, [storageProductId]);
+
+  // The Live Experiment Viewer is one of the player's immersive pages: while
+  // it is open the footer navigation hides (see isFooterHiddenPage); coming
+  // back to the experiment library brings the footer back.
+  useEffect(() => {
+    setExperimentSessionView(studyExperiment ? "viewer" : "library");
+  }, [studyExperiment]);
 
   // A hidden tab can never be the open one (a learner-authored course drops
   // the Paid tab): if the tab list ever loses the active tab, the pane falls
@@ -1202,6 +1210,20 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    * unloaded list is read once from Firestore instead of guessing it is empty
    * (a guess would overwrite the learner's other experiments).
    */
+  /**
+   * Diagram/hotspot images for the Brain composer's image-based question
+   * types: one Storage upload into the Study Library's practice-set course,
+   * returning the URL that gets saved inside the question (never base64
+   * inside the question document itself).
+   */
+  const uploadSelfSetImage = useCallback(
+    async (file: File): Promise<string> => {
+      if (!user?.id) throw new Error("Sign in to upload a question image.");
+      return (await uploadMyCourseResourceFile(user.id, SELF_PRACTICE_SETS_COURSE_ID, file)).url;
+    },
+    [user?.id],
+  );
+
   const createSelfExperiment = useCallback(
     async ({
       name,
@@ -2306,6 +2328,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           // Library shelf; the live listener feeds them back here).
           selfSets={selfBrainSets}
           onCreateSelfSet={createSelfBrainSet}
+          onUploadSelfSetImage={uploadSelfSetImage}
           selfSetPrompt={{
             topic: (activeBrainModuleId ? moduleTitleById[activeBrainModuleId] || "" : "") || product.title,
             level: selfSetLevelSeed,
@@ -2661,7 +2684,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           orientation={useLandscapeRails ? "landscape" : "portrait"}
           courseId={storageProductId}
           accent={activeStudyTab.color}
-          studyIcon={activeStudyTab.icon}
           lesson={viewerStack}
           study={studyOverlay}
           // Every writing surface whose keyboard deserves the whole deck: the

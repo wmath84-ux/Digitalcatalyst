@@ -108,7 +108,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .work-shell [data-course-peek-rail] [data-peek-icon],
   .work-shell [data-course-split-deck] [data-course-lesson-pane],
   .work-shell [data-course-split-deck] [data-course-study-pane] {
     animation: none !important;

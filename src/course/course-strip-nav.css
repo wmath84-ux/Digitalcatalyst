@@ -1,50 +1,89 @@
-/* In-flow footer: never overlays study content or the soft keyboard. */
+/* The Course Player's footer strip — its AREA, and the two course-only
+   adaptations that let the Workspace pill live inside it.
+ *
+ * The footer navigation AREA is unchanged from the strip it replaces:
+   the same in-flow strip, the same padding, the same height (its content
+   was 44px tall; the pill below is tokenised to exactly 44px). What changed
+   is only what the buttons look like: they are the Workspace footer's own
+   cells, painted by the Workspace footer's own stylesheet
+   (src/work/work-footer-nav.css, imported by CoursePeekDock.tsx before
+   this file). Nothing in the Workspace design is modified or simplified —
+   these rules only re-home its wrapper and fit its pill into this strip:
+ *
+ *   1. `[data-position="flow"]` already makes the wrapper a normal-flow
+ *      sibling (WorkApp uses it the same way); here it also loses the
+ *      floating wrapper's padding and pointer-events gate, and centres.
+ *   2. The pill's height token (--work-nav-h) becomes 44px — the height the
+ *      strip's buttons already occupied (the Workspace design itself
+ *      retokenises this to 54px on narrow phones). Every other dimension
+ *      stays the design's: 40px radius, the soft reference shadow, 46px
+ *      cells (the design's 7–8-cell width; the course has 9–10 tools),
+ *      26px icons, its colours, opacity ramp and lift.
+ *   3. The pill is the horizontal scroller: with more tools than fit, a
+ *      left/right swipe (or drag / shift-wheel) inside the pill reaches
+ *      the rest. Cells keep their Workspace size — nothing is shrunk to
+ *      force a fit.
+ *
+ * The old letter-plate strip selectors are gone; the strip's tests now
+ * pin this design.
+ */
+
+/* ── The footer area — byte-for-byte the strip's existing box ──────────── */
+
 [data-course-strip-nav] {
   flex: 0 0 auto; min-width: 0; width: 100%; z-index: 80;
   container-type: inline-size;
   padding: 0 max(8px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
   background: #fff; border-top: 1px solid #e2e8f0;
 }
-.course-strip-track {
-  display: flex; gap: 6px; overflow-x: auto; overscroll-behavior-x: contain;
-  scrollbar-width: thin;
-  /* ── Wide stages: CENTRE, never stretch (owner, 2026-10-14) ─────────────
-     The strips used to be `flex: 1`, so on a desktop every one of them grew
-     until it filled the bar — and the circular plate drawn behind each label
-     (a percentage-width box) stretched into a wide ellipse with it. The row
-     now keeps its items at their natural size and centres the whole group,
-     and `safe` keeps the FIRST strip reachable when the row still overflows
-     (plain `center` + overflow hides it off the scroll start). */
-  justify-content: safe center;
+
+/* ── 1 · The Workspace wrapper, re-homed in-flow ────────────────────────── */
+
+[data-course-strip-nav] [data-course-work-pill] {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  padding: 0;
+  pointer-events: auto;
 }
-[data-course-strip-nav] button {
-  position: relative; isolation: isolate; flex: 0 0 auto;
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  height: 44px; min-height: 44px; min-width: 44px; padding: 0 6px;
-  color: #fff; font-size: 14px; line-height: 20px; font-weight: 750;
-  border: 0; background: transparent; border-radius: 999px; cursor: pointer;
+
+/* ── 2+3 · The pill: 44px tall (area unchanged), swipeable ─────────────── */
+
+[data-course-strip-nav] [data-course-work-pill] [data-site-footer][data-nav-count] {
+  /* The strip's buttons were 44px tall; the pill takes exactly that height
+     so the footer area does not grow or shrink by a pixel. */
+  --work-nav-h: 44px;
+  /* The Workspace design's cell width when the dock is crowded (7–8 cells);
+     the course strip carries 9–10 tools at the same dimension. */
+  --work-nav-cell: 46px;
+  /* Fit the tools; never stretch the pill into a bar. */
+  width: fit-content;
+  max-width: 100%;
+  justify-content: flex-start;
+  /* The swipe: extra buttons scroll inside the pill. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
 }
-/* The plate is a REAL 32px circle at every width — it used to be a
-   percentage-width box on a stretched button, i.e. an ellipse wherever the
-   footer was wide. */
-.course-strip-plate {
-  display: grid; place-items: center;
-  width: 32px; height: 32px; border-radius: 50%;
-  background: var(--strip-color); opacity: 0.85;
-  transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+
+[data-course-strip-nav] [data-course-work-pill] [data-site-footer]::-webkit-scrollbar {
+  display: none;
 }
-[data-course-strip-nav] button[aria-pressed='true'] .course-strip-plate {
-  opacity: 1; box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--strip-color);
+
+/* The row sizes to its cells (Workspace sets it to the pill's width because
+   its cells always fit); here the excess is what scrolls. */
+[data-course-strip-nav] [data-course-work-pill] [data-work-nav-row] {
+  width: max-content;
+  margin-top: 0;
 }
-[data-course-strip-nav] button:active .course-strip-plate { transform: scale(0.86); }
-[data-course-strip-nav] button:focus-visible { outline: 2px solid #000; outline-offset: -2px; }
-.course-strip-name { display: none; }
-/* Names only when each strip has enough space at the same readable 14px. */
-@container (min-width: 720px) {
-  [data-course-strip-nav] button { padding: 0 14px; }
-  [data-course-strip-nav] .course-strip-name { display: inline; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .course-strip-plate { transition: none; }
-  [data-course-strip-nav] button:active .course-strip-plate { transform: none; }
+
+/* Cells keep the Workspace width (above) and 26px icon; their height is the
+   strip's 44px (9px + 26px icon + 9px), so the area stays exact. */
+[data-course-strip-nav] [data-course-work-pill] [data-work-nav-cell] {
+  height: 44px;
+  padding: 9px 12px;
 }

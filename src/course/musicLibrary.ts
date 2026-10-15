@@ -56,6 +56,13 @@ export interface MusicTrack {
   addedAt: number;
   /** Set on an uploaded song: its row id inside the local music database. */
   localId?: string;
+  /**
+   * Artwork for online rows when the provider gives us one. YouTube search
+   * keeps the Data API thumbnail; a pasted YouTube link derives the same
+   * public video artwork from its id. Older saved rows may not carry it —
+   * the pane can still derive YouTube artwork from `url` at render time.
+   */
+  thumbnailUrl?: string;
 }
 
 /** The learner's saved links. Per uid, so two accounts on one device never mix. */
@@ -159,6 +166,10 @@ export const youTubeIdFrom = (value: string): string => {
  * YouTube song and a YouTube lesson can never drift apart (nocookie host,
  * `playsinline`, `fs=1` and the JS API that lets the pane pause it).
  */
+/** YouTube's public artwork for one video — used by search and saved rows. */
+export const youTubeThumbnailUrl = (id: string): string =>
+  /^[a-zA-Z0-9_-]{11}$/.test(id) ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : "";
+
 export const youTubeEmbedUrl = (id: string): string =>
   getCourseEmbed(
     {
@@ -209,6 +220,7 @@ export function parseMusicLink(raw: string): MusicTrack | null {
       subtitle: "YouTube",
       url: watch,
       embedUrl: youTubeEmbedUrl(youTubeId),
+      thumbnailUrl: youTubeThumbnailUrl(youTubeId),
       source: "link",
       addedAt,
     };
@@ -295,6 +307,7 @@ const cleanTrack = (value: unknown): MusicTrack | null => {
   if (!isMusicProvider(row.provider)) return null;
   const url = sanitizeMusicUrl(row.url);
   const embedUrl = row.provider === "audio" ? "" : sanitizeMusicUrl(row.embedUrl);
+  const thumbnailUrl = sanitizeMusicUrl(row.thumbnailUrl);
   const localId = typeof row.localId === "string" && row.localId ? row.localId : undefined;
   // A row is playable when it frames an embed, points at a direct file, or is
   // a local upload whose bytes live in the music database.
@@ -308,6 +321,7 @@ const cleanTrack = (value: unknown): MusicTrack | null => {
     embedUrl,
     source: row.source === "course" ? "course" : row.source === "upload" ? "upload" : "link",
     addedAt: Number(row.addedAt) || Date.now(),
+    ...(thumbnailUrl ? { thumbnailUrl } : {}),
     ...(localId ? { localId } : {}),
   };
 };

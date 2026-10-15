@@ -261,14 +261,16 @@ test("the player builds the sets from the SAME access rule as the modules list",
 // 4. Admin — the Brain option on the Product / Course-content page
 // ---------------------------------------------------------------------------
 
-test("resource type registry offers Brain · practice set", () => {
+test("resource type registry offers Brain Practice Set", () => {
   // Brain and its URL-less siblings are registered in the shared resource
   // registry rather than a component-local selector table.
-  assert.match(resourceTypeRegistry, /value: "brain", label: "Brain · practice set"/);
+  assert.match(resourceTypeRegistry, /value: "brain", label: "Brain Practice Set"/);
   assert.match(editor, /registerNoteResourceType\(ADMIN_PRODUCT_RESOURCE_TYPES\)/);
   assert.match(editor, /if \(type === "brain"\) return "Brain";/);
   assert.match(adminTypes, /\| "brain"/, "the editor's ProductResource type knows brain");
-  assert.match(adminTypes, /export type ProductPracticeQuestion = \{/);
+  // The admin question record IS the canonical question record (all eight
+  // types) — an alias, so the two can never drift apart again.
+  assert.match(adminTypes, /export type ProductPracticeQuestion = MyCourseQuestion;/);
   assert.match(adminTypes, /practiceQuestions\?: ProductPracticeQuestion\[\];/);
 });
 
@@ -288,14 +290,22 @@ test("picking Brain swaps the URL fields for the importer", () => {
 });
 
 test("the importer is the revision bulk-import flow, plus hand-written questions", () => {
-  assert.match(importer, /import \{ parsePracticeImport \} from "@\/utils\/practiceImport";/, "the SAME parse-and-validate step the composer uses");
+  assert.match(importer, /import \{ parsePracticeImport, parseTypedPracticeImport \} from "@\/utils\/practiceImport";/, "the SAME parse-and-validate steps the composer uses");
   assert.match(importer, /from "\.\.\/\.\.\/\.\.\/\.\.\/utils\/practiceSet\.js"/, "and the SAME normaliser the player reads");
-  assert.match(importer, /const parsedPaste = useMemo\(\(\) => \(paste\.trim\(\) \? parsePracticeImport\(paste\) : null\), \[paste\]\);/);
+  // MCQ pastes read the plain-text parser; every other type (and any
+  // JSON-shaped paste) reads the structured parser — never a silent MCQ
+  // conversion.
+  assert.match(importer, /if \(questionType === "mcq" && !looksJson\) \{\s*return \{ kind: "text" as const, result: parsePracticeImport\(paste\) \};\s*\}/);
+  assert.match(importer, /return \{ kind: "typed" as const, result: parseTypedPracticeImport\(paste, questionType\) \};/);
   assert.match(importer, /data-practice-paste-errors/, "parser problems are listed by line, never dropped silently");
   assert.match(importer, /data-practice-paste/);
   assert.match(importer, /data-practice-import/);
   assert.match(importer, /Add question manually/, "create/add by hand, not only bulk paste");
-  assert.match(importer, /data-practice-correct=\{correct \? "true" : "false"\}/, "tap the circle to mark the correct answer");
+  // Questions are edited in the shared type-specific editor (tap-to-mark
+  // MCQ answers, pair rows, image targets, hotspots) — the same component
+  // the learner creator uses.
+  assert.match(importer, /import BrainQuestionEditor from "@\/course\/BrainQuestionEditor";/);
+  assert.match(importer, /<BrainQuestionEditor/);
   assert.match(importer, /data-practice-question/);
   assert.match(importer, /MAX_PRACTICE_QUESTIONS/, "the 100-question ceiling is enforced at import time");
 });
@@ -475,7 +485,7 @@ test("the Brain practice flow is solid — the glass design is gone from it", ()
 });
 
 test("the Brain page covers the whole practice loop: questions, review, submit, result, answers", () => {
-  assert.match(brainPanel, /data-brain-screen="library"/);
+  assert.match(brainPanel, /data-brain-screen=\{composerOpen \? "create" : "library"\}/);
   assert.match(brainPanel, /data-brain-screen="question"/);
   assert.match(brainPanel, /data-brain-screen="review"/);
   assert.match(brainPanel, /data-brain-screen="result"/);
@@ -489,12 +499,12 @@ test("the Brain page covers the whole practice loop: questions, review, submit, 
   // inside the pane below the header row.
   assert.match(
     brainPanel,
-    /<BrainQuestionDeck\s*\n\s*items=\{deck\}\s*\n\s*questions=\{questions\}\s*\n\s*total=\{total\}\s*\n\s*selections=\{selections\}\s*\n\s*onAnswer=\{answerQuestion\}\s*\n\s*onFlick=\{dismissTopCard\}\s*\n\s*onEmpty=\{finishDeck\}/,
+    /<BrainQuestionDeck\s*\n\s*items=\{deck\}\s*\n\s*questions=\{questions\}\s*\n\s*total=\{total\}\s*\n\s*selections=\{deckSelections\}\s*\n\s*onAnswer=\{answerQuestion\}\s*\n\s*onFlick=\{dismissTopCard\}\s*\n\s*onEmpty=\{finishDeck\}/,
   );
   // The review grid still jumps back into the deck at any question, so an
   // answer can be changed before submitting.
   assert.match(brainPanel, /data-brain-review-tile=\{index \+ 1\}/);
-  assert.match(brainPanel, /onClick=\{\(\) => openDeck\(index\)\}/);
+  assert.match(brainPanel, /onClick=\{\(\) => jumpToQuestion\(index\)\}/);
   assert.match(brainPanel, /Tap any question to jump back and change your answer before you submit\./);
   // …and Back resumes at the first question that still has no answer, so a
   // learner returning to finish what they skipped is not sent through the whole

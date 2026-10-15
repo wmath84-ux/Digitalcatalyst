@@ -26,7 +26,7 @@ test("Home renders the requested dashboard sequence", () => {
     app.indexOf("<div data-home-continue>", renderStart),
     app.indexOf("<div data-home-category-nav>", renderStart),
     app.indexOf("<section data-home-trending", renderStart),
-    app.indexOf('title="Recommended for You"', renderStart),
+    app.indexOf("dc-home-recommendations", renderStart),
     app.indexOf("<div data-home-reviews>", renderStart),
     app.indexOf("<FeedbackSection", renderStart),
   ];
@@ -127,9 +127,9 @@ test("reviews show published data only and make verification conditional", () =>
 });
 
 test("Home feedback entry remains compact and opens its own hash subroute", () => {
-  assert.match(feedback, /Have something to share\?/);
+  assert.match(feedback, /Share feedback/);
   assert.match(feedback, /onClick=\{onOpen\}/);
-  assert.match(feedback, /Open feedback/);
+  assert.match(feedback, /Send feedback/);
   assert.doesNotMatch(feedback, /<Modal|textarea|createUserQuery/);
   assert.match(app, /window\.location\.hash = "#\/home\/feedback"/);
   assert.match(app, /isFeedbackExperience = .*window\.location\.hash\.split\("\?"\)\[0\] === "#\/home\/feedback"/);

@@ -8,8 +8,12 @@
 //     module context sit under "Unfiled notes". A single activation opens the
 //     note (the BlockNote editor for SELF, read-only for MASTER).
 //   - The single "+" button opens the same white block-document page
-//     (BlockNote, see ./NoteEditor) that fills the notes pane. While the editor
-//     is open the pane is a slim bar (status · Cancel · Save), then the page.
+//     (BlockNote, see ./NoteEditor) that fills the notes pane. The editor's
+//     chrome follows the reference design: no conventional header — only a
+//     top-left button (notes library drawer, where notes can be renamed) and
+//     a top-right one (this note's options: status, read/edit switch, Save ·
+//     Cancel · Delete); the bottom carries a centred navigation pill in read
+//     mode and the floating editing pill in edit mode.
 //   - Delete asks for confirmation in a dialog before the note is removed.
 //   - Pasting from anywhere (Docs, Notion, a website, an IDE, chat) is
 //     sanitised and imported as blocks; what the editor cannot hold (tables,
@@ -35,20 +39,21 @@
 import { useDoubleTapToEdit } from "./useDoubleTapToEdit";
 import { Component, Suspense, lazy, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import "./study-light-surfaces.css";
-import { Check, FileText, NotebookPen, Plus, X } from "lucide-react";
+import { ArrowLeft, BookOpen, Check, ChevronLeft, ChevronRight, FileText, MoreHorizontal, NotebookPen, PanelLeft, PanelRight, Pencil, Plus, Trash2, X } from "lucide-react";
 import "katex/dist/katex.min.css";
 import type { CourseModule, CoursePlayerNote, MasterCourseNote } from "../types/course";
 import type { PersonalCourseModule } from "../types/personalCourse";
 import RichTextEditor from "./RichTextEditor";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import { combineHtml } from "./notesStore";
-import { getCoursePanelSession, setNotesSessionView } from "./coursePanelSession";
+import { getCoursePanelSession, setNotesEditorOpen, setNotesSessionView } from "./coursePanelSession";
 import { useCourseTheme, useMasterSelfPreference, type CoursePlayerTheme } from "./playerPreferences";
 import { firstRichTextBlock, isEmptyRichText, plainToRichText, richTextToPlain, splitFirstHeading, sanitizeRichText } from "../utils/richText";
 import { MAX_NOTE_HTML_LENGTH } from "../../utils/courseNotes";
 import BranchedMenu, { BranchedMenuSkeleton, useBranchedOpen, type BranchedMenuItem } from "../components/branched-menu/BranchedMenu";
 import { ancestorSectionValues, buildBranchTree, type BranchEntry, type BranchSegment } from "../components/branched-menu/branchedTree";
 import { StudyLibraryEmptyState, StudyLibraryNotice } from "./StudyLibraryStates";
+import CoursePageHeader from "./CoursePageHeader";
 import { courseModuleSegments, personalModuleSegments } from "./studyResourceContext";
 import type { NoteDraft, NoteEditorHandle } from "./noteEditor/editorTypes";
 
@@ -226,19 +231,23 @@ function NoteStatus({
 function MasterNoteViewer({ note, onClose, theme }: { note: MasterCourseNote; onClose: () => void; theme: CoursePlayerTheme }) {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-white" data-course-master-note-viewer data-course-notes-mode="master-readonly" data-notes-theme={theme}>
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-3 py-2">
+      {/* Headerless like the SELF editor: floating corner actions only — back
+          to the library on the left, the read-only badge on the right. */}
+      <div className="flex h-11 shrink-0 items-center justify-between px-2" data-note-editor-chrome>
         <button
           type="button"
           onClick={onClose}
-          className="rounded-full px-3 py-2 text-sm font-bold text-indigo-700 hover:bg-indigo-50 focus-visible:outline-2 focus-visible:outline-indigo-600"
+          className="grid h-9 w-9 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 active:bg-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          aria-label="Back to MASTER library"
+          title="Back to MASTER library"
           data-course-master-note-back
         >
-          ← MASTER library
+          <ArrowLeft size={18} aria-hidden="true" />
         </button>
         <span className="shrink-0 rounded-full bg-indigo-50 px-3 py-1 text-[11px] font-black uppercase tracking-wide text-indigo-700" data-master-note-readonly>
           Read only · Master
         </span>
-      </header>
+      </div>
       <div className="min-h-0 flex-1" data-course-master-note-renderer>
         <Suspense fallback={<div className="grid h-full place-items-center text-sm text-slate-500" aria-busy="true">Loading master note…</div>}>
           <NoteEditor
@@ -316,6 +325,9 @@ export default function NotesPanel({
   // only) with a single "Edit" action; tapping Edit flips the SAME document to
   // editable and the same slot becomes "Save". No separate preview renderer.
   const [selfReadOnly, setSelfReadOnly] = useState(true);
+  // The editor's side panels (reference design): "left" = the learner's note
+  // library drawer, "right" = this note's options drawer. At most one is open.
+  const [sidePanel, setSidePanel] = useState<"left" | "right" | null>(null);
 
   // The editor is UNCONTROLLED: it is opened once from this seed (restored
   // from the session, or the stored note, or blank) and owns its content from
@@ -329,13 +341,28 @@ export default function NotesPanel({
   const composeCount = useRef(0);
   const editorRef = useRef<NoteEditorHandle | null>(null);
   const focusAfterEditRef = useRef(false);
-  const editGesture = useDoubleTapToEdit(Boolean(editingId && selfReadOnly), () => {
+  // Read ↔ edit on the SAME document: flip the panel state and the live
+  // editor together (the read-mode double-tap / Enter gesture, the read
+  // pill's Edit button and the right panel's mode toggle all land here).
+  const enterEditMode = useCallback(() => {
     discardingRef.current = false;
     focusAfterEditRef.current = true;
     setSelfReadOnly(false);
     editorRef.current?.setReadOnly(false);
     editorRef.current?.focusBody();
-  });
+  }, []);
+  const enterReadMode = useCallback(() => {
+    setSelfReadOnly(true);
+    editorRef.current?.setReadOnly(true);
+  }, []);
+  // Closing a side panel over an EDITING note hands the caret back to the
+  // document (the app's usual end-of-body landing) so writing resumes; in
+  // read view it simply closes.
+  const closeSidePanel = () => {
+    setSidePanel(null);
+    if (!selfReadOnly) editorRef.current?.focusBody();
+  };
+  const editGesture = useDoubleTapToEdit(Boolean(editingId && selfReadOnly), enterEditMode);
   useEffect(() => {
     if (selfReadOnly || !focusAfterEditRef.current) return;
     focusAfterEditRef.current = false;
@@ -364,6 +391,10 @@ export default function NotesPanel({
   // exit flush — even if this component unmounts before an effect fires.
   useEffect(() => {
     if (storageOnly) return;
+    // A full-panel note (the editor, or a MASTER note open for reading) is
+    // one of the player's immersive pages: the footer navigation hides
+    // while it is up and returns on the notes list (isFooterHiddenPage).
+    setNotesEditorOpen(editorOpen);
     if (composing) {
       setNotesSessionView({ view: "compose", draft, title: draftTitle });
     } else if (editingId) {
@@ -475,6 +506,7 @@ export default function NotesPanel({
     discardingRef.current = true;
     const saved = onAdd(html);
     if (saved === null) { discardingRef.current = false; return; }
+    setSidePanel(null);
     if (saved) {
       startEdit(saved);
       return;
@@ -510,6 +542,7 @@ export default function NotesPanel({
       discardingRef.current = true;
       onEdit(editingId, html);
       editorRef.current?.markSaved();
+      setSidePanel(null);
       // §14 — after a successful save the SAME note stays open as a read-only
       // view, with all tools hidden until the next direct edit gesture.
       const { heading, body } = splitFirstHeading(html);
@@ -587,6 +620,41 @@ export default function NotesPanel({
 
   const masterOpen = useBranchedOpen(masterTree);
   const selfOpen = useBranchedOpen(selfTree);
+  // A different note (or the composer) always starts with both side panels shut.
+  useEffect(() => { setSidePanel(null); }, [seed.key]);
+
+  // Two-step delete confirmation, shared by the library and the editor (the
+  // right panel's Delete lands here too). Rendered through a portal so the
+  // player's clipped sheet can never cut it off. Deleting the note that is
+  // open in the editor closes the editor with it.
+  const deleteDialog = (
+    <ConfirmDeleteDialog
+      theme={noteTheme}
+      open={Boolean(pendingDeleteNote)}
+      title="Delete this note?"
+      message={
+        pendingDeleteNote
+          ? `"${notePreview(pendingDeleteNote) || "Untitled note"}" will be permanently removed from your notes.`
+          : ""
+      }
+      detail={pendingDeleteNote ? "This action cannot be undone." : null}
+      confirmLabel="Delete note"
+      confirmTitle="Delete note"
+      onConfirm={() => {
+        if (pendingDeleteId) onDelete(pendingDeleteId);
+        if (pendingDeleteId && pendingDeleteId === editingId) {
+          discardingRef.current = true;
+          setEditingId(null);
+          setEditDraft("");
+          setEditTitle("");
+          setSelfReadOnly(true);
+        }
+        setPendingDeleteId(null);
+        setSidePanel(null);
+      }}
+      onCancel={() => setPendingDeleteId(null)}
+    />
+  );
   // Opening a note from elsewhere (the Modules library, a signal) reveals its branch.
   useEffect(() => {
     if (viewingMasterNoteId) masterOpen.reveal(ancestorSectionValues(masterTree, `master:${viewingMasterNoteId}`));
@@ -624,9 +692,17 @@ export default function NotesPanel({
     };
     const empty = legacyFallback ? isEmptyRichText(combineHtml(titleValue, value)) : editorEmpty;
     const darkNote = noteTheme === "dark";
+    const readView = editing && selfReadOnly;
+    // Previous / next SELF note for the read-mode bottom navigation.
+    const editingIndex = editingId ? notes.findIndex((note) => note.id === editingId) : -1;
+    const prevNote = editingIndex > 0 ? notes[editingIndex - 1] : null;
+    const nextNote = editingIndex >= 0 && editingIndex < notes.length - 1 ? notes[editingIndex + 1] : null;
+    const cornerButtonClass = `grid h-9 w-9 shrink-0 place-items-center rounded-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${darkNote ? "text-slate-300 hover:bg-slate-800 active:bg-slate-700" : "text-slate-500 hover:bg-slate-100 active:bg-slate-200"}`;
+    const pillButtonClass = `grid h-9 w-9 shrink-0 place-items-center rounded-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:pointer-events-none disabled:opacity-35 ${darkNote ? "hover:bg-slate-800 active:bg-slate-700" : "hover:bg-slate-100 active:bg-slate-200"}`;
+    const pillSepClass = `mx-1 h-5 w-px shrink-0 ${darkNote ? "bg-slate-700" : "bg-slate-200"}`;
     return (
       <div
-        className={`flex h-full flex-col overflow-hidden ${darkNote ? "bg-slate-950" : "bg-white"}`}
+        className={`relative flex h-full flex-col overflow-hidden ${darkNote ? "bg-slate-950" : "bg-white"}`}
         data-course-notes-panel
         data-course-notes-mode={editing ? "edit" : "compose"}
         data-notes-theme={noteTheme}
@@ -635,13 +711,39 @@ export default function NotesPanel({
         aria-label={editing && selfReadOnly ? "Saved note. Double tap or press Enter to edit. Escape returns to the library." : undefined}
         {...editGesture}
         onKeyDown={(event) => {
+          if (event.key === "Escape" && sidePanel) { closeSidePanel(); return; }
           if (event.key === "Escape" && selfReadOnly) cancel();
           else editGesture.onKeyDown(event);
         }}
       >
-        {/* The pane is exactly: a slim bar (status · theme · Cancel · Save),
-            then the page. No card, no frame — the page IS the pane. */}
+        {/* No conventional header (reference design): the pane is the page,
+            with only two corner buttons — top-left opens the notes library
+            drawer, top-right opens this note's options drawer. Status, the
+            read/edit switch and Save / Cancel live in the right drawer; the
+            bottom chrome switches with the mode (see below). */}
         <div className="flex min-h-0 flex-1 flex-col" data-course-notes-composer>
+          <div className="flex h-11 shrink-0 items-center justify-between px-2" data-note-editor-chrome>
+            <button
+              type="button"
+              className={cornerButtonClass}
+              aria-label="Open notes panel"
+              title="Notes"
+              data-note-open-left-panel
+              onClick={() => setSidePanel("left")}
+            >
+              <PanelLeft size={18} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className={cornerButtonClass}
+              aria-label="Open note options"
+              title="Note options"
+              data-note-open-right-panel
+              onClick={() => setSidePanel("right")}
+            >
+              <PanelRight size={18} aria-hidden="true" />
+            </button>
+          </div>
           {selfReadOnly && syncState?.status === "error" ? (
             <StudyLibraryNotice
               state="error"
@@ -650,32 +752,6 @@ export default function NotesPanel({
               onRetry={storageOnly ? undefined : onRetrySync}
             />
           ) : null}
-          {!(editing && selfReadOnly) ? <div
-            className={`flex shrink-0 items-center justify-between gap-2 border-b py-1.5 pl-[max(1.125rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] ${darkNote ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-white"}`}
-            data-course-notes-bar
-          >
-            <NoteStatus editing={editing} dirty={dirty} tooLong={tooLong} sync={syncState} dark={darkNote} storageOnly={storageOnly} />
-            <div className="flex shrink-0 items-center gap-1">
-              {/* Editing tools mount only after direct activation of the document. */}
-              <button
-                type="button"
-                onClick={cancel}
-                className="flex h-10 items-center gap-1 rounded-full px-3 text-[13px] font-bold text-slate-600 transition hover:bg-slate-100 active:bg-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-                {...(editing ? { "data-course-note-edit-cancel": true } : { "data-course-notes-cancel": true })}
-              >
-                <X size={15} /> Cancel
-              </button>
-              <button
-                type="button"
-                onClick={editing ? submitEdit : submitAdd}
-                disabled={empty || tooLong}
-                className="flex h-10 items-center gap-1 rounded-full bg-indigo-600 px-4 text-[13px] font-black text-white transition hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-                {...(editing ? { "data-course-note-edit-save": true } : { "data-course-notes-save": true })}
-              >
-                <Check size={15} /> Save
-              </button>
-            </div>
-          </div> : null}
           {editing && selfReadOnly ? <button type="button" className="sr-only focus:not-sr-only focus:absolute focus:z-20 focus:bg-white focus:p-2" onClick={cancel}>Back to notes library</button> : null}
           <div className="relative min-h-0 flex-1">
             <EditorBoundary
@@ -721,25 +797,206 @@ export default function NotesPanel({
             </EditorBoundary>
           </div>
         </div>
+
+        {/* Read mode's bottom navigation (reference design): one centred
+            floating pill — library · previous · next | new · edit · more.
+            In edit mode it unmounts and the editor's own editing pill takes
+            the bottom of the note instead (NoteDockedToolbar). */}
+        {readView ? (
+          <div className="pointer-events-none absolute inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 flex justify-center px-4">
+            <nav
+              className={`pointer-events-auto flex items-center gap-0.5 rounded-full border px-2 py-1.5 shadow-lg backdrop-blur ${darkNote ? "border-slate-700 bg-slate-900/95 text-slate-200 shadow-black/40" : "border-slate-200 bg-white/95 text-slate-600 shadow-slate-950/15"}`}
+              aria-label="Note navigation"
+              data-note-read-nav
+            >
+              <button type="button" className={pillButtonClass} aria-label="Back to notes library" title="Back to notes library" data-note-read-back onClick={cancel}>
+                <ArrowLeft size={16} aria-hidden="true" />
+              </button>
+              <button type="button" className={pillButtonClass} aria-label="Previous note" title="Previous note" data-note-read-prev disabled={!prevNote} onClick={() => { if (prevNote) startEdit(prevNote); }}>
+                <ChevronLeft size={16} aria-hidden="true" />
+              </button>
+              <button type="button" className={pillButtonClass} aria-label="Next note" title="Next note" data-note-read-next disabled={!nextNote} onClick={() => { if (nextNote) startEdit(nextNote); }}>
+                <ChevronRight size={16} aria-hidden="true" />
+              </button>
+              <span className={pillSepClass} aria-hidden="true" />
+              <button type="button" className={pillButtonClass} aria-label="New note" title="New note" data-note-read-new onClick={openComposer}>
+                <Plus size={16} aria-hidden="true" />
+              </button>
+              <button type="button" className={pillButtonClass} aria-label="Edit note" title="Edit note" data-note-read-edit onClick={enterEditMode}>
+                <Pencil size={16} aria-hidden="true" />
+              </button>
+              <button type="button" className={pillButtonClass} aria-label="More note options" title="More note options" data-note-read-more onClick={() => setSidePanel("right")}>
+                <MoreHorizontal size={16} aria-hidden="true" />
+              </button>
+            </nav>
+          </div>
+        ) : null}
+
+        {/* LEFT side panel: the learner's own notes. Picking a note opens it
+            (as a read view, like everywhere else); each row keeps the library
+            menu's rename + delete, so a note can be renamed from right here
+            inside the editor. */}
+        {sidePanel === "left" ? (
+          <>
+            <button type="button" aria-label="Close notes panel" data-note-panel-scrim className="absolute inset-0 z-30 bg-slate-950/30" onClick={closeSidePanel} />
+            <aside
+              className={`absolute inset-y-0 left-0 z-40 flex w-[280px] max-w-[85%] flex-col border-r shadow-2xl ${darkNote ? "border-slate-800 bg-slate-950 text-slate-100" : "border-slate-200 bg-white text-slate-900"}`}
+              aria-label="My notes"
+              data-note-left-panel
+            >
+              <div className={`flex h-12 shrink-0 items-center gap-2 border-b px-3 ${darkNote ? "border-slate-800" : "border-slate-100"}`}>
+                <NotebookPen size={16} className="shrink-0 text-indigo-500" aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate text-sm font-bold">My notes</span>
+                <span className={`shrink-0 text-xs font-semibold ${darkNote ? "text-slate-400" : "text-slate-400"}`}>{notes.length}</span>
+                <button type="button" className={cornerButtonClass} aria-label="Close notes panel" data-note-close-left-panel onClick={closeSidePanel}>
+                  <X size={16} aria-hidden="true" />
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-1 py-1">
+                {notes.length > 0 ? (
+                  <BranchedMenu
+                    items={selfTree}
+                    openValues={selfOpen.openValues}
+                    onToggle={selfOpen.toggle}
+                    activeValue={editingId ? `note:${editingId}` : null}
+                    onSelect={(value) => {
+                      const note = notes.find((entry) => `note:${entry.id}` === value);
+                      if (note) startEdit(note);
+                      setSidePanel(null);
+                    }}
+                    ariaLabel="Your notes"
+                    fullWidth
+                    rowHeight={40}
+                    className="notes-library-menu"
+                    dataAttrs={{ "data-note-left-panel-menu": "" }}
+                  />
+                ) : (
+                  <p className={`px-3 py-4 text-sm ${darkNote ? "text-slate-400" : "text-slate-500"}`}>Your saved notes will appear here.</p>
+                )}
+              </div>
+              <div className={`shrink-0 space-y-2 border-t p-3 ${darkNote ? "border-slate-800" : "border-slate-100"}`}>
+                <button
+                  type="button"
+                  className="flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-indigo-600 text-[13px] font-black text-white transition hover:bg-indigo-500 active:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                  data-note-panel-new
+                  onClick={() => { openComposer(); setSidePanel(null); }}
+                >
+                  <Plus size={15} aria-hidden="true" /> New note
+                </button>
+                <button
+                  type="button"
+                  className={`flex h-10 w-full items-center justify-center gap-1.5 rounded-full text-[13px] font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${darkNote ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"}`}
+                  data-note-panel-back
+                  onClick={cancel}
+                >
+                  <ArrowLeft size={15} aria-hidden="true" /> Back to library
+                </button>
+              </div>
+            </aside>
+          </>
+        ) : null}
+
+        {/* RIGHT side panel: this note's status, the read/edit switch, and
+            Save / Cancel / Delete — everything the old top bar carried, moved
+            behind the top-right corner button. */}
+        {sidePanel === "right" ? (
+          <>
+            <button type="button" aria-label="Close note options" data-note-panel-scrim className="absolute inset-0 z-30 bg-slate-950/30" onClick={closeSidePanel} />
+            <aside
+              className={`absolute inset-y-0 right-0 z-40 flex w-[300px] max-w-[85%] flex-col border-l shadow-2xl ${darkNote ? "border-slate-800 bg-slate-950 text-slate-100" : "border-slate-200 bg-white text-slate-900"}`}
+              aria-label="Note options"
+              data-note-right-panel
+            >
+              <div className={`flex h-12 shrink-0 items-center gap-2 border-b px-3 ${darkNote ? "border-slate-800" : "border-slate-100"}`}>
+                <span className="min-w-0 flex-1 truncate text-sm font-bold">Note options</span>
+                <button type="button" className={cornerButtonClass} aria-label="Close note options" data-note-close-right-panel onClick={closeSidePanel}>
+                  <X size={16} aria-hidden="true" />
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
+                <div>
+                  <p className={`mb-1.5 text-[11px] font-black uppercase tracking-wide ${darkNote ? "text-slate-400" : "text-slate-400"}`}>Status</p>
+                  <NoteStatus editing={editing} dirty={dirty} tooLong={tooLong} sync={syncState} dark={darkNote} storageOnly={storageOnly} />
+                </div>
+                {editing ? (
+                  <div>
+                    <p className={`mb-1.5 text-[11px] font-black uppercase tracking-wide ${darkNote ? "text-slate-400" : "text-slate-400"}`}>Mode</p>
+                    {readView ? (
+                      <button
+                        type="button"
+                        className={`flex h-10 w-full items-center gap-2 rounded-full px-3 text-[13px] font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${darkNote ? "text-slate-200 hover:bg-slate-800" : "text-slate-700 hover:bg-slate-100"}`}
+                        data-note-mode-edit
+                        onClick={() => { enterEditMode(); setSidePanel(null); }}
+                      >
+                        <Pencil size={15} aria-hidden="true" /> Edit note
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className={`flex h-10 w-full items-center gap-2 rounded-full px-3 text-[13px] font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${darkNote ? "text-slate-200 hover:bg-slate-800" : "text-slate-700 hover:bg-slate-100"}`}
+                        data-note-mode-read
+                        onClick={() => { enterReadMode(); setSidePanel(null); }}
+                      >
+                        <BookOpen size={15} aria-hidden="true" /> Reading view
+                      </button>
+                    )}
+                  </div>
+                ) : null}
+                <div>
+                  <p className={`mb-1.5 text-[11px] font-black uppercase tracking-wide ${darkNote ? "text-slate-400" : "text-slate-400"}`}>Actions</p>
+                  <div className="space-y-2">
+                    {!readView ? (
+                      <button
+                        type="button"
+                        onClick={() => { if (editing) submitEdit(); else submitAdd(); }}
+                        disabled={empty || tooLong}
+                        className="flex h-10 w-full items-center justify-center gap-1 rounded-full bg-indigo-600 px-4 text-[13px] font-black text-white transition hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                        {...(editing ? { "data-course-note-edit-save": true } : { "data-course-notes-save": true })}
+                      >
+                        <Check size={15} aria-hidden="true" /> Save
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={cancel}
+                      className={`flex h-10 w-full items-center justify-center gap-1 rounded-full px-3 text-[13px] font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${darkNote ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"}`}
+                      {...(editing ? { "data-course-note-edit-cancel": true } : { "data-course-notes-cancel": true })}
+                    >
+                      <X size={15} aria-hidden="true" /> {readView ? "Back to library" : "Cancel"}
+                    </button>
+                    {editing ? (
+                      <button
+                        type="button"
+                        className={`flex h-10 w-full items-center justify-center gap-1 rounded-full px-3 text-[13px] font-bold text-rose-600 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 ${darkNote ? "hover:bg-rose-500/10" : "hover:bg-rose-50"}`}
+                        data-note-delete
+                        onClick={() => { if (editingId) setPendingDeleteId(editingId); }}
+                      >
+                        <Trash2 size={15} aria-hidden="true" /> Delete note
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </aside>
+          </>
+        ) : null}
+
+        {deleteDialog}
       </div>
     );
   }
 
   return (
     <div className="flex h-full flex-col overflow-hidden" data-course-notes-panel data-course-notes-mode="list" data-notes-theme={noteTheme}>
-      {/* The library is one responsive resource-card system: the panel owns
-          the add affordance; each resource card itself is the open target. */}
-      <div className="relative min-h-0 flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto overscroll-contain p-3 pb-16" data-course-notes-list>
-          <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
-            <div className="flex items-center justify-between gap-3" data-course-note-collections>
-              <div>
-                <p className="text-xs font-black uppercase tracking-wide text-slate-700">Note library</p>
-                <p className="mt-0.5 text-[11px] text-slate-500">
-                  {storageOnly ? "Your notes are private to this device." : "Master course material and your private notes stay separate."}
-                </p>
-              </div>
-              {!storageOnly ? (
+      {/* The shared page header (the Resource Library header's size): the
+          page name, bold with its icon, and the MASTER / SELF control inside
+          the header — no longer a row that scrolls away with the list. */}
+      <CoursePageHeader
+        title="Notes"
+        icon={<NotebookPen size={20} aria-hidden="true" />}
+        dataAttrs={{ "data-course-note-collections": "" }}
+      >
+        {!storageOnly ? (
                 <div className="inline-flex shrink-0 rounded-xl border border-slate-200 bg-slate-50 p-1" role="tablist" aria-label="Note collection">
                   <button
                     type="button"
@@ -762,9 +1019,13 @@ export default function NotesPanel({
                     SELF <span className="ml-1 text-[10px]">{notes.length}</span>
                   </button>
                 </div>
-              ) : null}
-            </div>
-
+        ) : null}
+      </CoursePageHeader>
+      {/* The library is one responsive resource-card system: the panel owns
+          the add affordance; each resource card itself is the open target. */}
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        <div className="h-full overflow-y-auto overscroll-contain p-3 pb-16" data-course-notes-list>
+          <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
             {activeCollection === "master" ? (
               masterNotes.length > 0 ? (
                 <BranchedMenu
@@ -871,27 +1132,7 @@ export default function NotesPanel({
         ) : null}
       </div>
 
-      {/* Two-step delete confirmation. Rendered through a portal so the
-          player's clipped/overflow-hidden sheet can never cut it off, and
-          it always sits above the overlay + dock on phones and tablets. */}
-      <ConfirmDeleteDialog
-        theme={noteTheme}
-        open={Boolean(pendingDeleteNote)}
-        title="Delete this note?"
-        message={
-          pendingDeleteNote
-            ? `"${notePreview(pendingDeleteNote) || "Untitled note"}" will be permanently removed from your notes.`
-            : ""
-        }
-        detail={pendingDeleteNote ? "This action cannot be undone." : null}
-        confirmLabel="Delete note"
-        confirmTitle="Delete note"
-        onConfirm={() => {
-          if (pendingDeleteId) onDelete(pendingDeleteId);
-          setPendingDeleteId(null);
-        }}
-        onCancel={() => setPendingDeleteId(null)}
-      />
+      {deleteDialog}
     </div>
   );
 }

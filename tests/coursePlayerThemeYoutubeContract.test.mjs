@@ -13,12 +13,16 @@ const themeStyles = fs.readFileSync("src/course/courseTheme.css", "utf8");
 
 test("The Player theme toggle defaults to light and persists independently from other feature themes", () => {
   assert.match(playerPanel, /Light appearance/);
-  assert.match(playerPanel, /onPlayerThemeChange/);
+  // Appearance is light-only app-wide: the row is a passive indicator now,
+  // not a switch that would silently do nothing.
+  assert.match(playerPanel, /data-course-setting="lightTheme"/);
+  assert.match(playerPanel, /Always on/);
   assert.match(playerPanel, /playerTheme = "light"/);
   assert.match(coursePlayer, /useCourseTheme\("player", user\?\.id \?\? null\)/);
   assert.match(preferences, /fallback: CoursePlayerTheme = "light"/);
   assert.match(preferences, /prefKey\("courseTheme", feature, uid\)/);
-  assert.match(preferences, /stored === "light" \|\| stored === "dark" \? stored : fallback/);
+  // A stored dark pick is normalized to light now (appearance is light-only).
+  assert.match(preferences, /_fallback: CoursePlayerTheme = "light",\s*\): CoursePlayerTheme => \{\s*return "light";/);
   assert.match(coursePlayer, /style=\{\{ colorScheme: playerThemeCtl\.theme \}\}/);
   assert.doesNotMatch(coursePlayer, /const browserColorScheme = "dark" as const/);
 });

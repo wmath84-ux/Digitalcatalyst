@@ -11,9 +11,12 @@ test("Home uses one greeting with a bold first name and vector wave; only Flow k
 
   assert.match(app, /split\(\/\\s\+\/\)\[0\]/, "the home page must pass only the first word of the user's name");
   assert.match(header, /const firstName = userName\.trim\(\)\.split\(\/\\s\+\/\)\[0\] \|\| "Learner"/);
-  assert.match(header, /headerVariant === "flow" \? \([\s\S]*?<p data-home-welcome/);
+  // Only the FlowPath variant replaces the greeting (with its own wordmark);
+  // every other surface gets the one greeting.
+  assert.match(header, /headerVariant === "flow" \? "FlowPath" : \(/);
   assert.match(header, /data-home-greeting/);
-  assert.match(header, /Hello, <strong data-home-user-name className="font-extrabold">\{firstName\}<\/strong>/);
+  assert.match(header, /<strong className="font-extrabold">Hello<\/strong>/);
+  assert.match(header, /data-home-user-name>, \{firstName\}<\/span>/);
   assert.match(header, /PiHandWavingDuotone data-home-wave/);
   assert.match(header, /truncate whitespace-nowrap/);
   assert.doesNotMatch(header, /Good to see you|👋/);

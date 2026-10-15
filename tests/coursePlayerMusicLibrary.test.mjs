@@ -72,6 +72,7 @@ test('a pasted YouTube link becomes a playable row in every shape people paste i
     assert.equal(track.provider, 'youtube');
     assert.equal(track.url, `https://www.youtube.com/watch?v=${id}`);
     assert.equal(track.embedUrl, `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&controls=1&fs=1&enablejsapi=1`);
+    assert.equal(track.thumbnailUrl, `https://i.ytimg.com/vi/${id}/hqdefault.jpg`);
     assert.equal(track.source, 'link');
   }
 });
@@ -134,6 +135,7 @@ test('the shelf round-trips through storage, dedupes, and clears', () => {
   store.clear();
   const first = lib.addMusicLink(uid, 'https://youtu.be/dQw4w9WgXcQ');
   assert.equal(first.tracks.length, 1);
+  assert.equal(lib.loadMusicLinks(uid)[0].thumbnailUrl, 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg');
   const again = lib.addMusicLink(uid, 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=9s');
   assert.equal(again.tracks.length, 1, 'the same video added twice must stay ONE row');
   const second = lib.addMusicLink(uid, 'https://cdn.test/b.mp3');

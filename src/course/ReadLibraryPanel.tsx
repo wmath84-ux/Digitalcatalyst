@@ -64,7 +64,9 @@ import {
 } from "../../utils/readUploads.js";
 import { useAuth } from "../context/AuthContext";
 import PdfJsGenericViewer, { type PdfAnnotationApi } from "./PdfJsGenericViewer";
+import { setReadSessionView } from "./coursePanelSession";
 import CourseConfirmDialog from "./ConfirmDeleteDialog";
+import CoursePageHeader from "./CoursePageHeader";
 import useReadUploads, { type ReadUploadProgress } from "./useReadUploads";
 import { fetchPdfFromUrl, parseUrlList } from "./readUrlImport";
 import { useCourseTheme } from "./playerPreferences";
@@ -330,6 +332,15 @@ export default function ReadLibraryPanel({
     : localEntry?.uid === user?.id ? readUploads.uploads.find((row) => row.id === localEntry?.id && row.storageKind === "local") || null : null;
   const activeUploadRef = useRef<ReadUpload | null>(null);
   activeUploadRef.current = activeUpload;
+
+  // While a PDF is open in the reader — the course PDF viewer, the
+  // annotations viewer (an opened learner PDF) or the Google Drive
+  // viewer — the Read tab is one of the player's immersive pages and the
+  // footer navigation hides; back on the library shelf it returns (see
+  // isFooterHiddenPage in coursePanelSession.ts).
+  useEffect(() => {
+    setReadSessionView(activeId ? "reader" : "library");
+  }, [activeId]);
 
   const needle = query.trim().toLocaleLowerCase();
 
@@ -662,10 +673,11 @@ export default function ReadLibraryPanel({
       {/* Keep the searchable library mounted behind the reader. Its query and
           scroll position survive opening a PDF and returning with Back. */}
       <div className={`flex h-full min-h-0 flex-col ${activeId ? "hidden" : ""}`} aria-hidden={Boolean(activeId)} data-course-read-library>
-        <div className="shrink-0 border-b border-white/10 px-3 pb-3 pt-3 sm:px-4">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <BookOpenText size={17} className="shrink-0 text-violet-300" aria-hidden="true" />
-            <h2 className="text-sm font-bold text-white">Read library</h2>
+        {/* The shared page header (the Resource Library header's size):
+            the page name, bold with its icon, and the source switch, count
+            and upload actions inside the header. The search box sits in the
+            body directly beneath it, so the header area stays defined. */}
+        <CoursePageHeader title="Read library" icon={<BookOpenText size={20} aria-hidden="true" />}>
             <div
               className="inline-flex shrink-0 items-center rounded-full border border-white/10 bg-white/[0.05] p-0.5"
               role="tablist"
@@ -747,7 +759,8 @@ export default function ReadLibraryPanel({
               }}
               data-course-read-compose-input
             />
-          </div>
+        </CoursePageHeader>
+        <div className="shrink-0 border-b border-white/10 px-3 py-2 sm:px-4">
           <label className="sr-only" htmlFor="course-read-search">Search Read resources</label>
           <div className="relative">
             <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
@@ -1158,6 +1171,12 @@ export default function ReadLibraryPanel({
                   title={`${activeEntry.resource.name || "Read resource"} — Google Drive viewer`}
                   src={activeEntry.presentation.sourceUrl}
                   className="h-full w-full border-0 bg-white"
+                  // The Drive viewer opens in LIGHT mode (owner brief): a
+                  // frame's preferred colour scheme comes from the frame
+                  // element itself, and Drive's viewer follows
+                  // prefers-color-scheme, so pinning the frame to light
+                  // opens it light regardless of the OS theme.
+                  style={{ colorScheme: "light" }}
                   // Drive's viewer needs its scripts, its cookies/storage
                   // (allow-same-origin) and the share/print/download flows;
                   // the identical list guards the player's Drive previews in

@@ -44,7 +44,6 @@ import * as React from "react";
 import { createRoot } from "react-dom/client";
 import { act } from "react";
 import { SplitDeck } from ${JSON.stringify(path.join(ROOT, "src/course/studyPanels.tsx"))};
-import { BookOpen } from "lucide-react";
 
 export function mountDeck(host, options = {}) {
   const axis = options.axis || "row";
@@ -60,7 +59,6 @@ export function mountDeck(host, options = {}) {
         orientation: axis === "row" ? "landscape" : "portrait",
         courseId: options.courseId || "course-1",
         accent: "#FFBE0B",
-        studyIcon: BookOpen,
         lesson: React.createElement("div", { "data-fake-lesson": "" }),
         study: React.createElement("div", { "data-fake-study": "" }),
         renderExtraPane,

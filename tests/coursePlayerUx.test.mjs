@@ -39,6 +39,8 @@ const repoRoot = path.join(__dirname, "..");
 const readSource = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const coursePlayer = readSource("src/CoursePlayerApp.tsx");
+const progressHook = readSource("src/course/useLocalCourseProgress.ts");
+const accessHook = readSource("src/hooks/useCourseAccess.ts");
 const overlay = readSource("src/course/CourseOverlay.tsx");
 const playerPanel = readSource("src/course/PlayerPanel.tsx");
 const audioPlayer = readSource("src/course/AudioPlayer.tsx");
@@ -251,7 +253,7 @@ test("CoursePlayer persists notes to localStorage (per user + product)", () => {
   // with an official course. The cloud hook is scoped by the SAME id, and it is
   // the hook — not the player — that reads and writes the mirror now.
   assert.match(coursePlayer, /useCourseNotes\(\{ uid: user\?\.id \?\? null, productId: storageProductId \}\)/);
-  assert.match(notesHook, /const scoped = Boolean\(uid\) && productId != null && String\(productId\)\.length > 0;/);
+  assert.match(notesHook, /const scoped = Boolean\(uidText\) && productId != null && productText\.length > 0;/);
   assert.match(notesHook, /loadLocalNotes\(uidText, productText\)/);
   assert.match(notesHook, /persistLocalNotes\(uidText, productText, next\)/);
   // Firestore is the source of truth: one document per note, owner-scoped.
@@ -270,8 +272,10 @@ test("CoursePlayerNote type has all the fields the NotesPanel reads", () => {
 // ---------------------------------------------------------------------------
 
 test("CoursePlayer persists last opened file id", () => {
-  assert.match(coursePlayer, /lastOpenedFileId: file\.id/);
-  assert.match(coursePlayer, /setLastOpenedFileId/);
+  // Every selection reports the open into the progress store, and the store's
+  // cloud write carries it (with its timestamp) on the next flush.
+  assert.match(coursePlayer, /progressCtl\.store\.open\(file\.id\)/);
+  assert.match(progressHook, /lastOpenedFileId: batch\.opened\.id, lastOpenedAt: serverTimestamp\(\)/);
 });
 
 test("CoursePlayer resumes the last opened file when the snapshot delivers it", () => {
@@ -282,7 +286,7 @@ test("CoursePlayer resumes the last opened file when the snapshot delivers it", 
   // default first-lesson auto-selection does NOT count as one, which is what
   // finally lets the saved position take over once it arrives (the old
   // `selectedFile` guard made resume silently never fire).
-  assert.match(coursePlayer, /if \(!lastOpenedFileId \|\| deepLinkFileId \|\| userSelectedRef\.current\) return;/);
+  assert.match(coursePlayer, /if \(!lastOpenedFileId \|\| deepLinkFileId \|\| userSelectedRef\.current \|\| experimentOpenedRef\.current\) return;/);
   assert.match(coursePlayer, /const match = files\.find\(\(file\) => file\.id === lastOpenedFileId\)/);
   // The owning module + paid-update ownership are re-checked, so a position
   // saved before a refund / lock change never reopens unreachable content.
@@ -291,9 +295,18 @@ test("CoursePlayer resumes the last opened file when the snapshot delivers it", 
 });
 
 test("CoursePlayer persists completed file ids + access source + preview state", () => {
-  assert.match(coursePlayer, /completedFileIds: completing \? arrayUnion\(selectedFile\.id\) : arrayRemove\(selectedFile\.id\)/);
-  assert.match(coursePlayer, /accessSource: resolution\.hasFullProductAccess/);
-  assert.match(coursePlayer, /"full_product"|"module_purchase"|"subscription"|"locked"/);
+  // The completion write lives in the progress hook: per-file arrayUnion /
+  // arrayRemove against the owner-scoped courseProgress document.
+  assert.match(progressHook, /completedFileIds: arrayUnion\(\.\.\.added\)/);
+  assert.match(progressHook, /completedFileIds: arrayRemove\(\.\.\.removed\)/);
+  assert.match(progressHook, /doc\(db, 'users', uid, 'courseProgress', productId\)/);
+  // Access provenance is the resolver's richer per-module record now.
+  assert.match(accessHook, /moduleAccessSources/);
+  assert.match(accessHook, /resourceAccessSources/);
+    // The resolver distinguishes the same access kinds as typed fields now.
+  assert.match(accessHook, /ownedModuleIds: stringSet\(value\.ownedModuleIds\)/);
+  assert.match(accessHook, /subscriptionGrantedModuleIds: stringSet\(value\.subscriptionGrantedModuleIds\)/);
+  assert.match(accessHook, /lockedModuleIds: stringSet\(value\.lockedModuleIds\)/);
 });
 
 test("CoursePlayer excludes preview-only modules from the progress denominator", () => {

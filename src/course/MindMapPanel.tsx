@@ -131,6 +131,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import {
   AlignHorizontalJustifyCenter,
+  BookOpen,
   Check,
   Cloud,
   CloudAlert,
@@ -143,6 +144,9 @@ import {
   Maximize,
   Network,
   Palette,
+  PanelLeft,
+  PanelRight,
+  Pencil,
   Plus,
   RotateCcw,
   Square,
@@ -153,6 +157,7 @@ import {
   Type,
   WrapText,
   FileJson,
+  X,
 } from "lucide-react";
 import {
   addChildNode,
@@ -177,7 +182,8 @@ import {
   type MindNodeStyle,
 } from "../../utils/mindMapTree";
 import type { MindMapSaveStatus, MindMapSummary } from "./useCourseMindMap";
-import { useDoubleTapToEdit } from "./useDoubleTapToEdit";
+import { useCourseFooterInset } from "./useCourseFooterInset";
+import { COURSE_FOOTER_INSET_PROPERTY } from "./courseFooterInset";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import MindMapJsonImportDialog from "./MindMapJsonImport";
 import type { CourseModule } from "../types/course";
@@ -186,6 +192,7 @@ import type { PersonalCourseModule } from "../types/personalCourse";
 import { getCoursePanelSession, setMindMapSessionView } from "./coursePanelSession";
 import { useCourseTheme, useMasterSelfPreference } from "./playerPreferences";
 import MasterSelfControl from "./MasterSelfControl";
+import CoursePageHeader from "./CoursePageHeader";
 import { StudyLibraryEmptyState, StudyLibraryNotice } from "./StudyLibraryStates";
 import BranchedMenu, { BranchedMenuSkeleton, useBranchedOpen, type BranchedMenuItem } from "../components/branched-menu/BranchedMenu";
 import { ancestorSectionValues, buildBranchTree, type BranchEntry, type BranchSegment } from "../components/branched-menu/branchedTree";
@@ -1061,7 +1068,7 @@ interface ToolbarMenuProps {
  */
 function ToolbarMenu({ open, anchorRef, onClose, theme, label, children }: ToolbarMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const [anchor, setAnchor] = useState<{ bottom: number; right: number } | null>(null);
+  const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
 
   // Re-measure on every resize / scroll: the sheet slides, the keyboard
   // lifts it, and a menu that keeps the FIRST rect floats away from its
@@ -1071,7 +1078,7 @@ function ToolbarMenu({ open, anchorRef, onClose, theme, label, children }: Toolb
     const measure = () => {
       const box = anchorRef.current?.getBoundingClientRect();
       if (!box) return;
-      setAnchor({ bottom: box.bottom, right: box.right });
+      setAnchor({ top: box.top, right: box.right });
     };
     measure();
     window.addEventListener("resize", measure);
@@ -1111,10 +1118,11 @@ function ToolbarMenu({ open, anchorRef, onClose, theme, label, children }: Toolb
   const viewportWidth = window.innerWidth;
   const width = Math.min(MENU_WIDTH_PX, viewportWidth - 16);
   const left = Math.max(8, Math.min(anchor.right - width, viewportWidth - width - 8));
-  // The menu grows downward from 8px below its trigger, and is never allowed
-  // to be taller than the space below it (so it can't run off the bottom).
-  const spaceBelow = Math.max(120, window.innerHeight - anchor.bottom - 16);
-  const maxHeight = Math.min(spaceBelow, Math.round(window.innerHeight * 0.6));
+  // The toolbar rides at the BOTTOM of the sheet now, so the menu grows
+  // UPWARD from 8px above its trigger, and is never allowed to be taller
+  // than the space above it (so it can't run off the top).
+  const spaceAbove = Math.max(120, anchor.top - 16);
+  const maxHeight = Math.min(spaceAbove, Math.round(window.innerHeight * 0.6));
 
   return createPortal(
     <div
@@ -1126,7 +1134,7 @@ function ToolbarMenu({ open, anchorRef, onClose, theme, label, children }: Toolb
       data-course-theme-portal=""
       data-course-theme={theme}
       data-menu-theme={theme}
-      style={{ left, width, maxHeight, top: anchor.bottom + 8 }}
+      style={{ left, width, maxHeight, bottom: window.innerHeight - anchor.top + 8 }}
     >
       {children}
     </div>,
@@ -1230,6 +1238,13 @@ export interface MindMapPanelProps {
   storageOnly?: boolean;
   /** Use a parent surface's theme without changing Course Player preferences. */
   themeOverride?: MindMapTheme;
+  /**
+   * Reports whether the canvas (rather than the map library) is open. This is
+   * a parent-owned chrome signal only: it never writes to the course panel
+   * session, so storage-only hosts such as Work can hide their own shell
+   * chrome around the editor without leaking Work state into Course Player.
+   */
+  onEditorOpenChange?: (open: boolean) => void;
 }
 
 /** Read-only flag for every node box (hides the `+` and blocks editing). */
@@ -1264,6 +1279,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
     onCloseMasterMap,
     storageOnly = false,
     themeOverride,
+    onEditorOpenChange,
   } = props;
   // A master map replaces the canvas content but is never written: the map is
   // the teacher's, so every mutation is a no-op and the `+`/editing are off.
@@ -1299,10 +1315,25 @@ function MindMapCanvas(props: MindMapPanelProps) {
     else if (prevMasterKey.current) setLibraryOpen(true);
     prevMasterKey.current = masterKey;
   }, [masterKey]);
-  const editGesture = useDoubleTapToEdit(!readOnlyMaster && !libraryOpen && !editMode, () => {
+  // Edit mode is entered EXPLICITLY — the Map options panel's "Edit map"
+  // button, or Enter/F2 on the canvas (see the canvas onKeyDown). A
+  // double-tap / double-click on the preview must never unlock editing:
+  // in read mode the map is for looking, and an accidental second tap while
+  // panning or zooming used to drop learners into edit mode uninvited.
+  const enterEditMode = useCallback(() => {
     readOnlyRef.current = false;
     setEditMode(true);
-  });
+  }, []);
+  // Which side panel is open over the canvas ("left" = the map library
+  // drawer, "right" = this map's options drawer); at most one at a time.
+  const [sidePanel, setSidePanel] = useState<"left" | "right" | null>(null);
+  // The right panel's rename field for the map on the canvas: seeded from
+  // the live name whenever the panel opens or the open map changes, and
+  // saved through the same onRenameMap the library rows use.
+  const [renameDraft, setRenameDraft] = useState("");
+  useEffect(() => {
+    if (libraryOpen) setSidePanel(null);
+  }, [libraryOpen]);
   // Changing course module must not carry edit permissions to another map.
   useEffect(() => { setEditMode(false); }, [moduleId]);
   useEffect(() => { if (masterMap) setEditMode(false); }, [masterMap]);
@@ -1381,6 +1412,17 @@ function MindMapCanvas(props: MindMapPanelProps) {
   const updateNodeInternals = useUpdateNodeInternals();
   const canvasRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
+  // The editing toolbar is a floating pill at the bottom of the canvas now
+  // (the note editor's arrangement), so the player's footer navigation can
+  // cover its resting spot exactly the way it covers the note editor's —
+  // the same measured lift applies it (never an assumed height).
+  const footerInset = useCourseFooterInset(!libraryOpen && !readOnlyCanvas, canvasRef);
+  useLayoutEffect(() => {
+    const strip = statusRef.current;
+    if (!strip) return;
+    if (footerInset > 0) strip.style.setProperty(COURSE_FOOTER_INSET_PROPERTY, `${footerInset}px`);
+    else strip.style.removeProperty(COURSE_FOOTER_INSET_PROPERTY);
+  }, [footerInset, libraryOpen, readOnlyCanvas]);
   const saveAnchorRef = useRef<HTMLButtonElement>(null);
   const alignAnchorRef = useRef<HTMLButtonElement>(null);
 
@@ -1402,6 +1444,16 @@ function MindMapCanvas(props: MindMapPanelProps) {
   useEffect(() => {
     if (!storageOnly) setMindMapSessionView(libraryOpen ? "library" : "canvas");
   }, [libraryOpen, storageOnly]);
+
+  // Parent chrome follows the same library/canvas boundary in every host.
+  // Unlike the course session above, this callback is safe for storage-only
+  // Work surfaces because the state stays with the Work parent that passed it.
+  useEffect(() => {
+    onEditorOpenChange?.(!libraryOpen);
+  }, [libraryOpen, onEditorOpenChange]);
+  useEffect(() => () => {
+    onEditorOpenChange?.(false);
+  }, [onEditorOpenChange]);
 
   useEffect(() => {
     try {
@@ -1732,6 +1784,40 @@ function MindMapCanvas(props: MindMapPanelProps) {
     [activeMapKey, onSelectMap],
   );
 
+  // Seed the side panel's rename field from the live map name whenever the
+  // panel opens (and re-seed after a save lands, when the name prop moves).
+  useEffect(() => {
+    if (sidePanel === "right") setRenameDraft(activeMapName);
+  }, [sidePanel, activeMapKey, activeMapName]);
+
+  // "Done" — commit whatever is mid-edit, flush the pending save and drop
+  // back to the read/preview mode (the bottom pill's Check tile and the Map
+  // options panel's Reading-view button both land here).
+  const handleDone = useCallback(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+    onFlush?.();
+    setEditingId(null);
+    setSelectedId(null);
+    setSaveMenuOpen(false);
+    setAlignMenuOpen(false);
+    setStyleMenuOpen(false);
+    setEditMode(false);
+  }, [onFlush]);
+
+  // Start a fresh SELF map on the canvas, straight into edit mode (the
+  // library's + button and the side panel's New map share this).
+  const createNewMap = useCallback(() => {
+    onCloseMasterMap?.();
+    creatingMapRef.current = true;
+    onCreateMap?.();
+    setEditMode(true);
+    setLibraryOpen(false);
+    setSelectedId(null);
+    setEditingId(null);
+    setSidePanel(null);
+  }, [onCloseMasterMap, onCreateMap]);
+
   // The root can never be deleted, so the toolbar trash only arms itself for
   // a real branch selection.
   const canDeleteSelected = selectedId != null && selectedId !== rootId();
@@ -1795,9 +1881,12 @@ function MindMapCanvas(props: MindMapPanelProps) {
         height: placed.height,
         initialWidth: placed.width,
         initialHeight: placed.height,
-        // Hand placement: the learner can drag any node anywhere on the
-        // canvas and the drop is committed on release (see onNodeDragStop).
-        draggable: true,
+        // Hand placement: in EDIT mode the learner can drag any node
+        // anywhere on the canvas and the drop is committed on release (see
+        // onNodeDragStop). In read/preview mode nodes are locked — a
+        // per-node `draggable: true` would override the canvas-wide
+        // `nodesDraggable` gate and let preview pans move the map itself.
+        draggable: !readOnlyCanvas,
         selectable: true,
         // While a node's editor is open its box is allowed to grow with the
         // wrapping draft (fixed boxes would clip the extra lines — the body
@@ -2097,10 +2186,12 @@ function MindMapCanvas(props: MindMapPanelProps) {
         onClose={() => setJsonImportOpen(false)}
         onGenerate={applyJsonMap}
       />
-      {/* The toolbar only exists on the canvas — while the library is open
-          (no specific map chosen yet) there is no strip. It rides at the TOP
-          of the sheet, exactly like the notes editor: toolbar first, canvas
-          below it. */}
+      {/* The toolbar only exists on the canvas in EDIT mode — while the
+          library is open (no specific map chosen yet) and in read/preview
+          mode there is no strip. It floats at the BOTTOM of the sheet as
+          one opaque pill, exactly the note editor's toolbar: same resting
+          spot, same 36px round buttons, same lift over the player's footer
+          navigation (see the --mm-pill-bg / footer-inset rules). */}
       {/* ── Status strip — the mind map's toolbar ──────────────────────────
           The only persistent chrome, and every control on it is a SINGLE
           ICON: the cloud-save beacon (tinted by the save state, blinking
@@ -2156,23 +2247,14 @@ function MindMapCanvas(props: MindMapPanelProps) {
       {libraryOpen || readOnlyCanvas ? null : (
       <div
         ref={statusRef}
-        className="flex shrink-0 items-center overflow-x-auto border-b border-[var(--mm-border)] px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="absolute flex items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{ gap: "var(--mm-tool-gap)" }}
         data-course-mindmap-status
         data-compact={toolbarCompact ? "true" : "false"}
+        data-mindmap-footer-inset={footerInset > 0 ? footerInset : undefined}
       >
         <button type="button" className="mm-tool mm-tool-violet" aria-label="Save and read mind map" title="Save and read mind map" data-course-mindmap-done
-          onClick={() => {
-            const active = document.activeElement;
-            if (active instanceof HTMLElement) active.blur();
-            onFlush?.();
-            setEditingId(null);
-            setSelectedId(null);
-            setSaveMenuOpen(false);
-            setAlignMenuOpen(false);
-            setStyleMenuOpen(false);
-            setEditMode(false);
-          }}><Check size={16} /></button>
+          onClick={handleDone}><Check size={16} /></button>
         {/* ── Left cluster: cloud save + which map is open ─────────────── */}
         <div className="flex min-w-max flex-1 items-center" style={{ gap: "var(--mm-tool-gap)" }}>
           {/* ── Cloud save ──────────────────────────────────────────────
@@ -2509,13 +2591,47 @@ function MindMapCanvas(props: MindMapPanelProps) {
           onRetry={storageOnly ? undefined : onRetryMaps}
         />
       ) : null}
+      {/* No conventional header (the note editor's chrome): on the canvas
+          the only top chrome is two corner buttons — top-left opens the map
+          library drawer, top-right opens this map's options drawer. */}
+      {!libraryOpen ? (
+        <div className="flex h-11 shrink-0 items-center justify-between px-2" data-mindmap-editor-chrome>
+          <button
+            type="button"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[var(--mm-muted)] transition hover:bg-[var(--mm-soft-hover)] hover:text-[var(--mm-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
+            aria-label="Open mind map panel"
+            title="Mind maps"
+            data-mindmap-open-left-panel
+            onClick={() => setSidePanel("left")}
+          >
+            <PanelLeft size={18} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[var(--mm-muted)] transition hover:bg-[var(--mm-soft-hover)] hover:text-[var(--mm-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
+            aria-label="Open map options"
+            title="Map options"
+            data-mindmap-open-right-panel
+            onClick={() => setSidePanel("right")}
+          >
+            <PanelRight size={18} aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
       <div ref={canvasRef} className="relative min-h-0 flex-1" style={{ touchAction: "none" }} data-course-mindmap-canvas data-library-open={libraryOpen ? "true" : "false"}
         tabIndex={!libraryOpen ? 0 : undefined}
-        aria-label={!libraryOpen ? (readOnlyMaster ? "Read-only master mind map" : "Mind map. Double tap or press Enter to edit. Escape returns to the library.") : undefined}
-        {...editGesture}
+        aria-label={!libraryOpen ? (readOnlyMaster ? "Read-only master mind map" : "Mind map. Press Enter to edit, or open Map options and choose Edit map. Escape returns to the library.") : undefined}
         onKeyDown={(event) => {
-          if (event.key === "Escape" && event.target === event.currentTarget) { onFlush?.(); setEditMode(false); setLibraryOpen(true); }
-          else editGesture.onKeyDown(event);
+          if (event.target !== event.currentTarget) return;
+          if (event.key === "Escape") {
+            if (sidePanel) { setSidePanel(null); return; }
+            onFlush?.();
+            setEditMode(false);
+            setLibraryOpen(true);
+          } else if (!readOnlyMaster && !libraryOpen && !editMode && (event.key === "Enter" || event.key === "F2")) {
+            event.preventDefault();
+            enterEditMode();
+          }
         }}>
         {!libraryOpen && !readOnlyMaster && !editMode ? <button type="button" className="sr-only focus:not-sr-only focus:absolute focus:z-20 focus:bg-white focus:p-2" onClick={() => setLibraryOpen(true)}>Back to mind map library</button> : null}
         <MindReadOnlyContext.Provider value={readOnlyCanvas}>
@@ -2656,27 +2772,28 @@ function MindMapCanvas(props: MindMapPanelProps) {
             double-click/double-tap title gesture enters inline rename. */}
         {libraryOpen ? (
           <div className="absolute inset-0 z-20 flex flex-col bg-[var(--dc-chrome-glass)] [backdrop-filter:var(--dc-chrome-glass-blur)]" data-course-mindmap-library>
+            {/* The shared page header (the Resource Library header's size):
+                the page name, bold with its icon, and the MASTER / SELF
+                control inside the header. Course collection controls stay
+                out of Work mode: its library is private to this device. */}
+            <CoursePageHeader
+              title="Mind map"
+              icon={<Network size={20} aria-hidden="true" />}
+              dataAttrs={{ "data-course-mindmap-collections": "" }}
+            >
+              {!storageOnly ? (
+                <MasterSelfControl
+                  feature="mindMap"
+                  ariaLabel="Mind map collection"
+                  mode={collectionMode}
+                  onChange={masterSelfCtl.setMode}
+                  masterCount={masterMaps.length}
+                  selfCount={maps.length}
+                />
+              ) : null}
+            </CoursePageHeader>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 pb-16" data-course-mindmap-map-list>
               <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
-                {/* Course collection controls stay out of Work mode: its library is private to this device. */}
-                <div className="flex items-center justify-between gap-3" data-course-mindmap-collections>
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-wide text-[var(--dc-flat-ink-sub)]">Map library</p>
-                    <p className="mt-0.5 text-[11px] text-[var(--dc-flat-ink-label)]">
-                      {storageOnly ? "Your maps stay on this device only." : "Course maps and your own maps stay separate."}
-                    </p>
-                  </div>
-                  {!storageOnly ? (
-                    <MasterSelfControl
-                      feature="mindMap"
-                      ariaLabel="Mind map collection"
-                      mode={collectionMode}
-                      onChange={masterSelfCtl.setMode}
-                      masterCount={masterMaps.length}
-                      selfCount={maps.length}
-                    />
-                  ) : null}
-                </div>
                 {collectionMode === "master" ? (
                   masterMaps.length > 0 ? (
                     <BranchedMenu
@@ -2760,15 +2877,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
             {collectionMode === "self" ? (
             <button
               type="button"
-              onClick={() => {
-                onCloseMasterMap?.();
-                creatingMapRef.current = true;
-                onCreateMap?.();
-                setEditMode(true);
-                setLibraryOpen(false);
-                setSelectedId(null);
-                setEditingId(null);
-              }}
+              onClick={createNewMap}
               disabled={atMapLimit || !onCreateMap || !moduleId}
               className="absolute bottom-4 right-4 z-10 grid h-11 w-11 place-items-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-950/50 transition hover:bg-indigo-500 active:scale-95 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300"
               aria-label="Create a mind map"
@@ -2781,6 +2890,214 @@ function MindMapCanvas(props: MindMapPanelProps) {
           </div>
         ) : null}
       </div>
+
+      {/* ── LEFT side panel: this collection's maps over the canvas. Rows
+          keep the library menu's rename + delete, so a map can be renamed
+          from right here; picking a row opens that map. */}
+      {sidePanel === "left" && !libraryOpen ? (
+        <>
+          <button type="button" aria-label="Close mind map panel" data-mindmap-panel-scrim className="absolute inset-0 z-30 bg-slate-950/30" onClick={() => setSidePanel(null)} />
+          <aside
+            className="absolute inset-y-0 left-0 z-40 flex w-[280px] max-w-[85%] flex-col border-r border-[var(--mm-border)] bg-[var(--mm-panel-bg)] text-[var(--mm-text)] shadow-2xl"
+            aria-label="Mind maps"
+            data-mindmap-left-panel
+          >
+            <div className="flex h-12 shrink-0 items-center gap-2 border-b border-[var(--mm-border)] px-3">
+              <Network size={16} className="shrink-0 text-violet-500" aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate text-sm font-bold">{collectionMode === "master" ? "Master mind maps" : "My mind maps"}</span>
+              <span className="shrink-0 text-xs font-semibold text-[var(--mm-muted)]">{collectionMode === "master" ? masterMaps.length : maps.length}</span>
+              <button type="button" className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[var(--mm-muted)] transition hover:bg-[var(--mm-soft-hover)] hover:text-[var(--mm-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500" aria-label="Close mind map panel" data-mindmap-close-left-panel onClick={() => setSidePanel(null)}>
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-1 py-1">
+              {collectionMode === "master" ? (
+                masterMaps.length > 0 ? (
+                  <BranchedMenu
+                    items={masterTree}
+                    openValues={masterOpen.openValues}
+                    onToggle={masterOpen.toggle}
+                    onSelect={(value) => {
+                      const key = value.startsWith("master:") ? value.slice("master:".length) : "";
+                      if (key) onOpenMasterMap?.(key);
+                      setSidePanel(null);
+                    }}
+                    ariaLabel="Master mind maps"
+                    fullWidth
+                    rowHeight={40}
+                    className="mindmap-library-menu"
+                    dataAttrs={{ "data-mindmap-left-panel-menu": "" }}
+                  />
+                ) : (
+                  <p className="px-3 py-4 text-sm text-[var(--mm-muted)]">Course-published mind maps will appear here.</p>
+                )
+              ) : maps.length > 0 ? (
+                <BranchedMenu
+                  items={selfTree}
+                  openValues={selfOpen.openValues}
+                  onToggle={selfOpen.toggle}
+                  activeValue={activeMapKey ? `map:${activeMapKey}` : null}
+                  onSelect={(value) => {
+                    const key = value.startsWith("map:") ? value.slice("map:".length) : "";
+                    if (key) openMap(key);
+                    setSidePanel(null);
+                  }}
+                  ariaLabel="Your mind maps"
+                  fullWidth
+                  rowHeight={40}
+                  className="mindmap-library-menu"
+                  dataAttrs={{ "data-mindmap-left-panel-menu": "" }}
+                />
+              ) : (
+                <p className="px-3 py-4 text-sm text-[var(--mm-muted)]">Your saved mind maps will appear here.</p>
+              )}
+            </div>
+            <div className="shrink-0 space-y-2 border-t border-[var(--mm-border)] p-3">
+              {collectionMode === "self" ? (
+                <button
+                  type="button"
+                  onClick={createNewMap}
+                  disabled={atMapLimit || !onCreateMap || !moduleId}
+                  className="flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-indigo-600 text-[13px] font-black text-white transition hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                  data-mindmap-panel-new
+                >
+                  <Plus size={15} aria-hidden="true" /> New mind map
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="flex h-10 w-full items-center justify-center gap-1.5 rounded-full text-[13px] font-bold text-[var(--mm-text)] transition hover:bg-[var(--mm-soft-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
+                data-mindmap-panel-library
+                onClick={() => { setSidePanel(null); setLibraryOpen(true); }}
+              >
+                <Layers size={15} aria-hidden="true" /> Open full library
+              </button>
+            </div>
+          </aside>
+        </>
+      ) : null}
+
+      {/* ── RIGHT side panel: this map's name (rename), mode, save, delete ── */}
+      {sidePanel === "right" && !libraryOpen ? (
+        <>
+          <button type="button" aria-label="Close map options" data-mindmap-panel-scrim className="absolute inset-0 z-30 bg-slate-950/30" onClick={() => setSidePanel(null)} />
+          <aside
+            className="absolute inset-y-0 right-0 z-40 flex w-[300px] max-w-[85%] flex-col border-l border-[var(--mm-border)] bg-[var(--mm-panel-bg)] text-[var(--mm-text)] shadow-2xl"
+            aria-label="Map options"
+            data-mindmap-right-panel
+          >
+            <div className="flex h-12 shrink-0 items-center gap-2 border-b border-[var(--mm-border)] px-3">
+              <span className="min-w-0 flex-1 truncate text-sm font-bold">Map options</span>
+              <button type="button" className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[var(--mm-muted)] transition hover:bg-[var(--mm-soft-hover)] hover:text-[var(--mm-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500" aria-label="Close map options" data-mindmap-close-right-panel onClick={() => setSidePanel(null)}>
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
+              <div>
+                <p className="mb-1.5 text-[11px] font-black uppercase tracking-wide text-[var(--mm-muted)]">Map</p>
+                <p className="truncate text-sm font-bold">{readOnlyMaster ? (masterMap?.title || "Master mind map") : activeMapName}</p>
+                {!readOnlyMaster ? (
+                  <p className="mt-0.5 text-xs font-semibold text-[var(--mm-muted)]" data-mindmap-panel-stats>
+                    {totalNodes} {totalNodes === 1 ? "node" : "nodes"} · {levels} {levels === 1 ? "level" : "levels"}
+                  </p>
+                ) : (
+                  <p className="mt-0.5 text-xs font-semibold text-[var(--mm-muted)]">Read-only · Master</p>
+                )}
+                {!readOnlyMaster && activeMapKey ? (
+                  <div className="mt-2.5 flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={renameDraft}
+                      onChange={(event) => setRenameDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          const next = renameDraft.trim();
+                          if (next && next !== activeMapName) onRenameMap?.(activeMapKey, next);
+                        }
+                      }}
+                      placeholder="Map name"
+                      aria-label="Rename this mind map"
+                      data-mindmap-rename-input
+                      className="min-w-0 flex-1 rounded-full border border-[var(--mm-border)] bg-transparent px-3 py-2 text-sm text-[var(--mm-text)] outline-none transition placeholder:text-[var(--mm-muted)] focus:border-violet-400"
+                    />
+                    <button
+                      type="button"
+                      disabled={!renameDraft.trim() || renameDraft.trim() === activeMapName}
+                      onClick={() => {
+                        const next = renameDraft.trim();
+                        if (next && next !== activeMapName) onRenameMap?.(activeMapKey, next);
+                      }}
+                      className="h-9 shrink-0 rounded-full bg-indigo-600 px-4 text-[13px] font-black text-white transition hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                      data-mindmap-rename-save
+                    >
+                      Save
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              <div>
+                <p className="mb-1.5 text-[11px] font-black uppercase tracking-wide text-[var(--mm-muted)]">Mode</p>
+                {readOnlyMaster ? (
+                  <p className="text-sm text-[var(--mm-muted)]">Master maps are read-only.</p>
+                ) : editMode ? (
+                  <button
+                    type="button"
+                    className="flex h-10 w-full items-center gap-2 rounded-full px-3 text-[13px] font-bold text-[var(--mm-text)] transition hover:bg-[var(--mm-soft-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
+                    data-mindmap-panel-read
+                    onClick={() => { handleDone(); setSidePanel(null); }}
+                  >
+                    <BookOpen size={15} aria-hidden="true" /> Reading view
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="flex h-10 w-full items-center gap-2 rounded-full px-3 text-[13px] font-bold text-[var(--mm-text)] transition hover:bg-[var(--mm-soft-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
+                    data-course-mindmap-edit
+                    onClick={() => { enterEditMode(); setSidePanel(null); }}
+                  >
+                    <Pencil size={15} aria-hidden="true" /> Edit map
+                  </button>
+                )}
+              </div>
+              {!readOnlyMaster ? (
+                <div>
+                  <p className="mb-1.5 text-[11px] font-black uppercase tracking-wide text-[var(--mm-muted)]">Save</p>
+                  <p className="text-sm font-semibold" data-mindmap-panel-save-status>{save.label}</p>
+                  <div className="mt-2 space-y-2">
+                    <button
+                      type="button"
+                      className="flex h-10 w-full items-center justify-center gap-1 rounded-full bg-indigo-600 px-4 text-[13px] font-black text-white transition hover:bg-indigo-500 active:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                      data-mindmap-panel-save
+                      onClick={() => onFlush?.()}
+                    >
+                      <Check size={15} aria-hidden="true" /> Save now
+                    </button>
+                    {activeMapKey ? (
+                      <button
+                        type="button"
+                        className="flex h-10 w-full items-center justify-center gap-1 rounded-full px-3 text-[13px] font-bold text-rose-500 transition hover:bg-rose-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500"
+                        data-mindmap-panel-delete-map
+                        onClick={() => { requestMapDelete(activeMapKey); setSidePanel(null); }}
+                      >
+                        <Trash2 size={15} aria-hidden="true" /> Delete map
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="flex h-10 w-full items-center justify-center gap-1.5 rounded-full text-[13px] font-bold text-[var(--mm-text)] transition hover:bg-[var(--mm-soft-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
+                  data-mindmap-panel-master-back
+                  onClick={() => onCloseMasterMap?.()}
+                >
+                  Back to library
+                </button>
+              )}
+            </div>
+          </aside>
+        </>
+      ) : null}
 
       {/* ── Branch delete confirmation ────────────────────────────────────
           Every branch delete path lands here first (toolbar trash AND the

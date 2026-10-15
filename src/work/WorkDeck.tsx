@@ -91,7 +91,6 @@ function WorkSplitPrompt({ onOpen }: { onOpen: (page: WorkPageId) => void }) {
 export default function WorkDeck({ page, axis, renderPage }: WorkDeckProps) {
   const [primary, setPrimary] = useState<WorkPageId | null>(null);
   const activeRecord = workPageRecord(page);
-  const ActiveIcon = activeRecord.icon;
 
   // The top / primary pane takes the page the learner was on just before this
   // one. No history means a quiet page picker, not an empty black rectangle.
@@ -144,7 +143,6 @@ export default function WorkDeck({ page, axis, renderPage }: WorkDeckProps) {
         orientation={axis === "row" ? "landscape" : "portrait"}
         courseId="work"
         accent={activeRecord.color}
-        studyIcon={ActiveIcon}
         lesson={lesson}
         study={study}
         solid

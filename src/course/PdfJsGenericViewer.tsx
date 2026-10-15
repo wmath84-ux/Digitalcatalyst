@@ -27,6 +27,9 @@ interface PdfViewerApp {
   pdfDocument?: PdfDocumentProxyLike | null;
   pageNumber?: number;
   pdfViewer?: { currentPageNumber?: number; pagesCount?: number };
+  /** The viewer's side panel (thumbnails / outline / layers): its open
+   * state and the close the outside-click dismissal below drives. */
+  viewsManager?: { isOpen: boolean; close: () => void };
 }
 
 interface PdfjsElement extends HTMLElement {
@@ -163,6 +166,8 @@ export default function PdfJsGenericViewer({
     let element: PdfjsElement | null = null;
     let eventBus: PdfViewerEventBus | undefined;
     let pageHandler: ((event: unknown) => void) | undefined;
+    let frameDocument: Document | null = null;
+    let dismissViewsHandler: ((event: Event) => void) | null = null;
     let resizeObserver: ResizeObserver | null = null;
     let dirtyPoll: ReturnType<typeof setInterval> | null = null;
 
@@ -205,13 +210,16 @@ export default function PdfJsGenericViewer({
         element.setAttribute("sandbox-bundle-src", localUrl("build/pdf.sandbox.min.mjs"));
         element.setAttribute("standard-font-data-url", localUrl("standard_fonts/"));
         element.setAttribute("wasm-url", localUrl("wasm/"));
-        element.setAttribute("viewer-css-theme", "DARK");
+        // The viewer always opens in LIGHT mode (owner brief): the theme
+        // attribute maps to the viewer document's own colour scheme, so
+        // the toolbar, side panel and page backdrop all render light.
+        element.setAttribute("viewer-css-theme", "LIGHT");
         const savedPage = Number(initialPageRef.current);
         const initialPage = Number.isInteger(savedPage) && savedPage > 1
           ? savedPage
           : storageKey ? readPageFromStorage(storageKey) : 1;
         if (initialPage > 1) element.setAttribute("page", String(initialPage));
-        element.style.cssText = "display:block;width:100%;height:100%;min-height:0;background:#111827";
+        element.style.cssText = "display:block;width:100%;height:100%;min-height:0;background:#f8fafc";
         hostRef.current.replaceChildren(element);
 
         const initialized = await element.initPromise;
@@ -227,6 +235,31 @@ export default function PdfJsGenericViewer({
             if (Number.isInteger(page) && page > 0) pageChangeRef.current(page);
           };
           eventBus.on("pagechanging", pageHandler);
+        }
+
+        // ── Side panel: an outside click puts it away ────────────────────
+        // The viewer's side panel (page thumbnails / outline) stays open
+        // until its toolbar toggle is pressed again; the owner asked for
+        // the familiar dismissal instead: press anywhere in the viewer
+        // outside the panel — a page, the toolbar — and it closes. Presses
+        // inside the panel itself, and on the toggle button (whose own
+        // click performs the toggle), are left for the viewer to handle.
+        // The listener lives on the viewer's own document (same-origin
+        // iframe) in the capture phase so it observes the press before
+        // the viewer's handlers run, and it is removed with the viewer.
+        frameDocument = element.iframe?.contentDocument ?? null;
+        if (frameDocument && viewerApp) {
+          const doc = frameDocument;
+          dismissViewsHandler = (event: Event) => {
+            const manager = viewerApp.viewsManager;
+            if (!manager?.isOpen) return;
+            const target = event.target as Node | null;
+            if (!target) return;
+            if (doc.getElementById("viewsManager")?.contains(target)) return;
+            if ((target as Element).closest?.("#viewsManagerButton")) return;
+            manager.close();
+          };
+          doc.addEventListener("pointerdown", dismissViewsHandler, true);
         }
 
         // ── Annotation bridge ────────────────────────────────────────────
@@ -344,6 +377,7 @@ export default function PdfJsGenericViewer({
       if (dirtyPoll) clearInterval(dirtyPoll);
       resizeObserver?.disconnect();
       if (eventBus && pageHandler) eventBus.off("pagechanging", pageHandler);
+      if (frameDocument && dismissViewsHandler) frameDocument.removeEventListener("pointerdown", dismissViewsHandler, true);
       annotationApiRef.current?.(null);
       element?.remove();
       if (localBlobUrl) URL.revokeObjectURL(localBlobUrl);
@@ -351,7 +385,7 @@ export default function PdfJsGenericViewer({
   }, [src, title, storageKey, attempt, localOwner]);
 
   return (
-    <div className="relative h-full min-h-0 w-full overflow-hidden bg-slate-950" data-read-pdfjs-viewer>
+    <div className="relative h-full min-h-0 w-full overflow-hidden bg-[#f8fafc]" data-read-pdfjs-viewer>
       <div ref={hostRef} className="h-full min-h-0 w-full" />
       {problem ? (
         <div className="absolute inset-0 grid place-items-center bg-slate-950 p-6 text-center" role="alert" data-read-pdf-problem={problem.kind}>
