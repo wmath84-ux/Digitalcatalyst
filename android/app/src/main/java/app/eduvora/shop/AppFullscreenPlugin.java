@@ -116,8 +116,11 @@ public class AppFullscreenPlugin extends Plugin {
             if (active) {
                 controller.hide(WindowInsetsCompat.Type.systemBars());
             } else {
+                window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
                 controller.show(WindowInsetsCompat.Type.systemBars());
             }
+            View content = activity.findViewById(android.R.id.content);
+            if (content != null) androidx.core.view.ViewCompat.requestApplyInsets(content);
         } catch (Exception ignored) {
             // A device/theme that refuses the request must never crash the app.
         }

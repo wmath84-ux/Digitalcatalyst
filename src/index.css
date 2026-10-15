@@ -581,15 +581,15 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
     width: 100%;
   }
 
-  /* The app brand mark is 36 px on every band after the owner's +6 px
+  /* The app brand mark is 42 px on every band after the owner's +6 px
      request; keep tablet header CSS in sync with the component sizes.
-     The title remains 22 px, so tablet chrome does not drift from phone. */
+     The title is 27 px, so tablet chrome does not drift from phone. */
   [data-site-header] [data-header-app-icon] {
-    height: 36px;
-    width: 36px;
+    height: 42px;
+    width: 42px;
   }
   [data-site-header] h1 {
-    font-size: 22px;
+    font-size: 27px;
   }
 
   /* Hero carousel: bigger height + bigger typography on a tablet so
@@ -707,11 +707,11 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   }
 
   /* Fluid typography for tablet */
-  /* The desktop top-bar title is 22 px like every other header title; it
+  /* The desktop top-bar title is 27 px like every other header title; it
      used to shrink to 16–18 px on this band, which read as a different
      header from the phone's. */
   [data-desktop-page-title] {
-    font-size: 22px !important;
+    font-size: 27px !important;
   }
   [data-desktop-page-subtitle] {
     font-size: clamp(0.65rem, 1vw, 0.7rem) !important;
@@ -7377,4 +7377,11 @@ html[data-android-edge-to-edge="true"]::after {
    navigation and header/Edit action reachable while inspecting the canvas. */
 [data-course-sketch-panel][data-sketch-editing="false"] [data-course-sketch-host] .App-bottom-bar {
   display: none !important;
+}
+
+/* Page names are deliberately larger than the action/search text. Scoped
+   chrome rules beat the legacy tablet-wide h1 clamp without growing content. */
+[data-site-header] h1, [data-home-header] [data-home-greeting], [data-desktop-page-title] {
+  font-size: 27px !important;
+  line-height: 32px;
 }

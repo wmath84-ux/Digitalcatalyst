@@ -8,9 +8,9 @@
 //     are the hit targets (the plain side-panel trigger is pinned at 40px by
 //     tests/headerAvatarRingContract.test.mjs, and the notification plate by
 //     header-navigation.css).
-//   · the header text is 22px — the page title / greeting / the labels the
-//     action pills expand to / the search fields.
-//   · the app icon is 36px — the header brand mark and both rail brand blocks
+//   · page names/greetings are 27px; action labels and search fields stay
+//     22px.
+//   · the app icon is 42px — the header brand mark and both rail brand blocks
 //     (increased by 6px on the owner's request; action glyphs stay at 30px).
 //   · the `ad` option is NOT one of the header's icons: it lives in the side
 //     panel on every band (tests/openingAdControl.test.mjs pins that).
@@ -63,49 +63,49 @@ test("every header action icon is 30px on every band", () => {
   assert.match(shell, /<HeaderNotificationsButton[\s\S]{0,80}?size=\{40\}/);
 });
 
-test("the header text is 22px, on every band", () => {
+test("page names are 27px; action labels and search text stay 22px", () => {
   // Shared header title: one size, no `md:` step up to 40px.
-  assert.match(header, /truncate text-\[22px\] font-bold leading-\[26px\]/);
+  assert.match(header, /truncate text-\[27px\] font-bold leading-\[32px\]/);
   assert.doesNotMatch(header, /md:text-\[40px\]/);
   // Centre search field (desktop my-day style header).
   assert.match(header, /\[&_input\]:text-\[22px\] \[&_input\]:leading-\[26px\]/);
   // Home / FlowPath greeting and its search field.
-  assert.match(homeHeader, /text-\[22px\] font-bold leading-\[26px\] tracking-tight/);
+  assert.match(homeHeader, /text-\[27px\] font-bold leading-\[32px\] tracking-tight/);
   assert.match(homeHeader, /\[&_input\]:text-\[22px\] \[&_input\]:leading-\[26px\]/);
   // Desktop top bar: the page title, the search field and the pill labels.
-  assert.match(shell, /truncate text-\[22px\] font-bold leading-\[26px\] tracking-tight text-white" data-desktop-page-title/);
+  assert.match(shell, /truncate text-\[27px\] font-bold leading-\[32px\] tracking-tight text-white" data-desktop-page-title/);
   assert.match(shell, /\[&_input\]:text-\[22px\] \[&_input\]:leading-\[26px\]/);
   assert.match(shell, /text-\[22px\] leading-\[26px\] font-black text-white shadow-sm/);
   // …and the expanded ExpandingTabs pill.
   assert.match(read("src/components/ui/ExpandingTabs.tsx"), /text-\[22px\] font-semibold leading-\[26px\]/);
 });
 
-test("the app icon is 36px wherever the chrome shows it", () => {
-  assert.match(header, /data-header-app-icon className="flex h-\[36px\] w-\[36px\]/);
-  assert.match(header, /<BrandMark className="h-\[36px\] w-\[36px\]" \/>/);
-  assert.match(header, /<LogoIcon className="h-\[36px\] w-\[36px\]" \/>/);
-  assert.match(homeHeader, /<BrandMark className="h-\[36px\] w-\[36px\]/);
+test("the app icon is 42px wherever the chrome shows it", () => {
+  assert.match(header, /data-header-app-icon className="flex h-\[42px\] w-\[42px\]/);
+  assert.match(header, /<BrandMark className="h-\[42px\] w-\[42px\]" \/>/);
+  assert.match(header, /<LogoIcon className="h-\[42px\] w-\[42px\]" \/>/);
+  assert.match(homeHeader, /<BrandMark className="h-\[42px\] w-\[42px\]/);
   // Desktop + tablet rail brand blocks (wide and compact glass rails).
   assert.equal(
-    (shell.match(/data-header-app-icon className="grid h-\[36px\] w-\[36px\]/g) ?? []).length,
+    (shell.match(/data-header-app-icon className="grid h-\[42px\] w-\[42px\]/g) ?? []).length,
     2,
-    "both rail variants show the 36px app icon",
+    "both rail variants show the 42px app icon",
   );
-  assert.equal((shell.match(/<BrandMark className="h-\[36px\] w-\[36px\]" \/>/g) ?? []).length, 2);
-  assert.equal((shell.match(/<Sparkles className="h-\[26px\] w-\[26px\]" \/>/g) ?? []).length, 2);
-  // Landing chrome already uses a 36px brand mark.
-  assert.match(landing, /<BrandMark className="h-9 w-9 rounded-xl"/);
+  assert.equal((shell.match(/<BrandMark className="h-\[42px\] w-\[42px\]" \/>/g) ?? []).length, 2);
+  assert.equal((shell.match(/<Sparkles className="h-\[32px\] w-\[32px\]" \/>/g) ?? []).length, 2);
+  // Landing chrome follows the same 42px app mark.
+  assert.match(landing, /<BrandMark className="h-\[42px\] w-\[42px\] rounded-xl"/);
 });
 
 test("the tablet/desktop CSS keeps the same three numbers instead of fighting them", () => {
-  // Tablet band keeps the app-brand container at the new 36px size.
+  // Tablet band keeps the app-brand container at the new 42px size.
   assert.match(
     indexCss,
-    /\[data-site-header\] \[data-header-app-icon\] \{\s*height: 36px;\s*width: 36px;\s*\}/,
+    /\[data-site-header\] \[data-header-app-icon\] \{\s*height: 42px;\s*width: 42px;\s*\}/,
   );
-  assert.match(indexCss, /\[data-site-header\] h1 \{\s*font-size: 22px;\s*\}/);
+  assert.match(indexCss, /\[data-site-header\] h1 \{\s*font-size: 27px;\s*\}/);
   // Desktop band: the title used to shrink through a clamp to 16–18px.
-  assert.match(indexCss, /\[data-desktop-page-title\] \{\s*font-size: 22px !important;\s*\}/);
+  assert.match(indexCss, /\[data-desktop-page-title\] \{\s*font-size: 27px !important;\s*\}/);
   assert.doesNotMatch(indexCss, /\[data-site-header\] \.h-11\.w-11/, "the 48px tablet logo rule is gone");
 });
 

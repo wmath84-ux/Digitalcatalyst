@@ -81,6 +81,7 @@
   position: relative;
   display: flex;
   align-items: stretch;
+  flex-shrink: 0;
   min-width: 0;
 }
 
@@ -211,7 +212,7 @@
   min-height: var(--bm-row);
   height: auto;
   margin: 0;
-  padding: 6px 8px 6px var(--bm-indent);
+  padding: 10px 8px 10px var(--bm-indent);
   border: 0;
   background: none;
   color: var(--bm-muted);
@@ -282,11 +283,12 @@
 /* Long names wrap onto as many lines as they need (never truncated or clipped). */
 .branched-menu__label,
 .branched-menu__head-label {
+  display: block;
   min-width: 0;
   flex: 1 1 auto;
   overflow-wrap: anywhere;
   white-space: normal;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 .branched-menu__head-label {
@@ -443,3 +445,19 @@
     animation: none;
   }
 }
+
+/* A branch can contain long note/map names. Neither the node nor its row
+   may shrink to the nominal connector height when the label wraps. */
+.branched-menu__node { flex-shrink: 0; min-width: 0; }
+.branched-menu__tree { gap: 4px; }
+.branched-menu__actions { align-self: flex-start; padding-top: 8px; }
+
+/* LeafRow is nested inside leaf-wrap (which also owns the connector SVG).
+   Give that inner row the available width; otherwise its flex-basis is its
+   max-content width and a long label escapes instead of wrapping. */
+.branched-menu__leaf-wrap > .branched-menu__row { flex: 1 1 auto; width: 100%; }
+
+.branched-menu__body { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.branched-menu__fold { min-width: 0; }
+.branched-menu__copy { display: flex; flex: 1 1 0; min-width: 0; flex-direction: column; gap: 5px; }
+.branched-menu__details { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 4px 8px; }

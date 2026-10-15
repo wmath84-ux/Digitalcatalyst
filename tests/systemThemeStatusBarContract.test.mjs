@@ -91,7 +91,12 @@ test("Android native code includes AppStatusBarPlugin and handles configuration 
   assert.match(plugin, /setAppearanceLightNavigationBars/);
   assert.match(plugin, /setStatusBarColor/);
   assert.match(plugin, /setNavigationBarColor/);
-  assert.match(plugin, /res\.put\("edgeToEdge", Build\.VERSION\.SDK_INT >= 35\)/);
+  assert.match(mainActivity, /installSystemBarInsets\(\)/);
+  assert.match(mainActivity, /WindowInsetsCompat.Type.systemBars\(\)/);
+  assert.match(mainActivity, /WindowInsetsCompat.Type.displayCutout\(\)/);
+  assert.match(mainActivity, /view.setPadding\(safe.left, safe.top, safe.right, safe.bottom\)/);
+  assert.match(mainActivity, /setInsets\(fittedTypes, Insets.NONE\)/);
+  assert.match(plugin, /res\.put\("edgeToEdge", false\)/);
 
   const systemBars = read("src/utils/systemBars.ts");
   const indexCss = read("src/index.css");

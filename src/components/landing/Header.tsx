@@ -24,7 +24,7 @@ export default function Header() {
         contentClassName="landing-container flex items-center justify-between gap-3 py-3"
       >
         <a href="#/landing" className="flex shrink-0 items-center gap-2">
-          <BrandMark className="h-9 w-9 rounded-xl" fallbackLetter />
+          <BrandMark className="h-[42px] w-[42px] rounded-xl" fallbackLetter />
           <span className="hidden text-lg font-bold tracking-tight text-white sm:block">
             {appName}
             {tagline ? <span className="font-medium text-white/55"> | {tagline}</span> : null}

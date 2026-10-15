@@ -275,3 +275,10 @@ html[data-theme="light"] :is([data-home-content] [data-home-grid], [data-store-p
     padding: 13px 18px 16px;
   }
 }
+
+/* Dark card ink/surface are explicit too: neither route may inherit a
+   different white-text or neutral-surface reset from its page shell. */
+html:not([data-theme="light"]) :is([data-home-content] [data-home-grid], [data-store-page] [data-store-grid], [data-store-page] [data-store-mixed]) .dc-marketplace-card {
+  background: #101520 !important;
+  color: #f1f5f9 !important;
+}

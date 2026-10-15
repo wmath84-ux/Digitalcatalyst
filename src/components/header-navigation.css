@@ -166,3 +166,9 @@ html[data-theme="light"] .dc-header-notifications-badge {
     transition: none;
   }
 }
+
+/* Branded Upgrade is a coloured CTA, not neutral light-theme chrome. */
+[data-desktop-topbar] [data-header-upgrade],
+[data-desktop-topbar] [data-header-upgrade] svg {
+  color: #ffffff !important;
+}

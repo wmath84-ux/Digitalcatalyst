@@ -231,13 +231,19 @@ function LeafRow({
             {isValidElement(item.icon) ? item.icon : null}
           </span>
         ) : null}
-        <span className="branched-menu__label">{item.label}</span>
-        {item.tag ? (
-          <span className="branched-menu__tag" style={{ color: item.tag.color, borderColor: `${item.tag.color}66` }} data-branched-tag={item.tag.label.toLowerCase()}>
-            {item.tag.label}
-          </span>
-        ) : null}
-        {item.meta ? <span className="branched-menu__meta">{item.meta}</span> : null}
+        <span className="branched-menu__copy">
+          <span className="branched-menu__label">{item.label}</span>
+          {item.tag || item.meta ? (
+            <span className="branched-menu__details">
+              {item.tag ? (
+                <span className="branched-menu__tag" style={{ color: item.tag.color, borderColor: `${item.tag.color}66` }} data-branched-tag={item.tag.label.toLowerCase()}>
+                  {item.tag.label}
+                </span>
+              ) : null}
+              {item.meta ? <span className="branched-menu__meta">{item.meta}</span> : null}
+            </span>
+          ) : null}
+        </span>
       </button>
       {item.onRename || item.onDelete ? (
         <span className="branched-menu__actions">

@@ -138,10 +138,12 @@ test("Owned, already-in-cart and unavailable items retain navigation/favorites w
     [{ availableForSale: false }, {}, "Not for sale"],
   ]) {
     const doc = render(product, state);
-    assert.equal(
-      doc.querySelector(".dc-marketplace-purchase-state").textContent,
-      label
-    );
+    if (state.purchased) {
+      assert.equal(doc.querySelector(".dc-marketplace-status").textContent, label);
+      assert.equal(doc.querySelector(".dc-marketplace-purchase-state"), null);
+    } else {
+      assert.equal(doc.querySelector(".dc-marketplace-purchase-state").textContent, label);
+    }
     assert.equal(doc.querySelector(".dc-marketplace-buy"), null);
     assert.equal(
       doc.querySelector(".dc-marketplace-open").getAttribute("aria-label"),
@@ -173,11 +175,13 @@ test("Image fallback and favorites keep an honest identity and accessible action
 const storeCss = fs.readFileSync("src/components/store-marketplace.css", "utf8");
 const favoriteCardSource = fs.readFileSync("src/cartWishlist/components/FavoriteCard.tsx", "utf8");
 
-test("Desktop Store grid uses compact catalogue cards instead of full-width editorial cards", () => {
-  assert.match(storeCss, /@media \(min-width: 1024px\)\s*\{[\s\S]*?\.dc-desktop-shell \[data-store-marketplace\] \[data-store-grid\]\s*\{[\s\S]*?grid-template-columns:\s*repeat\(auto-fill, minmax\(min\(100%, 270px\), 1fr\)\)/);
-  assert.match(storeCss, /\.dc-desktop-shell \[data-store-marketplace\] \[data-store-grid\] > \.dc-marketplace-card\.is-large \.dc-marketplace-open\s*\{[\s\S]*?flex-direction:\s*column/);
-  assert.match(storeCss, /\.dc-desktop-shell \[data-store-marketplace\] \[data-store-grid\] > \.dc-marketplace-card\.is-large:hover[\s\S]*?box-shadow:\s*0 1px 3px rgba\(15, 23, 42, 0\.055\)/);
-  assert.match(storeCss, /html\[data-theme="dark"\] \.dc-desktop-shell \[data-store-marketplace\] \[data-store-grid\] > \.dc-marketplace-card\.is-large/);
+test("Store Grid uses the same compact card CSS as Home Trending", () => {
+  const sharedCss = fs.readFileSync("src/components/marketplace-card-shared.css", "utf8");
+  assert.match(sharedCss, /grid-template-columns: repeat\(auto-fill, minmax\(min\(100%, 290px\), 1fr\)\)/);
+  assert.match(sharedCss, /flex-direction: column/);
+  assert.match(sharedCss, /box-shadow: 0 2px 5px -4px/);
+  assert.match(sharedCss, /html:not\(\[data-theme="light"\]\)/);
+  assert.doesNotMatch(storeCss, /Desktop Store refresh/);
 });
 
 test("Favorite cover images do not show unverified duration or lesson-count overlays", () => {

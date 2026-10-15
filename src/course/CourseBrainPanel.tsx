@@ -70,6 +70,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import "./study-light-surfaces.css";
+import "./study-resource-rows.css";
 import { ArrowLeft, Brain, Plus, RotateCcw } from "lucide-react";
 import { CheckIcon, MinusIcon, XIcon } from "../revision/components/icons";
 import { collectBrainPracticeSets } from "../../utils/practiceSet.js";
@@ -462,14 +463,14 @@ export default function CourseBrainPanel({
                       type="button"
                       onClick={() => startSet(set.id)}
                       aria-label={description}
-                      className="group flex w-full min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] p-3 text-left transition hover:border-violet-300/40 hover:bg-violet-400/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                      className="study-resource-row group"
                       data-brain-set={set.id}
                       data-brain-self-set={personalLibrary ? "true" : undefined}
                       data-brain-set-module={set.moduleId}
                       data-brain-module={set.moduleId}
                       data-brain-library-row=""
                     >
-                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-violet-300/20 bg-violet-400/10 text-violet-200" aria-hidden="true" data-brain-library-icon>
+                      <span className="study-resource-row__icon" aria-hidden="true" data-brain-library-icon>
                         <Brain size={19} />
                       </span>
                       <span className="min-w-0 flex-1">
@@ -479,7 +480,7 @@ export default function CourseBrainPanel({
                           {set.questions.length} Q{done ? " · Done" : ""}{record ? ` · Best ${record.best}%` : ""}
                         </span>
                       </span>
-                      <span className="shrink-0 text-[10px] font-semibold text-slate-400 transition-colors group-hover:text-violet-200" data-brain-library-action>Start practice</span>
+                      <span className="study-resource-row__action" data-brain-library-action>Practice</span>
                     </button>
                   </li>
                 );

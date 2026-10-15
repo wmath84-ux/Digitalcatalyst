@@ -131,7 +131,7 @@
 
 /* Make the course structure easier to scan than the leaf resources beneath it. */
 .course-library__menu [data-course-library-module] {
-  font-weight: 700;
+  font-weight: 900;
 }
 
 /* Per-row marks: counts, progress, lock, preview, completion. */

@@ -34,6 +34,7 @@
 // "Add to My Module" dialog — the same one the Player settings use — so it
 // lands in a My Study Library module and reopens there in this very viewer.
 
+import "./study-resource-rows.css";
 import { parseLocalReadReference } from "../../utils/localReadReference.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -956,10 +957,10 @@ export default function ReadLibraryPanel({
                   <button
                     type="button"
                     onClick={() => setActiveId(withKind("course", entry.id))}
-                    className="group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] p-3 text-left transition hover:border-violet-300/40 hover:bg-violet-400/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                    className="study-resource-row group"
                     data-course-read-open={entry.id}
                   >
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-violet-300/20 bg-violet-400/10 text-violet-200" aria-hidden="true">
+                    <span className="study-resource-row__icon" aria-hidden="true">
                       {entry.presentation.kind === "pdfjs" ? <FileText size={19} /> : <ExternalLink size={18} />}
                     </span>
                     <span className="min-w-0 flex-1">
@@ -969,7 +970,7 @@ export default function ReadLibraryPanel({
                         {entry.resource.readFileName || entry.presentation.label}
                       </span>
                     </span>
-                    <span className="shrink-0 text-[10px] font-semibold text-slate-400 group-hover:text-violet-200">
+                    <span className="study-resource-row__action">
                       {entry.presentation.kind === "pdfjs"
                         ? "Read PDF"
                         : entry.presentation.kind === "drive"

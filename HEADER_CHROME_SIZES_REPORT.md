@@ -1,3 +1,10 @@
+> **Current update — 2026-10-15:** app marks are now **42px** (+6px),
+> and page names/greetings **27px** (+5px). Action glyphs remain 30px and
+> action/search text 22px. The desktop/tablet topbar has only the large
+> branded Upgrade CTA; the small duplicate Plans shortcut is removed.
+> Phone Home search is 10px shorter in height. The historical notes below
+> describe the earlier pass; current values are pinned by the updated tests.
+
 # Header chrome sizes + the `ad` move (2026-10-14)
 
 The owner's brief, in one line: **every header component is sized in three numbers — action icons 30 px, text

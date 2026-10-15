@@ -323,7 +323,7 @@ export default function DesktopShell({
       document.documentElement.removeAttribute("data-wide-tablet");
     };
   }, [screenSize]);
-  const { appName, logoUrl } = useBranding();
+  const { appName, logoUrl, homeGradientFrom, homeGradientTo } = useBranding();
   const { cartIds, favoriteIds } = useCommerce();
   const { purchasedIds } = useCatalog();
   const liveNotificationCount = useUnreadNotificationCount();
@@ -498,10 +498,10 @@ export default function DesktopShell({
             onSelect={(id) => (id === OPENING_AD_ITEM_ID ? openingAd.openPlayer() : handleNavigate(id))}
             header={
               <div className="flex items-center gap-2.5">
-                {/* The app icon is 36px in the rail too — the same size the
+                {/* The app icon is 42px in the rail too — the same size the
                     header uses, so the chrome never shows two brand sizes. */}
-                <div data-header-app-icon className="grid h-[36px] w-[36px] shrink-0 place-items-center overflow-hidden rounded-[10px] bg-indigo-600 text-white ring-1 ring-white/20">
-                  {customLogo ? <BrandMark className="h-[36px] w-[36px]" /> : <Sparkles className="h-[26px] w-[26px]" />}
+                <div data-header-app-icon className="grid h-[42px] w-[42px] shrink-0 place-items-center overflow-hidden rounded-[10px] bg-indigo-600 text-white ring-1 ring-white/20">
+                  {customLogo ? <BrandMark className="h-[42px] w-[42px]" /> : <Sparkles className="h-[32px] w-[32px]" />}
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-[13px] font-black tracking-tight text-white">{appName}</p>
@@ -550,8 +550,8 @@ export default function DesktopShell({
             so the rail feels like a continuation of the app's identity
             rather than a separate desktop chrome. */}
         <div className="flex items-center gap-3 px-5 pb-5 pt-5">
-          <div data-header-app-icon className="grid h-[36px] w-[36px] shrink-0 place-items-center overflow-hidden rounded-[10px] bg-indigo-600 text-white ring-1 ring-white/20">
-            {customLogo ? <BrandMark className="h-[36px] w-[36px]" /> : <Sparkles className="h-[26px] w-[26px]" />}
+          <div data-header-app-icon className="grid h-[42px] w-[42px] shrink-0 place-items-center overflow-hidden rounded-[10px] bg-indigo-600 text-white ring-1 ring-white/20">
+            {customLogo ? <BrandMark className="h-[42px] w-[42px]" /> : <Sparkles className="h-[32px] w-[32px]" />}
           </div>
           <div className="min-w-0">
             <p className="truncate text-[15px] font-black tracking-tight text-white">{appName}</p>
@@ -721,7 +721,7 @@ export default function DesktopShell({
         >
           <div data-desktop-topbar-row className="flex h-16 items-center gap-4">
             <div className="flex min-w-0 flex-1 items-center gap-3">
-              <h1 className="truncate text-[22px] font-bold leading-[26px] tracking-tight text-white" data-desktop-page-title>
+              <h1 className="truncate text-[27px] font-bold leading-[32px] tracking-tight text-white" data-desktop-page-title>
                 {resolvedTitle}
               </h1>
               {/* The opening-animation `ad` option is a rail row now, not a
@@ -824,7 +824,9 @@ export default function DesktopShell({
                 onClick={() => handleNavigate("#/subscription")}
                 aria-label="Upgrade to Premium"
                 title="Upgrade"
-                className="mr-1 hidden h-10 shrink-0 items-center gap-1.5 rounded-full border border-violet-300/40 bg-gradient-to-br from-violet-500 to-indigo-600 px-3.5 text-[22px] leading-[26px] font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_8px_20px_-8px_rgba(124,92,255,0.8)] transition hover:brightness-110 active:scale-95 sm:inline-flex"
+                data-header-upgrade
+                style={{ background: `linear-gradient(135deg, ${homeGradientFrom}, ${homeGradientTo})` }}
+                className="mr-1 hidden h-10 shrink-0 items-center gap-1.5 rounded-full border border-white/25 px-3.5 text-[22px] leading-[26px] font-black text-white shadow-sm transition hover:brightness-110 active:scale-95 sm:inline-flex"
               >
                 <Crown size={30} aria-hidden="true" />
                 Upgrade
@@ -863,12 +865,6 @@ export default function DesktopShell({
                     icon: <ShoppingBag size={30} />,
                     badge: cartCount > 0 ? String(cartCount) : undefined,
                     badgeTone: "rose",
-                  },
-                  {
-                    id: "subscription",
-                    label: "Plans",
-                    ariaLabel: "Subscription",
-                    icon: <Crown size={30} />,
                   },
                 ]}
               />

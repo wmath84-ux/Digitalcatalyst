@@ -1,0 +1,52 @@
+/* Read and Brain libraries share one calm row, not separate card designs.
+   Auto-height rows and wrapping copy also work in narrow split-player panes. */
+.study-resource-row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--course-border, #ffffff1a);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--course-text, #f1f5f9);
+  text-align: left;
+  box-shadow: none;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+.study-resource-row:hover {
+  background: color-mix(in srgb, var(--course-text, #fff) 4%, transparent);
+  border-color: var(--course-muted, #64748b);
+}
+.study-resource-row:focus-visible { outline: 2px solid #818cf8; outline-offset: 2px; }
+.study-resource-row__icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--course-text, #fff) 5%, transparent);
+  color: var(--course-muted, #94a3b8);
+}
+.study-resource-row > .min-w-0 > span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.study-resource-row__action {
+  align-self: center;
+  max-width: 9ch;
+  color: var(--course-muted, #94a3b8);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+[data-brain-screen="library"], [data-course-read-library] { container-type: inline-size; }
+@container (max-width: 300px) {
+  .study-resource-row { grid-template-columns: 32px minmax(0, 1fr); gap: 8px; padding: 10px; }
+  .study-resource-row__icon { width: 32px; height: 32px; }
+  .study-resource-row__action { grid-column: 2; max-width: none; }
+}

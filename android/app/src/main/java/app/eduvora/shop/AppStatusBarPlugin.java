@@ -25,8 +25,8 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  * asked for, instead of overwriting it with a system-theme default.
  *
  * <p>Android 15+ (targetSdk 35) forces edge-to-edge: the window bar colours are
- * ignored there. The result includes an {@code edgeToEdge} flag so the web layer
- * can paint the navigation safe area with the same colour as the status bar.
+ * ignored there. MainActivity reserves real native system-bar insets around
+ * the WebView; {@code edgeToEdge=false} prevents a duplicate CSS bottom inset.
  * Icon appearance is honoured on every API level that has the flag (AndroidX
  * compat handles the older ones).
  */
@@ -80,10 +80,10 @@ public class AppStatusBarPlugin extends Plugin {
                 res.put("navigation", navigationStr);
                 res.put("statusDarkIcons", statusDarkIcons);
                 res.put("navigationDarkIcons", navigationDarkIcons);
-                // Android 15+ enforces edge-to-edge for targetSdk 35, where
-                // navigationBarColor is ignored. Let the web layer paint the
-                // safe-area backdrop with the same colour behind the system UI.
-                res.put("edgeToEdge", Build.VERSION.SDK_INT >= 35);
+                // MainActivity fits the WebView host using real native insets
+                // on every API level, including Android 15. Disable the legacy
+                // CSS 24px navigation guess to avoid a second bottom gutter.
+                res.put("edgeToEdge", false);
                 call.resolve(res);
             } catch (Exception e) {
                 call.reject("Failed to set system bars: " + e.getMessage());
@@ -172,6 +172,8 @@ public class AppStatusBarPlugin extends Plugin {
             window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
             window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            View content = activity.findViewById(android.R.id.content);
+            if (content != null) content.setBackgroundColor(statusColor);
             window.setStatusBarColor(statusColor);
             window.setNavigationBarColor(navigationColor);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

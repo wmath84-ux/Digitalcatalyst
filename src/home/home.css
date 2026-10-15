@@ -1572,7 +1572,7 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
 /* Give the featured panel a clearer surface and a calmer copy/art balance. */
 [data-home-content] .dc-home-hero-module > .dc-scene-plate {
   border-radius: 26px;
-  box-shadow: 0 18px 42px -30px rgba(18, 38, 86, 0.5), 0 2px 8px -5px rgba(18, 38, 86, 0.28);
+  box-shadow: 0 10px 26px -24px rgba(18, 38, 86, 0.28), 0 1px 4px -3px rgba(18, 38, 86, 0.14);
   isolation: isolate;
 }
 
@@ -2034,5 +2034,13 @@ html[data-theme="dark"] [data-home-content] .dc-home-hero-metadata span {
   [data-home-content] .dc-home-search-empty p {
     font-size: 14px;
     line-height: 1.4;
+  }
+}
+
+/* Phone search: remove 5px from each vertical side (10px total), not
+   from the font size. Tablet/desktop inputs keep their existing dimensions. */
+@media (max-width: 639px) {
+  [data-home-header] [data-home-search-slot] .dc-scene-field .relative.flex {
+    padding-block: 3px;
   }
 }

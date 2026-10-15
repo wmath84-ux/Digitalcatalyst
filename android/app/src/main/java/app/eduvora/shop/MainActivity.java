@@ -3,6 +3,12 @@ package app.eduvora.shop;
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.webkit.WebView;
+import android.view.View;
+import android.view.WindowManager;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
 
@@ -49,8 +55,34 @@ public class MainActivity extends BridgeActivity {
             }
         } catch (Exception ignored) {}
 
+        installSystemBarInsets();
         installFullscreenWebChromeClient();
         syncStatusBarThemeWithSystem();
+    }
+
+    /**
+     * Android 15 enforces edge-to-edge. Fit the whole Capacitor content host,
+     * not just a header/footer in CSS: fixed pages, dialogs and landscape layouts
+     * must all stay between the real status/navigation bars and display cutouts.
+     * Visible insets become zero during an explicitly requested fullscreen mode.
+     */
+    private void installSystemBarInsets() {
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        View content = findViewById(android.R.id.content);
+        if (content == null) return;
+        ViewCompat.setOnApplyWindowInsetsListener(content, (view, windowInsets) -> {
+            int fittedTypes = WindowInsetsCompat.Type.systemBars()
+                | WindowInsetsCompat.Type.displayCutout();
+            Insets safe = windowInsets.getInsets(fittedTypes);
+            view.setPadding(safe.left, safe.top, safe.right, safe.bottom);
+            // The host already handled these insets. Do not let WebView/CSS
+            // apply them a second time. Preserve IME insets for keyboard resize.
+            return new WindowInsetsCompat.Builder(windowInsets)
+                .setInsets(fittedTypes, Insets.NONE)
+                .build();
+        });
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        ViewCompat.requestApplyInsets(content);
     }
 
     /**
