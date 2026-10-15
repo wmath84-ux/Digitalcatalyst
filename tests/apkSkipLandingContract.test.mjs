@@ -9,6 +9,7 @@ test("the APK never paints the marketing landing page", () => {
   assert.match(main, /installedMobilePwa \|\| isNativeApp\(\)/);
   assert.match(main, /landingRouteRequested/);
   assert.match(main, /history\.replaceState[\s\S]*HOME_HASH/);
-  assert.match(main, /setHash\(HOME_HASH\)/);
+  assert.match(main, /const destination = getWorkLaunchChoice\(\) === "work" \? WORK_HASH : HOME_HASH;/);
+  assert.match(main, /setHash\(destination\)/);
   assert.match(main, /isInstalledMobilePwa\(\) \|\| isNativeApp\(\)/);
 });

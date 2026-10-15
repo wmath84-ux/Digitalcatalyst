@@ -108,7 +108,7 @@ test("Resume finds the module that directly owns a file and re-checks access", (
 test("A manual navigation flags the selection so resume never clobbers it", () => {
   assert.match(coursePlayer, /const userSelectedRef = useRef\(false\);/);
   assert.match(coursePlayer, /userSelectedRef\.current = true;/);
-  assert.match(coursePlayer, /userSelectedRef\.current\) return;/);
+  assert.match(coursePlayer, /userSelectedRef\.current \|\| experimentOpenedRef\.current\) return;/);
 });
 
 // ---------------------------------------------------------------------------
@@ -254,8 +254,8 @@ test("The divider is an accessible separator: a slim strip with a yellow line on
   assert.doesNotMatch(studyPanels, /data-course-split-grabber/, "no grabber pill");
   assert.doesNotMatch(studyPanels, /data-course-split-ratio-bubble/, "no % bubble");
   assert.match(studyPanels, /aria-orientation=\{row \? "vertical" : "horizontal"\}/);
-  assert.match(studyPanels, /aria-valuemin=\{SPLIT_MIN\}/);
-  assert.match(studyPanels, /aria-valuemax=\{SPLIT_MAX\}/);
+  assert.match(studyPanels, /aria-valuemin=\{minimum\}/);
+  assert.match(studyPanels, /aria-valuemax=\{maximum\}/);
   assert.match(studyPanels, /aria-valuenow=\{ariaNow\}/);
   assert.match(studyPanels, /tabIndex=\{0\}/);
   // A slim 10px strip and no browser gesture stealing the drag; an invisible
@@ -314,10 +314,10 @@ test("Dragging to an edge fills one side and leaves a glowing peek rail", () => 
   // Tapping the rail brings the last ratio back with the entry spring.
   assert.match(studyPanels, /onRestore=\{restore\}/);
   assert.match(studyPanels, /animateRatio\(target, SPRING_ENTRY\)/);
-  // The rail shows the lesson's play glyph or the ACTIVE TAB's own icon.
-  assert.match(studyPanels, /icon=\{PlayCircle\}/);
-  assert.match(studyPanels, /icon=\{studyIcon\}/);
-  assert.match(coursePlayer, /studyIcon=\{activeStudyTab\.icon\}/);
+  // The rail shows NO icon (owner: the small glyph at the very top/bottom
+  // was unwanted) — only its accent glow, which the next test pins.
+  assert.doesNotMatch(studyPanels, /data-peek-icon|icon=\{PlayCircle\}|icon=\{studyIcon\}/);
+  assert.doesNotMatch(coursePlayer, /studyIcon=/);
 });
 
 test("The divider is fully keyboard driven", () => {
@@ -361,10 +361,10 @@ test("The ratio is remembered per course and per axis", () => {
   assert.match(splitMotion, /export const DEFAULT_SPLIT_RATIO: Record<SplitAxis, number> = \{ column: 40, row: 45 \};/);
   // A bad stored value falls back to the axis default instead of collapsing.
   assert.match(splitMotion, /if \(!Number\.isFinite\(raw\)\) return fallback;/);
-  assert.match(studyPanels, /loadSplitRatio\(courseId, axis, floor\)/);
+  assert.match(studyPanels, /loadSplitRatio\(\s*courseId,\s*axis,\s*floor,\s*fullRange \? 100 : SPLIT_MAX,/);
   assert.match(studyPanels, /saveSplitRatio\(courseId, axis, percent\)/);
   // Rotating re-reads the OTHER axis's own ratio + collapse.
-  assert.match(studyPanels, /\}, \[axis, courseId, floor\]\);/);
+  assert.match(studyPanels, /\}, \[axis, courseId, floor, fullRange, parkedRatio\]\);/);
   assert.match(studyPanels, /loadSplitCollapsed\(courseId, axis\)/);
   // Phone portrait keeps a 30% floor so notes stay writable.
   assert.match(splitMotion, /export const SPLIT_SMALL_SCREEN_MIN = 30;/);
@@ -490,10 +490,9 @@ test("Notes, mind map and the Player panel keep their tiling inside the pane", (
 });
 
 test("Coarse pointers and reduced motion get the cheap deck", () => {
-  assert.match(studyPanels, /const useCoarsePointer = \(\): boolean =>/);
-  assert.match(studyPanels, /const reduceMotion = useReducedMotion\(\) === true;/);
-  assert.match(studyPanels, /const cheap = coarse \|\| reduceMotion;/);
-  assert.match(studyPanels, /breathe=\{!cheap\}/);
+  // The peek rail's breathing icon is gone (the edge icon was removed on the
+  // owner's brief), so the deck needs no coarse-pointer gate for it any more.
+  assert.doesNotMatch(studyPanels, /useCoarsePointer|const cheap = coarse|breathe=/);
   assert.doesNotMatch(studyPanels, /data-course-split-pulse/, "no pulse ring to skip");
   // Only transform / opacity / box-shadow / flex-grow are ever animated.
   assert.doesNotMatch(studyPanels, /animate\(\{[^}]*blur/);
@@ -536,14 +535,14 @@ test("A landscape pane never settles narrower than the dock inside it, on any de
   // since 380 px is below their 15 % band). Collapse-to-rail bypasses it.
   assert.match(
     studyPanels,
-    /const dockFloor =\s+axis === "row" && deckWidth > 0 \? clampSplitRatio\(\(SPLIT_DOCK_MIN_PX \/ deckWidth\) \* 100\) : 0;/,
+    /const dockFloor =\s+!fullRange && axis === "row" && deckWidth > 0\s+\? clampSplitRatio\(\(SPLIT_DOCK_MIN_PX \/ deckWidth\) \* 100\)\s+: 0;/,
   );
-  assert.match(studyPanels, /const floor = Math\.max\(specFloor, dockFloor\);/);
+  assert.match(studyPanels, /const floor = fullRange \? 0 : Math\.max\(specFloor, dockFloor\);/);
   // The spec's percentage floor still governs everywhere else…
   assert.match(studyPanels, /const specFloor = splitFloorFor\(axis, phone\);/);
   assert.match(splitMotion, /export const splitFloorFor = \(axis: SplitAxis, smallScreen: boolean\): number =>/);
   // …and the clamp still caps it, so collapse-to-rail stays reachable.
-  assert.match(splitMotion, /export const clampSplitRatio = \(value: number, floor: number = SPLIT_MIN\): number =>/);
+  assert.match(splitMotion, /export const clampSplitRatio = \(\s*value: number,\s*floor: number = SPLIT_MIN,\s*maximum: number = SPLIT_MAX,\s*\): number =>/);
   assert.match(studyPanels, /data-course-peek-rail/);
 });
 

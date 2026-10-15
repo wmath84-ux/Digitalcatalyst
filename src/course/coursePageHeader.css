@@ -1,0 +1,147 @@
+/* src/course/coursePageHeader.css
+   ═══════════════════════════════════════════════════════════════════════════
+   The Course Player's shared page-header size, the main (top) header's
+   50% growth, and the ~95% pure-white page background.
+
+   ── 1. The page header (`.course-page-header`) ─────────────────────────────
+   The Resource Library header is the reference size. It used to measure
+   ~44px from its own paint (10px top pad + title row + 8px gap + 6px bottom
+   pad + hairline); that area is now DEFINED once, here, as
+   `--dc-course-page-header-h`, and the Resource Library header itself is
+   built from the same box — so every library/list page header (Notes, Mind
+   Map library, Brain, Live Experiment, Read, Music, My Modules, Paid,
+   Player) is exactly the Resource Library header's size, with the page name
+   bold beside its icon and the page's actions (MASTER / SELF included)
+   inside the same strip.
+
+   ── 2. The Course Player's main header ─────────────────────────────────────
+   The player's main header is the top progress + settings rail
+   (`[data-course-top-progress]` in CoursePlayerApp). Its strip used to be
+   21px tall in total (3px top pad + the 14px settings/progress controls
+   + 3px bottom pad + the 1px hairline). It is now 31.5px — an actual 50%
+   increase (21px × 1.5 = 31.5px) — via the `min-height` below.
+   The two halves (progress / settings), their labels and behaviour are
+   unchanged; only the strip's thickness grows.
+
+   ── 3. Page backgrounds ────────────────────────────────────────────────────
+   Every Course Player page surface listed below sits on approximately 95%
+   pure white: #f2f2f2 is rgb(242, 242, 242) ≈ 0.95 × 255.
+   The Resource Library (`[data-course-resource-library]`, `.library-header`,
+   `.library-body`) is deliberately NOT in that list and gets no rule here at
+   all: its existing background and appearance stay exactly as they were.
+   Editor/chat working surfaces (Sketch canvas, Mind Map canvas, AI chat,
+   the lesson viewer) are likewise untouched — this is the page background
+   of the library/list pages and the panes behind them.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.course-player-shell {
+  /* The Resource Library header's defined area, shared by every page header. */
+  --dc-course-page-header-h: 48px;
+  /* Approximately 95% pure white (242 ≈ 95% of 255). */
+  --dc-course-page-bg: #f2f2f2;
+}
+
+/* ── 1. The shared page header ─────────────────────────────────────────── */
+
+header.course-page-header {
+  box-sizing: border-box;
+  display: flex;
+  flex: 0 0 var(--dc-course-page-header-h, 48px);
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: var(--dc-course-page-header-h, 48px);
+  min-height: var(--dc-course-page-header-h, 48px);
+  /* Legacy per-panel collection rows used to pad this strip themselves
+     (e.g. the notes collections rule); the defined header area wins. */
+  padding: 0 14px !important;
+  border-bottom: 1px solid var(--course-border, rgba(255, 255, 255, 0.08));
+  /* No paint of its own: each page keeps its own surface. In particular the
+     Resource Library header's existing background is unchanged by this. */
+  background: transparent;
+  color: var(--course-text, #0f172a);
+}
+
+.course-page-header__title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  color: var(--course-text, #0f172a);
+}
+
+.course-page-header__icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.course-page-header__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.course-page-header__actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.course-page-header__actions::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  header.course-page-header {
+    padding: 0 10px !important;
+    gap: 8px;
+  }
+}
+
+/* ── 2. The main header: an actual 50% increase (21px → 31.5px) ────────── */
+
+.course-player-shell [data-course-top-progress] {
+  /* 21px × 1.5 = 31.5px. The strip's contents keep their own size and stay
+     vertically centred by the rail's stretch + the buttons' centring. */
+  min-height: 31.5px;
+}
+
+/* ── 3. ~95% pure-white page backgrounds (Resource Library exempt) ─────── */
+
+.course-player-shell :is(
+  [data-course-notes-panel][data-course-notes-mode="list"],
+  [data-course-brain-panel],
+  [data-course-experiment-panel],
+  [data-course-read-panel],
+  [data-course-music-panel],
+  [data-course-personal-modules],
+  [data-course-player-panel],
+  [data-course-mindmap-library],
+  [data-course-overlay-tab="paid"]
+) {
+  background: var(--dc-course-page-bg, #f2f2f2) !important;
+}
+
+/* The Notes list used to own a pure-white plate with `!important`
+   (study-light-surfaces.css). As a Course Player page it now sits on the
+   same ~95% white; this selector is deliberately one notch stronger so
+   the page background above is the one that paints. The note DOCUMENT
+   (editor / master viewer) keeps its own pure-white paper, untouched. */
+html[data-theme="light"] .course-player-shell[data-course-theme="light"]
+  [data-course-notes-panel][data-notes-theme="light"][data-course-notes-mode="list"] {
+  background: var(--dc-course-page-bg, #f2f2f2) !important;
+}

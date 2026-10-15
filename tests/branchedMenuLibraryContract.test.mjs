@@ -71,10 +71,13 @@ test("the Modules library shows the real module tree and the My Modules root ent
   assert.match(player, /const libraryPersonalEntry = isMine \|\| !personalModulesEntry/);
 });
 
-test("the Paid list keeps the SnapList; the module-row builder is removed from the overlay", () => {
-  assert.match(overlay, /const listRows = paidRows;/);
+test("the Paid list wears the Modules library's BranchedMenu design; the module-row builder stays removed", () => {
+  // Same listing system, same props as CourseResourceLibrary's menu.
+  assert.match(overlay, /<BranchedMenu/);
+  assert.match(overlay, /rowHeight=\{40\}/);
+  assert.match(overlay, /className="course-library__menu"/);
+  assert.match(overlay, /data-listing": "paid"/);
   assert.doesNotMatch(overlay, /moduleRows|const flatModules/);
-  assert.match(overlay, /\bSnapList\b/);
 });
 
 test("section heads only fold: a click toggles open state and never selects a child", () => {

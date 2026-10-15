@@ -41,6 +41,10 @@ import "./profile-glass.css";
 import "./course/flatPlayerChrome.css";
 // Scoped appearance overrides for the independently persisted Course Player's Light palette.
 import "./course/courseTheme.css";
+// The Course Player's shared page-header size (the Resource Library header's
+// defined area), its main top header's 50% growth and the ~95%-white page
+// backgrounds. After courseTheme.css so the shared header wins its ties.
+import "./course/coursePageHeader.css";
 // Course Player × Gradient Waves: pane scrims while "Modern module listing" is
 // ON. AFTER flatPlayerChrome.css + courseTheme.css, whose plates it re-tints.
 import "./course/courseGradientWaves.css";
@@ -2231,8 +2235,8 @@ initFooterGlow();
 // Publish the real footer-dock height so page areas can GROW by exactly that
 // amount instead of guessing with extra padding (see utils/footerNavSpace.ts).
 initFooterNavSpace();
-// Footer navigation: Edge-to-edge is the default for everyone — this moves a
-// browser that still had one of the older designs saved onto it ONCE (see
+// Footer navigation: the Workspace pill is the default for everyone — this
+// moves a browser that still had another design saved onto it ONCE (see
 // utils/footerNavigationStyle.ts; the Settings choice rules from then on).
 ensureDefaultFooterNavigationStyle();
 // HARD RULE: Ensure portrait lock is active on app start (mobile only)

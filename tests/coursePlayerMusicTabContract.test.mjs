@@ -29,12 +29,13 @@ test('Music is a real dock tab, appended last so no existing tab or shortcut mov
   // LAST entry of the tab list — the order below it (and therefore every
   // ⌘/Ctrl+1…9 shortcut) is untouched.
   assert.match(overlay, /icon: Music \},\n\];/);
-  assert.match(overlay, /import \{ BookOpen, Brain, FileText, FlaskConical, Music, Network, NotebookPen, PenLine, ShoppingBag, Sparkles \} from "lucide-react";/);
-  // The footer strip renders THAT list — it never keeps a copy of its own.
+  assert.match(overlay, /import \{ BookOpen, Brain, File, FileText, FlaskConical, LockKeyhole, Music, Network, NotebookPen, PenLine, ShoppingBag, Sparkles \} from "lucide-react";/);
+  // The footer renders THAT list — it never keeps a copy of its own — and
+  // each cell is the tab's own icon (the Music glyph included) at the
+  // Workspace pill's 26px, not a letter plate of its own.
   assert.match(strip, /const items = TABS\.filter\(item => !hiddenTabs\.includes\(item\.key\)\)/);
-  assert.match(strip, /music: \['♪', 'Music'\],/);
-  // "M" is Modules' letter — the music plate uses the note glyph instead.
-  assert.doesNotMatch(strip, /music: \['M'/);
+  assert.match(strip, /data-work-nav-cell=\{item\.key\}/);
+  assert.match(strip, /<Icon size=\{26\} \/>/);
 });
 
 test('the pane is the EXISTING glass music player — the lesson design, not a copy', () => {
@@ -62,6 +63,45 @@ test('the LIBRARY button opens three shelves, and a song is always one tap away'
   // A row says where it came from, and the learner can bin it again.
   assert.match(panel, /\{musicRowBadge\(track\)\}/);
   assert.match(panel, /track\.source !== "course" && \(/);
+});
+
+test('the redesigned pane is one light, full-space, responsive music workspace', () => {
+  // No separate Course Player page header inside Music: the player surface
+  // itself owns the Library control.
+  assert.doesNotMatch(panel, /CoursePageHeader|<header/);
+  assert.match(panel, /data-music-library-toggle/);
+  assert.match(panel, /data-music-layout=\{layoutMode\}/);
+  assert.match(panel, /new ResizeObserver\(update\)/);
+  assert.match(panel, /node\.clientWidth >= 640 \? "wide" : "compact"/);
+  assert.match(panel, /gridTemplateColumns: sheetOpen \? "minmax\(300px, 42%\) minmax\(0, 1fr\)"/);
+  assert.match(panel, /gridTemplateRows: sheetOpen \? "minmax\(240px, 42%\) minmax\(0, 1fr\)"/);
+  // Library opens white/light, search first, filters directly below it.
+  assert.match(panel, /data-music-library-sheet data-music-theme="light"/);
+  assert.match(panel, /data-music-search placeholder/);
+  assert.match(panel, /data-music-filters/);
+  for (const filter of ['course', 'device', 'online']) {
+    assert.match(panel, new RegExp(`data-music-filter=\\{filter\\.key\\}`));
+    assert.match(panel, new RegExp(`label: "${filter === 'course' ? 'Course' : filter === 'device' ? 'Device' : 'Online'}"`));
+  }
+  // The direct search-page view option makes online music YouTube-like:
+  // a large 16:9 thumbnail with the title underneath.
+  assert.match(panel, /data-music-search-view/);
+  assert.match(panel, /data-music-view-option="youtube"/);
+  assert.match(panel, /Bade thumbnails/);
+  assert.match(panel, /data-music-result-thumbnail/);
+  assert.match(panel, /data-music-track-thumbnail/);
+  assert.match(panel, /aspect-video w-full overflow-hidden/);
+});
+
+test('YouTube can be heard audio-style or watched in its embedded player', () => {
+  assert.match(panel, /data-music-youtube-player data-music-youtube-mode=\{youTubeMode\}/);
+  assert.match(panel, /data-music-youtube-mode-option="audio"/);
+  assert.match(panel, /data-music-youtube-mode-option="video"/);
+  assert.match(panel, /data-music-youtube-audio/);
+  assert.match(panel, /data-music-youtube-thumbnail/);
+  assert.match(panel, /data-music-youtube-play-toggle/);
+  assert.match(panel, /sendYouTubeCommand\(next \? "playVideo" : "pauseVideo"\)/);
+  assert.match(panel, /data-music-embed=\{current\.provider\}/);
 });
 
 test('a pasted link plays here; an unsupported one is refused with a sentence', () => {

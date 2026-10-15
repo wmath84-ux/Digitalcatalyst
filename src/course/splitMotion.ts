@@ -90,18 +90,19 @@ export const DIVIDER_HIT = 10;
 /** The collapsed pane's glass strip, in px. */
 export const PEEK_RAIL_PX = 28;
 /**
- * The divider's SWITCH button — the one control that swaps the two panes.
+ * The divider's toolbar — the switch + split controls the divider reveals:
  *
  *   · it is hidden until the learner TAPS the divider line (a tap, never a
  *     drag), so the split keeps its bare 2px line at rest;
- *   · it is deliberately tiny (the owner's "bahut chhota sa icon");
+ *   · it is one floating glass pill with honest touch targets (36px buttons,
+ *     16px icons) — readable as a toolbar, not a scatter of tiny chips;
  *   · it fades away again after an idle window, or on the next divider tap.
  *
  * A press is a TAP only while the pointer stayed inside the slop AND came up
  * inside the window — anything else is the divider's own resize drag.
  */
-export const SWAP_BUTTON_PX = 22;
-export const SWAP_ICON_PX = 12;
+export const SWAP_BUTTON_PX = 36;
+export const SWAP_ICON_PX = 16;
 export const SWAP_HINT_MS = 3600;
 export const SWAP_TAP_SLOP_PX = 6;
 export const SWAP_TAP_MS = 400;

@@ -7,16 +7,18 @@
 //   · NoteFormattingToolbar — the compact floating toolbar that follows a text
 //     selection with a fine pointer (desktop / hardware keyboard): block type
 //     · B I U S · code · link.
-//   · NoteDockedToolbar     — the same actions as ONE slim bar docked at the
-//     bottom of the note (plus undo / redo / insert). It is the note's toolbar
-//     wherever a finger is the primary pointer, and it is on screen on EVERY
-//     device from the moment the note has a cursor in it — with a soft
-//     keyboard open it rides directly above it, and where there is no keyboard
-//     (a desktop, a big tablet in desktop view, a floating window) it sits
-//     directly above the player's footer navigation. It is laid out in normal
-//     flow at the bottom of the editor, so it rides exactly as high as the
-//     pane does — the player's own keyboard state already sizes the pane to
-//     the visible area. No fixed offsets, no second keyboard listener.
+//   · NoteDockedToolbar     — the editing toolbar as ONE floating pill at the
+//     bottom-left of the note (the reference design): undo · redo | block
+//     type · B I S · highlight | code · quote · link | bullet · numbered ·
+//     checklist · indent · outdent. It is the note's toolbar wherever a finger
+//     is the primary pointer, and it is on screen on EVERY device from the
+//     moment the note has a cursor in it. The pill floats over the bottom of
+//     the scroll area, so it rides exactly as high as the pane does — with a
+//     soft keyboard open it sits directly above it, and where there is no
+//     keyboard (a desktop, a big tablet in desktop view, a floating window)
+//     directly above the player's footer navigation (the footer inset lifts
+//     it clear). Absolute over the pane, never fixed: no second keyboard
+//     listener, no hard-coded keyboard heights.
 //   · NoteSideMenu          — the subtle per-block controls (insert / handle).
 //   · useNoteSlashItems     — the slash menu's items.
 //
@@ -25,7 +27,7 @@
 // the keyboard stays up.
 
 import { useMemo, type ReactNode } from "react";
-import { HistoryExtension, SideMenuExtension, SuggestionMenu } from "@blocknote/core/extensions";
+import { HistoryExtension, SideMenuExtension } from "@blocknote/core/extensions";
 import {
   AddBlockButton,
   BasicTextStyleButton,
@@ -55,11 +57,13 @@ import {
   Heading1,
   Heading2,
   Heading3,
+  Highlighter,
+  Indent,
   List,
   ListOrdered,
   Minus,
+  Outdent,
   Pilcrow,
-  Plus,
   Quote,
   Redo2,
   Undo2,
@@ -166,44 +170,90 @@ function HistoryButton({ direction }: { direction: "undo" | "redo" }) {
   );
 }
 
-/** "+" — opens the slash menu at the caret (discoverable on touch). */
-function InsertButton() {
+/** One pill divider (the reference toolbar's grouped-button separators). */
+const DockSeparator = () => <span className="dc-note-dock-sep" aria-hidden="true" />;
+
+/** A pill button that runs one of the note's block commands at the caret. */
+function DockCommandButton({ command, label }: { command: NoteCommandKey; label: string }) {
   const Components = useComponentsContext()!;
   const editor = useBlockNoteEditor() as unknown as NoteEditorInstance;
+  const Icon = COMMAND_ICONS[command];
   return (
     <Components.FormattingToolbar.Button
-      className="dc-note-insert"
-      label="Insert block"
-      mainTooltip="Insert block"
-      icon={<Plus size={16} />}
-      onClick={() => {
-        editor.focus();
-        // Like BlockNote's own "+": a blank line is used as is, otherwise a new
-        // blank line opens below the caret's block — then the menu opens on it.
-        const block = editor.getTextCursorPosition().block;
-        const blank = block.type === "paragraph" && Array.isArray(block.content) && block.content.length === 0;
-        if (!blank) {
-          const [created] = editor.insertBlocks([{ type: "paragraph" }], block, "after");
-          if (created) editor.setTextCursorPosition(created, "start");
-        }
-        editor.getExtension(SuggestionMenu)?.openSuggestionMenu("/");
-      }}
+      className="dc-note-dock-command"
+      label={label}
+      mainTooltip={label}
+      icon={<Icon size={16} />}
+      onClick={() => runSlashCommand(editor, command)}
     />
   );
 }
 
 /**
- * The docked toolbar — the note's ONE toolbar on touch, and its always-reachable
- * one everywhere else: it is mounted whenever the note has a cursor in it, on
- * any device (see NoteEditor). Rendered inside the editor's React tree (it needs
- * BlockNote's contexts) but laid out in flow beneath the scroll area — see the
- * file header. The "mobile" UI mode keeps BlockNote's dropdowns from taking
- * focus, which would blur the editor and dismiss the keyboard.
+ * Highlight — toggles the schema's background-colour style on the selection,
+ * so the pill's highlighter is a real formatter, not a decoration. Active
+ * state follows the caret's live styles.
  */
-export function NoteDockedToolbar({ onFocusWithinChange }: { onFocusWithinChange?: (within: boolean) => void }) {
+function HighlightButton() {
   const Components = useComponentsContext()!;
   const editor = useBlockNoteEditor() as unknown as NoteEditorInstance;
+  const activeBackground = useEditorState({
+    editor,
+    selector: ({ editor: live }) => live.getActiveStyles().backgroundColor,
+  });
+  const highlighted = Boolean(activeBackground && activeBackground !== "transparent");
+  return (
+    <Components.FormattingToolbar.Button
+      className="dc-note-highlight"
+      label="Highlight"
+      mainTooltip="Highlight"
+      icon={<Highlighter size={16} />}
+      isSelected={highlighted}
+      onClick={() => editor.toggleStyles({ backgroundColor: "yellow" })}
+    />
+  );
+}
+
+/** Indent / outdent the caret's block one level (list nesting included). */
+function IndentButton({ direction }: { direction: "indent" | "outdent" }) {
+  const Components = useComponentsContext()!;
+  const editor = useBlockNoteEditor() as unknown as NoteEditorInstance;
+  const can = useEditorState({
+    editor,
+    selector: ({ editor: live }) => (direction === "indent" ? live.canNestBlock() : live.canUnnestBlock()),
+  });
+  const Icon = direction === "indent" ? Indent : Outdent;
+  const label = direction === "indent" ? "Indent" : "Outdent";
+  return (
+    <Components.FormattingToolbar.Button
+      className="dc-note-indent"
+      label={label}
+      mainTooltip={label}
+      icon={<Icon size={16} />}
+      isDisabled={!can}
+      onClick={() => (direction === "indent" ? editor.nestBlock() : editor.unnestBlock())}
+    />
+  );
+}
+
+/**
+ * The editing toolbar — the note's ONE toolbar on touch, and its
+ * always-reachable one everywhere else: it is mounted whenever the note has a
+ * cursor in it, on any device (see NoteEditor). Rendered inside the editor's
+ * React tree (it needs BlockNote's contexts) as a floating pill at the
+ * bottom-left of the note — see the file header and noteEditor.css. The
+ * "mobile" UI mode keeps BlockNote's dropdowns from taking focus, which would
+ * blur the editor and dismiss the keyboard.
+ *
+ * Button order is the reference design's, left to right: undo · redo |
+ * block type (Heading) · bold · italic · strikethrough · highlight |
+ * code · quote · link | bulleted list · numbered list · checklist ·
+ * indent · outdent. Every button acts on the live document.
+ */
+export function NoteDockedToolbar({ onFocusWithinChange }: { onFocusWithinChange?: (within: boolean) => void }) {
+  const editor = useBlockNoteEditor() as unknown as NoteEditorInstance;
   const items = useBlockTypeItems(editor);
+  const Components = useComponentsContext()!;
   return (
     <UIModeContext.Provider value="mobile">
       <div
@@ -219,17 +269,25 @@ export function NoteDockedToolbar({ onFocusWithinChange }: { onFocusWithinChange
         }}
       >
         <Components.FormattingToolbar.Root className="bn-toolbar dc-note-dock-bar">
-          {/* The writing tools scroll sideways on a narrow phone (insert first,
-              because it is the one nothing else can replace); undo / redo stay
-              pinned at the end where a thumb always finds them. */}
           <div className="dc-note-dock-tools">
-            <InsertButton key="insert" />
-            <BlockTypeSelect key="blockType" items={items} />
-            <InlineActions />
-          </div>
-          <div className="dc-note-dock-history">
             <HistoryButton direction="undo" key="undo" />
             <HistoryButton direction="redo" key="redo" />
+            <DockSeparator key="sep-history" />
+            <BlockTypeSelect key="blockType" items={items} />
+            <BasicTextStyleButton basicTextStyle="bold" key="bold" />
+            <BasicTextStyleButton basicTextStyle="italic" key="italic" />
+            <BasicTextStyleButton basicTextStyle="strike" key="strike" />
+            <HighlightButton key="highlight" />
+            <DockSeparator key="sep-inline" />
+            <BasicTextStyleButton basicTextStyle="code" key="code" />
+            <DockCommandButton key="quote" command="quote" label="Quote" />
+            <CreateLinkButton key="link" />
+            <DockSeparator key="sep-lists" />
+            <DockCommandButton key="bulletList" command="bulletList" label="Bulleted list" />
+            <DockCommandButton key="numberedList" command="numberedList" label="Numbered list" />
+            <DockCommandButton key="checklist" command="checklist" label="Checklist" />
+            <IndentButton key="indent" direction="indent" />
+            <IndentButton key="outdent" direction="outdent" />
           </div>
         </Components.FormattingToolbar.Root>
       </div>

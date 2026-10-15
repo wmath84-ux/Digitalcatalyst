@@ -62,6 +62,7 @@ import {
 } from "../../utils/personalCourse";
 import { trackFeatureEvent } from "../utils/featureAnalytics";
 import CourseConfirmDialog from "./ConfirmDeleteDialog";
+import CoursePageHeader from "./CoursePageHeader";
 
 type View = "home" | "module-create" | "module-edit" | "resource-create" | "resource-edit";
 
@@ -843,20 +844,25 @@ export default function PersonalModulesPanel({ personal, productTitle, playerThe
   // ── The pane body (owned by the Course Player's Modules tab) ───────────
   return (
     <div className="flex h-full min-h-0 flex-col" data-course-personal-modules data-course-theme={playerTheme}>
-      <div className="flex items-center gap-2 px-4 pb-0 pt-3">
-        <button
-          type="button"
-          aria-label="Back to course modules"
-          className="grid h-8 w-8 place-items-center rounded-xl text-[var(--course-muted)] transition-colors hover:bg-white/[0.06] hover:text-white"
-          onClick={onExit}
-          data-personal-exit
-        >
-          <ChevronRight size={18} className="rotate-180" />
-        </button>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-black text-white/90" data-personal-heading>My Modules</p>
-          <p className="truncate text-[10px] font-bold uppercase tracking-wide text-[var(--course-muted)]">{productTitle}</p>
-        </div>
+      {/* The shared page header (the Resource Library header's size): the
+          page name, bold with its icon, back on the left, Library on the
+          right. `productTitle` stays the panel's context, shown in its body. */}
+      <CoursePageHeader
+        title="My Modules"
+        icon={<Library size={20} aria-hidden="true" />}
+        dataAttrs={{ "data-personal-heading": "" }}
+        leading={(
+          <button
+            type="button"
+            aria-label="Back to course modules"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-[var(--course-muted)] transition-colors hover:bg-white/[0.06] hover:text-white"
+            onClick={onExit}
+            data-personal-exit
+          >
+            <ChevronRight size={18} className="rotate-180" />
+          </button>
+        )}
+      >
         {onOpenLibrary ? (
           <button
             type="button"
@@ -867,7 +873,7 @@ export default function PersonalModulesPanel({ personal, productTitle, playerThe
             <Library size={14} /> Library
           </button>
         ) : null}
-      </div>
+      </CoursePageHeader>
       <div className="min-h-0 flex-1">
         {view === "module-create" ? renderModuleForm(true)
           : view === "module-edit" ? renderModuleForm(false)

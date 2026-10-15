@@ -20,10 +20,16 @@ html[data-theme="light"] [data-course-notes-list] .branched-menu {
 }
 html[data-theme="light"] [data-course-note-collections] {
   color: var(--dc-ink, #0f172a);
-  padding: 12px 0;
   border-bottom: 1px solid #e2e8f0;
+}
+/* As the shared page header (CoursePageHeader), the collections strip keeps
+   the header's defined area: no legacy row padding/wrap, and its MASTER /
+   SELF buttons shrink to fit inside the 48px header. */
+html[data-theme="light"] [data-course-note-collections]:not(.course-page-header) {
+  padding: 12px 0;
   flex-wrap: wrap;
 }
+html[data-theme="light"] .course-page-header [data-course-note-collection] { min-height: 32px; }
 html[data-theme="light"] [data-course-note-collections] [role="tablist"] { background: #f1f5f9; border-color: #e2e8f0; }
 html[data-theme="light"] [data-course-note-collection] { color: var(--dc-ink-3, #475569); min-height: 40px; }
 html[data-theme="light"] [data-course-note-collection][aria-selected="true"] { background: #fff; color: var(--dc-brand-ink, #3730a3); }

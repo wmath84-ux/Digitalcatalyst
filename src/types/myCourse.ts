@@ -20,17 +20,101 @@
 
 import type { CourseContentFileType } from "./course";
 
-/** One MCQ of a Brain practice set — byte-identical to the admin's shape. */
+/**
+ * Every question type a Brain practice set can hold. A question records its
+ * type EXPLICITLY; a record saved before types existed has no `questionType`
+ * and is an MCQ — old sets keep working untouched, and an unrecognised type
+ * is never silently converted into an MCQ (utils/practiceSet.js reports it
+ * as unsupported instead).
+ */
+export type BrainQuestionType =
+  | "mcq"
+  | "fill_blank"
+  | "label_diagram"
+  | "assertion_reason"
+  | "one_word"
+  | "match"
+  | "drag_drop"
+  | "hotspot";
+
+/** Learner-facing names for the type selector and the listing filter. */
+export const BRAIN_QUESTION_TYPE_LABELS: Record<BrainQuestionType, string> = {
+  mcq: "MCQ",
+  fill_blank: "Fill in the Blank",
+  label_diagram: "Label the Diagram",
+  assertion_reason: "Assertion and Reason",
+  one_word: "One-Word / One-Line Answer",
+  match: "Match the Following",
+  drag_drop: "Drag and Drop",
+  hotspot: "Hotspot Questions",
+};
+
+/**
+ * One question of a Brain practice set. The core (prompt, explanation,
+ * difficulty, topic) is shared by every type; each type then carries ONLY
+ * its own fields — a matching question's pairs never hide inside the MCQ
+ * `options` array. Normalisation and validation live in
+ * utils/practiceSet.js (`normalizePracticeQuestion`,
+ * `practiceQuestionIssues`), the one rule every surface reads.
+ */
 export interface MyCourseQuestion {
   id: string;
+  /** The question's own type. Absent on legacy records — those are MCQs. */
+  questionType?: BrainQuestionType;
   prompt: string;
+  /** MCQ choices. Empty for the other types (A&R uses the shared 4 choices). */
   options: string[];
-  /** -1 = no answer marked yet (the editor names it as "answer missing"). */
+  /** MCQ / Assertion-and-Reason key. -1 = no answer marked yet. */
   correctIndex: number;
   explanation: string;
   difficulty: "easy" | "medium" | "hard";
   topic: string;
+  /** fill_blank: accepted answers per blank, aligned with the ___ markers. */
+  blankAnswers?: string[][];
+  /** one_word: the expected answer plus accepted variants. */
+  acceptedAnswers?: string[];
+  /** assertion_reason: the two statements. */
+  assertion?: string;
+  reason?: string;
+  /** match: the correct Column A → Column B pairs. */
+  matchPairs?: Array<{ left: string; right: string }>;
+  /** drag_drop: the item pool, and the targets with their correct item. */
+  dragItems?: string[];
+  dragTargets?: Array<{ id: string; label: string; answer: string }>;
+  /** label_diagram / hotspot: the image the coordinates belong to. */
+  imageUrl?: string;
+  /** label_diagram: targets in relative % coords (0–100) with their label. */
+  labelTargets?: Array<{ id: string; x: number; y: number; label: string }>;
+  /** label_diagram: the label pool offered to the learner. */
+  labelOptions?: string[];
+  /** hotspot: regions in relative % coords, and which of them are correct. */
+  hotspots?: Array<{ id: string; x: number; y: number; r: number }>;
+  correctHotspotIds?: string[];
 }
+
+/** The discriminated per-type views over the stored record. */
+export type TypedBrainQuestion =
+  | (MyCourseQuestion & { questionType: "mcq" })
+  | (MyCourseQuestion & { questionType: "fill_blank"; blankAnswers: string[][] })
+  | (MyCourseQuestion & { questionType: "one_word"; acceptedAnswers: string[] })
+  | (MyCourseQuestion & { questionType: "assertion_reason"; assertion: string; reason: string })
+  | (MyCourseQuestion & { questionType: "match"; matchPairs: Array<{ left: string; right: string }> })
+  | (MyCourseQuestion & {
+      questionType: "drag_drop";
+      dragItems: string[];
+      dragTargets: Array<{ id: string; label: string; answer: string }>;
+    })
+  | (MyCourseQuestion & {
+      questionType: "label_diagram";
+      imageUrl: string;
+      labelTargets: Array<{ id: string; x: number; y: number; label: string }>;
+    })
+  | (MyCourseQuestion & {
+      questionType: "hotspot";
+      imageUrl: string;
+      hotspots: Array<{ id: string; x: number; y: number; r: number }>;
+      correctHotspotIds: string[];
+    });
 
 /**
  * The resource types a learner may author. Same vocabulary as the official

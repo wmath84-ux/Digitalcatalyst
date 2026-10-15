@@ -57,7 +57,8 @@ test("the divider renders the controls it is handed, next to the switch", () => 
   assert.match(DECK, /actions\?: SplitDividerAction\[\];/);
   assert.match(DECK, /data-course-split-action=\{action\.id\}/);
   assert.match(DECK, /\{actions\.map\(\(action\) => \(/);
-  // The switch itself is untouched: still the tiny tap-revealed button.
+  // The switch itself is untouched: still the tap-revealed toolbar button
+  // (36px glass pill since the divider-toolbar redesign).
   assert.match(DECK, /data-course-split-swap=""/);
   assert.match(DECK, /<ArrowLeftRight size=\{SWAP_ICON_PX\} \/>/);
 });
@@ -117,19 +118,20 @@ test("the extra part's own tab chooser is a real control", () => {
   assert.match(TABS, /className="extra-pane-tab-plate"/);
 });
 
-/* ── the desktop footer strip: circles, never stretched ──────────────────── */
+/* ── the footer: the Workspace pill, in the strip's unchanged area ─────── */
 
-test("the footer strip keeps its plates circular on a wide stage", () => {
-  // The button no longer grows with the row…
-  assert.match(STRIP_CSS, /\[data-course-strip-nav\] button \{[\s\S]*?flex: 0 0 auto;/);
-  // …the row is centred instead…
-  assert.match(STRIP_CSS, /justify-content: safe center;/);
-  // …and the plate is a fixed square, i.e. a real circle at every width.
-  assert.match(STRIP_CSS, /\.course-strip-plate \{[\s\S]*?width: 32px; height: 32px; border-radius: 50%;/);
-  // The old percentage-width plate (`inset: 6px 0` on a stretched button) is gone.
-  assert.doesNotMatch(STRIP_CSS, /inset: 6px 0/);
-  // The rest of the strip's published behaviour is untouched.
+test("the footer is the Workspace pill at the strip's exact height, swipeable", () => {
+  // The pill takes the Workspace design's markup hooks…
+  const strip = read("src/course/CoursePeekDock.tsx");
+  assert.match(strip, /data-work-footer-nav=""/);
+  assert.match(strip, /data-site-footer=""/);
+  assert.match(strip, /data-work-nav-cell=\{item\.key\}/);
+  // …at exactly the height the old strip buttons occupied (area unchanged)…
+  assert.match(STRIP_CSS, /--work-nav-h: 44px;/);
+  // …and extra tools are reached by swiping inside the pill, never by
+  // shrinking a cell.
   assert.match(STRIP_CSS, /overflow-x: auto/);
-  assert.match(STRIP_CSS, /@container \(min-width: 720px\)/);
-  assert.match(STRIP_CSS, /prefers-reduced-motion/);
+  assert.match(STRIP_CSS, /--work-nav-cell: 46px/);
+  // The old letter plates are gone.
+  assert.doesNotMatch(STRIP_CSS, /course-strip-plate|inset: 6px 0/);
 });

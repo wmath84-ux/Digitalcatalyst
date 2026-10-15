@@ -19,6 +19,12 @@ export declare const SELF_PRACTICE_SETS_COURSE_DESCRIPTION: string;
 /** A blank hand-written question (4 empty options, no answer marked yet). */
 export declare const selfPracticeEmptyQuestion: (index?: number) => MyCourseQuestion;
 
+/** A blank question of any supported type, with that type's own empty fields. */
+export declare const selfPracticeEmptyQuestionOfType: (
+  type: string,
+  index?: number,
+) => MyCourseQuestion;
+
 /** Bulk-parser output → stored question records (ids, clamps, topic fill). */
 export declare const selfPracticeQuestionsFromParsed: (
   parsed: unknown,

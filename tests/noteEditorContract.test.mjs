@@ -268,13 +268,16 @@ test("the editor adds no second keyboard system", () => {
   assert.match(footerHook, /"data-course-keyboard"\]/);
 });
 
-test("no hard-coded keyboard heights or bottom offsets; the docked toolbar is in normal flow", () => {
+test("no hard-coded keyboard heights or bottom offsets; the editing toolbar floats over the pane, never fixed", () => {
   for (const [name, source] of [["NoteEditor.tsx", editor], ["NoteEditorToolbar.tsx", toolbar], ["noteEditor.css", css]]) {
     assert.doesNotMatch(source, /\b(280|300|320|336|340)\s*px/, `${name} must not carry a keyboard-sized constant`);
   }
   assert.doesNotMatch(css, /\.dc-note \.dc-note-dock \{[^}]*position:\s*fixed/);
   assert.doesNotMatch(css, /(^|[^-])bottom:\s*-?\d+(\.\d+)?(px|rem)/m);
-  assert.match(css, /\.dc-note \.dc-note-dock \{[^}]*position: relative;/);
+  // The reference design's floating pill: absolute over the note's own shell
+  // (so it rides the pane the deck sized to the visible area), bottom-left.
+  assert.match(css, /\.dc-note \.dc-note-dock \{[^}]*position: absolute;/);
+  assert.match(css, /\.dc-note \.dc-note-shell \{[^}]*position: relative;/);
   // Taps on the toolbar never move focus out of the writing surface.
   assert.match(toolbar, /preventFocusOnTap/);
   assert.match(toolbar, /<UIModeContext\.Provider value="mobile">/);
@@ -291,10 +294,10 @@ test("the toolbar ends just above the footer navigation — measured, never assu
   // from the player entirely — lifts nothing: no phantom gap above nothing.
   assert.match(footerMath, /if \(footer\.height <= 0\) return 0;/);
   assert.match(footerMath, /if \(!surface \|\| !footer\) return 0;/);
-  // Published as a custom property, applied as a MARGIN (the bar's own paper
-  // stops where the footer begins), and never as a fixed offset or a constant.
+  // Published as a custom property, applied inside the pill's `bottom` (its
+  // resting offset plus the measured lift), never as a constant offset.
   assert.match(footerMath, /export const COURSE_FOOTER_INSET_PROPERTY = "--dc-note-footer-inset";/);
-  assert.match(css, /\.dc-note \.dc-note-dock \{[^}]*margin-bottom: var\(--dc-note-footer-inset, 0px\);/);
+  assert.match(css, /\.dc-note \.dc-note-dock \{[^}]*bottom: calc\(max\(0\.5rem, env\(safe-area-inset-bottom\)\) \+ var\(--dc-note-footer-inset, 0px\)\);/);
   assert.match(editor, /const footerInset = useCourseFooterInset\(docked, shellRef\);/);
   assert.match(editor, /shell\.style\.setProperty\(COURSE_FOOTER_INSET_PROPERTY, `\$\{footerInset\}px`\);/);
   assert.match(editor, /shell\.style\.removeProperty\(COURSE_FOOTER_INSET_PROPERTY\);/);

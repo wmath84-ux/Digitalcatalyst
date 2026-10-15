@@ -22,8 +22,10 @@
 //      that is the biggest type on that card;
 //   3. product cards use image-only Home-ratio artwork with their copy beside it
 //      on wider screens (not an image overlay or square crop);
-//   4. Store Grid stays one large-card column, and Mixed inserts two list rows
-//      between each large card at every breakpoint;
+//   4. Store Grid is a responsive multi-column catalogue (2 per row on a
+//      phone, then 3 / 4 / 5 across as the marketplace widens; owner brief
+//      update — the one-column full-width card read as broken on desktop),
+//      and Mixed inserts two list rows between each large card;
 //   5. the store glass is the owner's material — blur 42–50% of the 40px
 //      ceiling, light blue rgb(173,216,255) at 22–30%;
 //   6. the footer navigation (the main app dock AND FlowPath's dock, which is
@@ -267,28 +269,28 @@ test("the price is on the card at every breakpoint, not only from sm:", () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* 4. One roomy Store track on phone / tablet / desktop                 */
+/* 4. Responsive Store catalogue — columns grow with the space          */
 /* ------------------------------------------------------------------ */
 
-test("Grid view stays one full-width column on phones, tablets and desktop", () => {
+test("Grid view is a responsive multi-column catalogue at every size", () => {
+  // index.css owns only the shared track behaviour — never a column count —
+  // so no stale one-column rule can override the container steps below.
   const base = /\n\[data-store-grid\] \{([^}]*)\}/.exec(indexCss)?.[1];
   assert.ok(base, "expected the base [data-store-grid] rule");
   assert.match(base, /display: grid/);
-  assert.match(base, /grid-template-columns: minmax\(0, 1fr\)/);
-  assert.match(base, /gap: clamp\(14px, 1\.6vw, 24px\)/);
-
-  const tabletBlock =
-    /@media \(min-width: 640px\) and \(max-width: 959px\) \{\s*\n\s*\[data-store-grid\] \{([^}]*)\}/.exec(indexCss)?.[1];
-  assert.ok(tabletBlock, "expected the 640–959 Store grid rule");
-  assert.match(tabletBlock, /grid-template-columns: minmax\(0, 1fr\) !important/);
-
-  const desktopBlock =
-    /@media \(min-width: 960px\) \{\s*\n\s*\[data-store-grid\] \{([^}]*)\}/.exec(indexCss)?.[1];
-  assert.ok(desktopBlock, "expected the desktop Store grid rule");
-  assert.match(desktopBlock, /grid-template-columns: minmax\(0, 1fr\) !important/);
+  assert.match(base, /gap: clamp\(12px, 1\.6vw, 20px\)/);
+  assert.doesNotMatch(indexCss, /\[data-store-grid\] \{[^}]*grid-template-columns/);
 
   const css = read("src/components/store-marketplace.css");
-  assert.match(css, /\.dc-marketplace-grid\[data-store-grid\][\s\S]*?grid-template-columns: minmax\(0, 1fr\) !important/);
+  // Two per row on a phone, then 3 / 4 / 5 as the marketplace container
+  // (rail + layout width, not the raw viewport) widens.
+  assert.match(css, /\.dc-marketplace-grid\[data-store-grid\] \{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\) !important;/);
+  assert.match(css, /@container dc-marketplace \(min-width: 700px\) \{\s*\[data-store-marketplace\] \.dc-marketplace-grid\[data-store-grid\] \{\s*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\) !important;/);
+  assert.match(css, /@container dc-marketplace \(min-width: 1024px\) \{\s*\[data-store-marketplace\] \.dc-marketplace-grid\[data-store-grid\] \{\s*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\) !important;/);
+  assert.match(css, /@container dc-marketplace \(min-width: 1440px\) \{\s*\[data-store-marketplace\] \.dc-marketplace-grid\[data-store-grid\] \{\s*grid-template-columns: repeat\(5, minmax\(0, 1fr\)\) !important;/);
+  // The cards stack compactly inside the cells — artwork on top, copy below.
+  assert.match(css, /\[data-store-grid\] > \.dc-marketplace-card\.is-large \.dc-marketplace-open \{\s*display: flex;\s*flex-direction: column;/);
+  assert.match(css, /\[data-store-grid\] > \.dc-marketplace-card\.is-large \.dc-marketplace-cover \{\s*width: 100%;\s*aspect-ratio: 16 \/ 10;/);
 });
 
 test("Mixed view places two full-width list rows between each large card", () => {

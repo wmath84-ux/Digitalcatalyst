@@ -303,10 +303,14 @@ test("the ramp is CSS-only and contains no forbidden viewport/container sizing",
   assert.doesNotMatch(css.slice(scaleStart), /\b(?:javascript|onclick)\b/i);
 });
 
-test("Home and Admin keep the matching 520 / 640 / 740 boxes", () => {
-  const homeBoxes = homeApp.match(/h-\[520px\][^"`]*sm:h-\[640px\][^"`]*md:h-\[740px\]/g) || [];
-  assert.equal(homeBoxes.length, 2, "Home wall and social slot each keep the height ladder");
-  assert.ok(homeBoxes.every((box) => box.includes("w-full")));
+test("feedback wall and social slot keep their boxes; Admin previews the social card", () => {
+  // The feedback wall moved into its own framed box (420 / 560 / 640) on the
+  // dedicated feedback page; the social slot kept the 520 / 640 / 740 ladder
+  // and the Admin branding preview still matches the social card exactly.
+  const socialBoxes = homeApp.match(/h-\[520px\][^"`]*sm:h-\[640px\][^"`]*md:h-\[740px\]/g) || [];
+  assert.equal(socialBoxes.length, 1, "the social slot keeps the 520 / 640 / 740 ladder");
+  assert.ok(socialBoxes.every((box) => box.includes("w-full")));
+  assert.match(homeApp, /dc-home-feedback-wall-frame h-\[420px\] w-full[^"]*sm:h-\[560px\][^"]*md:h-\[640px\]/);
   assert.match(brandingPage, /h-\[520px\] w-full sm:h-\[640px\] md:h-\[740px\]/);
   assert.match(homeApp, /data-home-social-slot/);
 });

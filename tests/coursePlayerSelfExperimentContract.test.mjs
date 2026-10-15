@@ -260,12 +260,16 @@ test("Create is immediate and waits for a runnable draft", () => {
 // 4. The “+” and its dropdown, wired end to end
 // ---------------------------------------------------------------------------
 
-test("the header '+' opens a dropdown with the ways in and the templates", () => {
+test("the bottom-right '+' (SELF only) opens a dropdown with the ways in and the templates", () => {
   assert.match(panel, /data-experiment-self-add=""/);
   assert.match(panel, /aria-label="Create your own experiment"/);
-  // The “+” belongs to the learner's OWN side: from MASTER it opens SELF first,
-  // so the list behind the dropdown is where the new experiment will land.
-  assert.match(panel, /masterSelfCtl\.setMode\("self"\);/);
+  // The “+” belongs to the learner's OWN side: one circular pink button
+  // anchored bottom-right, rendered ONLY while SELF is the open filter —
+  // never over the MASTER list, and never without a save callback.
+  assert.match(panel, /\{selfMode && \(onCreateSelfExperiment \|\| onCreateSelfMindMap\) \? \(/);
+  assert.match(panel, /background: "#FF6BF5"/);
+  assert.match(panel, /rounded-full/);
+  assert.match(panel, /data-experiment-screen=\{composerOpen \? "create" : "library"\}/);
   assert.match(panel, /data-experiment-self-menu=""/);
   assert.match(panel, /role="menu"/);
   assert.match(panel, /data-experiment-self-menu-item="scratch"/);
@@ -285,7 +289,7 @@ test("the page is a MASTER/SELF list with both empty states and the shared contr
   assert.match(panel, /selfCount=\{selfExperiments\.length\}/);
   assert.match(panel, /data-experiment-self-empty=""/);
   assert.match(panel, /data-experiment-master-empty=""/);
-  assert.match(panel, /Tap \+ in the header to create your own 2D experiment/);
+  assert.match(panel, /Tap the \+ button below to create your own 2D experiment/);
   assert.match(panel, /data-experiment-card=\{experiment\.id\}/);
   // The filter is the shared, persisted preference — per feature, per learner.
   assert.match(panel, /const masterSelfCtl = useMasterSelfPreference\("experiment", uid \?\? null, "master"\);/);

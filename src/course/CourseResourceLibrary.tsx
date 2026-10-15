@@ -35,6 +35,7 @@ import { isExperimentFileType, NOTE_RESOURCE_FILE_TYPE, READ_RESOURCE_FILE_TYPE 
 import BranchedMenu, { BranchedMenuSkeleton, useBranchedOpen, type BranchedMenuItem } from "../components/branched-menu/BranchedMenu";
 import { ancestorSectionValues, buildBranchTree, type BranchEntry, type BranchSegment } from "../components/branched-menu/branchedTree";
 import { StudyLibraryEmptyState, StudyLibraryNotice } from "./StudyLibraryStates";
+import CoursePageHeader from "./CoursePageHeader";
 import "./courseResourceLibrary.css";
 import { isVisibleFile } from "./fileVisibility";
 
@@ -461,17 +462,20 @@ export default function CourseResourceLibrary({
 
   return (
     <div className="course-resource-library" data-course-resource-library>
-      <div className="library-header" data-library-header>
-        <div className="library-header__title-row">
-          <h2 className="library-header__title">
-            <BookOpen size={15} aria-hidden="true" />
-            <span>Resource Library</span>
-          </h2>
-          {status === "ready" && hasAnything ? (
-            <span className="library-header__count">{totalResources} {totalResources === 1 ? "resource" : "resources"}</span>
-          ) : null}
-        </div>
-      </div>
+      {/* The reference header every other Course Player page now matches:
+          the shared CoursePageHeader box (coursePageHeader.css). Its own
+          background and the library's appearance stay as they were. */}
+      <CoursePageHeader
+        title="Resource Library"
+        icon={<BookOpen size={20} aria-hidden="true" />}
+        className="library-header"
+        titleClassName="library-header__title"
+        dataAttrs={{ "data-library-header": "" }}
+      >
+        {status === "ready" && hasAnything ? (
+          <span className="library-header__count">{totalResources} {totalResources === 1 ? "resource" : "resources"}</span>
+        ) : null}
+      </CoursePageHeader>
 
       <div className="library-body" data-library-body>
         {status === "loading" ? (

@@ -26,7 +26,7 @@
 //      "player bars" hide toggles are gone too because there is no header
 //      left to hide.
 
-import { BookmarkPlus, ExternalLink, FileQuestion, FolderPlus, Maximize2, PencilLine, Eye, MonitorSmartphone, RefreshCw } from "lucide-react";
+import { BookmarkPlus, ExternalLink, FileQuestion, FolderPlus, Maximize2, PencilLine, Eye, MonitorSmartphone, RefreshCw, SlidersHorizontal } from "lucide-react";
 import type { CSSProperties, ComponentType, ReactNode } from "react";
 import CourseDownloadButton from "./CourseDownloadButton";
 import { GlassButton } from "../components/ui/glass-button";
@@ -36,6 +36,7 @@ import { toast } from "../components/ui/glass-toast";
 import { resolveImageSrc } from "../components/ui/SafeImage";
 import { useHomeHold } from "../hooks/useHomeHold";
 import type { CourseFileActions } from "./ResourceViewer";
+import CoursePageHeader from "./CoursePageHeader";
 
 // ── Preference row accents — the same colours the ⚙ popover used ──────────
 const SETTING_ACCENTS: Record<string, { color: string; delay: number; divider: boolean }> = {
@@ -249,7 +250,11 @@ export default function PlayerPanel({
   };
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto overscroll-contain pb-3" data-course-player-panel>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden" data-course-player-panel>
+      {/* The shared page header (the Resource Library header's size): the
+          page name, bold with its icon, above the settings list. */}
+      <CoursePageHeader title="Player" icon={<SlidersHorizontal size={20} aria-hidden="true" />} />
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-3">
       {/* ── 1. Course identity — logo back button, title, badges ──────── */}
       <SectionLabel>Course</SectionLabel>
       <div className="flex items-center gap-3 px-3 py-1.5" data-course-panel-section="course">
@@ -453,6 +458,7 @@ export default function PlayerPanel({
           </div>
         </>
       ) : null}
+      </div>
     </div>
   );
 }

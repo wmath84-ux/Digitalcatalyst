@@ -44,12 +44,12 @@ import { normalizeResourceUrl } from "../../../../utils/productMapping";
 import { experimentBlockingIssues } from "@/utils/experimentSpec";
 import {
   countIncompletePracticeQuestions,
-  normalizePracticeQuestions,
   practiceQuestionsExplained,
   practiceQuestionsReady,
 } from "../../../../utils/practiceSet.js";
 import { ADMIN_PRODUCT_RESOURCE_TYPES, registerNoteResourceType } from "../../../../utils/productResourceTypes.js";
 import { MAX_NOTE_HTML_LENGTH } from "../../../../utils/courseNotes.js";
+import { isCloudinaryImageUploadConfigured, uploadImageToCloudinary } from "../../../../utils/cloudinaryUpload";
 import { getFirebaseStorage } from "../../../../firebase";
 import {
   buildReadStoragePath,
@@ -84,6 +84,17 @@ function providerForType(type: ProductResource["type"]) {
   if (["gdrive", "gdoc", "gsheet", "gslides", "gform"].includes(type)) return "Google";
   if (type === "whimsical") return "Whimsical";
   return "Public URL";
+}
+
+/**
+ * Diagram/hotspot images for Brain Practice Set questions go through the
+ * admin's own image pipeline (Cloudinary, like every other product image);
+ * the question stores the hosted URL — never base64 inside the product
+ * document. When Cloudinary is not configured the editors fall back to
+ * their image-URL field, exactly like the learner creator does.
+ */
+async function uploadBrainPracticeImage(file: File): Promise<string> {
+  return uploadImageToCloudinary(file, { folder: "brain-practice", tags: ["brain", "practice-set"] });
 }
 
 function genLocalId(prefix: string) {
@@ -810,7 +821,10 @@ function ResourceCard({
   // the HTML designed in the panel below (or a hosted page). Everything else
   // keeps the URL-ready rule.
   const isBrain = resource.type === "brain";
-  const brainQuestions = normalizePracticeQuestions(resource.practiceQuestions);
+  // The badge counts DRAFTS as typed (a blank question the admin just added
+  // is a question being written, not "no questions"); readiness below still
+  // reads the normalised set the player would actually receive.
+  const brainDraftCount = (resource.practiceQuestions ?? []).length;
   // Two rules, on purpose: `brainReady` is what the Course Player can run,
   // `brainExplained` is the admin's publish rule on top of it — an explanation
   // on every question is NEVER optional (owner rule, 2026-10-07).
@@ -844,11 +858,11 @@ function ResourceCard({
         </p>
         {isBrain ? (
           <Pill tone={brainExplained ? "success" : "warn"}>
-            {brainQuestions.length === 0
+            {brainDraftCount === 0
               ? "Questions required"
               : brainExplained
-                ? `${brainQuestions.length} question${brainQuestions.length === 1 ? "" : "s"} ready`
-                : `${brainQuestions.length} question${brainQuestions.length === 1 ? "" : "s"} · ${Math.max(brainIncomplete, 1)} to fix`}
+                ? `${brainDraftCount} question${brainDraftCount === 1 ? "" : "s"} ready`
+                : `${brainDraftCount} question${brainDraftCount === 1 ? "" : "s"} · ${Math.max(brainIncomplete, 1)} to fix`}
           </Pill>
         ) : isExperiment ? (
           <Pill tone={experimentReady ? "success" : experimentErrors.length ? "danger" : "warn"}>
@@ -966,9 +980,10 @@ function ResourceCard({
 
       {isBrain ? (
         <PracticeSetImportPanel
-          questions={brainQuestions}
+          questions={resource.practiceQuestions ?? []}
           title={resource.practiceTitle || ""}
           resourceName={resource.name}
+          onUploadImage={isCloudinaryImageUploadConfigured() ? uploadBrainPracticeImage : undefined}
           onChange={({ questions, title }) =>
             onUpdate({
               // Normalise for storage (caps, ids, difficulty) but keep drafts:
@@ -1207,8 +1222,8 @@ function ResourceCard({
       ) : null}
       {isBrain && !brainReady ? (
         <p className="rounded-lg bg-amber-100 p-2 text-xs font-medium text-amber-800">
-          Every practice question needs text, two options and a marked answer. The set only reaches the learner&apos;s Brain tab once it is
-          complete — drafts stay saved here meanwhile.
+          Every practice question must be complete for its type — its answer key filled in and an explanation written. The set only
+          reaches the learner&apos;s Brain tab once it is complete — drafts stay saved here meanwhile.
         </p>
       ) : null}
       {isMindMap && !mindMapReady ? (

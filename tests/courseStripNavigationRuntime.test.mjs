@@ -12,7 +12,7 @@ globalThis.window = dom.window;
 globalThis.document = dom.window.document;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const tabsSource = fs.readFileSync('src/course/CourseOverlay.tsx', 'utf8');
-const tabs = [...tabsSource.matchAll(/\{ key: "(\w+)", label: "([^"]+)", heading: "([^"]+)", hint: "[^"]*", color: "([^"]+)"/g)].map(([, key, label, heading, color]) => ({ key, label, heading, color }));
+const tabs = [...tabsSource.matchAll(/\{ key: "(\w+)", label: "([^"]+)", heading: "([^"]+)", hint: "[^"]*", color: "([^"]+)", icon: (\w+) \}/g)].map(([, key, label, heading, color]) => ({ key, label, heading, color, icon: (props) => React.createElement('svg', { 'data-icon-size': props.size }) }));
 let keyboardVisible = false;
 function load(file, resolver = require) {
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -23,6 +23,7 @@ function load(file, resolver = require) {
 const Nav = load('src/course/CoursePeekDock.tsx', id => {
   if (id === './CourseOverlay') return { TABS: tabs };
   if (id === './useCourseKeyboard') return { useCourseKeyboard: () => ({ keyboardVisible }) };
+  if (id === './coursePanelSession') return { useFooterHiddenPage: () => false };
   if (id.endsWith('.css')) return {};
   return require(id);
 }).default;
@@ -35,8 +36,13 @@ test('real strip render, click, keyboard focus, hidden tabs and soft keyboard', 
   const buttons = [...document.querySelectorAll('button')];
   assert.equal(buttons.length, 9);
   assert.equal(document.querySelector('[data-course-strip="paid"]'), null);
-  assert.equal(document.querySelector('[data-course-strip="notes"]').getAttribute('aria-pressed'), 'true');
-  assert.ok(buttons.every(button => button.getAttribute('aria-label') && button.style.getPropertyValue('--strip-color')));
+  // The Workspace pill's cells: every tool is a work-nav cell with its icon…
+  assert.ok(buttons.every(button => button.hasAttribute('data-work-nav-cell') && button.querySelector('svg')));
+  // …and the selected cell is the "current page", tinted with its own accent
+  // (the notes blue), exactly as the Workspace footer marks selection.
+  const active = document.querySelector('[data-course-strip="notes"]');
+  assert.equal(active.getAttribute('aria-current'), 'page');
+  assert.equal(active.style.getPropertyValue('--work-nav-active'), tabs.find((t) => t.key === 'notes').color);
   await act(() => document.querySelector('[data-course-strip="read"]').click());
   assert.deepEqual(selected, ['read']);
   for (const button of buttons) button.scrollIntoView = () => {};

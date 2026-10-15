@@ -243,11 +243,15 @@ test("a cursor in the TITLE field brings the toolbar up instantly", async () => 
   assert.equal(window.document.activeElement, title(), "the title really has the cursor");
   assert.equal(docked(), "true");
   assert.ok(dock(), "the toolbar is on screen — with no soft keyboard anywhere");
-  // The one toolbar, with its full set of tools.
+  // The one toolbar, with the reference design's full tool set in its order:
+  // undo · redo | block type · bold · italic · strike · highlight |
+  // code · quote | lists · checklist · indent · outdent. (The link button
+  // joins whenever a body selection can take one — BlockNote's own rule,
+  // unchanged; underline stays on the floating selection toolbar.)
   assert.deepEqual(
     Array.from(dock().querySelectorAll(".bn-ak-button")).map((button) => button.getAttribute("aria-label") || button.textContent.trim()),
-    ["Insert block", "Paragraph", "Bold", "Italic", "Underline", "Strike", "Code", "Undo", "Redo"],
-    "the same tool set the soft-keyboard toolbar has always had",
+    ["Undo", "Redo", "Paragraph", "Bold", "Italic", "Strike", "Highlight", "Code", "Quote", "Bulleted list", "Numbered list", "Checklist", "Indent", "Outdent"],
+    "the reference editing pill's tool set, in its order",
   );
   await probe.unmount();
 });

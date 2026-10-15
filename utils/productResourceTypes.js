@@ -20,7 +20,7 @@ export const CORE_PRODUCT_RESOURCE_TYPES = Object.freeze([
   { value: "github_pages", label: "GitHub Pages" },
   { value: "whimsical", label: "Whimsical" },
   { value: "iframe", label: "Other embed / iframe" },
-  { value: "brain", label: "Brain · practice set" },
+  { value: "brain", label: "Brain Practice Set" },
   { value: "interactive", label: "Interactive 2D experiment" },
   { value: "read", label: "Read · PDF / library" },
   { value: "mind_map", label: "Mind Map" },

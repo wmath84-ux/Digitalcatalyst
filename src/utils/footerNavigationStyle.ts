@@ -4,23 +4,28 @@ export type FooterNavigationStyle = "youtube" | "uiverse" | "glass-dock" | "work
 
 const STORAGE_KEY = "dc-footer-navigation-style";
 const CHANGE_EVENT = "dc:footer-navigation-style-change";
-const DEFAULT_STYLE: FooterNavigationStyle = "youtube";
+const DEFAULT_STYLE: FooterNavigationStyle = "work-pill";
 /**
- * The one-time "everyone starts on Edge-to-edge" pass (owner, 2026-10-14):
+ * The one-time "everyone starts on the Workspace pill" pass:
  *
- *   "Footer navigation ko by default setting mein jaakar profile ke
- *    edge-to-edge wala select karke rakh do — sabke liye set kar do."
+ *   "Workspace ka pill-style footer navigation sabhi users ke liye
+ *    default set karo."
  *
- * A browser that still had one of the two older designs saved (or an older
- * key this module never wrote) is moved onto the default ONCE, at app boot.
- * The marker makes it strictly one-time: from the next visit on, the Settings
- * choice is the learner's again and is never silently overwritten.
+ * This supersedes the earlier Edge-to-edge (`youtube`) default. A browser
+ * that still has any other design saved — Edge-to-edge included — is moved
+ * onto the Workspace pill (`work-pill`) ONCE, at app boot. The marker is a
+ * NEW key, distinct from the retired `…edge-default.v1` one, so browsers
+ * that already ran that pass are still moved onto the new default.
+ *
+ * The marker makes it strictly one-time: from the next visit on, the
+ * Settings choice is the learner's again and is never silently overwritten,
+ * so a design picked in Settings is preserved across later boots.
  *
  * Deliberately NOT a module side effect: harness pages and component tests
  * import this file to switch styles on purpose, and only the real app boot
  * (`src/main.tsx`) is allowed to re-seat a stored preference.
  */
-const MIGRATION_KEY = "dc-footer-navigation-style.edge-default.v1";
+const MIGRATION_KEY = "dc-footer-navigation-style.work-pill-default.v1";
 
 /**
  * Runs once per browser (idempotent thanks to the marker). Safe to call on
@@ -34,7 +39,7 @@ export function ensureDefaultFooterNavigationStyle(): void {
     window.localStorage.setItem(STORAGE_KEY, DEFAULT_STYLE);
   } catch {
     // Private mode / storage denied: the in-memory default is already
-    // Edge-to-edge, so there is nothing to migrate.
+    // the Workspace pill, so there is nothing to migrate.
   }
   window.dispatchEvent(new window.Event(CHANGE_EVENT));
 }

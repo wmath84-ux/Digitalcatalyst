@@ -33,7 +33,7 @@
 // Services → Credentials) — the Data API is billed per quota unit, and an
 // unrestricted key can be lifted out of any client bundle.
 
-import { createMusicId, youTubeEmbedUrl, type MusicTrack } from "./musicLibrary";
+import { createMusicId, youTubeEmbedUrl, youTubeThumbnailUrl, type MusicTrack } from "./musicLibrary";
 
 declare const __DC_YOUTUBE_API_KEY__: string | undefined;
 
@@ -96,7 +96,11 @@ export const youTubeSearchUrl = (query: string): string =>
 
 interface YouTubeSearchItem {
   id?: { videoId?: string };
-  snippet?: { title?: string; channelTitle?: string };
+  snippet?: {
+    title?: string;
+    channelTitle?: string;
+    thumbnails?: Record<string, { url?: string } | undefined>;
+  };
 }
 
 /**
@@ -124,6 +128,10 @@ export async function searchYouTube(query: string, signal?: AbortSignal): Promis
         if (!/^[a-zA-Z0-9_-]{11}$/.test(id)) return null;
         const title = String(item?.snippet?.title || "").trim() || "YouTube video";
         const channel = String(item?.snippet?.channelTitle || "").trim();
+        const thumbnails = item?.snippet?.thumbnails || {};
+        const apiThumbnail = [thumbnails.high, thumbnails.medium, thumbnails.default]
+          .map((candidate) => String(candidate?.url || "").trim())
+          .find((candidate) => candidate.startsWith("https://")) || "";
         const track: MusicTrack = {
           id: createMusicId(`youtube:${id}`),
           provider: "youtube",
@@ -131,6 +139,7 @@ export async function searchYouTube(query: string, signal?: AbortSignal): Promis
           subtitle: channel || "YouTube",
           url: `https://www.youtube.com/watch?v=${id}`,
           embedUrl: youTubeEmbedUrl(id),
+          thumbnailUrl: apiThumbnail || youTubeThumbnailUrl(id),
           source: "link",
           addedAt: Date.now(),
         };

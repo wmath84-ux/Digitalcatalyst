@@ -123,7 +123,7 @@ test("the viewer is shared with Read, and its Read-only contract is untouched", 
   assert.match(viewer, /resourceId\?: string;/);
   assert.match(viewer, /: storageKey \? readPageFromStorage\(storageKey\) : 1;/);
   // The pre-flight check (honest failure messages) still runs for every source.
-  assert.match(viewer, /const verdict = await checkPdfSource\(src\);/);
+  assert.match(viewer, /const verdict = await checkPdfSource\(viewerSrc\);/);
 });
 
 test("no other code path drops a direct PDF into a bare iframe", () => {

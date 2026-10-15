@@ -79,7 +79,7 @@ test("the Read library has a course/mine toggle, compose for modules, and a stal
   assert.match(panel, /data-course-read-mode="mine"/);
   assert.match(panel, /data-course-read-compose/);
   assert.match(panel, /multiple/);
-  assert.match(panel, /Create your module/);
+  assert.match(panel, /Create a module, add a submodule, and upload one or more PDFs/);
   assert.match(panel, /Submodule/);
   assert.match(panel, /Your annotations/);
   assert.match(panel, /data-course-read-upload/);

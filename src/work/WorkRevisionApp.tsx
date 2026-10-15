@@ -10,6 +10,7 @@ import {
   FileUp,
   Layers3,
   LoaderCircle,
+  PanelLeft,
   Pencil,
   Plus,
   RotateCcw,
@@ -54,6 +55,7 @@ import {
   WORK_REVISION_BACKUP_MAX_BYTES,
   type WorkRevisionBackupEnvelope,
 } from "./storage/workRevisionBackup";
+import WorkRevisionTestPanel from "./WorkRevisionTestPanel";
 import { WORK_DEVICE_UID } from "./workIdentity";
 import type { UnifiedCard, UnifiedDeck, UnifiedRating, UnifiedSnapshot, UnifiedStudySession } from "../revision/domain/types";
 import "./work-revision.css";
@@ -73,7 +75,15 @@ type View =
 
 type DraftFlashcard = { front: string; back: string; hint: string; tags: string };
 type DraftBrainQuestion = { prompt: string; options: string[]; correctIndex: number; explanation: string; topic: string };
-type WorkRevisionAppProps = { notes: CoursePlayerNote[] };
+type WorkRevisionAppProps = {
+  notes: CoursePlayerNote[];
+  /**
+   * Leaves Work for the app Home. The Revision page is headless in Work, so
+   * its test panel carries this as the way out — the learner is never
+   * trapped inside the Revision page.
+   */
+  onExit?: () => void;
+};
 
 const freshFlashcard = (): DraftFlashcard => ({ front: "", back: "", hint: "", tags: "" });
 const freshBrainQuestion = (): DraftBrainQuestion => ({ prompt: "", options: ["", "", "", ""], correctIndex: 0, explanation: "", topic: "" });
@@ -224,20 +234,39 @@ function WorkRevisionDeckStrip({
   );
 }
 
+/** The one test-panel button every Revision chrome carries at its top-left. */
+function WorkRevisionPanelButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Open test panel"
+      title="Switch test"
+      data-work-revision-panel-button=""
+      className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[var(--border-color)] bg-[var(--surface-bg)] text-[var(--text-secondary)] transition hover:text-[var(--accent-color)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent-color)]"
+    >
+      <PanelLeft size={16} aria-hidden="true" />
+    </button>
+  );
+}
+
 function WorkRevisionTopline({
   title,
   subtitle,
   onBack,
   right,
+  onOpenPanel,
 }: {
   title: string;
   subtitle?: string;
-  onBack: () => void;
+  onBack?: () => void;
   right?: ReactNode;
+  onOpenPanel?: () => void;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border-color)] px-3 py-2.5 sm:px-5" data-work-revision-subheader>
-      <button type="button" onClick={onBack} aria-label="Back to Revision" className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[var(--border-color)] bg-[var(--surface-bg)] text-[var(--text-secondary)] transition hover:text-[var(--accent-color)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent-color)]"><ArrowLeft size={16} /></button>
+      {onOpenPanel ? <WorkRevisionPanelButton onClick={onOpenPanel} /> : null}
+      {onBack ? <button type="button" onClick={onBack} aria-label="Back to Revision" className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[var(--border-color)] bg-[var(--surface-bg)] text-[var(--text-secondary)] transition hover:text-[var(--accent-color)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent-color)]"><ArrowLeft size={16} /></button> : null}
       <div className="min-w-0 flex-1">
         <h2 className="truncate text-sm font-extrabold text-[var(--text-primary)]">{title}</h2>
         {subtitle ? <p className="truncate text-[11px] text-[var(--text-tertiary)]">{subtitle}</p> : null}
@@ -387,6 +416,8 @@ function WorkFlashcardReview({
   onSubmit,
   onRate,
   onSkip,
+  onBack,
+  onOpenPanel,
 }: {
   card: UnifiedCard;
   index: number;
@@ -401,6 +432,10 @@ function WorkFlashcardReview({
   onSubmit: () => void;
   onRate: (rating: UnifiedRating) => void;
   onSkip: () => void;
+  /** Headless viewers keep their way back inside the card surface itself. */
+  onBack?: () => void;
+  /** Top-left test switcher: opens the test panel over this card. */
+  onOpenPanel?: () => void;
 }) {
   const isMcq = card.cardType === "mcq" && (card.options?.length ?? 0) >= 2;
   const isCorrect = selectedOption === card.correctIndex;
@@ -408,7 +443,22 @@ function WorkFlashcardReview({
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-4 sm:px-6" data-work-revision-fsrs-card={card.id}>
       <div className="mx-auto flex w-full max-w-[780px] flex-1 flex-col">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <span className="text-xs font-bold text-[var(--text-secondary)]">Card {index + 1} of {total}</span>
+          <span className="flex min-w-0 items-center gap-2">
+            {onOpenPanel ? <WorkRevisionPanelButton onClick={onOpenPanel} /> : null}
+            {onBack ? (
+              <button
+                type="button"
+                onClick={onBack}
+                aria-label="Back to study styles"
+                title="Back to study styles"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-[var(--border-color)] bg-[var(--surface-bg)] text-[var(--text-secondary)] transition hover:text-[var(--accent-color)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent-color)]"
+                data-work-revision-viewer-back=""
+              >
+                <ArrowLeft size={15} aria-hidden="true" />
+              </button>
+            ) : null}
+            <span className="text-xs font-bold text-[var(--text-secondary)]">Card {index + 1} of {total}</span>
+          </span>
           <span className="rounded-full border border-[var(--border-color)] px-2.5 py-1 text-[10px] font-semibold capitalize text-[var(--text-tertiary)]">{card.scheduling.state === "new" ? "New" : card.scheduling.state}</span>
         </div>
         <BrainSurface className="work-revision-card-face flex min-h-[190px] flex-1 flex-col justify-center border border-[var(--border-color)] p-5 sm:min-h-[240px] sm:p-8" shadow="top">
@@ -490,9 +540,11 @@ function WorkFlashcardReview({
   );
 }
 
-export default function WorkRevisionApp({ notes }: WorkRevisionAppProps) {
+export default function WorkRevisionApp({ notes, onExit }: WorkRevisionAppProps) {
   const [snapshot, setSnapshot] = useState<UnifiedSnapshot | null>(null);
   const [view, setView] = useState<View>("dashboard");
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [brainAnswering, setBrainAnswering] = useState(false);
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
   const [studySession, setStudySession] = useState<UnifiedStudySession | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
@@ -566,6 +618,14 @@ export default function WorkRevisionApp({ notes }: WorkRevisionAppProps) {
     const cardId = studySession.cardIds[studySession.currentIndex];
     return snapshot.cards.find((card) => card.id === cardId && !card.deletedAt) ?? null;
   }, [snapshot, studySession]);
+
+  // Headless in Work: the whole Revision page sits outside the outer Work
+  // header — WorkPageSurface treats the Revision page itself as immersive,
+  // exactly like the Sketch page, so this surface carries its own chrome
+  // everywhere (toplines on page views, viewer headers on the card decks).
+  // `brainAnswering` still governs the Brain answer viewer's internal
+  // chrome: while a set is being answered, the viewer's own practice header
+  // is the only band on screen.
 
   const enterCreateFlow = (next: View) => {
     setDeckName("");
@@ -944,9 +1004,41 @@ export default function WorkRevisionApp({ notes }: WorkRevisionAppProps) {
     }
   };
 
-  const currentSessionCards = studySession?.cardIds.length ?? 0;
   const cardsForDeck = (deckId: string) => cards.filter((card) => card.deckId === deckId);
   const deckDue = (deckId: string) => getWorkload(cardsForDeck(deckId)).dueToday;
+
+  /* ── Test panel (the side-panel switcher) ───────────────────────────────
+     One overlay for every Revision view: it lists the tests already on this
+     device and opens one straight away, so tests can be switched mid-study.
+     It renders as a sibling inside each view's root, so the screen under it
+     (a half-answered card included) is never unmounted or reset. */
+  const openTestPanel = () => setPanelOpen(true);
+  const testRows = decks
+    .slice()
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .map((deck) => ({
+      id: deck.id,
+      name: deck.name,
+      cards: cardsForDeck(deck.id).length,
+      due: deckDue(deck.id),
+      active: deck.id === selectedDeckId,
+    }));
+  const openTestFromPanel = (id: string) => {
+    const deck = decks.find((row) => row.id === id);
+    setPanelOpen(false);
+    if (deck) goToStudyStyle(deck);
+  };
+  const panelNode = (
+    <WorkRevisionTestPanel
+      open={panelOpen}
+      tests={testRows}
+      onClose={() => setPanelOpen(false)}
+      onGoDashboard={() => { setPanelOpen(false); setView("dashboard"); }}
+      onGoLibrary={() => { setPanelOpen(false); setView("library"); }}
+      onOpenTest={openTestFromPanel}
+      onExit={onExit}
+    />
+  );
 
   if (!snapshot) {
     return (
@@ -960,8 +1052,15 @@ export default function WorkRevisionApp({ notes }: WorkRevisionAppProps) {
     const studyCards = cards.filter((card) => card.deckId === selectedDeck.id);
     const brainSets = asBrainSets(selectedDeck, studyCards);
     return (
-      <div className="flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-storage="device-only" data-work-revision-mode="brain">
-        <WorkRevisionTopline title={selectedDeck.name} subtitle="Slidable Brain-style review · local practice history" onBack={() => setView("study-style")} />
+      <div className="relative flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-storage="device-only" data-work-revision-mode="brain" data-work-revision-headless={brainAnswering ? "true" : undefined}>
+        {panelNode}
+        {/* While the Brain answer deck is up, the viewer's own practice
+            header is the only chrome (headless). The topline returns with
+            the Brain library/review/result screens so the way back to the
+            study styles is always visible outside the answer viewer. */}
+        {brainAnswering ? null : (
+          <WorkRevisionTopline onOpenPanel={openTestPanel} title={selectedDeck.name} subtitle="Slidable Brain-style review · local practice history" onBack={() => setView("study-style")} />
+        )}
         {brainSets.length ? (
           <div className="work-revision-brain min-h-0 flex-1 overflow-hidden" data-work-revision-brain-root>
             <CourseBrainPanel
@@ -973,6 +1072,8 @@ export default function WorkRevisionApp({ notes }: WorkRevisionAppProps) {
               openSetId={selectedDeck.id}
               uid={WORK_DEVICE_UID}
               workMode
+              onAnsweringChange={setBrainAnswering}
+              headerLeadingAction={<WorkRevisionPanelButton onClick={openTestPanel} />}
             />
           </div>
         ) : (
@@ -984,13 +1085,10 @@ export default function WorkRevisionApp({ notes }: WorkRevisionAppProps) {
 
   if (view === "study-fsrs" && studySession && activeCard) {
     return (
-      <div className="flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-storage="device-only" data-work-revision-mode="fsrs">
-        <WorkRevisionTopline
-          title={selectedDeck?.name ?? "Convertible review"}
-          subtitle={`FSRS review · ${Math.min(studySession.currentIndex + 1, currentSessionCards)} of ${currentSessionCards}`}
-          onBack={() => setView("study-style")}
-          right={<span className="hidden rounded-full border border-[var(--border-color)] px-2.5 py-1 text-[10px] font-semibold text-[var(--text-tertiary)] sm:inline-flex">Saved locally</span>}
-        />
+      <div className="relative flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-storage="device-only" data-work-revision-mode="fsrs" data-work-revision-headless="true">
+        {panelNode}
+        {/* Headless card viewer: no subheader band. The card surface itself
+            carries the back control (see WorkFlashcardReview). */}
         {error ? <p role="alert" className="mx-3 mt-2 rounded-xl bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-600">{error}</p> : null}
         <WorkFlashcardReview
           card={activeCard}
@@ -1006,6 +1104,8 @@ export default function WorkRevisionApp({ notes }: WorkRevisionAppProps) {
           onSubmit={() => setSubmitted(true)}
           onRate={(rating) => void rateCurrentCard(rating)}
           onSkip={() => void skipCurrentCard()}
+          onBack={() => setView("study-style")}
+          onOpenPanel={openTestPanel}
         />
       </div>
     );
@@ -1024,8 +1124,9 @@ export default function WorkRevisionApp({ notes }: WorkRevisionAppProps) {
   if (view === "study-result" && studySession) {
     const rated = Object.values(studySession.ratings).reduce((sum, count) => sum + count, 0);
     return (
-      <div className="flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-mode="result">
-        <WorkRevisionTopline title="Review complete" subtitle="FSRS review history saved on this device" onBack={() => setView("study-style")} />
+      <div className="relative flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-mode="result">
+        {panelNode}
+        <WorkRevisionTopline onOpenPanel={openTestPanel} title="Review complete" subtitle="FSRS review history saved on this device" onBack={() => setView("study-style")} />
         <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
           <div className="mx-auto max-w-[620px] rounded-[24px] border border-[var(--border-color)] bg-[var(--surface-bg)] p-5 shadow-[var(--work-shadow-card)] sm:p-7">
             <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-600"><Check size={23} /></div>
@@ -1049,8 +1150,9 @@ export default function WorkRevisionApp({ notes }: WorkRevisionAppProps) {
     const brainAvailable = studyCards.some((card) => card.cardType === "mcq" && (card.options?.length ?? 0) >= 2);
     const dueCount = getWorkload(studyCards).dueToday;
     return (
-      <div className="flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-storage="device-only" data-work-revision-style-choice="">
-        <WorkRevisionTopline title="Choose a study style" subtitle={selectedDeck.name} onBack={() => setView("library")} />
+      <div className="relative flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-storage="device-only" data-work-revision-style-choice="">
+        {panelNode}
+        <WorkRevisionTopline onOpenPanel={openTestPanel} title="Choose a study style" subtitle={selectedDeck.name} onBack={() => setView("library")} />
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6">
           <div className="mx-auto grid w-full max-w-[900px] gap-3 md:grid-cols-2">
             <button type="button" onClick={() => setView("study-brain")} disabled={!brainAvailable} className={cx("group rounded-[22px] border border-[var(--border-color)] bg-[var(--surface-bg)] p-4 text-left shadow-[var(--work-shadow-card)] transition hover:-translate-y-0.5 hover:border-[var(--accent-color)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent-color)] disabled:cursor-not-allowed disabled:opacity-50 sm:p-5")} data-work-revision-style="brain">
@@ -1077,8 +1179,9 @@ export default function WorkRevisionApp({ notes }: WorkRevisionAppProps) {
 
   if (view === "create-choice") {
     return (
-      <div className="flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-storage="device-only" data-work-revision-create-choice="">
-        <WorkRevisionTopline title="Create your revision cards" subtitle="Click your favourite deck styling to create your own revision cards" onBack={() => setView("dashboard")} />
+      <div className="relative flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-storage="device-only" data-work-revision-create-choice="">
+        {panelNode}
+        <WorkRevisionTopline onOpenPanel={openTestPanel} title="Create your revision cards" subtitle="Click your favourite deck styling to create your own revision cards" onBack={() => setView("dashboard")} />
         <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-6">
           <div className="mx-auto grid max-w-[900px] gap-3 sm:grid-cols-2">
             <button type="button" onClick={() => enterCreateFlow("create-flashcards")} className="rounded-[22px] border border-[var(--border-color)] bg-[var(--surface-bg)] p-4 text-left shadow-[var(--work-shadow-card)] transition hover:-translate-y-0.5 hover:border-[var(--accent-color)] sm:p-5" data-work-revision-create="flashcards">
@@ -1101,8 +1204,9 @@ export default function WorkRevisionApp({ notes }: WorkRevisionAppProps) {
 
   if (view === "create-flashcards") {
     return (
-      <div className="flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-storage="device-only" data-work-revision-create="flashcards">
-        <WorkRevisionTopline title="Build a flashcard deck" subtitle="Questions and answers save to this device" onBack={() => setView("create-choice")} right={<span className="hidden text-[10px] font-bold text-[var(--text-tertiary)] sm:inline">Local only</span>} />
+      <div className="relative flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-storage="device-only" data-work-revision-create="flashcards">
+        {panelNode}
+        <WorkRevisionTopline onOpenPanel={openTestPanel} title="Build a flashcard deck" subtitle="Questions and answers save to this device" onBack={() => setView("create-choice")} right={<span className="hidden text-[10px] font-bold text-[var(--text-tertiary)] sm:inline">Local only</span>} />
         <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5">
           <div className="mx-auto max-w-[840px] space-y-3">
             <div className="rounded-[18px] border border-[var(--border-color)] bg-[var(--surface-bg)] p-3 sm:p-4">
@@ -1135,8 +1239,9 @@ export default function WorkRevisionApp({ notes }: WorkRevisionAppProps) {
 
   if (view === "create-brain") {
     return (
-      <div className="flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-storage="device-only" data-work-revision-create="brain">
-        <WorkRevisionTopline title="Build a Brain practice set" subtitle="Multiple-choice cards · saved locally" onBack={() => setView("create-choice")} />
+      <div className="relative flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-storage="device-only" data-work-revision-create="brain">
+        {panelNode}
+        <WorkRevisionTopline onOpenPanel={openTestPanel} title="Build a Brain practice set" subtitle="Multiple-choice cards · saved locally" onBack={() => setView("create-choice")} />
         <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5">
           <div className="mx-auto max-w-[840px] space-y-3">
             <div className="grid gap-3 rounded-[18px] border border-[var(--border-color)] bg-[var(--surface-bg)] p-3 sm:grid-cols-2 sm:p-4">
@@ -1175,8 +1280,9 @@ export default function WorkRevisionApp({ notes }: WorkRevisionAppProps) {
 
   if (view === "import") {
     return (
-      <div className="flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-storage="device-only" data-work-revision-import="">
-        <WorkRevisionTopline title="Import a revision set" subtitle="CSV · Markdown · JSON · Anki text/TSV · stays on this device" onBack={() => setView("dashboard")} />
+      <div className="relative flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-storage="device-only" data-work-revision-import="">
+        {panelNode}
+        <WorkRevisionTopline onOpenPanel={openTestPanel} title="Import a revision set" subtitle="CSV · Markdown · JSON · Anki text/TSV · stays on this device" onBack={() => setView("dashboard")} />
         <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5">
           <div className="mx-auto max-w-[760px] space-y-3">
             <div className="rounded-[20px] border border-[var(--border-color)] bg-[var(--surface-bg)] p-4 shadow-[var(--work-shadow-card)]">
@@ -1215,8 +1321,9 @@ export default function WorkRevisionApp({ notes }: WorkRevisionAppProps) {
   if (view === "ai") {
     const provider = AI_PROVIDERS.find((item) => item.id === aiConfig.config.provider) ?? AI_PROVIDERS[0];
     return (
-      <div className="flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-storage="device-only" data-work-revision-ai="">
-        <WorkRevisionTopline title="Make a set with AI" subtitle="Generation is direct to your chosen provider; the result is saved only here" onBack={() => setView("dashboard")} />
+      <div className="relative flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-storage="device-only" data-work-revision-ai="">
+        {panelNode}
+        <WorkRevisionTopline onOpenPanel={openTestPanel} title="Make a set with AI" subtitle="Generation is direct to your chosen provider; the result is saved only here" onBack={() => setView("dashboard")} />
         <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5">
           <div className="mx-auto max-w-[780px] space-y-3">
             <div className="rounded-[20px] border border-[var(--border-color)] bg-[var(--surface-bg)] p-4 shadow-[var(--work-shadow-card)] sm:p-5">
@@ -1245,8 +1352,9 @@ export default function WorkRevisionApp({ notes }: WorkRevisionAppProps) {
 
   if (view === "library") {
     return (
-      <div className="flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-library="" data-work-revision-storage="device-only">
-        <WorkRevisionTopline title="Revision library" subtitle={`${decks.length} set${decks.length === 1 ? "" : "s"} · saved on this device`} onBack={() => setView("dashboard")} right={<WorkActionButton className="min-h-9 px-3 py-1.5 text-xs" onClick={() => setView("create-choice")} icon={<Plus size={14} />}>Create</WorkActionButton>} />
+      <div className="relative flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-library="" data-work-revision-storage="device-only">
+        {panelNode}
+        <WorkRevisionTopline onOpenPanel={openTestPanel} title="Revision library" subtitle={`${decks.length} set${decks.length === 1 ? "" : "s"} · saved on this device`} onBack={() => setView("dashboard")} right={<WorkActionButton className="min-h-9 px-3 py-1.5 text-xs" onClick={() => setView("create-choice")} icon={<Plus size={14} />}>Create</WorkActionButton>} />
         {decks.length ? (
           <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-3 sm:px-5 sm:py-4">
             {decks.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map((deck) => (
@@ -1263,7 +1371,9 @@ export default function WorkRevisionApp({ notes }: WorkRevisionAppProps) {
   const recentDecks = decks.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 3);
   const dueCount = overallWorkload?.dueToday ?? 0;
   return (
-    <div className="flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-dashboard="" data-work-revision-storage="device-only">
+    <div className="relative flex h-full min-h-0 flex-col" data-work-revision="" data-work-revision-dashboard="" data-work-revision-storage="device-only">
+      {panelNode}
+      <WorkRevisionTopline onOpenPanel={openTestPanel} title="Revision" subtitle="Private · this device" />
       {busy ? <div className="sr-only" aria-live="polite">Saving locally</div> : null}
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-5 sm:py-4">
         <div className="mx-auto max-w-[1100px] space-y-3">

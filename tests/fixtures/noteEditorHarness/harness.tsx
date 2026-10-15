@@ -6,7 +6,6 @@
 
 import { Profiler, StrictMode, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { NotebookPen } from "lucide-react";
 import "../../../src/index.css";
 import NotesPanel from "../../../src/course/NotesPanel";
 import { SplitDeck } from "../../../src/course/studyPanels";
@@ -80,7 +79,6 @@ function Harness() {
             orientation="portrait"
             courseId="note-editor-harness"
             accent="#3A86FF"
-            studyIcon={NotebookPen}
             lesson={<div style={{ background: "#12203a", color: "#9fb4d9", display: "grid", placeItems: "center", height: "100%" }}>LESSON PANE</div>}
             study={
               panel ? (

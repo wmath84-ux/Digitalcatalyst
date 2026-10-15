@@ -47,7 +47,7 @@ import {
 } from "react";
 import { DEFAULT_MODULE_LISTING_STYLE } from "./playerPreferences";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from "framer-motion";
-import { BookOpen, Brain, FileText, FlaskConical, Music, Network, NotebookPen, PenLine, ShoppingBag, Sparkles } from "lucide-react";
+import { BookOpen, Brain, File, FileText, FlaskConical, LockKeyhole, Music, Network, NotebookPen, PenLine, ShoppingBag, Sparkles } from "lucide-react";
 import { collectAccessibleReadResources } from "../../utils/readResources.js";
 import ReadLibraryPanel from "./ReadLibraryPanel";
 import type { ReadUpload } from "../../utils/readUploads.js";
@@ -58,7 +58,14 @@ import NotesPanel from "./NotesPanel";
 import GlassDock, { type GlassDockItem } from "../components/glass-dock/GlassDock";
 import { EASE_OUT_MOTION } from "./splitMotion";
 import { useCourseKeyboard } from "./useCourseKeyboard";
+import { useFooterHiddenPage } from "./coursePanelSession";
 import { AiTabIcon } from "./studyTabIcons";
+import CoursePageHeader from "./CoursePageHeader";
+import BranchedMenu, { useBranchedOpen, type BranchedMenuItem } from "../components/branched-menu/BranchedMenu";
+import { isVisibleFile } from "./fileVisibility";
+// The Paid listing wears the Modules library's own design, so it shares the
+// library sheet's row marks (lock, count — and the price below).
+import "./courseResourceLibrary.css";
 
 export type DockTab = "modules" | "brain" | "notes" | "mindmap" | "ai" | "paid" | "player" | "experiment" | "sketch" | "read" | "music";
 export type DockOrientation = "portrait" | "landscape";
@@ -565,6 +572,177 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
   return { activeTab, listRows, listModeAttr, emptyMessage };
 }
 
+// ── The Paid listing — the Modules library's own design ───────────────────
+//
+// Owner brief: "Paid-page listing ka design module resources ki library ke
+// bilkul same karo", "Paid resources mein folder ke naam se pehle lock icon
+// dikhao", "Paid resources ka price clearly dikhao".
+//
+// So the Paid page is no longer a dock-style SnapList: it renders through
+// the SAME BranchedMenu, with the SAME props and row marks, as the Modules
+// tab's CourseResourceLibrary — folding folders, branch trunks, 40px rows,
+// count marks. Every purchasable thing is a folder in that design:
+//
+//   · the folder's name carries a LOCK icon before it (amber, the library's
+//     own lock colour — BranchedMenu section heads render `icon` ahead of
+//     the label, leaves have always had that slot);
+//   · the folder's meta shows its PRICE, in the library sheet's price mark
+//     (full-weight amber, never truncated), beside the contents count;
+//   · inside the folder: one "Unlock" leaf (the buy action, the old rows'
+//     data-course-overlay-buy-* hooks kept) and the locked contents
+//     themselves — visible but not selectable, exactly the library's own
+//     treatment of locked resources.
+//
+// The entries and their order are the ones the old list showed (every
+// purchasable update, then every locked paid module, nested ones included);
+// only the presentation changed.
+const PAID_GOLD = "#C9A96E";
+
+function PaidLibraryPanel({
+  updates,
+  modules,
+  ownedUpdateIds,
+  onBuyModule,
+  onBuyUpdate,
+  empty,
+}: {
+  updates: PaidCourseUpdate[];
+  modules: CourseModule[];
+  ownedUpdateIds: Set<string>;
+  onBuyModule: (module: { id: string; paidUpdateId?: string; paidUpdateTitle?: string; paidUpdatePrice?: string }) => void;
+  onBuyUpdate: (update: PaidCourseUpdate) => void;
+  empty?: ReactNode;
+}) {
+  const { items, buyByValue } = useMemo(() => {
+    const buyByValue = new Map<string, () => void>();
+    const price = (label: string) => (
+      <span className="course-library__price" data-paid-price>{label}</span>
+    );
+    // Before every folder's name (the section head's icon slot).
+    const folderLock = <LockKeyhole size={16} strokeWidth={2.1} aria-hidden="true" className="course-library__lock" />;
+    // The library's trailing lock on its locked leaves, at its own size.
+    const leafLock = <LockKeyhole size={12} aria-label="Locked" className="course-library__lock" />;
+    const items: BranchedMenuItem[] = [];
+
+    for (const update of updates) {
+      const priceLabel = `₹${update.price.toLocaleString("en-IN")}`;
+      const buyValue = `buy-update:${update.id}`;
+      buyByValue.set(buyValue, () => onBuyUpdate(update));
+      const children: BranchedMenuItem[] = [
+        {
+          value: buyValue,
+          label: "Unlock this update",
+          icon: <ShoppingBag size={16} strokeWidth={2.1} aria-hidden="true" />,
+          color: PAID_GOLD,
+          meta: price(priceLabel),
+          description: `Unlock ${update.title} for ${priceLabel}`,
+          dataAttrs: { "data-course-overlay-buy-update": String(update.id) },
+        },
+        ...update.contentNames.map((name, index): BranchedMenuItem => ({
+          value: `update:${update.id}:content:${index}`,
+          label: name,
+          icon: <File size={16} strokeWidth={2.1} aria-hidden="true" />,
+          disabled: true,
+          meta: leafLock,
+          description: `${name}. Locked`,
+        })),
+      ];
+      items.push({
+        value: `update:${update.id}`,
+        label: update.title,
+        icon: folderLock,
+        meta: (
+          <>
+            {price(priceLabel)}
+            <span className="course-library__count">{update.contentNames.length}</span>
+          </>
+        ),
+        dataAttrs: { "data-course-paid-folder": "", "data-paid-kind": "update", "data-paid-id": String(update.id), "data-locked": "true" },
+        children,
+      });
+    }
+
+    for (const { module, depth } of flattenModules(modules).filter(({ module }) => module.accessLevel !== "hidden" && isPaidLocked(module, ownedUpdateIds))) {
+      const moduleId = String(module.id);
+      const update = updates.find((candidate) => String(candidate.id) === String(module.paidUpdateId));
+      const priceLabel = module.paidUpdatePrice?.trim()
+        || (update ? `₹${update.price.toLocaleString("en-IN")}` : "");
+      const buyValue = `buy-module:${moduleId}`;
+      buyByValue.set(buyValue, () => onBuyModule({
+        id: moduleId,
+        paidUpdateId: module.paidUpdateId,
+        paidUpdateTitle: module.paidUpdateTitle,
+        paidUpdatePrice: module.paidUpdatePrice,
+      }));
+      const files = (module.files || []).filter(isVisibleFile);
+      const children: BranchedMenuItem[] = [
+        {
+          value: buyValue,
+          label: "Unlock this module",
+          icon: <ShoppingBag size={16} strokeWidth={2.1} aria-hidden="true" />,
+          color: PAID_GOLD,
+          meta: priceLabel ? price(priceLabel) : undefined,
+          description: priceLabel ? `Unlock ${module.title} for ${priceLabel}` : `Unlock ${module.title}`,
+          dataAttrs: { "data-course-overlay-buy-module": moduleId, "data-module-depth": String(depth) },
+        },
+        ...files.map((file): BranchedMenuItem => ({
+          value: `module:${moduleId}:file:${file.id}`,
+          label: file.name,
+          icon: <File size={16} strokeWidth={2.1} aria-hidden="true" />,
+          disabled: true,
+          meta: leafLock,
+          description: `${file.name}. Locked`,
+        })),
+      ];
+      items.push({
+        value: `module:${moduleId}`,
+        label: module.title,
+        icon: folderLock,
+        meta: (
+          <>
+            {priceLabel ? price(priceLabel) : price(module.paidUpdateTitle || "Paid")}
+            <span className="course-library__count">{files.length}</span>
+          </>
+        ),
+        dataAttrs: { "data-course-paid-folder": "", "data-paid-kind": "module", "data-paid-id": moduleId, "data-module-depth": String(depth), "data-locked": "true" },
+        children,
+      });
+    }
+
+    return { items, buyByValue };
+  }, [updates, modules, ownedUpdateIds, onBuyModule, onBuyUpdate]);
+
+  const { openValues, toggle } = useBranchedOpen(items);
+
+  if (items.length === 0) {
+    return (
+      <div className="grid h-full place-items-center px-6 text-center text-xs text-[var(--course-muted)]" data-course-overlay-empty>
+        {empty}
+      </div>
+    );
+  }
+
+  return (
+    // The library's own scroll body (same padding, same overscroll), so the
+    // listing occupies the page exactly as the Modules library does.
+    <div className="library-body" data-course-paid-library>
+      <BranchedMenu
+        items={items}
+        openValues={openValues}
+        onToggle={toggle}
+        onSelect={(value) => buyByValue.get(value)?.()}
+        ariaLabel="Paid course content"
+        fullWidth
+        rowHeight={40}
+        fontSize={14}
+        indent={40}
+        className="course-library__menu"
+        dataAttrs={{ "data-course-paid-menu": "", "data-listing": "paid", "data-course-overlay-list": "", "data-mode": "paid" }}
+      />
+    </div>
+  );
+}
+
 /**
  * Placeholder body for the Brain and AI tabs — dummy buttons for now, the
  * real functionality lands later. A centred icon + title so the tab never
@@ -624,6 +802,7 @@ export function StudyContent({
   sketchPanel,
   resourceLibraryPanel,
   musicPanel,
+  paidPanel,
   moduleListingStyle = DEFAULT_MODULE_LISTING_STYLE,
 }: {
   tab: DockTab;
@@ -644,6 +823,8 @@ export function StudyContent({
   resourceLibraryPanel?: ReactNode;
   /** Music — the glass player plus the learner's library. */
   musicPanel?: ReactNode;
+  /** Paid — the library-design listing of purchasable content (PaidLibraryPanel). */
+  paidPanel?: ReactNode;
   moduleListingStyle?: "classic" | "modern";
 }) {
   return (
@@ -723,6 +904,30 @@ export function StudyContent({
             panelAttr="data-course-ai-panel"
           />
         )
+      ) : tab === "paid" ? (
+        // The Paid list is a page like the libraries: it carries the shared
+        // page header (the Resource Library header's size) above a listing in
+        // the Modules library's own design (PaidLibraryPanel — folding
+        // folders with a lock before the name and the price beside it). A
+        // call site without the panel keeps the old dock-style list.
+        <div className="flex h-full min-h-0 flex-col" data-course-overlay-paid="">
+          <CoursePageHeader title="Paid content" icon={<ShoppingBag size={20} aria-hidden="true" />} />
+          {paidPanel ?? (
+            <div className="min-h-0 flex-1">
+              <SnapList
+                rows={rows}
+                empty={empty}
+                moduleListingStyle={moduleListingStyle}
+                dataAttrs={{
+                  "data-course-overlay-list": "",
+                  ...(listModeAttr ? { "data-mode": listModeAttr } : null),
+                  "data-course-overlay-paid": "",
+                  "data-module-listing-style": moduleListingStyle,
+                }}
+              />
+            </div>
+          )}
+        </div>
       ) : (
         <SnapList
           rows={rows}
@@ -731,7 +936,6 @@ export function StudyContent({
           dataAttrs={{
             "data-course-overlay-list": "",
             ...(listModeAttr ? { "data-mode": listModeAttr } : null),
-            ...(tab === "paid" ? { "data-course-overlay-paid": "" } : null),
             "data-module-listing-style": moduleListingStyle,
           }}
         />
@@ -749,6 +953,13 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // The player's one keyboard state — the footer navigation hides while the
   // soft keyboard is open, whichever of its two homes is in use.
   const { keyboardVisible } = useCourseKeyboard();
+
+  // The immersive-page rule (coursePanelSession.ts): while the learner is
+  // inside the Note Editor, the Mind Map Editor, the Brain answer page, the
+  // Live Experiment Viewer, the Sketch Editor or the Read PDF / Annotations
+  // viewers, this footer navigation hides; it returns on the library pages,
+  // and the Music Player's footer behaves exactly as before.
+  const immersivePage = useFooterHiddenPage(tab);
 
   // Read entries reuse the exact module-unlock resolver already used by the
   // Modules tab, plus the current paid-update ownership set for resource-level
@@ -819,6 +1030,19 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       sketchPanel={props.sketchPanel}
       resourceLibraryPanel={props.resourceLibraryPanel}
       musicPanel={props.musicPanel}
+      paidPanel={
+        // The Paid listing in the Modules library's design. Built here —
+        // the overlay owns the purchasable updates, the locked modules and
+        // the buy handlers the folders' Unlock leaves fire.
+        <PaidLibraryPanel
+          updates={props.updates}
+          modules={props.modules}
+          ownedUpdateIds={props.ownedUpdateIds}
+          onBuyModule={props.onBuyModule}
+          onBuyUpdate={props.onBuyUpdate}
+          empty={emptyMessage}
+        />
+      }
     />
   );
 
@@ -842,7 +1066,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // writing surface. Hiding (not unmounting) preserves the pane's restore.
   const dock = props.peekDock ? null : (
     <div
-      className={`relative z-50 shrink-0 px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-0 ${keyboardVisible ? "hidden" : ""}`}
+      className={`relative z-50 shrink-0 px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-0 ${keyboardVisible || immersivePage ? "hidden" : ""}`}
       data-course-dock
       data-orientation={orientation}
       data-in-split="true"

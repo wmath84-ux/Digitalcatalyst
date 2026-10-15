@@ -227,13 +227,13 @@ test("Work Revision UI is wired to local notes and does not use the cloud Revisi
   assert.match(app, /saveWorkRevisionSnapshot/);
   assert.match(app, /CourseBrainPanel/);
   assert.match(app, /workMode/);
-  assert.match(brainPanel, /workMode\s*\?\s*\[\]\s*:/);
+  assert.match(brainPanel, /const personalLibrary = workMode \|\| masterSelfCtl\.mode === "self";/);
   assert.match(brainPanel, /!workMode\s*&&\s*personalLibrary/);
   assert.match(brainPanel, /loadBrainScores\(productId, workMode\)/);
   assert.match(brainPanel, /saveBrainScores\(productId, next, workMode\)/);
   assert.match(app, /recordWorkRevisionRating/);
   assert.match(app, /Click your favourite deck styling/);
   assert.match(app, /WorkRevisionStylePreview/);
-  assert.match(surface, /<WorkRevisionApp notes=\{notes\.notes\} \/>/);
+  assert.match(surface, /<WorkRevisionApp notes=\{notes\.notes\} onExit=\{onExit\} \/>/);
   assert.doesNotMatch(surface, /WorkPhasePlaceholder|Revision library · Phase 4/);
 });

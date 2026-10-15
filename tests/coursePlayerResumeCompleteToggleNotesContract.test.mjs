@@ -23,6 +23,8 @@ const repoRoot = path.join(__dirname, "..");
 const readSource = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const coursePlayer = readSource("src/CoursePlayerApp.tsx");
+const progressHook = readSource("src/course/useLocalCourseProgress.ts");
+const progressStore = readSource("src/course/localProgress.ts");
 const resourceViewer = readSource("src/course/ResourceViewer.tsx");
 const audioPlayer = readSource("src/course/AudioPlayer.tsx");
 const imageViewer = readSource("src/course/ImageViewer.tsx");
@@ -63,7 +65,7 @@ test("CoursePlayer loads, reports and flushes the playback snapshot", () => {
   assert.match(coursePlayer, /loadPlaybackStore\(user\.id, storageProductId\)/);
   assert.match(coursePlayer, /const reportPlayback = useCallback/);
   assert.match(coursePlayer, /mergePlaybackEntry\(playbackRef\.current, fileId, patch\)/);
-  assert.match(coursePlayer, /persistPlaybackStore\(user\.id, storageProductId, playbackRef\.current\)/);
+  assert.match(coursePlayer, /persistPlaybackStore\(user\.id, storageProductId, store\)/);
   // Hiding / closing the tab must not lose the position.
   assert.match(coursePlayer, /window\.addEventListener\("pagehide", flush\)/);
   assert.match(coursePlayer, /document\.addEventListener\("visibilitychange", flush\)/);
@@ -140,8 +142,12 @@ test("Documents keep their own scroll / page because the iframe is never torn do
 test("Mark complete toggles both ways so an accidental tap is reversible", () => {
   assert.match(coursePlayer, /const toggleComplete = async \(\) =>/);
   assert.match(coursePlayer, /const completing = !completedIds\.has\(selectedFile\.id\)/);
-  assert.match(coursePlayer, /completedFileIds: completing \? arrayUnion\(selectedFile\.id\) : arrayRemove\(selectedFile\.id\)/);
-  assert.match(coursePlayer, /import \{ arrayRemove, arrayUnion/);
+  // The toggle flips the progress store; the hook writes the flip as
+  // arrayUnion (complete) / arrayRemove (un-complete) per changed file.
+  assert.match(coursePlayer, /progressCtl\.store\.complete\(selectedFile\.id, completing\)/);
+  assert.match(progressHook, /completedFileIds: arrayUnion\(\.\.\.added\)/);
+  assert.match(progressHook, /completedFileIds: arrayRemove\(\.\.\.removed\)/);
+  assert.match(progressHook, /from 'firebase\/firestore'/);
   // The button is never disabled once complete — that is what made it a
   // one-way door before.
   assert.doesNotMatch(coursePlayer, /disabled=\{isDone\}/);
@@ -166,7 +172,9 @@ test("Mark complete toggles both ways so an accidental tap is reversible", () =>
 test("Un-completing plays the remove cue and keeps progress honest", () => {
   assert.match(coursePlayer, /if \(completing\) playSfxComplete\(\);\s*\n\s*else playSfxRemove\(\);/);
   // Optimistic local flip so the UI answers instantly.
-  assert.match(coursePlayer, /if \(completing\) next\.add\(selectedFile\.id\);\s*\n\s*else next\.delete\(selectedFile\.id\);/);
+    // The optimistic flip itself lives in the progress store's complete().
+  assert.match(progressStore, /if \(value\) ids\.add\(id\); else ids\.delete\(id\);/);
+  assert.match(progressStore, /complete\(id: string, value: boolean\)/);
 });
 
 // ---------------------------------------------------------------------------

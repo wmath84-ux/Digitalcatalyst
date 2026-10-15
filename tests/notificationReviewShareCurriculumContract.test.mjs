@@ -71,7 +71,7 @@ test("the PDP share menu uses the compact sweet-sloth window animation with mass
   assert.match(panel, /border-radius:\s*70px/);
   assert.match(panel, /transform-origin:\s*bottom right/);
   assert.match(panel, /linear-gradient\(-75deg,[\s\S]*rgba\(255,\s*255,\s*255,\s*0\.2\)/);
-  assert.match(panel, /backdrop-filter:\s*blur\(clamp\(1px,\s*0\.125em,\s*4px\)\)/);
+  assert.match(panel, /backdrop-filter:\s*blur\(5px\) saturate\(1\.2\)/);
   assert.match(panel, /inset 0 -0\.125em 0\.125em rgba\(255,\s*255,\s*255,\s*0\.5\)/);
   assert.match(glassStyles, /@keyframes dc-compact-glass-window-stretch[\s\S]*?10%\s*\{[^}]*scale\(1\.1,\s*0\.9\)[\s\S]*?30%\s*\{[^}]*scale\(0\.9,\s*1\.1\)/);
   assert.match(glassStyles, /\.dc-compact-glass-window\[data-open="true"\][\s\S]*?animation:\s*dc-compact-glass-window-stretch/);

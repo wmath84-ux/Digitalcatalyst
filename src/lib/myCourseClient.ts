@@ -88,6 +88,7 @@ const DIFFICULTIES: MyCourseQuestion["difficulty"][] = ["easy", "medium", "hard"
 
 export const createMyQuestion = (): MyCourseQuestion => ({
   id: newId("q"),
+  questionType: "mcq",
   prompt: "",
   options: ["", "", "", ""],
   correctIndex: -1,
@@ -142,6 +143,17 @@ export const createMyCourse = (uid: string, title = ""): MyCourse => {
 
 // ── Normalisation (Firestore → typed, defensively) ─────────────────────────
 
+const QUESTION_TYPES: MyCourseQuestion["questionType"][] = [
+  "mcq",
+  "fill_blank",
+  "label_diagram",
+  "assertion_reason",
+  "one_word",
+  "match",
+  "drag_drop",
+  "hotspot",
+];
+
 const parseQuestion = (raw: unknown, index: number): MyCourseQuestion | null => {
   if (!raw || typeof raw !== "object") return null;
   const source = raw as Record<string, unknown>;
@@ -149,19 +161,95 @@ const parseQuestion = (raw: unknown, index: number): MyCourseQuestion | null => 
     ? source.options.map((option) => String(option ?? "")).slice(0, 6)
     : [];
   const prompt = String(source.prompt ?? "").trim();
-  if (!prompt && options.filter(Boolean).length < 2) return null;
+  // The question's own type travels with it (absent on legacy records —
+  // those are MCQs). A typed question is identified by its own fields, not
+  // by MCQ options it does not have.
+  const questionType = QUESTION_TYPES.includes(source.questionType as MyCourseQuestion["questionType"])
+    ? (source.questionType as MyCourseQuestion["questionType"])
+    : undefined;
+  const typed = questionType !== undefined && questionType !== "mcq";
+  const hasIdentity =
+    Boolean(prompt) ||
+    Boolean(String(source.assertion ?? "").trim()) ||
+    (Array.isArray(source.matchPairs) && source.matchPairs.length > 0) ||
+    (Array.isArray(source.dragTargets) && source.dragTargets.length > 0) ||
+    Boolean(String(source.imageUrl ?? "").trim());
+  if (!hasIdentity && options.filter(Boolean).length < 2) return null;
   const correct = Number(source.correctIndex);
   const difficulty = String(source.difficulty ?? "").toLowerCase();
+  const textList = (value: unknown): string[] =>
+    Array.isArray(value) ? value.map((entry) => String(entry ?? "")).filter(Boolean) : [];
+  const coord = (value: unknown, fallback = 50): number => {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.min(100, Math.max(0, number)) : fallback;
+  };
   return {
     id: String(source.id || `q${index + 1}`),
+    questionType,
     prompt,
-    options: options.length ? options : ["", ""],
-    correctIndex: Number.isInteger(correct) && correct >= 0 && correct < options.length ? correct : -1,
+    options: typed ? options : options.length ? options : ["", ""],
+    correctIndex:
+      Number.isInteger(correct) &&
+      correct >= 0 &&
+      correct < (questionType === "assertion_reason" ? 4 : options.length)
+        ? correct
+        : -1,
     explanation: String(source.explanation ?? ""),
     difficulty: (DIFFICULTIES as string[]).includes(difficulty)
       ? (difficulty as MyCourseQuestion["difficulty"])
       : "medium",
     topic: String(source.topic ?? ""),
+    // Type-specific fields, carried through verbatim (lightly coerced) so a
+    // typed question survives the Firestore round trip with its answers,
+    // mappings, image and coordinates intact.
+    blankAnswers: Array.isArray(source.blankAnswers)
+      ? source.blankAnswers.map((entry) => textList(entry))
+      : undefined,
+    acceptedAnswers: textList(source.acceptedAnswers).length ? textList(source.acceptedAnswers) : undefined,
+    assertion: typeof source.assertion === "string" ? source.assertion : undefined,
+    reason: typeof source.reason === "string" ? source.reason : undefined,
+    matchPairs: Array.isArray(source.matchPairs)
+      ? source.matchPairs.map((pair) => {
+          const item = (pair ?? {}) as Record<string, unknown>;
+          return { left: String(item.left ?? ""), right: String(item.right ?? "") };
+        })
+      : undefined,
+    dragItems: textList(source.dragItems).length ? textList(source.dragItems) : undefined,
+    dragTargets: Array.isArray(source.dragTargets)
+      ? source.dragTargets.map((target, targetIndex) => {
+          const item = (target ?? {}) as Record<string, unknown>;
+          return {
+            id: String(item.id || `t${targetIndex + 1}`),
+            label: String(item.label ?? ""),
+            answer: String(item.answer ?? ""),
+          };
+        })
+      : undefined,
+    imageUrl: typeof source.imageUrl === "string" ? source.imageUrl : undefined,
+    labelTargets: Array.isArray(source.labelTargets)
+      ? source.labelTargets.map((target, targetIndex) => {
+          const item = (target ?? {}) as Record<string, unknown>;
+          return {
+            id: String(item.id || `t${targetIndex + 1}`),
+            x: coord(item.x),
+            y: coord(item.y),
+            label: String(item.label ?? ""),
+          };
+        })
+      : undefined,
+    labelOptions: textList(source.labelOptions).length ? textList(source.labelOptions) : undefined,
+    hotspots: Array.isArray(source.hotspots)
+      ? source.hotspots.map((spot, spotIndex) => {
+          const item = (spot ?? {}) as Record<string, unknown>;
+          return {
+            id: String(item.id || `s${spotIndex + 1}`),
+            x: coord(item.x),
+            y: coord(item.y),
+            r: coord(item.r ?? item.radius, 10) || 10,
+          };
+        })
+      : undefined,
+    correctHotspotIds: textList(source.correctHotspotIds).length ? textList(source.correctHotspotIds) : undefined,
   };
 };
 

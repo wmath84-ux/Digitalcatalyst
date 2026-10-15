@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type TouchEvent } from "react";
 import "./work-myday.css";
-import { ArrowLeft, CalendarDays, Check, Menu, Moon, NotebookPen, PencilLine, Save, Sun, Trash2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, Check, Moon, NotebookPen, PanelLeft, PencilLine, Sun, Trash2 } from "lucide-react";
 import WorkFooterNav, { type WorkNavCell } from "../WorkFooterNav";
 import WorkMyDayEditor, { type WorkMyDayEditorHandle } from "./WorkMyDayEditor";
 import WorkMyDayDrawer from "./WorkMyDayDrawer";
@@ -8,13 +8,36 @@ import WorkMyDayLibrary from "./WorkMyDayLibrary";
 import { requestWorkReminderPermission, workRemindersRunInBackground } from "../storage/workReminders";
 import { useWorkMyDayFilter, setWorkMyDayFilter } from "../storage/workPrefs";
 import type { WorkMyDayController } from "../storage/useWorkMyDay";
-import type { WorkMyDayKind } from "../storage/workMyDay";
+import type { WorkMyDayItemDraft, WorkMyDayKind } from "../storage/workMyDay";
 import type { WorkTheme } from "../storage/workPrefs";
 
 const EDITOR_FOOTER_CELLS: WorkNavCell[] = [
   { id: "back", label: "Back", color: "#4f46e5", icon: ArrowLeft, title: "Save and return to the My Day library" },
   { id: "delete", label: "Delete", color: "#e11d48", icon: Trash2, title: "Move this item to the Work trash" },
 ];
+
+/* The single editor header's three selectable boxes: item type, notebook,
+   and the due schedule. The chosen value is what the box itself shows — no
+   field captions anywhere. */
+const KIND_OPTIONS: { value: WorkMyDayKind; label: string }[] = [
+  { value: "task", label: "Task" },
+  { value: "scheduled", label: "Scheduled" },
+  { value: "reminder", label: "Reminder" },
+  { value: "note", label: "Note" },
+];
+
+const localDateTimeValue = (stamp?: number): string => {
+  if (!stamp) return "";
+  const date = new Date(stamp);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+};
+
+const localDateValue = (stamp?: number): string => localDateTimeValue(stamp).slice(0, 10);
+
+const currentTimeZone = () => {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch { return "UTC"; }
+};
 
 export interface WorkMyDayPageProps {
   slotKey: string;
@@ -113,6 +136,42 @@ export default function WorkMyDayPage({
     if (await saveItem()) onEditingChange(false);
   }, [editing, onEditingChange, saveItem]);
 
+  /* The header boxes write through the same updateItem the editor body has
+     always used (these handlers moved here with the single header). */
+  const patchCurrent = useCallback((patch: WorkMyDayItemDraft) => {
+    if (currentItem) void controller.updateItem(currentItem.id, patch);
+  }, [controller, currentItem]);
+
+  const setKind = (value: string) => {
+    const kind = KIND_OPTIONS.some((option) => option.value === value) ? value as WorkMyDayKind : "task";
+    patchCurrent({ kind });
+  };
+  const setDueAt = (value: string) => {
+    if (!currentItem) return;
+    let dueAt: number | undefined;
+    if (value && currentItem.allDay) {
+      const [year, month, day] = value.split("-").map(Number);
+      dueAt = new Date(year, month - 1, day, 9, 0, 0, 0).getTime();
+    } else if (value) {
+      dueAt = new Date(value).getTime();
+    }
+    const recurrence = currentItem.schedule?.recurrence || { freq: "once" as const };
+    const timeZone = currentItem.schedule?.timeZone || currentTimeZone();
+    patchCurrent({
+      dueAt: Number.isFinite(dueAt) ? dueAt : undefined,
+      schedule: Number.isFinite(dueAt) ? { timeZone, recurrence } : undefined,
+    });
+  };
+  const setRepeat = (value: string) => {
+    if (!currentItem?.dueAt) return;
+    const freq = ["once", "daily", "weekly", "monthly"].includes(value)
+      ? value as "once" | "daily" | "weekly" | "monthly"
+      : "once";
+    patchCurrent({
+      schedule: { timeZone: currentItem.schedule?.timeZone || currentTimeZone(), recurrence: { freq } },
+    });
+  };
+
   const openItem = (id: string) => {
     setDrawerOpen(false);
     onOpenItem(id);
@@ -146,39 +205,95 @@ export default function WorkMyDayPage({
       onTouchEndCapture={onTouchEndCapture}
     >
       {view === "editor" && currentItem ? (
-        <header className="work-myday-header" data-work-header-area="myday-editor">
-          <button type="button" className="work-myday-icon-button" aria-label="Open notebooks and notes" title="Open notebook drawer" onClick={() => setDrawerOpen(true)}>
-            <Menu size={19} aria-hidden="true" />
+        /* ONE header for the editor (the old header row + meta row merged):
+           the side-panel (drawer) button, the three selectable boxes whose
+           own faces show the chosen values, and the single pencil/tick
+           toggle — finishing editing through it IS the save, so there is no
+           separate Save button. The header wears the page's background. */
+        <header className="work-myday-header work-myday-editor-header" data-work-header-area="myday-editor" data-work-myday-editor-header>
+          <button type="button" className="work-myday-icon-button" aria-label="Open notebooks and notes" title="Notebooks and notes" data-work-myday-side-panel-button onClick={() => setDrawerOpen(true)}>
+            <PanelLeft size={17} aria-hidden="true" />
           </button>
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-[13px] font-bold leading-tight text-[var(--text-primary)]">{currentItem.title.trim() || "New item"}</h1>
-            <p className="truncate text-[10px] leading-tight text-[var(--text-tertiary)]">{editing ? "Editing · saved on this device" : "Read · double-tap to edit"}</p>
+          <div className="work-myday-editor-boxes" data-no-swipe="">
+            <select
+              className="work-myday-box work-myday-box-type"
+              value={currentItem.kind}
+              disabled={!editing}
+              onChange={(event) => setKind(event.target.value)}
+              aria-label="Item type"
+              data-work-myday-box="type"
+            >
+              {KIND_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+            <select
+              className="work-myday-box work-myday-box-notebook"
+              value={currentItem.notebookId || ""}
+              disabled={!editing}
+              onChange={(event) => patchCurrent({ notebookId: event.target.value || undefined })}
+              aria-label="Notebook"
+              data-work-myday-box="notebook"
+            >
+              <option value="">No notebook</option>
+              {controller.notebooks.map((notebook) => <option key={notebook.id} value={notebook.id}>{notebook.title}</option>)}
+            </select>
+            <span className="work-myday-due-box">
+              <input
+                className="work-myday-box"
+                type={currentItem.allDay ? "date" : "datetime-local"}
+                value={currentItem.allDay ? localDateValue(currentItem.dueAt) : localDateTimeValue(currentItem.dueAt)}
+                disabled={!editing}
+                onChange={(event) => setDueAt(event.target.value)}
+                aria-label={currentItem.allDay ? "Due date" : "Due date and time"}
+                data-work-myday-box="due"
+              />
+              {currentItem.dueAt ? (
+                <select
+                  className="work-myday-box work-myday-box-repeat"
+                  value={currentItem.schedule?.recurrence.freq || "once"}
+                  disabled={!editing}
+                  onChange={(event) => setRepeat(event.target.value)}
+                  aria-label="Repeat schedule"
+                  data-work-myday-box="repeat"
+                >
+                  <option value="once">Does not repeat</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              ) : null}
+              {currentItem.dueAt ? (
+                <label className="work-myday-all-day">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(currentItem.allDay)}
+                    disabled={!editing}
+                    onChange={(event) => {
+                      const allDay = event.target.checked;
+                      if (allDay && currentItem.dueAt) {
+                        const dueDate = new Date(currentItem.dueAt);
+                        dueDate.setHours(9, 0, 0, 0);
+                        patchCurrent({ allDay, dueAt: dueDate.getTime() });
+                      } else {
+                        patchCurrent({ allDay });
+                      }
+                    }}
+                    aria-label="All day"
+                  />
+                  <span>All day</span>
+                </label>
+              ) : null}
+            </span>
           </div>
-          {editing ? (
-            <button type="button" className="work-myday-icon-button" aria-label="Save on this device" title="Save" onClick={() => void saveItem()}>
-              <Save size={16} aria-hidden="true" />
-            </button>
-          ) : null}
           <button
             type="button"
             className={`work-myday-icon-button${editing ? " is-accent" : ""}`}
             aria-label={editing ? "Save and finish editing" : "Edit this item"}
             title={editing ? "Save and finish" : "Edit item"}
             aria-pressed={editing}
+            data-work-myday-edit-toggle
             onClick={() => void toggleEditing()}
           >
             {editing ? <Check size={17} aria-hidden="true" /> : <PencilLine size={16} aria-hidden="true" />}
-          </button>
-          <button
-            type="button"
-            className="work-myday-icon-button"
-            aria-label={`Switch to ${dark ? "light" : "dark"} Work theme`}
-            aria-pressed={dark}
-            title={`${dark ? "Light" : "Dark"} theme`}
-            data-work-theme-toggle=""
-            onClick={onToggleTheme}
-          >
-            {dark ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
           </button>
         </header>
       ) : (
@@ -213,7 +328,6 @@ export default function WorkMyDayPage({
         <WorkMyDayEditor
           ref={editorRef}
           item={currentItem}
-          notebooks={controller.notebooks}
           editing={editing}
           theme={theme}
           onEdit={() => onEditingChange(true)}

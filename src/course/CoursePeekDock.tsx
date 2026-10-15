@@ -1,20 +1,44 @@
-// Compact, direct-access study strips replace the icon dock and reveal handle.
+// The Course Player's footer navigation — the Workspace pill, verbatim.
+//
+// Owner brief:
+//   "Workspace ke existing pill-style footer navigation ka exact design
+//    Course Player ke footer navigation mein use karo."
+//
+// So this is NOT a course look-alike of the pill: it renders the Workspace
+// footer's own markup (`[data-work-footer-nav]` → `[data-site-footer]` →
+// `[data-work-nav-row]` → `[data-work-nav-cell]`, exactly as
+// src/work/WorkFooterNav.tsx renders it) and imports the Workspace footer's
+// own stylesheet, so the button design, styling and dimensions — 26px icons
+// in 46–56px cells, the destination's own accent on the selected cell, the
+// 0.8 → 1 opacity ramp, the −4px hover lift, the soft
+// `0 10px 15px rgba(0,0,0,.041)` shadow on a white 40px-radius plate — are
+// the Workspace footer's, shared, not copied. The Workspace footer itself
+// (WorkFooterNav + work-footer-nav.css) is untouched.
+//
+// Two course-only adaptations, both in course-strip-nav.css and both forced
+// by the brief's other clauses, neither of which restyles a button:
+//
+//   · the footer AREA keeps its size: the pill's height token
+//     (--work-nav-h) is set to the 44px the strip's buttons already
+//     occupied, so the in-flow footer strip is exactly as tall as before;
+//   · with ten study tools (Workspace has six), the pill is the horizontal
+//     scroller: swipe/drag left-right inside it to reach the rest. (In
+//     Workspace every cell fits, so its pill never needs to scroll.)
 import { useRef, type CSSProperties, type KeyboardEvent } from 'react'
 import { TABS, type DockTab } from './CourseOverlay'
 
 // The footer's single website colour — same value as COURSE_FOOTER_COLOR in
 // CourseOverlay.tsx (kept local here: CourseOverlay imports nothing from the strip).
+// It is the pill's resting `--work-nav-active` (hover/focus tint); a selected
+// cell overrides it with its destination's own accent, exactly as the
+// Workspace footer does.
 const FOOTER_COLOR = '#4f46e5'
 import { useCourseKeyboard } from './useCourseKeyboard'
+import { useFooterHiddenPage } from './coursePanelSession'
+// The Workspace footer's design, shared — imported FIRST so the course
+// strip's area/scroll overrides (course-strip-nav.css) win their ties.
+import '../work/work-footer-nav.css'
 import './course-strip-nav.css'
-
-const LABELS: Partial<Record<DockTab, [string, string]>> = {
-  modules: ['M', 'Modules'], brain: ['B', 'Brain'], notes: ['N', 'Notes'],
-  mindmap: ['MM', 'Map'], ai: ['AI', 'AI'], paid: ['P', 'Paid'],
-  experiment: ['E', 'Lab'], sketch: ['S', 'Sketch'], read: ['R', 'Read'],
-  // Music takes the note glyph, not an "M": Modules already owns that letter.
-  music: ['♪', 'Music'],
-}
 
 export default function CoursePeekDock({ tab, onTabChange, hiddenTabs = [] }: {
   tab: DockTab
@@ -22,6 +46,12 @@ export default function CoursePeekDock({ tab, onTabChange, hiddenTabs = [] }: {
   hiddenTabs?: DockTab[]
 }) {
   const { keyboardVisible } = useCourseKeyboard()
+  // On the player's immersive pages (Note Editor, Mind Map Editor, Brain
+  // answer page, Live Experiment Viewer, Sketch Editor, the Read PDF /
+  // Annotations viewers) the footer navigation is not shown at all; it
+  // returns as soon as the learner is back on a library page. The Music
+  // Player is not one of those pages — its footer behaviour is unchanged.
+  const immersivePage = useFooterHiddenPage(tab)
   const navRef = useRef<HTMLElement>(null)
   const items = TABS.filter(item => !hiddenTabs.includes(item.key))
   const moveFocus = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -33,23 +63,46 @@ export default function CoursePeekDock({ tab, onTabChange, hiddenTabs = [] }: {
     buttons?.[next]?.focus()
     buttons?.[next]?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }
-  if (keyboardVisible) return null
+  if (keyboardVisible || immersivePage) return null
   return (
     <nav ref={navRef} data-course-strip-nav aria-label="Course study tools">
-      <div className="course-strip-track">
-        {items.map((item, index) => {
-          const [letter, name] = LABELS[item.key] ?? [item.label[0], item.label]
-          return (
-            <button key={item.key} type="button" data-course-strip={item.key}
-              aria-label={item.heading} title={item.heading}
-              aria-pressed={tab === item.key}
-              onClick={() => onTabChange(item.key)} onKeyDown={event => moveFocus(event, index)}
-              style={{ '--strip-color': FOOTER_COLOR } as CSSProperties}>
-              <span className="course-strip-plate" aria-hidden="true">{letter}</span>
-              <span className="course-strip-name" aria-hidden="true">{name}</span>
-            </button>
-          )
-        })}
+      {/* The Workspace pill, in-flow: its wrapper is re-homed (not restyled)
+          by course-strip-nav.css so the strip keeps its exact area. No
+          [data-site-footer-nav]: that hook belongs to the measured site
+          footer (utils/footerNavSpace.ts), which this strip is not. */}
+      <div data-work-footer-nav="" data-course-work-pill="" data-position="flow">
+        <div
+          data-site-footer=""
+          data-nav-count={String(items.length)}
+          style={{ '--work-nav-n': String(items.length), '--work-nav-active': FOOTER_COLOR } as CSSProperties}
+        >
+          <div data-work-nav-row="">
+            {items.map((item, index) => {
+              const Icon = item.icon
+              const isActive = tab === item.key
+              // The selected cell publishes its own accent, so the pill's
+              // tint and the destination's colour stay one rule — the
+              // Workspace footer's own mechanism (WorkFooterNav).
+              const cellStyle = {
+                ...(isActive ? { '--work-nav-active': item.color } : null),
+              } as CSSProperties
+              return (
+                <button key={item.key} type="button"
+                  data-work-nav-cell={item.key}
+                  data-course-strip={item.key}
+                  data-active={isActive ? 'true' : 'false'}
+                  aria-current={isActive ? 'page' : undefined}
+                  aria-label={item.heading} title={item.heading}
+                  onClick={() => onTabChange(item.key)} onKeyDown={event => moveFocus(event, index)}
+                  style={cellStyle}>
+                  <span data-work-nav-icon="" aria-hidden="true">
+                    <Icon size={26} />
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
       </div>
     </nav>
   )

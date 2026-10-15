@@ -21,6 +21,36 @@
 // `src/revision/engine/aiGenerate.ts` when the question rules change there.
 
 import { MAX_PRACTICE_QUESTIONS } from "../../utils/practiceSet.js";
+import type { BrainQuestionType } from "../types/myCourse";
+
+/**
+ * The eight types the Brain creation page offers, in selector order. (Labels
+ * mirror `BRAIN_QUESTION_TYPE_LABELS` in src/types/myCourse.ts — this module
+ * is imported straight by Node's strip-types test runs, so it cannot import
+ * that TS file at runtime.)
+ */
+export const PRACTICE_QUESTION_TYPE_OPTIONS: Array<{ value: BrainQuestionType; label: string }> = [
+  { value: "mcq", label: "MCQ" },
+  { value: "fill_blank", label: "Fill in the Blank" },
+  { value: "label_diagram", label: "Label the Diagram" },
+  { value: "assertion_reason", label: "Assertion and Reason" },
+  { value: "one_word", label: "One-Word / One-Line Answer" },
+  { value: "match", label: "Match the Following" },
+  { value: "drag_drop", label: "Drag and Drop" },
+  { value: "hotspot", label: "Hotspot Questions" },
+];
+
+/** The do/don't pills shown next to the CMD for the structured (JSON) types. */
+export const PRACTICE_PROMPT_JSON_RULES: string[] = [
+  "Reply with strict JSON only — no prose, no markdown fences",
+  "One object per question, with its \"questionType\"",
+  "“explanation” on EVERY question",
+  "Exactly the fields shown — coordinates are % of the image (0–100)",
+];
+
+/** The rule pills for the selected type (plain-text rules for MCQ). */
+export const practicePromptRulesFor = (questionType?: string): string[] =>
+  !questionType || questionType === "mcq" ? PRACTICE_PROMPT_RULES : PRACTICE_PROMPT_JSON_RULES;
 
 /** How many questions the CMD asks for when the admin did not choose a number. */
 export const PRACTICE_PROMPT_DEFAULT_COUNT = 10;
@@ -83,6 +113,12 @@ export interface PracticePromptOptions {
   /** Language of the questions: English | Hinglish | Hindi. */
   language?: string;
   /**
+   * Which question type to ask for. "mcq" (or omitted) keeps the established
+   * plain-text CMD byte-for-byte; every other type gets a strict-JSON CMD
+   * whose schema is exactly what `parseTypedPracticeImport` reads back.
+   */
+  questionType?: BrainQuestionType | string;
+  /**
    * Whether the explanation line is demanded. The admin set requires it (the
    * publish rule refuses a set without one), so the default is "required". The
    * learner Bulk Import accepts questions without one, so it asks for it as a
@@ -97,19 +133,93 @@ const clampCount = (value: unknown): number => {
   return Math.min(count, MAX_PRACTICE_QUESTIONS);
 };
 
+/** The per-type JSON schema + example the structured CMDs prescribe. */
+const TYPED_SCHEMAS: Record<string, { shape: string; example: string; rules: string }> = {
+  fill_blank: {
+    shape: `{ "questionType": "fill_blank", "prompt": "The process by which plants make food is called ___.", "blankAnswers": [["photosynthesis"]], "explanation": "…", "difficulty": "easy", "topic": "…" }`,
+    example: `{ "questionType": "fill_blank", "prompt": "Water is made of hydrogen and ___.", "blankAnswers": [["oxygen", "O2"]], "explanation": "A water molecule is H2O — two hydrogen atoms and one oxygen atom.", "difficulty": "easy", "topic": "Matter" }`,
+    rules: `- Put each blank in the prompt as ___ (three underscores) and give one "blankAnswers" list per blank, in order.\n- The first answer in each list is the main answer; add accepted spellings/variants after it.`,
+  },
+  one_word: {
+    shape: `{ "questionType": "one_word", "prompt": "…", "acceptedAnswers": ["…"], "explanation": "…", "difficulty": "easy", "topic": "…" }`,
+    example: `{ "questionType": "one_word", "prompt": "What is the SI unit of force?", "acceptedAnswers": ["newton", "N"], "explanation": "Force is measured in newtons, named after Isaac Newton.", "difficulty": "easy", "topic": "Force" }`,
+    rules: `- The answer must be one word or one short line. The first accepted answer is the main one; add real variants (abbreviations, spellings) after it.`,
+  },
+  assertion_reason: {
+    shape: `{ "questionType": "assertion_reason", "assertion": "…", "reason": "…", "correctIndex": 0, "explanation": "…", "difficulty": "medium", "topic": "…" }`,
+    example: `{ "questionType": "assertion_reason", "assertion": "Ice floats on water.", "reason": "Ice is less dense than liquid water.", "correctIndex": 0, "explanation": "Both are true, and the lower density of ice is exactly why it floats.", "difficulty": "medium", "topic": "Matter" }`,
+    rules: `- "correctIndex" uses this fixed convention: 0 = both true and the Reason correctly explains the Assertion; 1 = both true but the Reason does not explain the Assertion; 2 = Assertion true, Reason false; 3 = Assertion false, Reason true.`,
+  },
+  match: {
+    shape: `{ "questionType": "match", "prompt": "Match the following.", "matchPairs": [{ "left": "…", "right": "…" }], "explanation": "…", "difficulty": "medium", "topic": "…" }`,
+    example: `{ "questionType": "match", "prompt": "Match the organ to its function.", "matchPairs": [{ "left": "Heart", "right": "Pumps blood" }, { "left": "Lungs", "right": "Exchange gases" }, { "left": "Liver", "right": "Produces bile" }], "explanation": "Each organ has one primary job in the list.", "difficulty": "medium", "topic": "Human body" }`,
+    rules: `- Give 3–6 pairs. Every left item must have exactly one right partner, and no two pairs may share a left item.`,
+  },
+  drag_drop: {
+    shape: `{ "questionType": "drag_drop", "prompt": "…", "dragItems": ["…"], "dragTargets": [{ "label": "…", "answer": "…" }], "explanation": "…", "difficulty": "medium", "topic": "…" }`,
+    example: `{ "questionType": "drag_drop", "prompt": "Drop each gas into the jar where it collects.", "dragItems": ["Oxygen", "Carbon dioxide", "Hydrogen"], "dragTargets": [{ "label": "Jar A (from photosynthesis)", "answer": "Oxygen" }, { "label": "Jar B (from respiration)", "answer": "Carbon dioxide" }], "explanation": "Photosynthesis releases oxygen; respiration releases carbon dioxide.", "difficulty": "medium", "topic": "Gases" }`,
+    rules: `- Every target's "answer" must appear word-for-word in "dragItems". You may add 1–2 extra distractor items that belong nowhere.`,
+  },
+  label_diagram: {
+    shape: `{ "questionType": "label_diagram", "prompt": "Label the parts of …", "labelTargets": [{ "x": 50, "y": 40, "label": "…" }], "explanation": "…", "difficulty": "medium", "topic": "…" }`,
+    example: `{ "questionType": "label_diagram", "prompt": "Label the parts of a plant cell.", "labelTargets": [{ "x": 50, "y": 30, "label": "Nucleus" }, { "x": 25, "y": 65, "label": "Cell wall" }], "explanation": "The nucleus controls the cell; the wall gives it shape.", "difficulty": "medium", "topic": "Cells" }`,
+    rules: `- Coordinates are percentages of the diagram's width (x) and height (y), 0–100. Also add one "imagePrompt" field per question describing the diagram to draw, so the learner can attach a matching image — the app never invents the image itself.`,
+  },
+  hotspot: {
+    shape: `{ "questionType": "hotspot", "prompt": "…", "hotspots": [{ "id": "s1", "x": 50, "y": 40, "r": 10 }], "correctHotspotIds": ["s1"], "explanation": "…", "difficulty": "medium", "topic": "…" }`,
+    example: `{ "questionType": "hotspot", "prompt": "Tap the heart in the diagram.", "hotspots": [{ "id": "s1", "x": 52, "y": 38, "r": 12 }, { "id": "s2", "x": 30, "y": 60, "r": 10 }], "correctHotspotIds": ["s1"], "explanation": "The heart sits slightly left of the centre of the chest.", "difficulty": "medium", "topic": "Human body" }`,
+    rules: `- Coordinates are percentages of the image's width (x) and height (y), 0–100; "r" is the tap radius in %. Give each hotspot a short id and list the correct one(s) in "correctHotspotIds". Also add one "imagePrompt" field describing the picture, so the learner can attach a matching image.`,
+  },
+};
+
+const buildTypedPracticeAiPrompt = (
+  questionType: string,
+  { topic, level, count, language, explanation = "required" }: PracticePromptOptions,
+): string => {
+  const subject = String(topic || "").trim() || PRACTICE_PROMPT_TOPIC_PLACEHOLDER;
+  const klass = String(level || "").trim() || PRACTICE_PROMPT_LEVEL_PLACEHOLDER;
+  const total = clampCount(count);
+  const lang = String(language || "").trim() || "English";
+  const label =
+    PRACTICE_QUESTION_TYPE_OPTIONS.find((option) => option.value === questionType)?.label || questionType;
+  const schema = TYPED_SCHEMAS[questionType];
+  return `You are an expert exam setter for Indian school students. Write a ${label} practice set and reply with STRICT JSON in exactly the shape below, because my app reads your reply with a machine parser.
+
+CLASS / LEVEL: ${klass}
+TOPIC: ${subject}
+NUMBER OF QUESTIONS: ${total}
+LANGUAGE OF THE QUESTIONS: ${lang}
+
+WHAT TO WRITE
+- Exactly ${total} questions of type "${questionType}" on the topic above, at the level above. Mix easy, medium and hard; never ask the same fact twice.
+- Every question must have one unambiguous correct answer. Check the facts, maths, units and spelling before answering — a wrong key is worse than one fewer question.
+${schema ? schema.rules : ""}
+
+${explanation === "optional" ? EXPLANATION_OPTIONAL : EXPLANATION_REQUIRED}
+
+REPLY FORMAT (strict)
+- Reply with ONE JSON object and nothing else: no prose, no markdown, no code fences.
+- Shape: { "questions": [ <one object per question> ] }
+- Every question object has exactly these fields: ${schema ? schema.shape : ""}
+- "difficulty" is one of "easy", "medium", "hard". "topic" repeats the topic above (or a sub-topic).
+
+EXAMPLE — copy this shape exactly
+${schema ? schema.example : ""}
+
+Reply now with the JSON for ${total} questions and nothing else.`;
+};
+
 /**
  * The prompt the admin copies into an AI tool. Reply for reply, the text the
  * model returns must paste straight into "Paste questions" and import: numbered
  * prompts, lettered options, a ✓ on the right answer and an explanation on
  * every question.
  */
-export const buildPracticeAiPrompt = ({
-  topic,
-  level,
-  count,
-  language,
-  explanation = "required",
-}: PracticePromptOptions): string => {
+export const buildPracticeAiPrompt = (options: PracticePromptOptions): string => {
+  const { topic, level, count, language, explanation = "required", questionType } = options;
+  if (questionType && questionType !== "mcq" && TYPED_SCHEMAS[questionType]) {
+    return buildTypedPracticeAiPrompt(questionType, options);
+  }
   const subject = String(topic || "").trim() || PRACTICE_PROMPT_TOPIC_PLACEHOLDER;
   const klass = String(level || "").trim() || PRACTICE_PROMPT_LEVEL_PLACEHOLDER;
   const total = clampCount(count);

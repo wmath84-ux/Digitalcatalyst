@@ -103,11 +103,11 @@ test("every course card is the store's product card — image, title, Play, Edit
 
 test("One New course action opens the builder; course open and edit routes remain intact", () => {
   assert.match(study, /MY_COURSE_NEW_HASH = "#\/my-course\/new"/);
-  assert.equal((study.match(/data-my-course-create\b/g) || []).length, 1);
-  assert.doesNotMatch(
-    study,
-    /data-my-course-create-empty|data-my-course-create-fab/
-  );
+  // One always-visible header action; the empty state gets its own CTA.
+  // Both open the same builder route and there is no FAB.
+  assert.equal((study.match(/data-my-course-create(?![\w-])/g) || []).length, 1);
+  assert.equal((study.match(/data-my-course-create-empty/g) || []).length, 1);
+  assert.doesNotMatch(study, /data-my-course-create-fab/);
   assert.match(study, /encodeURIComponent\(courseId\)/);
   assert.match(study, /myCoursePlayHash\(course\.id\)/);
   assert.match(study, /myCourseEditHash\(course\.id\)/);
@@ -340,7 +340,8 @@ test("no premium (Paid) tab in a learner-authored course", () => {
     overlay,
     /TABS\.filter\(\(\{ key \}\) => !hiddenTabs\.includes\(key\)\)/
   );
-  assert.match(peekDock, /buildDockItems\(tab, hiddenTabs\)/);
+  // The peek dock applies the same hidden-tab filter to its own row.
+  assert.match(peekDock, /TABS\.filter\(item => !hiddenTabs\.includes\(item\.key\)\)/);
   assert.match(player, /const visibleTabOrder = useMemo\(/);
   // …and a hidden tab can never be the open one.
   assert.match(
@@ -362,9 +363,12 @@ test("settings stay, the three official-resource rows do not", () => {
     playerPanel,
     /!mine && showPersonalLibraryActions && onSaveForLater/
   );
-  // Every other preference is untouched.
+  // Every other preference is untouched. (The "Always-visible footer dock"
+  // toggle is retired — the Workspace-pill dock is always on now.)
   assert.match(playerPanel, /settingsRow\("Snowfall"/);
-  assert.match(playerPanel, /settingsRow\("Always-visible footer dock"/);
+  assert.match(playerPanel, /settingsRow\("Desktop view"/);
+  assert.match(playerPanel, /settingsRow\("Hide status bar"/);
+  assert.doesNotMatch(playerPanel, /Always-visible footer dock/);
 });
 
 test("everything the learner writes is stored under mine-<courseId>", () => {
@@ -377,9 +381,15 @@ test("everything the learner writes is stored under mine-<courseId>", () => {
     /export const myCourseStorageId = \(courseId: string\): string => `mine-\$\{courseId\}`;/
   );
   // progress · notes · playback · mind maps · AI chat · split ratio
+  // Progress flows through the shared hook now; the Firestore document it
+  // reads/writes is users/{uid}/courseProgress/{storageProductId}.
   assert.match(
     player,
-    /doc\(db, "users", user\.id, "courseProgress", storageProductId\)/
+    /useLocalCourseProgress\(user\?\.id \?\? null, String\(storageProductId\)\)/
+  );
+  assert.match(
+    read("src/course/useLocalCourseProgress.ts"),
+    /doc\(db, 'users', uid, 'courseProgress', productId\)/
   );
   // Notes are scoped by the same id, through the cloud hook: one Firestore
   // document per note at `users/{uid}/notes/{noteId}`, `productId` field =
@@ -399,7 +409,7 @@ test("everything the learner writes is stored under mine-<courseId>", () => {
   assert.match(player, /loadPlaybackStore\(user\.id, storageProductId\)/);
   assert.match(
     player,
-    /persistPlaybackStore\(user\.id, storageProductId, playbackRef\.current\)/
+    /persistPlaybackStore\(user\.id, storageProductId, store\)/
   );
   assert.match(
     player,

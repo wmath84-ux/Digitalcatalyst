@@ -19,9 +19,14 @@ test("definite user-not-found login switches directly to signup", () => {
   assert.match(form, /हमने Sign Up form खोल दिया है/);
 });
 
-test("ambiguous credential errors offer a clear signup action", () => {
-  assert.match(form, /New user\? Sign Up करें/);
-  assert.match(form, /नए user हैं\? पहले Sign Up/);
+test("ambiguous credential errors offer a clear way forward", () => {
+  // The dedicated "New user? Sign Up" action was replaced by google-only
+  // detection: a Google-created account has no password to check, so the
+  // login surfaces the Google button instead of a dead-end credential error.
+  assert.match(auth, /code === "auth\/invalid-credential" \|\| code === "auth\/wrong-password"/);
+  assert.match(auth, /code: "auth\/google-only-account"/);
+  assert.match(form, /result\.code === "auth\/google-only-account"\) setHighlightGoogle\(true\)/);
+  assert.match(form, /data-auth-google data-highlight=\{highlightGoogle \|\| undefined\}/);
   assert.match(form, /setPassword\(""\)/);
 });
 

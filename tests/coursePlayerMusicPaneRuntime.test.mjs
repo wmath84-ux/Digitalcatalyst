@@ -349,6 +349,17 @@ test("with a YouTube key, search happens INSIDE the player and its results play 
   assert.equal(results.length, 2);
   assert.match(results[0].textContent, /Never Gonna Give You Up/);
   assert.match(results[0].textContent, /Rick Astley/);
+  assert.equal(
+    results[0].querySelector("[data-music-result-thumbnail] img").getAttribute("src"),
+    "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+  );
+
+  // The direct view option on the search/filter page switches the same
+  // results to the large YouTube-style thumbnail + title presentation.
+  await act(async () => { q('[data-music-view-option="youtube"]').click(); });
+  await settle();
+  assert.equal(q("[data-music-results]").getAttribute("data-music-results-view"), "youtube");
+  assert.ok(Boolean(qa("[data-music-result]")[0].querySelector("[data-music-result-thumbnail] img")));
 
   // Tapping a result plays it right here and keeps it on the shelf.
   await act(async () => { results[1].click(); });
@@ -376,6 +387,74 @@ test("a key that returns nothing says so and offers the YouTube hand-off", async
     q("[data-music-no-results] a").getAttribute("href"),
     "https://www.youtube.com/results?search_query=quota%20khatam",
   );
+});
+
+test("Course, Device and Online filters show one shelf at a time", async () => {
+  window.localStorage.clear();
+  mount();
+  await settle();
+  typeInto(q("[data-music-link]"), "https://cdn.example.test/Filter_Song.mp3");
+  await act(async () => { q("[data-music-add-link]").click(); });
+  await settle();
+  await act(async () => { q("[data-music-library-toggle]").click(); });
+  await settle();
+
+  await act(async () => { q('[data-music-filter="online"]').click(); });
+  await settle();
+  assert.equal(Boolean(q('[data-music-section="course"]')), false);
+  assert.equal(Boolean(q('[data-music-section="upload"]')), false);
+  assert.equal(q('[data-music-section="link"]').getAttribute("data-music-section-count"), "1");
+
+  await act(async () => { q('[data-music-filter="device"]').click(); });
+  await settle();
+  assert.equal(q('[data-music-section="upload"]').getAttribute("data-music-section-count"), "0");
+  assert.equal(Boolean(q('[data-music-section="link"]')), false);
+
+  await act(async () => { q('[data-music-filter="course"]').click(); });
+  await settle();
+  assert.equal(q('[data-music-section="course"]').getAttribute("data-music-section-count"), "1");
+  assert.equal(Boolean(q('[data-music-section="upload"]')), false);
+});
+
+test("opening the library does not unmount the playing glass player", async () => {
+  window.localStorage.clear();
+  mount();
+  await settle();
+  const row = q('[data-music-track="course-f1"]');
+  await act(async () => { row.querySelector('button[aria-label^="Play"]').click(); });
+  await settle();
+  const playerBefore = q("[data-course-audio-player]");
+  const audioBefore = q("[data-course-audio-element]");
+  assert.ok(Boolean(playerBefore));
+
+  await act(async () => { q("[data-music-library-toggle]").click(); });
+  await settle();
+  assert.equal(Boolean(q("[data-music-library-sheet]")), true);
+  assert.equal(q("[data-course-audio-player]") === playerBefore, true, "the same player stays mounted");
+  assert.equal(q("[data-course-audio-element]") === audioBefore, true, "the same audio element keeps its playback state");
+});
+
+test("a YouTube song can switch between audio-style and embedded video", async () => {
+  window.localStorage.clear();
+  mount();
+  await settle();
+  typeInto(q("[data-music-link]"), "https://youtu.be/dQw4w9WgXcQ");
+  await act(async () => { q("[data-music-add-link]").click(); });
+  await settle();
+  assert.equal(q("[data-music-youtube-player]").getAttribute("data-music-youtube-mode"), "video");
+  const frameBefore = q('[data-music-embed="youtube"]');
+
+  await act(async () => { q('[data-music-youtube-mode-option="audio"]').click(); });
+  await settle();
+  assert.equal(q("[data-music-youtube-player]").getAttribute("data-music-youtube-mode"), "audio");
+  assert.ok(Boolean(q("[data-music-youtube-audio]")), "the audio-style surface is shown");
+  assert.equal(q("[data-music-youtube-thumbnail]").getAttribute("src"), "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg");
+  assert.ok(Boolean(q("[data-music-youtube-play-toggle]")), "audio mode has its own play control");
+  assert.equal(q('[data-music-embed="youtube"]') === frameBefore, true, "switching presentation does not replace the official embed");
+
+  await act(async () => { q('[data-music-youtube-mode-option="video"]').click(); });
+  await settle();
+  assert.equal(q("[data-music-youtube-player]").getAttribute("data-music-youtube-mode"), "video");
 });
 
 test("the library's search filters every shelf at once", async () => {

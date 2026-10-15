@@ -288,11 +288,14 @@ test("every Brain screen measures its own box and publishes the scale", () => {
   );
   assert.match(panelFit, /export function publishVar\(el: HTMLElement, name: string, value: string\): void \{\s*\n\s*if \(el\.style\.getPropertyValue\(name\) === value\) return;/,
     "an unchanged value is never re-written — the divider drag is a per-frame path");
-  // The ref sits on EVERY screen root (library / review / result / answers /
-  // question), so whichever one is mounted owns the measurement.
-  const roots = brainPanel.match(/data-brain-screen="\w+"/g) ?? [];
-  assert.equal(roots.length, 5, "five screens");
-  assert.equal((brainPanel.match(/ref=\{fitRef\}/g) ?? []).length, 5, "…and all five measure themselves");
+  // The ref sits on EVERY screen root (library+creator / review / result /
+  // answers / question), so whichever one is mounted owns the measurement.
+  // The library root doubles as the nested creator page — one measured root,
+  // named by whichever of the two is showing.
+  assert.match(brainPanel, /data-brain-screen=\{composerOpen \? "create" : "library"\}/);
+  const roots = brainPanel.match(/data-brain-screen="[a-z]+"/g) ?? [];
+  assert.equal(roots.length, 4, "question / review / result / answers roots");
+  assert.equal((brainPanel.match(/ref=\{fitRef\}/g) ?? []).length, 5, "…and all five screen roots measure themselves");
 });
 
 test("the Brain question screen is the deck, and the review bar stays docked", () => {

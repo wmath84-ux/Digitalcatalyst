@@ -37,6 +37,7 @@ test("desktop signed-out Settings uses a compact centered panel", () => {
 const studyCard = fs.readFileSync("src/personal-library/MyCourseCard.tsx", "utf8");
 const studyCss = fs.readFileSync("src/personal-library/study-library-minimal.css", "utf8");
 const homeCss = fs.readFileSync("src/home/home.css", "utf8");
+const cardSharedCss = fs.readFileSync("src/components/marketplace-card-shared.css", "utf8");
 const experimentCss = fs.readFileSync("src/personal-library/course-editor-minimal.css", "utf8");
 const experimentEditor = fs.readFileSync("src/personal-library/MyCourseExperimentEditor.tsx", "utf8");
 
@@ -50,11 +51,13 @@ test("Study Library gets full-width horizontal course rows only above the mobile
 });
 
 test("Home product cards use a restrained shadow and readable light-theme ownership badges", () => {
-  assert.match(homeCss, /\[data-home-content\] \[data-home-grid\] \.dc-marketplace-card,\s*\[data-home-content\] \[data-home-grid\] \.dc-marketplace-card:hover/);
-  assert.match(homeCss, /box-shadow:\s*0 2px 5px -4px rgba\(15, 23, 42, 0\.2\) !important/);
-  assert.match(homeCss, /\.dc-marketplace-status\[data-status="purchased"\],[\s\S]*?color:\s*#176b50 !important/);
-  assert.match(homeCss, /\.dc-marketplace-status\[data-status="free"\][\s\S]*?color:\s*#176b50 !important/);
-  assert.match(homeCss, /@media \(min-width: 640px\)[\s\S]*?\.dc-marketplace-card\.is-large \.dc-marketplace-open[\s\S]*?flex-direction: column/);
+  // The card rules live in the shared marketplace-card sheet now, scoped to
+  // the Home grid and the Store grids through one :is() group.
+  assert.match(cardSharedCss, /:is\(\[data-home-content\] \[data-home-grid\], \[data-store-page\] \[data-store-grid\], \[data-store-page\] \[data-store-mixed\]\) \.dc-marketplace-card,\s*:is\(\[data-home-content\] \[data-home-grid\], \[data-store-page\] \[data-store-grid\], \[data-store-page\] \[data-store-mixed\]\) \.dc-marketplace-card:hover/);
+  assert.match(cardSharedCss, /box-shadow:\s*0 2px 5px -4px rgba\(15, 23, 42, 0\.2\) !important/);
+  assert.match(cardSharedCss, /\.dc-marketplace-status\[data-status="purchased"\],\s*html\[data-theme="light"\] :is\(\[data-home-content\] \[data-home-grid\], \[data-store-page\] \[data-store-grid\], \[data-store-page\] \[data-store-mixed\]\) \.dc-marketplace-card \.dc-marketplace-status\[data-status="free"\] \{[\s\S]*?color:\s*#176b50 !important/);
+  assert.match(cardSharedCss, /\.dc-marketplace-status\[data-status="free"\][\s\S]*?color:\s*#176b50 !important/);
+  assert.match(cardSharedCss, /@media \(min-width: 640px\)[\s\S]*?\.dc-marketplace-card\.is-large \.dc-marketplace-open/);
 });
 
 test("Light experiment templates, helper copy and run status retain readable contrast", () => {

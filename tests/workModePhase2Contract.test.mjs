@@ -101,7 +101,7 @@ test("Work theme and exit controls live in the page header, never as floating sh
 test("My Day and Phase 4 Revision mount as local Work surfaces instead of placeholders", () => {
   assert.match(page, /<WorkMyDayPage/);
   assert.doesNotMatch(page, /My Day · Phase 3|Revision library · Phase 4|WorkPhasePlaceholder/);
-  assert.match(page, /<WorkRevisionApp notes=\{notes\.notes\} \/>/);
+  assert.match(page, /<WorkRevisionApp notes=\{notes\.notes\} onExit=\{onExit\} \/>/);
   assert.match(workRevision, /data-work-revision-dashboard/);
   assert.match(workRevision, /data-work-revision-library/);
   assert.match(workRevision, /data-work-revision-style-choice/);

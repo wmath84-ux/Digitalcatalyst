@@ -18,7 +18,8 @@ test("an installed mobile PWA skips landing and opens Home", () => {
   // was pinning the superseded policy, not catching a regression.
   assert.match(main, /installedMobilePwa \|\| isNativeApp\(\)/);
   assert.match(main, /history\.replaceState[\s\S]*HOME_HASH/);
-  assert.match(main, /setHash\(HOME_HASH\)/);
+  assert.match(main, /const destination = getWorkLaunchChoice\(\) === "work" \? WORK_HASH : HOME_HASH;/);
+  assert.match(main, /setHash\(destination\)/);
 });
 
 test("desktop browser can open the learner app from landing", () => {

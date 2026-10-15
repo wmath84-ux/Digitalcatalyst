@@ -17,7 +17,7 @@ import {
 } from "@/components/admin/ui";
 import { useConfirm, useToast, useUnsavedGuard } from "@/components/admin/AdminProviders";
 import { adminFetch } from "@/lib/admin/client";
-import type { PaidUpdate, ProductImage, ProductModule } from "@/lib/admin/types";
+import type { PaidUpdate, ProductImage, ProductModule, ProductPracticeQuestion } from "@/lib/admin/types";
 import { CloudinaryImageUploadField } from "@/components/admin/products/CloudinaryImageUploadField";
 import ModulesResourcesEditor from "@/components/admin/products/ModulesResourcesEditor";
 import {
@@ -234,19 +234,19 @@ export function ProductEditor({ productId }: { productId?: string }) {
         if (r.salePrice != null && (r.cashPrice == null || r.salePrice < 0 || r.salePrice > r.cashPrice)) add(`Resource “${r.name}” sale price must be between ₹0 and its cash price.`, "modules");
         const learnerVisible = r.visibility !== "hidden" && r.accessLevel !== "hidden" && m.visibility !== "hidden" && m.accessLevel !== "hidden";
         if (r.type === "brain") {
-          // The Brain practice set is the ONE resource type that is valid
+          // The Brain Practice Set is the ONE resource type that is valid
           // WITHOUT a URL — its content is the imported question list. A set
-          // the learner can see must be complete: every question needs text,
-          // two options, a marked answer AND an explanation (never optional —
-          // owner rule, 2026-10-07), otherwise it would either never reach the
-          // player's Brain tab or reach it without the teaching half of the
-          // question.
+          // the learner can see must be complete: every question complete for
+          // its own type (answer key filled in) AND an explanation (never
+          // optional — owner rule, 2026-10-07), otherwise it would either
+          // never reach the player's Brain tab or reach it without the
+          // teaching half of the question.
           const questions = Array.isArray(r.practiceQuestions) ? r.practiceQuestions : [];
           if (questions.length === 0) {
             add(`Brain practice set “${r.name || "Untitled resource"}” in “${m.title}” has no questions yet — import or add at least one.`, "modules", learnerVisible);
           } else if (!practiceQuestionsReady(questions) || !practiceQuestionsExplained(questions)) {
             const incomplete = countIncompletePracticeQuestions(questions);
-            add(`Brain practice set “${r.name || "Untitled resource"}” in “${m.title}” has ${incomplete} incomplete question${incomplete === 1 ? "" : "s"} — each needs text, two options, a marked answer and an explanation.`, "modules", learnerVisible);
+            add(`Brain practice set “${r.name || "Untitled resource"}” in “${m.title}” has ${incomplete} incomplete question${incomplete === 1 ? "" : "s"} — each question must be complete for its type, with its answer key filled in and an explanation.`, "modules", learnerVisible);
           }
         } else if (r.type === "interactive") {
           // An experiment is playable with its inline HTML OR a hosted page —
@@ -409,7 +409,11 @@ export function ProductEditor({ productId }: { productId?: string }) {
             youtubeVideoId: "",
             sortOrder: index,
             paidUpdateId,
-            practiceQuestions: normalizePracticeQuestions(resource.practiceQuestions),
+            // The normaliser deliberately carries an unsupported type through
+            // as a string so validation can name it; the publish gate above
+            // keeps such a set from ever going learner-visible, and on read
+            // the same normaliser + `practiceQuestionIssues` report it again.
+            practiceQuestions: normalizePracticeQuestions(resource.practiceQuestions) as ProductPracticeQuestion[],
             practiceTitle: (resource.practiceTitle || "").trim(),
           };
         }

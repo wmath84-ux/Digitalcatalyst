@@ -135,7 +135,7 @@ async function openSavedNote(page, press, id) {
     await page.touchscreen.tap(box.x + 12, box.y + 12);
     await page.touchscreen.tap(box.x + 12, box.y + 12);
   } else await title.dblclick();
-  await page.waitForSelector('[data-course-note-edit-save]');
+  await page.waitForSelector('[data-note-view-mode="edit"]');
   await page.waitForSelector('.bn-editor[contenteditable="true"]');
 }
 
@@ -149,7 +149,22 @@ const firstVisibleRect = (page, selector) =>
     }
     return null;
   }, selector);
-const status = (page) => page.$eval("[data-course-notes-status]", (el) => el.textContent);
+// Status, Save and Cancel live in the right side panel (the reference
+// design's chrome): peek at the status (the panel hands the caret back to
+// the document when it closes over an editing note), or act through it.
+const status = async (page, press) => {
+  await press("[data-note-open-right-panel]");
+  await page.waitForSelector("[data-note-right-panel]");
+  const text = await page.$eval("[data-course-notes-status]", (el) => el.textContent);
+  await press("[data-note-close-right-panel]");
+  await page.waitForSelector("[data-note-right-panel]", { state: "detached" });
+  return text;
+};
+const viaOptions = async (page, press, selector) => {
+  await press("[data-note-open-right-panel]");
+  await page.waitForSelector("[data-note-right-panel]");
+  await press(selector);
+};
 const noteHtml = (page, id) => page.evaluate((i) => window.__notes.find((n) => n.id === i)?.html, id);
 
 // ── Flows ──────────────────────────────────────────────────────────────────
@@ -173,8 +188,8 @@ browserTest("create: title → body → slash command → bold → Save stores t
   await page.keyboard.press("Enter");
   await page.keyboard.type("revise chapter 4");
   await page.waitForTimeout(400);
-  assert.equal(await status(page), "Unsaved");
-  await page.click("[data-course-notes-save]");
+  assert.equal(await status(page, press), "Unsaved");
+  await viaOptions(page, press, "[data-course-notes-save]");
   await page.waitForFunction(() => window.__log.includes("add"));
   assert.equal(
     await page.evaluate(() => window.__notes[0].html),
@@ -194,11 +209,11 @@ browserTest("edit: every block round-trips; Cancel discards; Save keeps the rest
   await openSavedNote(page, press, "n1");
   await editorReady();
   assert.equal(await page.$eval(".dc-note-title", (el) => el.value), "Photosynthesis");
-  assert.equal(await status(page), "Synced", "an untouched note is not 'Unsaved'");
+  assert.equal(await status(page, press), "Synced", "an untouched note is not 'Unsaved'");
   await page.keyboard.type("SHOULD NOT PERSIST");
   await page.waitForTimeout(400);
-  assert.equal(await status(page), "Unsaved");
-  await press("[data-course-note-edit-cancel]");
+  assert.equal(await status(page, press), "Unsaved");
+  await viaOptions(page, press, "[data-course-note-edit-cancel]");
   await page.waitForTimeout(250);
   assert.doesNotMatch(await noteHtml(page, "n1"), /SHOULD NOT/);
 
@@ -206,7 +221,7 @@ browserTest("edit: every block round-trips; Cancel discards; Save keeps the rest
   await editorReady();
   await page.keyboard.type(" — appended");
   await page.waitForTimeout(350);
-  await press("[data-course-note-edit-save]");
+  await viaOptions(page, press, "[data-course-note-edit-save]");
   await page.waitForFunction(() => window.__log.some((l) => l.startsWith("edit:")));
   const saved = await noteHtml(page, "n1");
   assert.match(saved, /^<h1>Photosynthesis<\/h1><hr>/);
@@ -240,7 +255,7 @@ browserTest("legacy notes open intact: table preserved verbatim, checklist / quo
   await editorReady();
   assert.deepEqual(await page.$$eval(".bn-block-content", (n) => n.map((x) => x.getAttribute("data-content-type"))), ["paragraph", "legacyHtml", "paragraph"]);
   assert.equal(await page.locator(".dc-note-legacy table").count(), 1);
-  await press("[data-course-note-edit-save]");
+  await viaOptions(page, press, "[data-course-note-edit-save]");
   await page.waitForFunction(() => window.__log.some((l) => l.startsWith("edit:")));
   assert.match(await noteHtml(page, "n3"), /<table><tbody><tr><th>Term<\/th><th>Meaning<\/th><\/tr><tr><td>ATP<\/td><td>Energy<\/td><\/tr><\/tbody><\/table>/, "saving an untouched note must not alter the table");
 
@@ -257,7 +272,7 @@ browserTest("a plain-text-only legacy note (no html field) opens with its words 
   await editorReady();
   assert.equal(await bodyText(page), "Plain only");
   assert.equal(await page.$eval(".dc-note-title", (el) => el.value), "", "no heading → no title; the words stay in the body");
-  await press("[data-course-note-edit-save]");
+  await viaOptions(page, press, "[data-course-note-edit-save]");
   await page.waitForFunction(() => window.__log.some((l) => l.startsWith("edit:")));
   assert.equal(await noteHtml(page, "n5"), "<p>Plain only</p>");
   await context.close();
@@ -276,7 +291,7 @@ browserTest("offline-first: if the editor chunk cannot load, the previous editor
   await page.keyboard.type("Offline title");
   await page.keyboard.press("Enter");
   await page.keyboard.type("written with the fallback editor");
-  await page.click("[data-course-notes-save]");
+  await viaOptions(page, press, "[data-course-notes-save]");
   await page.waitForFunction(() => window.__log.includes("add"));
   assert.equal(await page.evaluate(() => window.__notes[0].html), "<h1>Offline title</h1><hr>written with the fallback editor");
   await context.close();
@@ -300,7 +315,7 @@ browserTest("undo / redo and a clean history boundary per note", async () => {
   await page.waitForTimeout(150);
   assert.equal(await bodyText(page), before, "Ctrl+Y redoes");
   // A freshly opened note starts with an EMPTY history: undo can never reach the previous note.
-  await press("[data-course-notes-cancel]");
+  await viaOptions(page, press, "[data-course-notes-cancel]");
   await openSavedNote(page, press, "n2");
   await editorReady();
   const opened = await bodyText(page);
@@ -347,7 +362,7 @@ browserTest("every slash command creates its block: paragraph, headings 1–3, b
     `blocks created: ${JSON.stringify(blocks)}`,
   );
   // …and every one of them reaches the stored note: no block type is lost on the way out.
-  await page.click("[data-course-notes-save]");
+  await viaOptions(page, press, "[data-course-notes-save]");
   await page.waitForFunction(() => window.__log.includes("add"));
   const stored = await page.evaluate(() => window.__notes[0].html);
   for (const fragment of ["<p>paragraph text</p>", "<h1>heading text</h1>", "<h2>heading text</h2>", "<h3>heading text</h3>", "<ul><li>bulletListItem text</li></ul>", "<ol><li>numberedListItem text</li></ol>", '<ul><li data-checked="false">checkListItem text</li></ul>', "<blockquote>quote text</blockquote>", "<hr>", "<pre><code>codeBlock text</code></pre>"]) {
@@ -398,8 +413,8 @@ browserTest("an older Android WebView (no findLast / toReversed): typing, copy, 
   await page.keyboard.press("Enter");
   await page.keyboard.type("quoted");
   await page.waitForTimeout(450);
-  assert.equal(await status(page), "Unsaved");
-  await page.click("[data-course-notes-save]");
+  assert.equal(await status(page, press), "Unsaved");
+  await viaOptions(page, press, "[data-course-notes-save]");
   await page.waitForFunction(() => window.__log.includes("add"));
   const stored = await page.evaluate(() => window.__notes[0].html);
   assert.ok(stored.includes("<h1>Floor</h1>") && stored.includes("<p>typed on an older WebView</p><blockquote>quoted</blockquote>"), stored);
@@ -509,7 +524,7 @@ browserTest("inline formulas stay editable source: replace LaTeX, type around it
   assert.match(await html(page), /<annotation encoding="application\/x-tex">x\^3<\/annotation>/);
   assert.match(await bodyText(page), /start Before/);
   assert.match(await bodyText(page), /after\s*end/, "the text following an inline math atom survives source replacement");
-  await page.click("[data-course-notes-save]");
+  await viaOptions(page, press, "[data-course-notes-save]");
   await page.waitForFunction(() => window.__log.includes("add"));
   const saved = await page.evaluate(() => window.__notes[0].html);
   assert.match(saved, /data-note-math="inline"/);
@@ -529,6 +544,8 @@ browserTest("Save never truncates: an over-long note says so and cannot be saved
     dt.setData("text/plain", "word ".repeat(13000));
     document.querySelector(".bn-editor").dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
   });
+  await press("[data-note-open-right-panel]");
+  await page.waitForSelector("[data-note-right-panel]");
   await page.waitForFunction(() => document.querySelector("[data-course-notes-status]")?.textContent === "Too long to save", null, { timeout: 15000 });
   assert.equal(await page.$eval("[data-course-notes-save]", (b) => b.disabled), true);
   await context.close();
@@ -698,7 +715,7 @@ for (const engine of ["resize", "overlay"]) {
     // floating window never saw it at all.)
     assert.equal(await page.locator("[data-note-dock]").count(), 1, "the toolbar is up for the caret alone");
     const beforeKeyboard = await firstVisibleRect(page, "[data-note-dock]");
-    assert.ok(Math.abs(beforeKeyboard.bottom - (await visible()).bottom) <= 1.5, `flush with the bottom while nothing else is down there: dock ${JSON.stringify(beforeKeyboard)}, visual ${JSON.stringify(await visible())}`);
+    assert.ok(Math.abs(beforeKeyboard.bottom - ((await visible()).bottom - 8)) <= 1.5, `the floating pill rests 8px above the bottom while nothing else is down there: dock ${JSON.stringify(beforeKeyboard)}, visual ${JSON.stringify(await visible())}`);
     assert.equal(await page.evaluate(() => window.__kb.visible), false, "and no keyboard is open");
 
     await keyboard(320);
@@ -707,13 +724,13 @@ for (const engine of ["resize", "overlay"]) {
     assert.equal(deck.pad, engine === "overlay" ? "320px" : "0px", "overlay: the deck pads by the inset; resize: the layout already shrank — never both");
     const dock = await firstVisibleRect(page, "[data-note-dock]");
     assert.ok(dock, "the docked toolbar is shown");
-    assert.ok(Math.abs(dock.bottom - (await visible()).bottom) <= 1.5, `dock must end at the visible bottom (dock ${dock.bottom}, visible ${(await visible()).bottom})`);
+    assert.ok(Math.abs(dock.bottom - ((await visible()).bottom - 8)) <= 1.5, `the pill must rest 8px above the visible bottom (dock ${dock.bottom}, visible ${(await visible()).bottom})`);
     const scroll = await firstVisibleRect(page, "[data-note-scroll]");
-    assert.ok(Math.abs(scroll.bottom - dock.top) <= 1.5, "the page ends exactly where the dock begins");
+    assert.ok(scroll.bottom > dock.top, "the page scrolls beneath the floating pill");
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, "no horizontal overflow");
     const dockLabels = () => page.$$eval("[data-note-dock] .bn-ak-button", (n) => n.map((b) => b.getAttribute("aria-label") || b.textContent.trim()));
     // With only a caret there is nothing to link; the link tool joins once words are selected.
-    assert.deepEqual(await dockLabels(), ["Insert block", "Paragraph", "Bold", "Italic", "Underline", "Strike", "Code", "Undo", "Redo"]);
+    assert.deepEqual(await dockLabels(), ["Undo", "Redo", "Paragraph", "Bold", "Italic", "Strike", "Highlight", "Code", "Quote", "Bulleted list", "Numbered list", "Checklist", "Indent", "Outdent"]);
 
     // A tool tap keeps the selection and the keyboard.
     await page.evaluate(() => {
@@ -728,7 +745,7 @@ for (const engine of ["resize", "overlay"]) {
     await page.waitForTimeout(250);
     const selected = await page.evaluate(() => window.getSelection().toString());
     await page.waitForSelector('[data-note-dock] .bn-ak-button[aria-label="Create link"]');
-    assert.deepEqual(await dockLabels(), ["Insert block", "Paragraph", "Bold", "Italic", "Underline", "Strike", "Code", "Create link", "Undo", "Redo"]);
+    assert.deepEqual(await dockLabels(), ["Undo", "Redo", "Paragraph", "Bold", "Italic", "Strike", "Highlight", "Code", "Quote", "Create link", "Bulleted list", "Numbered list", "Checklist", "Indent", "Outdent"]);
     await page.tap('[data-note-dock] .bn-ak-button[aria-label="Bold"]');
     await page.waitForTimeout(250);
     assert.equal(await page.evaluate(() => window.getSelection().toString()), selected);
@@ -746,8 +763,8 @@ for (const engine of ["resize", "overlay"]) {
     await page.waitForTimeout(300);
     assert.equal(await page.locator('.bn-block-content[data-content-type="heading"][data-level="2"]').count(), 1);
 
-    // "+" opens the slash menu above the keyboard AND above the dock.
-    await page.tap('[data-note-dock] .bn-ak-button[aria-label="Insert block"]');
+    // Typing "/" opens the slash menu above the keyboard AND above the pill.
+    await page.keyboard.type("/");
     await page.waitForSelector(".bn-ak-menu[role='listbox']");
     const menu = await firstVisibleRect(page, ".bn-ak-menu[role='listbox']");
     const dockNow = await firstVisibleRect(page, "[data-note-dock]");
@@ -787,7 +804,7 @@ browserTest("in-flow Course Player strip: the split-pane toolbar meets it withou
     null,
     "an in-flow course strip must not be treated as an overlay inset",
   );
-  assert.ok(Math.abs(dock.bottom - footer.top) <= 1.5, `the split-pane toolbar ends at the strip, with no gap (dock ${dock.bottom}, strip ${footer.top})`);
+  assert.ok(Math.abs(dock.bottom - (footer.top - 8)) <= 1.5, `the floating pill rests just above the strip (dock ${dock.bottom}, strip ${footer.top})`);
 
   // When the strip is hidden (as it is while the soft keyboard is open), the
   // split stage expands and the toolbar follows the pane instead of retaining
@@ -798,11 +815,11 @@ browserTest("in-flow Course Player strip: the split-pane toolbar meets it withou
   const bottom = await page.evaluate(() => window.innerHeight);
   assert.equal(await page.$eval(".dc-note-shell", (s) => s.getAttribute("data-note-footer-inset")), null);
   assert.ok(dropped, "the toolbar remains up while the caret is in the note");
-  assert.ok(Math.abs(dropped.bottom - bottom) <= 1.5, `the expanded split stage reaches the viewport bottom (dock ${dropped.bottom}, bottom ${bottom})`);
+  assert.ok(Math.abs(dropped.bottom - (bottom - 8)) <= 1.5, `the pill follows the expanded split stage to 8px above the viewport bottom (dock ${dropped.bottom}, bottom ${bottom})`);
 
   await page.evaluate(() => { const strip = document.querySelector("[data-course-strip-nav]"); if (strip) strip.style.display = ""; });
   const restored = await firstVisibleRect(page, "[data-course-strip-nav]");
-  assert.ok(Math.abs((await firstVisibleRect(page, "[data-note-dock]")).bottom - restored.top) <= 1.5, "the toolbar returns to the strip without a gap");
+  assert.ok(Math.abs((await firstVisibleRect(page, "[data-note-dock]")).bottom - (restored.top - 8)) <= 1.5, "the pill returns to just above the strip");
   assert.deepEqual(problems, []);
   await context.close();
 });
@@ -815,7 +832,7 @@ browserTest("always-visible footer dock: the toolbar already ends at it, so no l
   const dock = await firstVisibleRect(page, "[data-note-dock]");
   assert.ok(footer && footer.height > 0, "the in-flow footer dock is on screen");
   assert.ok(dock, "the toolbar is up for the caret");
-  assert.ok(Math.abs(dock.bottom - footer.top) <= 1.5, `the toolbar ends where the footer begins (dock ${dock.bottom}, footer ${footer.top})`);
+  assert.ok(Math.abs(dock.bottom - (footer.top - 8)) <= 1.5, `the floating pill rests just above the footer (dock ${dock.bottom}, footer ${footer.top})`);
   assert.equal(
     await page.$eval(".dc-note-shell", (s) => s.getAttribute("data-note-footer-inset")),
     null,
@@ -849,8 +866,16 @@ for (const width of [320, 360, 375, 390, 412, 430, 768, 1024]) {
     const m = await page.evaluate(() => {
       const rect = (s) => { const r = document.querySelector(s).getBoundingClientRect(); return { l: r.left, r: r.right, h: r.height }; };
       const title = document.querySelector(".dc-note-title");
-      return { title: rect(".dc-note-title"), clipped: title.scrollHeight > title.clientHeight + 1, save: rect("[data-course-note-edit-save]"), cancel: rect("[data-course-note-edit-cancel]"), legacy: rect(".dc-note-legacy"), editor: rect(".bn-editor"), inner: window.innerWidth };
+      return { title: rect(".dc-note-title"), clipped: title.scrollHeight > title.clientHeight + 1, legacy: rect(".dc-note-legacy"), editor: rect(".bn-editor"), inner: window.innerWidth };
     });
+    await press("[data-note-open-right-panel]");
+    await page.waitForSelector("[data-note-right-panel]");
+    const actions = await page.evaluate(() => {
+      const rect = (s) => { const r = document.querySelector(s).getBoundingClientRect(); return { l: r.left, r: r.right, h: r.height }; };
+      return { save: rect("[data-course-note-edit-save]"), cancel: rect("[data-course-note-edit-cancel]") };
+    });
+    m.save = actions.save;
+    m.cancel = actions.cancel;
     assert.equal(m.clipped, false, "the title auto-grows instead of clipping");
     assert.ok(m.title.l >= 0 && m.title.r <= m.inner + 0.5);
     assert.ok(m.save.r <= m.inner + 0.5 && m.cancel.l >= 0, "Save / Cancel are inside the viewport");
@@ -901,15 +926,15 @@ browserTest("saved note is headerless, single tap cannot edit, and a second edit
   await page.locator('.dc-note-title').dblclick();
   await page.waitForFunction(() => document.activeElement?.classList.contains('bn-editor'));
   await page.keyboard.type(' first edit');
-  await press('[data-course-note-edit-save]');
+  await viaOptions(page, press, '[data-course-note-edit-save]');
   await page.waitForSelector('[data-note-view-mode="read"]');
   assert.equal(await page.locator('[data-course-notes-bar]').count(), 0);
   await page.locator('.dc-note-title').dblclick();
   await page.waitForFunction(() => document.activeElement?.classList.contains('bn-editor'));
   await page.keyboard.type(' second edit');
   await page.waitForTimeout(400);
-  assert.equal(await status(page), 'Unsaved');
-  await press('[data-course-note-edit-save]');
+  assert.equal(await status(page, press), 'Unsaved');
+  await viaOptions(page, press, '[data-course-note-edit-save]');
   assert.match(await noteHtml(page, 'n1'), /first edit second edit/);
   await context.close();
 });
@@ -925,7 +950,7 @@ async function openMindMap({ touch = false } = {}) {
   return { page, context, problems };
 }
 
-browserTest("saved mind map reads without tools; double-click unlocks, Done commits and locks, errors remain recoverable", async () => {
+browserTest("saved mind map reads without tools; double-click never unlocks, the options panel unlocks, Done commits and locks, errors remain recoverable", async () => {
   const { page, context, problems } = await openMindMap();
   await page.locator('[data-course-mindmap-map-grid] [data-branched-leaf]').click();
   await page.waitForSelector('[data-mindmap-mode="read"]');
@@ -933,7 +958,17 @@ browserTest("saved mind map reads without tools; double-click unlocks, Done comm
   const root = page.locator('[data-mind-node="root"]');
   await root.click();
   assert.equal(await page.locator('[data-mind-node-input]').count(), 0);
+  // A double-click on the preview must NOT open editing: the map stays in
+  // read mode and no toolbar appears. (Preview drags are locked too — the
+  // nodes only move in edit mode.)
   await root.dblclick();
+  await page.waitForTimeout(400);
+  assert.equal(await page.locator('[data-course-mindmap-status]').count(), 0, "double-click must not unlock editing");
+  assert.equal(await page.locator('[data-mindmap-mode="read"]').count(), 1, "still reading after the double-click");
+  // Editing is explicit: Map options (top-right) → Edit map.
+  await page.locator('[data-mindmap-open-right-panel]').click();
+  await page.waitForSelector('[data-mindmap-right-panel]');
+  await page.locator('[data-course-mindmap-edit]').click();
   await page.waitForSelector('[data-course-mindmap-status]');
   assert.equal(await page.locator('[data-course-confirm-delete]').count(), 0, 'the unlocking gesture must not delete');
   await root.click();

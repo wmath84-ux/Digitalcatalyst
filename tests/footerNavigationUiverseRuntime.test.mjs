@@ -46,14 +46,14 @@ const renderFooter = () => React.act(() => root.render(React.createElement(Uiver
 const profileButton = () => document.querySelector('[data-uiverse-tab="profile"]');
 const menu = () => document.querySelector('[role="menu"]');
 
-test("one Profile tap opens four shortcuts; selecting one navigates and closes the menu", () => {
+test("one Profile tap opens five shortcuts; selecting one navigates and closes the menu", () => {
   renderFooter();
   React.act(() => profileButton().click());
   assert.equal(profileButton().getAttribute("aria-expanded"), "true");
   assert.equal(menu().getAttribute("data-open"), "true");
   assert.deepEqual(
     [...menu().querySelectorAll('[role="menuitem"]')].map((item) => item.textContent.trim()),
-    ["My Day", "My Study Library", "Revision", "FlowPath"],
+    ["Work Mode", "My Day", "My Study Library", "Revision", "FlowPath"],
   );
   React.act(() => menu().querySelector('[aria-label="My Day"]').click());
   assert.equal(window.location.hash, "#/my-day");

@@ -54,13 +54,15 @@ const brandingUtil = fs.readFileSync("src/utils/branding.ts", "utf8");
 /* 1 · SIZE — identical geometry to the feedback wall                   */
 /* ------------------------------------------------------------------ */
 
-test("the social card box matches the feedback wall box at every breakpoint", () => {
-  // Same height steps, in the same order, on both the wall and the slot
-  // the social card lives in (one for each).
+test("the social card box keeps the 520 / 640 / 740 ladder; the wall has its own framed box", () => {
+  // The social slot kept the 520 / 640 / 740 ladder. The feedback wall now
+  // sits in its own framed box on the same page (420 / 560 / 640) — both
+  // remain full width inside the shared feedback-section width rule below.
   const boxes = homeApp.match(/h-\[520px\][^"`]*sm:h-\[640px\][^"`]*md:h-\[740px\]/g) || [];
-  assert.equal(boxes.length, 2, "the wall and the social slot share the same height steps");
+  assert.equal(boxes.length, 1, "the social slot keeps the same height steps");
+  assert.match(homeApp, /dc-home-feedback-wall-frame h-\[420px\] w-full[^"]*sm:h-\[560px\][^"]*md:h-\[640px\]/);
   // Same full width on both.
-  assert.equal(boxes.filter((box) => box.includes("w-full")).length, 2);
+  assert.equal(boxes.filter((box) => box.includes("w-full")).length, 1);
   // Same horizontal padding on both sections, so the two cards line up
   // edge to edge on every screen size.
   // Both sections take the same shared feedback-section width rule, so the

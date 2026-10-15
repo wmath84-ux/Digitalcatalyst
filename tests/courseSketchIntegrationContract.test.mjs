@@ -114,7 +114,7 @@ test("nothing remounts the editor except a genuine change of board", () => {
   // `initialData` is memoised on the scene identity, so a re-render cannot
   // hand the editor a new object either.
   assert.match(panel, /const initialData = useMemo\(\(\) => \{/);
-  assert.match(panel, /\}, \[sceneKey\]\);/);
+  assert.match(panel, /\}, \[sceneKey, sketchTheme\]\);/);
 });
 
 test("the Sketch body is mounted by the same StudyContent switch as every other tab", () => {

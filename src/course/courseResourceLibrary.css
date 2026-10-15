@@ -1,8 +1,10 @@
 /* src/course/courseResourceLibrary.css
    Layout for the Modules tab library. The rows, branches and folding come from
    the shared Branched Menu (src/components/branched-menu); this sheet only
-   places the header, the search and the per-row marks. Colours resolve from the
-   Course Player theme tokens so the light and dark themes both read cleanly. */
+   places the header and the per-row marks. There is NO search box — the
+   library is purely navigational (see CourseResourceLibrary.tsx) — so this
+   sheet carries no search styles. Colours resolve from the Course Player
+   theme tokens so the light and dark themes both read cleanly. */
 
 .course-resource-library {
   display: flex;
@@ -13,30 +15,13 @@
   color: var(--course-text, rgba(255, 255, 255, 0.92));
 }
 
-/* ── Header (title + count + search) ─────────────────────────────────── */
-
-.library-header {
-  flex-shrink: 0;
-  padding: 10px 14px 6px;
-  border-bottom: 1px solid var(--course-border, rgba(255, 255, 255, 0.08));
-}
-
-.library-header__title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-}
+/* ── Header (title + count) ──────────────────────────────────────────── */
+/* The header's SIZE is the shared, defined one (`.course-page-header` in
+   coursePageHeader.css — this header is its reference). This sheet keeps
+   only the library's own title ink; the header's background and the
+   library's appearance are unchanged. */
 
 .library-header__title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 0.02em;
   color: var(--course-text, rgba(255, 255, 255, 0.88));
 }
 
@@ -47,72 +32,6 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   white-space: nowrap;
-}
-
-/* ── Search ──────────────────────────────────────────────────────────── */
-
-.library-search {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-  padding: 0 8px 0 10px;
-  height: 38px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--course-text, #fff) 6%, transparent);
-  border: 1px solid var(--course-border, rgba(255, 255, 255, 0.1));
-  transition: border-color 160ms ease, background-color 160ms ease;
-}
-
-.library-search:focus-within {
-  border-color: var(--dc-flat-cyan, #22d3ee);
-}
-
-.library-search__icon {
-  flex-shrink: 0;
-  color: var(--course-muted, rgba(255, 255, 255, 0.5));
-}
-
-.library-search__input {
-  flex: 1 1 auto;
-  min-width: 0;
-  height: 100%;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font-size: 13px;
-  outline: none;
-}
-
-.library-search__input::placeholder {
-  color: var(--course-muted, rgba(255, 255, 255, 0.45));
-}
-
-.library-search__count {
-  flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--course-muted, rgba(255, 255, 255, 0.5));
-  white-space: nowrap;
-}
-
-.library-search__clear {
-  display: grid;
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  place-items: center;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  color: var(--course-muted, rgba(255, 255, 255, 0.6));
-  cursor: pointer;
-}
-
-.library-search__clear:focus-visible,
-.library-search__input:focus-visible {
-  outline: none;
 }
 
 /* ── Body ────────────────────────────────────────────────────────────── */
@@ -143,6 +62,17 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The Paid listing's price (the Paid page wears this same library design):
+   full-weight amber, tabular figures, never truncated — it must read at a
+   glance next to the folder it unlocks. */
+.course-library__price {
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: #b45309;
+}
+
 .course-library__empty-tag {
   font-size: 10.5px;
   font-weight: 600;
@@ -168,35 +98,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 11px;
-}
-
-/* ── No results ──────────────────────────────────────────────────────── */
-
-.library-no-results {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 18px 4px;
-  color: var(--course-muted, rgba(255, 255, 255, 0.6));
-  font-size: 13px;
-}
-
-.library-no-results p {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.library-no-results__reset {
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid var(--course-border, rgba(255, 255, 255, 0.14));
-  border-radius: 10px;
-  background: none;
-  color: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
 }
 
 /* Phones: a little less padding around the list. */

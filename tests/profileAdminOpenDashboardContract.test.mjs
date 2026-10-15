@@ -13,10 +13,14 @@ const profile = fs.readFileSync("src/profile/App.tsx", "utf8");
 const profileLayout = fs.readFileSync("src/profile/ProfileLayout.tsx", "utf8");
 const auth = fs.readFileSync("src/AuthApp.tsx", "utf8");
 
-test("auth page keeps the tiny Open dashboard hint", () => {
-  assert.match(auth, /text-\[9px\] font-medium tracking-wide/);
-  assert.match(auth, />Open dashboard</);
-  assert.match(auth, /#\/admin-login/);
+test("learner auth page carries no dashboard hint; the admin entry stays dedicated", () => {
+  // The tiny 9px "Open dashboard" hint was removed from the learner auth
+  // page. The dashboard is reached through the approved admin's Profile
+  // (below) or the dedicated #/admin-login route.
+  assert.doesNotMatch(auth, /Open dashboard/);
+  assert.doesNotMatch(auth, /#\/admin-login/);
+  assert.match(fs.readFileSync("src/AdminLoginApp.tsx", "utf8"), />Open dashboard</);
+  assert.match(fs.readFileSync("src/main.tsx", "utf8"), /"#\/admin-login"/);
 });
 
 test("profile keeps a readable dashboard link only for the approved admin", () => {

@@ -251,7 +251,13 @@ test("the branded marketplace uses plain catalog cards and native filters withou
   assert.match(nativeCard, /hasOriginal/);
   assert.match(css, /background: #0a0e18/);
   assert.match(css, /min-height: 44px/);
-  assert.doesNotMatch(css, /backdrop-filter|bg-gradient|blur-3xl/);
+  // Blur, where it exists at all in this sheet, is confined to the compact
+  // popover windows — catalog cards stay plain (no gradient/blur filler).
+  for (const rule of css.matchAll(/([^{}]+)\{[^{}]*backdrop-filter[^{}]*\}/g)) {
+    // Only the popover glass window and its body-portal layer may blur.
+    assert.match(rule[1], /dc-compact-glass-window|data-store-popover-portal/, "backdrop-filter stays inside the popover glass");
+  }
+  assert.doesNotMatch(css, /bg-gradient|blur-3xl/);
 });
 
 test("product detail keeps its media frame but removes nested glass info cards", () => {

@@ -6,6 +6,7 @@ const hook = fs.readFileSync("src/hooks/useUnreadNotificationCount.ts", "utf8");
 const header = fs.readFileSync("src/components/Header.tsx", "utf8");
 const homeHeader = fs.readFileSync("src/home/components/Header.tsx", "utf8");
 const storage = fs.readFileSync("utils/siteNotifications.ts", "utf8");
+const notifButton = fs.readFileSync("src/components/HeaderNotificationsButton.tsx", "utf8");
 
 test("shared notification badge combines local and cloud unread IDs without double count", () => {
   assert.match(hook, /loadSiteNotifications/);
@@ -13,12 +14,16 @@ test("shared notification badge combines local and cloud unread IDs without doub
   assert.match(hook, /new Set\(localItems\.filter/);
   assert.match(hook, /cloudUnreadItems\.filter\(allowed\)\.forEach\(\(item\) => ids\.add\(item\.id\)\)/);
   assert.match(header, /useUnreadNotificationCount/);
-  assert.match(header, /99\+/);
+  // The 99+ cap lives in the shared header notifications button now.
+  assert.match(header, /count=\{displayedNotificationCount\}/);
+  assert.match(notifButton, /unreadCount > 99 \? "99\+" : String\(unreadCount\)/);
 });
 
 test("home header uses the same real unread count instead of a decorative dot", () => {
   assert.match(homeHeader, /useUnreadNotificationCount/);
-  assert.match(homeHeader, /unreadNotificationCount > 0/);
+  // The real count feeds the shared button (which renders the badge itself).
+  assert.match(homeHeader, /count=\{unreadNotificationCount\}/);
+  assert.match(homeHeader, /<HeaderNotificationsButton/);
   assert.doesNotMatch(homeHeader, /right-2 top-2 h-2 w-2/);
 });
 
