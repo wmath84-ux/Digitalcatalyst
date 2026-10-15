@@ -117,3 +117,14 @@ html[data-theme="light"] [data-brain-composer-surface] :is([data-brain-self-pars
 [data-course-brain-panel] .brain-practice-heading [data-brain-deck-hint] {
   margin-top: 2px; color: var(--dc-ink-3, #475569); font-size: 12px; line-height: 1.5;
 }
+
+/* Course Player non-library panels: ~95% pure white background in light theme. */
+html[data-theme="light"] .course-player-shell [data-course-music-panel],
+html[data-theme="light"] .course-player-shell [data-course-experiment-panel],
+html[data-theme="light"] .course-player-shell [data-course-ai-panel],
+html[data-theme="light"] .course-player-shell [data-course-sketch-panel],
+html[data-theme="light"] .course-player-shell [data-course-read-panel],
+html[data-theme="light"] .course-player-shell [data-course-mindmap-panel] {
+  background: #f2f2f2;
+  color-scheme: light;
+}
