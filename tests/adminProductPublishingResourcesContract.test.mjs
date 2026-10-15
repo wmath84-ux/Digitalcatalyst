@@ -119,10 +119,17 @@ test("learners see gated Master notes in a separate read-only collection while S
   assert.match(notesPanel, /useState<"master" \| "self">\(\(\) =>[\s\S]*?"master"/);
   assert.match(notesPanel, /onSelect=\{\(value\) => \{[\s\S]*?setViewingMasterNoteId\(note\.id\)/);
   assert.match(notesPanel, /readOnly/);
+  // Self notes are still written by the same three calls. Saving is automatic
+  // now, so a NEW note takes its id from onAdd and every later write updates
+  // that same note through onEdit — there is no Save button in between.
   assert.match(notesPanel, /onAdd\(html\)/);
-  assert.match(notesPanel, /onEdit\(editingId, html\)/);
+  assert.match(notesPanel, /const openId = editingIdRef\.current;\s*if \(openId\) \{\s*onEdit\(openId, html\);/);
   assert.match(notesPanel, /onDelete\(pendingDeleteId\)/);
-  assert.match(notesPanel, /activeCollection === "self" \? \([\s\S]*?data-course-notes-add/);
+  // The SELF collection is the library's own half, and the panel's ONE bottom
+  // button is the only "add note" control left (the header's Add button went
+  // with the header).
+  assert.match(notesPanel, /"data-listing": "notes-self"/);
+  assert.match(notesPanel, /data-note-library-foot[\s\S]*?data-course-notes-add/);
 });
 
 test("Firestore authorization keeps published Master resources admin-write-only and Self notes owner-scoped", () => {

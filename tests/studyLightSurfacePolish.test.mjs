@@ -13,7 +13,11 @@ test('AI sidebar owns an opaque white surface for docked and drawer modes', () =
 });
 test('note library owns its white plate, navigation ink and all empty/sync states', () => {
   assert.match(read('src/course/NotesPanel.tsx'), /import "\.\/study-light-surfaces.css"/);
-  assert.match(css, /data-course-notes-mode="list"/);
+  // The plate now hangs off the headless home and the ONE library panel
+  // (the header, and with it data-course-notes-mode="list", is gone).
+  assert.match(css, /data-course-notes-home/);
+  assert.match(css, /\[data-note-library-panel\]/);
+  assert.match(css, /\[data-note-left-panel\]/);
   assert.match(css, /background: #fff !important/);
   assert.match(css, /--bm-ink: var\(--dc-ink, #0f172a\)/);
   for (const hook of ['study-library-empty', 'study-library-notice__message', 'study-library-notice__retry', 'data-course-notes-add']) assert.ok(css.includes(hook));

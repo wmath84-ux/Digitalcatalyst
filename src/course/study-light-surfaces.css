@@ -1,6 +1,7 @@
 /* Feature-owned solid surfaces: do not inherit the legacy dark player plate.
    Kept scoped to library UI, never to authored note/editor content. */
-html[data-theme="light"] .course-player-shell [data-course-notes-panel][data-notes-theme="light"][data-course-notes-mode="list"],
+html[data-theme="light"] .course-player-shell [data-course-notes-panel][data-notes-theme="light"][data-course-notes-home],
+html[data-theme="light"] .course-player-shell [data-course-notes-panel][data-notes-theme="light"] [data-note-library-panel],
 html[data-theme="light"] [data-course-notes-panel][data-notes-theme="light"] [data-course-notes-list] {
   background: #fff !important;
   color: var(--dc-ink, #0f172a) !important;
@@ -18,19 +19,20 @@ html[data-theme="light"] [data-course-notes-list] .branched-menu {
   --bm-accent: var(--dc-brand, #4338ca);
   --bm-line: #cbd5e1;
 }
-html[data-theme="light"] [data-course-note-collections] {
-  color: var(--dc-ink, #0f172a);
-  border-bottom: 1px solid #e2e8f0;
-}
-/* As the shared page header (CoursePageHeader), the collections strip keeps
-   the header's defined area: no legacy row padding/wrap, and its MASTER /
-   SELF buttons shrink to fit inside the 48px header. */
-html[data-theme="light"] [data-course-note-collections]:not(.course-page-header) {
-  padding: 12px 0;
-  flex-wrap: wrap;
-}
+/* The notes home page and its one library panel: the same solid plate, the
+   same ink, in the light palette. */
+html[data-theme="light"] [data-course-notes-home] { background: #fff !important; }
+/* The library panel's MASTER / SELF control and its single New note button. */
+html[data-theme="light"] [data-note-library-head] { background: #fff; }
+html[data-theme="light"] [data-note-left-panel] { background: #fff; color: var(--dc-ink, #0f172a); }
+html[data-theme="light"] [data-note-library-foot] [data-course-notes-add] { background: var(--dc-brand, #4f46e5) !important; color: #fff !important; }
+/* The row popup (rename / delete) paints like the panel it opens over. */
+html[data-theme="light"] [data-note-left-panel] .branched-menu__popup { --bm-popup-bg: #fff; --bm-danger: #b91c1c; }
 html[data-theme="light"] .course-page-header [data-course-note-collection] { min-height: 32px; }
-html[data-theme="light"] [data-course-note-collections] [role="tablist"] { background: #f1f5f9; border-color: #e2e8f0; }
+/* Notes has no page header at all any more (owner brief): the MASTER / SELF
+   control is the library panel's own top-centre element (notesLibrary.css), so
+   the light plate hooks that head instead of the removed header strip. */
+html[data-theme="light"] [data-note-library-head] [role="tablist"] { background: #f1f5f9; border-color: #e2e8f0; }
 html[data-theme="light"] [data-course-note-collection] { color: var(--dc-ink-3, #475569); min-height: 40px; }
 html[data-theme="light"] [data-course-note-collection][aria-selected="true"] { background: #fff; color: var(--dc-brand-ink, #3730a3); }
 html[data-theme="light"] [data-course-notes-add] { background: var(--dc-brand, #4f46e5) !important; color: #fff !important; box-shadow: 0 6px 18px #4f46e530; }

@@ -407,6 +407,60 @@
   outline: none;
 }
 
+/* ── Row actions popup (long press · secondary click · menu key) ──────── */
+/* The rows themselves stay clean one-liners: rename and delete live in this
+   small menu, which opens over the row it belongs to. */
+
+.branched-menu__popup {
+  position: absolute;
+  top: calc(100% - 2px);
+  left: var(--bm-indent);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 9.5rem;
+  padding: 4px;
+  border: 1px solid var(--bm-line);
+  border-radius: 12px;
+  background: var(--bm-popup-bg, #ffffff);
+  color: var(--bm-ink);
+  box-shadow: 0 14px 30px rgb(2 6 23 / 0.3);
+}
+
+.branched-menu__popup[data-flip="up"] {
+  top: auto;
+  bottom: calc(100% - 2px);
+}
+
+.branched-menu__popup-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  padding: 0 0.6rem;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.branched-menu__popup-item svg { flex: none; }
+
+.branched-menu__popup-item--danger { color: var(--bm-danger, #b91c1c); }
+
+.branched-menu__popup-item:focus-visible { outline: 2px solid var(--bm-accent); outline-offset: 2px; }
+
+@media (hover: hover) and (pointer: fine) {
+  .branched-menu__popup-item:hover { background: color-mix(in srgb, var(--bm-ink) 8%, transparent); }
+}
+
 /* ── Loading skeleton (same rhythm as the rows) ─────────────────────── */
 
 .branched-menu-skeleton {

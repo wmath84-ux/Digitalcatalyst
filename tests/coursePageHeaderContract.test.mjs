@@ -33,7 +33,8 @@ const player = read("src/CoursePlayerApp.tsx");
 
 const PAGES = [
   ["src/course/CourseResourceLibrary.tsx", "Resource Library"],
-  ["src/course/NotesPanel.tsx", "Notes"],
+  // Notes is NOT here on purpose: the owner's brief removed the page header
+  // from every notes page (see the MASTER / SELF test below).
   ["src/course/MindMapPanel.tsx", "Mind map"],
   ["src/course/CourseBrainPanel.tsx", "Brain"],
   ["src/course/ExperimentPanel.tsx", "Live Experiment"],
@@ -85,12 +86,20 @@ test("MASTER / SELF controls live inside the header, in the defined area", () =>
   for (const file of ["src/course/CourseBrainPanel.tsx", "src/course/ExperimentPanel.tsx", "src/course/MindMapPanel.tsx"]) {
     assert.match(headerSlice(read(file)), /<MasterSelfControl/, `${file} keeps MASTER / SELF inside its page header`);
   }
-  // Notes keeps its own MASTER / SELF tablist — also inside the header now.
-  const notesHeader = headerSlice(read("src/course/NotesPanel.tsx"));
-  assert.match(notesHeader, /data-course-note-collection="master"/);
-  assert.match(notesHeader, /data-course-note-collection="self"/);
-  // …and the collections hook itself moved onto the header element.
-  assert.match(notesHeader, /data-course-note-collections/);
+  // Notes has NO header at all any more (owner brief 2026-10-15: "koi header
+  // hoga hi nahin kahin bhi, pure note me"). Its MASTER / SELF tablist heads
+  // the ONE library panel instead — same shared control, same hooks.
+  const notes = read("src/course/NotesPanel.tsx");
+  assert.doesNotMatch(notes, /CoursePageHeader|data-course-page-header/);
+  const headAt = notes.indexOf("data-note-library-head");
+  const notesHead = notes.slice(notes.lastIndexOf("<div", headAt), notes.indexOf("data-note-library-foot"));
+  assert.match(notesHead, /<MasterSelfControl/);
+  assert.match(notesHead, /feature="notes"/);
+  // …and the shared control keeps the hooks the tabs have always had.
+  const control = read("src/course/MasterSelfControl.tsx");
+  assert.match(control, /data-course-note-collection="master"/);
+  assert.match(control, /data-course-note-collection="self"/);
+  assert.match(notesHead, /justify-center/, "the filter sits at the panel's top CENTRE");
   assert.match(headerSlice(read("src/course/CourseBrainPanel.tsx")), /data-brain-collection/);
   assert.match(headerSlice(read("src/course/ExperimentPanel.tsx")), /data-experiment-collection/);
   assert.match(headerSlice(read("src/course/MindMapPanel.tsx")), /data-course-mindmap-collections/);
