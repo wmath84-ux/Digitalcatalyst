@@ -259,3 +259,26 @@
     transition: none !important;
   }
 }
+
+/* ── three choices (the website: Landing page · Home · Work) ────────────────
+ * The kept two-up grid is only right for two tiles. With three, every option
+ * gets its own full-width row in the SAME icon + copy + arrow language, so
+ * nothing is squeezed on a 360px phone and the card still reads as one list. */
+.dc-work-launch-choices[data-work-launch-choices="3"] {
+  grid-template-columns: 1fr;
+  gap: 9px;
+  margin-top: 20px;
+}
+
+.dc-work-launch-choices[data-work-launch-choices="3"] .dc-work-launch-choice {
+  min-height: 74px;
+  padding: 12px 13px;
+  border-radius: 18px;
+}
+
+/* The website tile wears the app's teal accent — Home is indigo, Work violet. */
+.dc-work-launch-choice--landing .dc-work-launch-icon {
+  border-color: rgba(13, 148, 136, 0.18);
+  background: linear-gradient(145deg, rgba(79, 70, 229, 0.1), rgba(13, 148, 136, 0.1));
+  color: #0f766e;
+}

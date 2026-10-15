@@ -35,18 +35,47 @@ test("Work is an immersive lazy route and the first-choice overlay only owns def
   assert.match(MAIN, /\|\| hash\.startsWith\(WORK_HASH\)/, "Work must bypass the desktop Home shell");
   assert.match(MAIN, /<WorkLaunchChooser \/>/);
   assert.match(LAUNCH, /hash === "#\/home"/);
-  assert.match(LAUNCH, /choice !== "ask"/);
-  assert.match(LAUNCH, /resolvedForThisBoot = useRef\(false\)/);
-  assert.match(LAUNCH, /resolvedForThisBoot\.current = true/);
+  assert.match(LAUNCH, /const asking = askPending && choice === "ask"/, "only the `ask` choice paints the card");
+  assert.match(LAUNCH, /if \(!asking\) return null/, "the card leaves the tree when the question is answered");
   assert.match(LAUNCH, /role="dialog"[\s\S]*?aria-modal="true"/);
   assert.match(LAUNCH, /setWorkLaunchChoice\(destination\)/);
+
+  // The website card offers THREE options; the installed PWA / APK keeps two,
+  // because `RootPage` rewrites a landing boot to #/home there — the option is
+  // offered exactly where it is a real destination, never as a dead end.
+  assert.match(LAUNCH, /const landingIsReachable = \(\): boolean =>/);
+  assert.match(LAUNCH, /!isInstalledMobilePwa\(\) && !isNativeApp\(\)/);
+  assert.match(LAUNCH, /dc-work-launch-choice dc-work-launch-choice--landing/);
+  assert.match(LAUNCH, /data-work-launch-choices=\{showLandingChoice \? "3" : "2"\}/);
+  assert.match(LAUNCH, /if \(choice === "landing"\) return LANDING_HASH;/);
+});
+
+test("answering the startup card closes it through real state (never a cosmetic hide)", () => {
+  // Owner report 2026-10-15: on the APK / installed PWA the app boots on an
+  // empty hash that RootPage normalises to #/home with replaceState — no
+  // `hashchange` is raised — so a ref-only "resolved" flag left the card and
+  // its full-screen backdrop mounted over Home, swallowing every tap on it.
+  assert.match(LAUNCH, /const \[answeredForThisBoot, setAnsweredForThisBoot\] = useState\(false\)/);
+  assert.doesNotMatch(LAUNCH, /resolvedForThisBoot/, "the once-per-boot answer must be state, not a ref");
+  // The answer is recorded BEFORE the destination is routed to, so the answer
+  // itself unblocks Home even when the hash already IS #/home.
+  assert.match(LAUNCH, /const setDestination = \(destination: "home" \| "work" \| "landing"\) => \{[\s\S]*?setAnsweredForThisBoot\(true\);[\s\S]*?launchTarget\(destination\)/);
+  assert.match(LAUNCH, /if \(window\.location\.hash !== target\) window\.location\.hash = target;/);
+  // The launch opening is the other half of the startup pair: it must be
+  // released through its single owner, and only while it is actually visible —
+  // a tap-only / skipped boot stays untouched.
+  assert.match(LAUNCH, /function dismissOpeningOverlay\(\): void \{[\s\S]*?attachOpeningSplash\(\)[\s\S]*?isOpeningVisible\(opening\.state\)[\s\S]*?opening\.dismiss\(\)/);
+  assert.match(LAUNCH, /dismissOpeningOverlay\(\);[\s\S]*?if \(remember\) setWorkLaunchChoice\(destination\)/);
+  // …and the Settings answers ("Always open Home" / "Always open Work") hand
+  // over the same way on the boot that uses them.
+  assert.match(LAUNCH, /useEffect\(\(\) => \{\s*if \(choice === "ask" \|\| !askPending\) return;[\s\S]*?dismissOpeningOverlay\(\);/);
 });
 
 test("launch, theme, last-page and history preferences are defensive device storage only", () => {
   for (const key of ["dc.work.launch.v1", "dc.work.theme.v1", "dc.work.lastPage.v1", "dc.work.history.v1"]) {
     assert.ok(WORK_PREFS.includes(key), `missing device preference ${key}`);
   }
-  assert.match(WORK_PREFS, /export type WorkLaunchChoice = "ask" \| "home" \| "work"/);
+  assert.match(WORK_PREFS, /export type WorkLaunchChoice = "ask" \| "home" \| "work" \| "landing"/);
   assert.match(WORK_PREFS, /export type WorkTheme = "light" \| "dark"/);
   assert.match(WORK_PREFS, /localStorage\.getItem/);
   assert.match(WORK_PREFS, /localStorage\.setItem/);
@@ -54,6 +83,7 @@ test("launch, theme, last-page and history preferences are defensive device stor
   assert.match(SETTINGS, /Ask every time/);
   assert.match(SETTINGS, /Always open Home/);
   assert.match(SETTINGS, /Always open Work/);
+  assert.match(SETTINGS, /Always open Landing page/);
   assert.match(SETTINGS, /On this device/);
 
   const files = [];

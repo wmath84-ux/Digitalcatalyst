@@ -30,7 +30,7 @@ import { useSyncExternalStore } from "react";
 import { WORK_PAGE_ORDER, isWorkPageId, type WorkPageId } from "../workPages";
 
 /** What the app does on a cold start. */
-export type WorkLaunchChoice = "ask" | "home" | "work";
+export type WorkLaunchChoice = "ask" | "home" | "work" | "landing";
 /** Work's own appearance. The rest of the app is light-only by owner decision
  *  (src/lib/theme.ts) — this theme is scoped to `[data-work-shell]` and never
  *  touches `html[data-theme]`. */
@@ -87,7 +87,7 @@ const emit = (): void => {
 /* ── launch choice (the Settings option, brief 3) ───────────────────────── */
 
 const normalizeLaunch = (value: string | null | undefined): WorkLaunchChoice =>
-  value === "home" || value === "work" || value === "ask" ? value : WORK_LAUNCH_DEFAULT;
+  value === "home" || value === "work" || value === "landing" ? value : value === "ask" ? "ask" : WORK_LAUNCH_DEFAULT;
 
 export const getWorkLaunchChoice = (): WorkLaunchChoice => normalizeLaunch(safeGet(WORK_KEYS.launch));
 
