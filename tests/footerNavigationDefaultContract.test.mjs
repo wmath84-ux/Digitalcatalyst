@@ -25,7 +25,7 @@ const MAIN = read("src/main.tsx");
 /* ── source shape ────────────────────────────────────────────────────────── */
 
 test("Edge-to-edge stays the one default, and the migration is one-time", () => {
-  assert.match(PREFERENCE, /const DEFAULT_STYLE: FooterNavigationStyle = "youtube";/);
+  assert.match(PREFERENCE, /const DEFAULT_STYLE: FooterNavigationStyle = "work-pill";/);
   assert.match(PREFERENCE, /export function ensureDefaultFooterNavigationStyle\(\): void \{/);
   assert.match(PREFERENCE, /const MIGRATION_KEY = "dc-footer-navigation-style\.edge-default\.v1";/);
   // The marker is checked BEFORE anything is written, so a second boot is a
@@ -48,7 +48,7 @@ test("only the real app boot runs it — harness pages keep switching styles on 
 /* ── runtime ─────────────────────────────────────────────────────────────── */
 
 const STORAGE_KEY = "dc-footer-navigation-style";
-const MIGRATION_KEY = "dc-footer-navigation-style.edge-default.v1";
+const MIGRATION_KEY = "dc-footer-navigation-style.work-default.v1";
 
 const loadPreferenceModule = () => {
   const code = ts.transpileModule(PREFERENCE, {
@@ -77,7 +77,7 @@ const loadPreferenceModule = () => {
   globalThis.window = fakeWindow;
   const module = { exports: {} };
   new Function("require", "module", "exports", code)((id) => {
-    if (id === "react") return { useSyncExternalStore: () => "youtube" };
+    if (id === "react") return { useSyncExternalStore: () => "work-pill" };
     throw new Error(`unexpected import: ${id}`);
   }, module, module.exports);
   return { preference: module.exports, store, events };
@@ -89,7 +89,7 @@ test("a browser with an older design saved is moved onto Edge-to-edge once", () 
 
   preference.ensureDefaultFooterNavigationStyle();
 
-  assert.equal(preference.getFooterNavigationStyle(), "youtube", "the old design is gone");
+  assert.equal(preference.getFooterNavigationStyle(), "work-pill", "the old design is gone");
   assert.equal(store.get(MIGRATION_KEY), "1", "…and the pass is marked done");
   assert.deepEqual(events, ["dc:footer-navigation-style-change"], "mounted footers are told");
 
@@ -105,10 +105,10 @@ test("a browser with an older design saved is moved onto Edge-to-edge once", () 
 test("a browser with nothing stored simply reads the default", () => {
   const { preference, store } = loadPreferenceModule();
 
-  assert.equal(preference.getFooterNavigationStyle(), "youtube");
+  assert.equal(preference.getFooterNavigationStyle(), "work-pill");
   preference.ensureDefaultFooterNavigationStyle();
-  assert.equal(preference.getFooterNavigationStyle(), "youtube");
-  assert.equal(store.get(STORAGE_KEY), "youtube", "the default is written, and the marker with it");
+  assert.equal(preference.getFooterNavigationStyle(), "work-pill");
+  assert.equal(store.get(STORAGE_KEY), "work-pill", "the default is written, and the marker with it");
   assert.equal(store.get(MIGRATION_KEY), "1");
 });
 
@@ -127,5 +127,5 @@ test("storage that refuses writes never breaks the footer", () => {
   };
 
   assert.doesNotThrow(() => preference.ensureDefaultFooterNavigationStyle());
-  assert.equal(preference.getFooterNavigationStyle(), "youtube");
+  assert.equal(preference.getFooterNavigationStyle(), "work-pill");
 });

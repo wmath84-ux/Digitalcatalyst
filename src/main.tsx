@@ -2231,7 +2231,7 @@ initFooterGlow();
 // Publish the real footer-dock height so page areas can GROW by exactly that
 // amount instead of guessing with extra padding (see utils/footerNavSpace.ts).
 initFooterNavSpace();
-// Footer navigation: Edge-to-edge is the default for everyone — this moves a
+// Footer navigation: the Work pill is the default for everyone — this moves a
 // browser that still had one of the older designs saved onto it ONCE (see
 // utils/footerNavigationStyle.ts; the Settings choice rules from then on).
 ensureDefaultFooterNavigationStyle();
