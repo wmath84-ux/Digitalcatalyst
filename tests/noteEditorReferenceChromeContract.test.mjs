@@ -125,7 +125,7 @@ test("3 — rows are one line with NO pencil / trash; long press opens Rename + 
 });
 
 test("4+7 — read mode's bottom navigation: library · prev · next | new · edit | home", () => {
-  assert.match(editorBranch, /\{readView \? \([\s\S]{0,1400}?data-note-read-nav/);
+  assert.match(editorBranch, /\{readView && readChromeVisible \? \([\s\S]{0,1600}?data-note-read-nav/);
   for (const hook of ["data-note-read-library", "data-note-read-prev", "data-note-read-next", "data-note-read-new", "data-note-read-edit", "data-note-read-home"]) {
     assert.match(editorBranch, new RegExp(hook), hook);
   }
@@ -135,6 +135,20 @@ test("4+7 — read mode's bottom navigation: library · prev · next | new · ed
   assert.match(editorBranch, /if \(prevNote\) openNote\(prevNote\)/);
   assert.match(editorBranch, /if \(nextNote\) openNote\(nextNote\)/);
   assert.match(editorBranch, /data-note-read-edit onClick=\{enterEditMode\}/);
+  // ONE tap on the page hides that tray, and the next tap brings it straight
+  // back (owner brief, 2026-10-15): the whole nav — the side-panel button
+  // included — disappears so a note can be read whole. A press that TRAVELLED
+  // is a selection drag or a swipe, never a tap, and the chrome itself (the
+  // tray, the panel, a dialog) is never a tap on the page.
+  assert.match(notesPanel, /const READ_TAP_SLOP_PX = 10;/);
+  assert.match(editorBranch, /onPointerDown=\{\(event\) => \{ readTapStartRef\.current = \{ x: event\.clientX, y: event\.clientY \}; \}\}/);
+  assert.match(editorBranch, /if \(!readView \|\| libraryOpen\) return;/);
+  assert.match(editorBranch, /Math\.hypot\(event\.clientX - start\.x, event\.clientY - start\.y\) > READ_TAP_SLOP_PX/);
+  assert.match(editorBranch, /closest\("\[data-note-read-nav\], \[data-note-library-panel\], \[data-course-confirm-delete\]"\)/);
+  assert.match(editorBranch, /setReadChromeVisible\(\(visible\) => !visible\)/);
+  // …and the tray only ever exists while that flag is on, so the tap really
+  // takes the side-panel button away with everything else.
+  assert.match(editorBranch, /\{readView && readChromeVisible \? \(/);
   assert.match(editorBranch, /data-note-read-home onClick=\{goHome\}/);
   // The 3-dot drawer button is gone for good.
   assert.doesNotMatch(notesPanel, /data-note-read-more|MoreHorizontal/);
@@ -145,14 +159,22 @@ test("4+7 — read mode's bottom navigation: library · prev · next | new · ed
   assert.match(editorBranch, /data-note-view-mode=\{readView \? "read" : "edit"\}/);
 });
 
-test("10 — the editing pill: black Read capsule FIRST, then the sliding tray", () => {
+test("10 — the editing pill: the EYE tile FIRST, then the sliding tray", () => {
   const dock = toolbar.slice(toolbar.indexOf("export function NoteDockedToolbar"));
-  // The Read capsule leads the bar and is pinned OUTSIDE the scroller, so it
-  // can never scroll out of reach.
-  assert.ok(dock.indexOf('className="dc-note-dock-read"') < dock.indexOf("dc-note-dock-tools"), "Read comes first");
-  assert.match(dock, /data-note-edit-read=""/);
-  assert.match(dock, /<BookOpen size=\{15\} aria-hidden="true" \/>[\s\S]{0,80}?<span>Read<\/span>/);
-  assert.match(css, /\.dc-note \.dc-note-dock-read \{[\s\S]{0,400}?background: #0b1220;[\s\S]{0,200}?color: #ffffff;[\s\S]{0,200}?font-weight: 800;/);
+  // The read control leads the bar — one more tile of the SAME row, built from
+  // BlockNote's own toolbar button, so it cannot drift from its neighbours in
+  // size, weight or colour. It is pinned OUTSIDE the scroller, so it can never
+  // scroll out of reach. (The solid black "Read" capsule is gone: owner brief,
+  // 2026-10-15 — "simple eye button, same design as the other toolbar buttons".)
+  assert.ok(dock.indexOf('className="dc-note-read-eye"') < dock.indexOf("dc-note-dock-tools"), "the eye comes first");
+  assert.match(dock, /className="dc-note-read-eye"[\s\S]{0,200}?data-note-edit-read=""/);
+  assert.match(dock, /icon=\{<Eye size=\{16\} \/>\}/);
+  assert.match(dock, /<Components\.FormattingToolbar\.Button/);
+  assert.doesNotMatch(dock, /dc-note-dock-read/, "no capsule, no <span>Read</span>");
+  assert.doesNotMatch(css, /0b1220/, "and no black capsule left in the sheet");
+  // The tile takes the dock's own sizing rules, like every button beside it.
+  assert.match(css, /\.dc-note \.dc-note-dock \.bn-ak-button[\s\S]{0,400}?width: 2\.25rem;/);
+  assert.match(css, /\.dc-note \.dc-note-dock \.dc-note-read-eye \{[\s\S]{0,120}?flex: 0 0 auto;/);
   // The tools are a sliding tray: nothing shrinks, it scrolls sideways.
   assert.match(css, /\.dc-note \.dc-note-dock-tools \{[\s\S]{0,400}?overflow-x: auto;/);
   assert.match(css, /\.dc-note \.dc-note-dock-tools > \* \{\s*flex: 0 0 auto;/);
@@ -162,7 +184,7 @@ test("10 — the editing pill: black Read capsule FIRST, then the sliding tray",
   assert.match(notesPanel, /onReadRequest=\{enterReadMode\}/);
   assert.match(notesPanel, /onDockChange=\{setDockUp\}/);
   // Leaving the editor for the read view is a SAVE POINT (automatic save).
-  assert.match(notesPanel, /const enterReadMode = useCallback\(\(\) => \{\s*saveNowRef\.current\(\);/);
+  assert.match(notesPanel, /const enterReadMode = useCallback\(\(\) => \{\s*setReadChromeVisible\(true\);\s*saveNowRef\.current\(\);/);
 });
 
 test("the editing pill's tools are the reference order — and every one of them acts", () => {

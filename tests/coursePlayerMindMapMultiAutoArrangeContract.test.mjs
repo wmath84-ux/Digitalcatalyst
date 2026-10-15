@@ -275,7 +275,7 @@ test("the learner returns to the map they had open in that module", () => {
 // ---------------------------------------------------------------------------
 
 test("the panel ships a shared branched list of the module's maps", () => {
-  assert.match(panel, /data-course-mindmap-maps/, "a switcher must open the library");
+  assert.match(panel, /data-course-mindmap-maps/, "a switcher must open the home page");
   assert.match(panel, /data-course-mindmap-library/);
   assert.match(panel, /<BranchedMenu\b/);
   assert.match(panel, /data-course-mindmap-new/);
@@ -351,7 +351,11 @@ test("the rules tie every map document id to its own map key", () => {
 
 test("both mind-map collections and the notes list share the branched menu", () => {
   assert.match(notesPanel, /data-course-notes-grid": "true"|data-course-notes-grid="true"/);
-  assert.equal((panel.match(/<BranchedMenu\b/g) || []).length, 4, "library + side-panel drawer share the SELF and MASTER trees");
+  assert.equal(
+    (panel.match(/<BranchedMenu\b/g) || []).length,
+    2,
+    "the ONE library panel carries both the SELF and the MASTER tree",
+  );
   assert.match(panel, /data-course-mindmap-map-grid": "true"|data-course-mindmap-map-grid="true"/);
   assert.match(resourceCardStyles, /overflow-wrap: anywhere/);
   assert.doesNotMatch(resourceCardStyles, /text-overflow: ellipsis/);

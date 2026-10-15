@@ -51,9 +51,9 @@ import {
 import {
   ArrowDown,
   ArrowUp,
-  BookOpen,
   CheckSquare,
   Code2,
+  Eye,
   FileCode2,
   Heading1,
   Heading2,
@@ -297,9 +297,10 @@ function IndentButton({ direction }: { direction: "indent" | "outdent" }) {
  * indent · outdent. Every button acts on the live document.
  *
  * Two things sit around those tools:
- *   · the READ button FIRST, pinned (it never scrolls away): leaving the
- *     editor for the read view is the one action a learner must always be able
- *     to find, so it is a solid black "Read" capsule at the head of the bar;
+ *   · the READ button FIRST: leaving the editor for the read view is the one
+ *     action a learner must always be able to find, so it leads the bar — as
+ *     one more 36px toolbar tile with an EYE glyph, in the exact design of
+ *     every other button on the row (the black "Read" capsule is gone);
  *   · the tools themselves are a SLIDING tray: the buttons keep their real
  *     36px size — nothing is ever squeezed to fit — and the tray scrolls
  *     sideways (with scroll snapping) on a narrow pane, so every tool stays
@@ -331,18 +332,21 @@ export function NoteDockedToolbar({
         }}
       >
         <Components.FormattingToolbar.Root className="bn-toolbar dc-note-dock-bar">
+          {/* Read FIRST — in the SAME design as every tool beside it: one more
+              36px round ghost tile, with an EYE for a glyph. (It is pinned
+              before the sliding tray, so the way back to the read view never
+              scrolls out of reach; the black "Read" capsule it replaced is
+              gone.) */}
           {onRead ? (
-            <button
-              type="button"
-              className="dc-note-dock-read"
+            <Components.FormattingToolbar.Button
+              key="read"
+              className="dc-note-read-eye"
               data-note-edit-read=""
-              aria-label="Read mode"
-              title="Read mode"
+              label="Read mode"
+              mainTooltip="Read mode"
+              icon={<Eye size={16} />}
               onClick={onRead}
-            >
-              <BookOpen size={15} aria-hidden="true" />
-              <span>Read</span>
-            </button>
+            />
           ) : null}
           <div className="dc-note-dock-tools" data-note-dock-tools>
             <HistoryButton direction="undo" key="undo" />

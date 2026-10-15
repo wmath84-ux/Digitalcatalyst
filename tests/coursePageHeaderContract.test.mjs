@@ -33,9 +33,10 @@ const player = read("src/CoursePlayerApp.tsx");
 
 const PAGES = [
   ["src/course/CourseResourceLibrary.tsx", "Resource Library"],
-  // Notes is NOT here on purpose: the owner's brief removed the page header
-  // from every notes page (see the MASTER / SELF test below).
-  ["src/course/MindMapPanel.tsx", "Mind map"],
+  // Notes and the mind map are NOT here on purpose: the owner's brief removed
+  // the page header from every notes page, and the mind map followed the same
+  // design system (see the MASTER / SELF test below).
+
   ["src/course/CourseBrainPanel.tsx", "Brain"],
   ["src/course/ExperimentPanel.tsx", "Live Experiment"],
   ["src/course/ReadLibraryPanel.tsx", "Read library"],
@@ -83,7 +84,7 @@ test("every relevant Course Player page renders the shared header with its name 
 
 test("MASTER / SELF controls live inside the header, in the defined area", () => {
   // The shared control, inside the header element (not the scrolling body).
-  for (const file of ["src/course/CourseBrainPanel.tsx", "src/course/ExperimentPanel.tsx", "src/course/MindMapPanel.tsx"]) {
+  for (const file of ["src/course/CourseBrainPanel.tsx", "src/course/ExperimentPanel.tsx"]) {
     assert.match(headerSlice(read(file)), /<MasterSelfControl/, `${file} keeps MASTER / SELF inside its page header`);
   }
   // Notes has NO header at all any more (owner brief 2026-10-15: "koi header
@@ -102,7 +103,17 @@ test("MASTER / SELF controls live inside the header, in the defined area", () =>
   assert.match(notesHead, /justify-center/, "the filter sits at the panel's top CENTRE");
   assert.match(headerSlice(read("src/course/CourseBrainPanel.tsx")), /data-brain-collection/);
   assert.match(headerSlice(read("src/course/ExperimentPanel.tsx")), /data-experiment-collection/);
-  assert.match(headerSlice(read("src/course/MindMapPanel.tsx")), /data-course-mindmap-collections/);
+  // The mind map is headless too ("use that same complete, exact UI design
+  // system in the mind map"). Its MASTER / SELF control sits at the top centre
+  // of the ONE library panel, beside the notes page's own.
+  const mindMap = read("src/course/MindMapPanel.tsx");
+  assert.doesNotMatch(mindMap, /CoursePageHeader|data-course-page-header/);
+  const mapHeadAt = mindMap.indexOf("data-mindmap-panel-head");
+  const mapHead = mindMap.slice(mindMap.lastIndexOf("<div", mapHeadAt), mindMap.indexOf("data-course-mindmap-map-list"));
+  assert.match(mapHead, /<MasterSelfControl/);
+  assert.match(mapHead, /feature="mindMap"/);
+  assert.match(mapHead, /data-course-mindmap-collections/, "the collection switcher keeps its hook");
+  assert.match(mapHead, /justify-center/, "the filter sits at the panel's top CENTRE");
 });
 
 test("the Resource Library keeps its header hooks and its existing background", () => {
@@ -134,7 +145,8 @@ test("the other pages sit on approximately 95% pure white", () => {
     "data-course-music-panel",
     "data-course-personal-modules",
     "data-course-player-panel",
-    "data-course-mindmap-library",
+    // The mind map's pages are headless now, so they wear their own --mm-*
+    // palette (Light / Dark with the map's own theme) instead of the plate.
     'data-course-overlay-tab="paid"',
   ]) {
     assert.ok(headerCssRules.includes(hook), `${hook} gets the ~95% white page background`);

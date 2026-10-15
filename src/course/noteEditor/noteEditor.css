@@ -531,35 +531,16 @@
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
-/* The Read button leads the bar and is PINNED: it never scrolls out of reach,
-   so the way back to the read view is always exactly where it was. */
-.dc-note .dc-note-dock-read {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.3rem;
+/* The Read control leads the bar as the EYE tile (`.dc-note-read-eye`): an
+   ordinary button of the dock row — the same 36px round tile, the same 16px
+   glyph and the same ghost hover as Undo, Bold or the block type beside it —
+   pinned in front of the sliding tray so it can never scroll away. The solid
+   black "Read" capsule it replaced is gone (the owner's brief): nothing on
+   this bar is a different shape, weight or colour from its neighbours.
+   `.dc-note .dc-note-dock .bn-ak-button` sizes the tile; this rule only keeps
+   it from being squeezed by the tray next to it. */
+.dc-note .dc-note-dock .dc-note-read-eye {
   flex: 0 0 auto;
-  height: 2.25rem;
-  padding: 0 0.9rem;
-  border: 0;
-  border-radius: 999px;
-  background: #0b1220;
-  color: #ffffff;
-  font: inherit;
-  font-size: 0.8125rem;
-  font-weight: 800;
-  letter-spacing: 0.01em;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgb(2 6 23 / 0.35);
-  -webkit-tap-highlight-color: transparent;
-}
-.dc-note .dc-note-dock-read svg { flex: none; }
-/* The black-on-white capsule is the design in BOTH themes; on the dark page it
-   gains a hairline so it never melts into the bar behind it. */
-.dc-note[data-notes-theme="dark"] .dc-note-dock-read { box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.22), 0 2px 8px rgb(0 0 0 / 0.45); }
-.dc-note .dc-note-dock-read:focus-visible { outline: 2px solid var(--dc-note-accent); outline-offset: 2px; }
-@media (hover: hover) and (pointer: fine) {
-  .dc-note .dc-note-dock-read:hover { background: #1e293b; }
 }
 /* The tools are a SLIDING TRAY: every button keeps its full 36px size (nothing
    is ever squeezed to fit) and the row scrolls sideways instead — a swipe

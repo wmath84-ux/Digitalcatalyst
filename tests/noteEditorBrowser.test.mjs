@@ -13,7 +13,7 @@
 //     button at the bottom, no pencil / trash on the rows (rename + delete live
 //     in the row's long-press popup);
 //   · create / edit / delete flows and their stored HTML, with the AUTOMATIC
-//     save (the tray's black Read capsule commits; there is no Save button);
+//     save (the dock's eye button commits; there is no Save button);
 //   · legacy notes open with their tables, checklists, quotes and code intact;
 //   · slash menu (filter + apply), shortcuts, undo / redo, paste, links;
 //   · the selection toolbar floats over a selection and never steals it;
@@ -163,10 +163,10 @@ const firstVisibleRect = (page, selector) =>
 const status = async (page) => (await page.$eval("[data-course-notes-status]", (el) => el.textContent || "")).trim();
 /**
  * Leave the editor for the note's READ view. Saving is automatic, and this is
- * the gesture that commits: the tray's black Read capsule stores the draft and
- * flips the SAME document back to read-only. (A brand-new note with words in it
- * is given its id by that same commit.) The capsule is docked while the caret
- * is in the note and floats on its own the moment the caret leaves.
+ * the gesture that commits: the dock's eye button stores the draft and flips
+ * the SAME document back to read-only. (A brand-new note with words in it is
+ * given its id by that same commit.) The eye leads the dock while the caret is
+ * in the note and floats on its own the moment the caret leaves.
  */
 const readMode = async (page, press) => {
   await press("[data-note-edit-read], [data-note-edit-read-float]");
@@ -231,7 +231,7 @@ browserTest("create: title → body → slash command → bold → Save stores t
   await page.keyboard.type("revise chapter 4");
   await page.waitForTimeout(400);
   assert.equal(await status(page), "Unsaved");
-  // Leaving the editor IS the save: the black Read capsule commits the draft
+  // Leaving the editor IS the save: the dock's eye button commits the draft
   // (there is no Save button anywhere on the page).
   await readMode(page, press);
   await page.waitForFunction(() => window.__log.includes("add"));
@@ -936,7 +936,7 @@ for (const width of [320, 360, 375, 390, 412, 430, 768, 1024]) {
       const title = document.querySelector(".dc-note-title");
       return { title: rect(".dc-note-title"), clipped: title.scrollHeight > title.clientHeight + 1, legacy: rect(".dc-note-legacy"), editor: rect(".bn-editor"), inner: window.innerWidth };
     });
-    // The editing tray at the bottom: the black Read capsule first, then the
+    // The editing tray at the bottom: the eye (read) button first, then the
     // tools in a SLIDING tray of full-size buttons — never squeezed to fit, and
     // the tray itself is what scrolls when the pane is narrow.
     await page.waitForSelector("[data-note-dock]");
@@ -954,8 +954,8 @@ for (const width of [320, 360, 375, 390, 412, 430, 768, 1024]) {
     m.tray = tray;
     assert.equal(m.clipped, false, "the title auto-grows instead of clipping");
     assert.ok(m.title.l >= 0 && m.title.r <= m.inner + 0.5);
-    assert.ok(tray.read.l >= 0 && tray.read.r <= m.inner + 0.5, "the Read capsule is inside the viewport");
-    assert.ok(tray.read.h >= 36, "Read is touch-sized");
+    assert.ok(tray.read.l >= 0 && tray.read.r <= m.inner + 0.5, "the eye (read) button is inside the viewport");
+    assert.ok(tray.read.h >= 36, "the read eye is touch-sized, like every tool beside it");
     assert.ok(tray.minButton >= 36, `every tray button keeps its full size (smallest ${tray.minButton}px) — the tray scrolls instead`);
     assert.ok(tray.tools && tray.tools.scroll >= tray.tools.client, "the tray is the part that scrolls sideways");
     assert.equal(tray.chromeButtons, 0, "nothing at the top of a notes page is a button");
@@ -1024,25 +1024,57 @@ browserTest("a saved note opens headless in READ mode; one tap cannot edit; noth
   await context.close();
 });
 
+/**
+ * The mind map page, opened the way a learner opens it: a HEADLESS home (three
+ * centred buttons, no header) whose My Library button opens the ONE side panel
+ * — nearly a full page, MASTER / SELF top-centre, one button at its bottom.
+ */
 async function openMindMap({ touch = false } = {}) {
   const context = await browser.newContext({ viewport: { width: touch ? 390 : 1100, height: 760 }, hasTouch: touch, isMobile: touch });
   const page = await context.newPage();
   const problems = [];
   page.on('pageerror', error => problems.push(error.message));
+  const tap = (selector) => (touch ? page.tap(selector) : page.click(selector));
   await page.goto(`${origin}/tests/fixtures/noteEditorHarness/mindmap.html`);
-  await page.waitForSelector('[data-course-mindmap-library]');
+  await page.waitForSelector('[data-course-mindmap-home]');
+  assert.equal(await page.locator('header, [data-course-mindmap-header]').count(), 0, "a mind map page has no header");
+  await tap('[data-mindmap-home-mine]');
+  await page.waitForSelector('[data-mindmap-left-panel]');
   await page.getByRole('tab', { name: /SELF/ }).click();
-  return { page, context, problems };
+  return { page, context, problems, tap };
 }
 
-browserTest("saved mind map reads without tools; double-click never unlocks, the options panel unlocks, Done commits and locks, errors remain recoverable", async () => {
-  const { page, context, problems } = await openMindMap();
+/**
+ * Read mode's chrome. ONE tap on the canvas hides the whole tray — the
+ * side-panel button with it — and the next tap brings it straight back, so a
+ * flow that is about to press a tray button first makes sure the tray is up.
+ */
+const trayUp = (page) => page.locator('[data-mindmap-read-tray]').count().then((n) => n > 0);
+async function showTray(page) {
+  if (await trayUp(page)) return;
+  await page.mouse.click(40, 300);
+  await page.waitForSelector('[data-mindmap-read-tray]');
+}
+
+browserTest("a saved mind map reads without tools; no tap pair unlocks it, the tray's pencil does, the eye locks it again, errors remain recoverable", async () => {
+  const { page, context, problems, tap } = await openMindMap();
   await page.locator('[data-course-mindmap-map-grid] [data-branched-leaf]').click();
   await page.waitForSelector('[data-mindmap-mode="read"]');
-  assert.equal(await page.locator('[data-course-mindmap-status]').count(), 0);
+  // Read-first: the ONE tray — library · prev · next | new · edit | home — and
+  // no editing toolbar at all. The panel shut behind the map.
+  await page.waitForSelector('[data-mindmap-read-tray]');
+  assert.equal(await page.locator('[data-mindmap-left-panel]').count(), 0, "the panel closes behind the map");
+  assert.equal(await page.locator('[data-course-mindmap-status]').count(), 0, "a saved map opens without the editing toolbar");
   const root = page.locator('[data-mind-node="root"]');
+  // ONE tap on the canvas hides the whole tray — the side-panel button with it
+  // — and the next tap brings it straight back (owner brief).
+  await page.mouse.click(40, 300);
+  await page.waitForSelector('[data-mindmap-read-tray]', { state: "detached" });
+  assert.equal(await page.locator('[data-mindmap-read-library]').count(), 0, "the side-panel button hides with the rest of the tray");
+  await page.mouse.click(40, 300);
+  await page.waitForSelector('[data-mindmap-read-tray]');
   await root.click();
-  assert.equal(await page.locator('[data-mind-node-input]').count(), 0);
+  assert.equal(await page.locator('[data-mind-node-input]').count(), 0, "a tap only reads");
   // A double-click on the preview must NOT open editing: the map stays in
   // read mode and no toolbar appears. (Preview drags are locked too — the
   // nodes only move in edit mode.)
@@ -1050,19 +1082,21 @@ browserTest("saved mind map reads without tools; double-click never unlocks, the
   await page.waitForTimeout(400);
   assert.equal(await page.locator('[data-course-mindmap-status]').count(), 0, "double-click must not unlock editing");
   assert.equal(await page.locator('[data-mindmap-mode="read"]').count(), 1, "still reading after the double-click");
-  // Editing is explicit: Map options (top-right) → Edit map.
-  await page.locator('[data-mindmap-open-right-panel]').click();
-  await page.waitForSelector('[data-mindmap-right-panel]');
-  await page.locator('[data-course-mindmap-edit]').click();
+  // Editing is explicit: read mode's tray pencil.
+  await showTray(page);
+  await tap('[data-mindmap-read-edit]');
   await page.waitForSelector('[data-course-mindmap-status]');
   assert.equal(await page.locator('[data-course-confirm-delete]').count(), 0, 'the unlocking gesture must not delete');
+  // …and the eye leads that toolbar back to reading.
+  assert.equal(await page.locator('[data-course-mindmap-status] > :first-child').getAttribute('data-mindmap-edit-read'), '', "the eye is the toolbar's first control");
   await root.click();
   const input = page.locator('[data-mind-node-input="root"]');
   await input.focus();
   await page.keyboard.press('Control+A');
   await page.keyboard.type('Edited root');
-  await page.locator('[data-course-mindmap-done]').click();
+  await tap('[data-mindmap-edit-read]');
   await page.waitForSelector('[data-mindmap-mode="read"]');
+  await page.waitForSelector('[data-mindmap-read-tray]', { state: "visible" });
   assert.equal(await page.locator('[data-course-mindmap-status]').count(), 0);
   assert.equal(await page.evaluate(() => window.__mind.rootTopic), 'Edited root');
   await page.evaluate(() => window.__syncError());
@@ -1073,29 +1107,85 @@ browserTest("saved mind map reads without tools; double-click never unlocks, the
   await context.close();
 });
 
-browserTest("touch double tap unlocks a saved mind map, while new maps start with tools", async () => {
-  const { page, context, problems } = await openMindMap({ touch: true });
+browserTest("touch: a quick tap pair still only reads; the tray's pencil edits, the eye reads, and a new map starts with tools", async () => {
+  const { page, context, problems, tap } = await openMindMap({ touch: true });
   await page.locator('[data-course-mindmap-map-grid] [data-branched-leaf]').tap();
   await page.waitForSelector('[data-mind-node="root"]');
+  await page.waitForSelector('[data-mindmap-read-tray]');
   const root = await page.locator('[data-mind-node="root"]').boundingBox();
   await page.touchscreen.tap(root.x + root.width / 2, root.y + root.height / 2);
-  assert.equal(await page.locator('[data-course-mindmap-status]').count(), 0);
+  assert.equal(await page.locator('[data-course-mindmap-status]').count(), 0, "one tap reads");
   await page.touchscreen.tap(root.x + root.width / 2, root.y + root.height / 2);
-  await page.waitForSelector('[data-course-mindmap-status]');
-  await page.locator('[data-course-mindmap-done]').tap();
-  await page.locator('[data-course-mindmap-canvas]').focus();
-  await page.keyboard.press('Escape');
-  await page.locator('[data-course-mindmap-new]').tap();
+  await page.waitForTimeout(500);
+  assert.equal(await page.locator('[data-course-mindmap-status]').count(), 0, "and a tap pair on a phone does not unlock editing either");
+  assert.equal(await page.locator('[data-mindmap-mode="read"]').count(), 1);
+  // The tray's pencil is the phone's door into the editor…
+  await showTray(page);
+  await tap('[data-mindmap-read-edit]');
   await page.waitForSelector('[data-course-mindmap-status]');
   assert.equal(await page.locator('[data-mindmap-mode="edit"]').count(), 1);
+  assert.equal(await page.locator('[data-mindmap-read-tray]').count(), 0, "and the read tray stands down while editing");
+  // …and the eye takes it back out to the read tray.
+  await tap('[data-mindmap-edit-read]');
+  await page.waitForSelector('[data-mindmap-mode="read"]');
+  await page.waitForSelector('[data-mindmap-read-tray]');
+  // A NEW map has nothing to read yet: it opens in the editor, tools up.
+  await tap('[data-mindmap-read-new]');
+  await page.waitForSelector('[data-course-mindmap-status]');
+  assert.equal(await page.locator('[data-mindmap-mode="edit"]').count(), 1);
+  assert.equal(await page.locator('[data-mindmap-read-tray]').count(), 0);
+  // The tray's home button lands on the headless home, whose three buttons are
+  // the same three the notes page carries.
+  await tap('[data-mindmap-edit-read]');
+  await tap('[data-mindmap-read-home]');
+  await page.waitForSelector('[data-course-mindmap-home]');
+  for (const hook of ['[data-mindmap-home-new]', '[data-mindmap-home-mine]', '[data-mindmap-home-course]']) {
+    assert.equal(await page.locator(hook).count(), 1, `${hook} is on the home page`);
+  }
+  assert.equal(await page.locator('[data-course-mindmap-new], [data-mindmap-home-actions] button').count(), 3, "home is exactly three buttons");
+  // The panel's rows carry no buttons: a long press opens Rename + Delete, and
+  // Rename turns that row's own name into the input — never a dialog.
+  await tap('[data-mindmap-home-mine]');
+  await page.waitForSelector('[data-mindmap-left-panel]');
+  assert.equal(
+    await page.locator('[data-course-mindmap-map-grid] [data-branched-rename-button], [data-course-mindmap-map-grid] [data-branched-delete]').count(),
+    0,
+    "the rows carry no pencil / trash buttons",
+  );
+  assert.equal(await page.locator('[data-mindmap-panel-foot] button').count(), 1, "one button at the panel's bottom — New mind map");
+  await longPressRow(page, '[data-course-mindmap-map-grid] [data-branched-leaf]');
+  assert.equal(await page.locator('[data-branched-menu-rename]').count(), 1, "a long press offers Rename");
+  assert.equal(await page.locator('[data-branched-menu-delete]').count(), 1, "…and Delete");
+  await page.locator('[data-branched-menu-rename]').click();
+  const rename = page.locator('[data-branched-rename-input]');
+  await rename.waitFor();
+  assert.equal(await rename.inputValue(), 'Saved map', "the input is the row's own name");
+  await page.keyboard.press('Escape');
   assert.deepEqual(problems, []);
   await context.close();
 });
 
 browserTest("MASTER mind map cannot unlock via mouse, touch or keyboard", async () => {
-  const { page, context, problems } = await openMindMap({ touch: true });
+  const { page, context, problems, tap } = await openMindMap({ touch: true });
+  // The banner and the read-only shell live on the canvas: open one of the
+  // learner's own maps, then hand the module its course master map.
+  await page.locator('[data-course-mindmap-map-grid] [data-branched-leaf]').tap();
+  await page.waitForSelector('[data-mindmap-mode="read"]');
   await page.evaluate(() => window.__master());
   await page.waitForSelector('[data-course-mindmap-master-banner]');
+  // A master map's tray keeps the side-panel button and Home — and nothing
+  // that could open an editor.
+  await page.waitForSelector('[data-mindmap-read-tray]');
+  assert.equal(await page.locator('[data-mindmap-read-library]').count(), 1, "the side-panel button stays");
+  assert.equal(await page.locator('[data-mindmap-read-home]').count(), 1, "so does Home");
+  assert.equal(await page.locator('[data-mindmap-read-edit]').count(), 0, "a master map has no pencil");
+  assert.equal(await page.locator('[data-mindmap-read-new]').count(), 0, "and no New mind map either");
+  await tap('[data-mindmap-read-library]');
+  await page.waitForSelector('[data-mindmap-left-panel]');
+  assert.equal(await page.locator('[data-mindmap-panel-new]').count(), 1, "the panel still carries its ONE bottom button");
+  const stripX = await page.evaluate(() => window.innerWidth - 12);
+  await page.mouse.click(stripX, 200);
+  await page.waitForSelector('[data-mindmap-left-panel]', { state: "detached" });
   await page.locator('[data-mind-node="root"]').dblclick();
   await page.locator('[data-course-mindmap-canvas]').focus();
   await page.keyboard.press('Enter');

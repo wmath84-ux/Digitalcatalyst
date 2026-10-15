@@ -263,6 +263,30 @@ const click = async (element, label) => {
     await sleep(30);
   });
 };
+/** ONE tap on the canvas itself (never on the chrome it carries). */
+const tapCanvas = async (element) => {
+  assert.ok(element, "expected the canvas to tap");
+  await act(async () => {
+    element.dispatchEvent(new window.PointerEvent("pointerdown", { bubbles: true, cancelable: true, clientX: 12, clientY: 12 }));
+    element.dispatchEvent(new window.PointerEvent("click", { bubbles: true, cancelable: true, clientX: 12, clientY: 12 }));
+    await sleep(40);
+  });
+};
+/** A finger held on a row: pointerdown, a pause past the long-press window, up. */
+const longPress = async (element) => {
+  assert.ok(element, "expected a row to press");
+  const down = new window.PointerEvent("pointerdown", { bubbles: true, cancelable: true, clientX: 10, clientY: 10 });
+  Object.defineProperty(down, "pointerType", { value: "touch" });
+  await act(async () => {
+    element.dispatchEvent(down);
+    await sleep(520);
+  });
+  await act(async () => {
+    element.dispatchEvent(new window.PointerEvent("pointerup", { bubbles: true, cancelable: true, clientX: 10, clientY: 10 }));
+    await sleep(60);
+  });
+};
+
 const tapNode = async (element) => {
   await act(async () => {
     element.dispatchEvent(new window.PointerEvent("pointerdown", { bubbles: true, cancelable: true, clientX: 12, clientY: 12 }));
@@ -273,19 +297,52 @@ const tapNode = async (element) => {
 
 /* ── the flow ─────────────────────────────────────────────────────────────── */
 
-test("Work Mind Map Editor: preview locks, edit unlocks, rename saves, footer follows", async () => {
+test("Work Mind Map Editor: headless home, ONE panel, read-first maps, the eye, the tray", async () => {
   const mounted = await fixture.mountWorkMindMap();
   await settle(120);
 
-  /* Library: Work header on, no canvas yet, footer reported visible. */
-  assert.ok(workHeader(), "the Work header is present on the map library");
-  assert.ok($("[data-course-mindmap-library]"), "the map library is the home screen");
+  /* 1 — HOME: headless, with Work's own header still on it. */
+  assert.ok(workHeader(), "the Work header is present on the map home page");
+  const home = $("[data-course-mindmap-home]");
+  assert.ok(home, "the map home is the headless home page");
+  assert.equal($("[data-course-mindmap-library]"), null, "no library panel until it is asked for");
+  assert.equal(mode(), "read", "the shell is not in edit mode on the home page");
   assert.equal(surface()?.getAttribute("data-work-immersive"), "false");
+  const actions = home.querySelector("[data-mindmap-home-actions]");
+  assert.ok(actions, "the home page has its action stack");
+  assert.equal(actions.querySelectorAll("button").length, 3, "New mind map · My Library · Course Library");
+  for (const hook of ["data-mindmap-home-new", "data-mindmap-home-mine", "data-mindmap-home-course"]) {
+    assert.ok(actions.querySelector(`[${hook}]`), `${hook} is on the home page`);
+  }
+  assert.equal(home.querySelector("header"), null, "and no header of its own");
 
-  /* Open the device map → the canvas in PREVIEW/read mode. */
-  await click($("[data-course-mindmap-open-map='main']"), "the saved map row");
-  await settle(150);
-  assert.equal($("[data-course-mindmap-library]"), null, "the library drawer closed over the canvas");
+  /* 2 — My Library opens the ONE side panel: nearly a page wide, MASTER / SELF
+        at the top centre, exactly one button at the very bottom. */
+  await click($("[data-mindmap-home-mine]"), "My Library");
+  await settle(60);
+  const panel = $("[data-mindmap-left-panel]");
+  assert.ok(panel, "the ONE side panel opens");
+  assert.ok(panel.hasAttribute("data-course-mindmap-library"), "…and it IS the map library");
+  assert.ok(panel.classList.contains("w-[calc(100%-2.5rem)]"), "nearly a page wide — a thin strip stays visible");
+  const head = panel.querySelector("[data-mindmap-panel-head]");
+  assert.ok(head, "the panel has its head");
+  assert.match(head.className, /justify-center/, "…centred at the top");
+  // Work is device-only: there is no MASTER collection to switch to, so the
+  // head names the scope instead of offering a tab that leads nowhere.
+  assert.match(head.textContent, /My mind maps/);
+  const footButtons = Array.from(panel.querySelectorAll("[data-mindmap-panel-foot] button"));
+  assert.equal(footButtons.length, 1, "exactly ONE button at the bottom of the panel");
+  assert.ok(footButtons[0].hasAttribute("data-mindmap-panel-new"), "…and it is New mind map");
+  assert.equal(panel.querySelector("[data-mindmap-panel-library]"), null, "the old \"Open full library\" button is gone");
+  assert.equal(panel.querySelector("[data-mindmap-close-left-panel]"), null, "and so is the panel's X — the strip closes it");
+  const row = panel.querySelector("[data-course-mindmap-open-map='main']");
+  assert.ok(row, "the saved map is a row in the panel");
+  assert.equal(row.querySelector("[data-branched-rename-button], [data-branched-delete]"), null, "rows carry no pencil / trash");
+
+  /* 3 — a row opens the map READ-first, headless and immersive. */
+  await click(row, "the saved map row");
+  await settle(180);
+  assert.equal($("[data-mindmap-left-panel]"), null, "the panel closes over the canvas");
   assert.equal(mode(), "read", "a map opens as a preview, not in edit mode");
   assert.equal(workHeader(), null, "no Work header over the canvas");
   assert.ok(
@@ -293,13 +350,21 @@ test("Work Mind Map Editor: preview locks, edit unlocks, rename saves, footer fo
     "the slot reports immersive — the signal that hides the Work footer navigation",
   );
 
-  /* 5 — the only top chrome: left (library) + right (options) corner buttons. */
-  assert.ok($("[data-mindmap-open-left-panel]"), "top-left side-panel button");
-  assert.ok($("[data-mindmap-open-right-panel]"), "top-right side-panel button");
-  assert.equal($("[data-mindmap-editor-chrome]")?.querySelectorAll("button").length, 2);
+  /* 4 — read mode's tray: the note page's read navigation, and the map page's
+        ONLY chrome (no header, no corner buttons, no options drawer). */
+  const tray = $("[data-mindmap-read-tray]");
+  assert.ok(tray, "read mode's bottom tray is up");
+  for (const hook of ["data-mindmap-read-library", "data-mindmap-read-new", "data-mindmap-read-edit", "data-mindmap-read-home"]) {
+    assert.ok(tray.querySelector(`[${hook}]`), `${hook} in the tray`);
+  }
+  assert.equal($("[data-course-mindmap-status]"), null, "no editing toolbar in read mode");
+  assert.equal(
+    $("[data-mindmap-open-left-panel], [data-mindmap-open-right-panel], [data-mindmap-editor-chrome], [data-mindmap-right-panel]"),
+    null,
+    "nothing in the page's chrome opens a panel, and the options drawer is gone",
+  );
 
-  /* 1+2 — preview interactions: taps and double-taps never unlock editing,
-        and nodes cannot be dragged. */
+  /* 1+2 — a tap and a double-tap never unlock editing, and nodes cannot drag. */
   const node = $("[data-mind-node]");
   assert.ok(node, "the root node rendered");
   await tapNode(node);
@@ -316,53 +381,73 @@ test("Work Mind Map Editor: preview locks, edit unlocks, rename saves, footer fo
     flowNodes().every((element) => !element.classList.contains("draggable")),
     "nodes are not draggable in preview/read mode",
   );
-  assert.equal($("[data-course-mindmap-status]"), null, "no editing toolbar in preview");
 
-  /* Enter edit mode explicitly from Map options. */
-  await click($("[data-mindmap-open-right-panel]"), "the map options button");
-  await settle(50);
-  assert.ok($("[data-mindmap-right-panel]"), "the right side panel opens");
+  /* 5 — ONE tap on the canvas hides the tray (the side-panel button and the
+        rest); the next tap brings it straight back. */
+  const canvas = $("[data-course-mindmap-canvas]");
+  await tapCanvas(canvas);
+  assert.equal($("[data-mindmap-read-tray]"), null, "a tap on the canvas hides read mode's tray");
+  await tapCanvas(canvas);
+  assert.ok($("[data-mindmap-read-tray]"), "and the next tap shows it again");
 
-  /* 6 — rename from the side panel, saved into the device-only store. */
-  const renameInput = $("[data-mindmap-rename-input]");
-  assert.ok(renameInput, "the side panel's rename field");
-  const setValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-  await act(async () => {
-    setValue.call(renameInput, "Renamed work map");
-    renameInput.dispatchEvent(new window.Event("input", { bubbles: true }));
-    await sleep(10);
-  });
-  await click($("[data-mindmap-rename-save]"), "the rename Save button");
-  await settle(60);
-  assert.ok(
-    $("[data-mindmap-right-panel]").textContent.includes("Renamed work map"),
-    "the panel shows the renamed map",
-  );
-  const mirror = window.localStorage.getItem("dc.mindMap.v1.work-device.workbench.personal-workspace.main");
-  assert.ok(mirror && mirror.includes("Renamed work map"), "the rename persisted to the Work device mirror");
-
-  /* Edit mode: toolbar up, nodes draggable. */
-  await click($("[data-course-mindmap-edit]"), "Edit map in the side panel");
-  await settle(80);
-  assert.equal(mode(), "edit", "Edit map enters edit mode explicitly");
-  assert.ok($("[data-course-mindmap-status]"), "the bottom editing toolbar is mounted in edit mode");
+  /* 6 — the tray's pencil enters edit mode; the EYE at the front of the toolbar
+        — the same design as every tool beside it — goes back to reading. */
+  await click($("[data-mindmap-read-edit]"), "the tray's pencil");
+  await settle(90);
+  assert.equal(mode(), "edit", "the tray's pencil enters edit mode explicitly");
+  const strip = $("[data-course-mindmap-status]");
+  assert.ok(strip, "the bottom editing toolbar is mounted in edit mode");
+  const eye = strip.querySelector("[data-mindmap-edit-read]");
+  assert.ok(eye, "the eye leads the editing toolbar");
+  assert.ok(eye.classList.contains("mm-tool"), "…in the same design as every other tool on the bar");
+  assert.ok(eye.querySelector("svg"), "…with the eye for its glyph");
+  assert.equal(eye.textContent.trim(), "", "…and no text capsule");
+  assert.equal(strip.firstElementChild, eye, "it is the FIRST control of the bar");
   assert.ok(
     flowNodes().some((element) => element.classList.contains("draggable")),
     "nodes are draggable only in edit mode",
   );
-
-  /* Back to reading view, then the library: Work chrome + footer restore. */
-  await click($("[data-mindmap-open-right-panel]"), "the map options button");
-  await settle(40);
-  await click($("[data-mindmap-panel-read]"), "Reading view in the side panel");
-  await settle(60);
-  assert.equal(mode(), "read", "Reading view returns to preview");
-  await click($("[data-mindmap-open-left-panel]"), "the map library button");
-  await settle(40);
-  await click($("[data-mindmap-panel-library]"), "Open full library in the side panel");
+  await click(eye, "the eye — back to reading");
   await settle(80);
-  assert.ok($("[data-course-mindmap-library]"), "back on the map library");
-  assert.ok(workHeader(), "the Work header returns on the library");
+  assert.equal(mode(), "read", "the eye returns to the read view");
+  assert.ok($("[data-mindmap-read-tray]"), "…with its tray");
+
+  /* 7 — the tray's library button opens the panel again; a LONG PRESS on a row
+        offers Rename, and Rename turns that row's own name into an input that
+        writes through Work's device-only store. */
+  await click($("[data-mindmap-read-library]"), "the tray's library button");
+  await settle(60);
+  const panelAgain = $("[data-mindmap-left-panel]");
+  assert.ok(panelAgain, "the tray's library button opens the ONE panel");
+  await longPress(panelAgain.querySelector("[data-course-mindmap-open-map='main']"));
+  const popup = $("[data-branched-menu-popup]");
+  assert.ok(popup, "a long press opens the row's actions");
+  await click(popup.querySelector("[data-branched-menu-rename]"), "Rename");
+  await settle(40);
+  const renameInput = $("[data-branched-rename-input]");
+  assert.ok(renameInput, "Rename turns the row's own name into an input");
+  const setValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+  await act(async () => {
+    setValue.call(renameInput, "Renamed work map");
+    renameInput.dispatchEvent(new window.Event("input", { bubbles: true }));
+    await sleep(20);
+  });
+  await act(async () => {
+    renameInput.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await sleep(80);
+  });
+  const mirror = window.localStorage.getItem("dc.mindMap.v1.work-device.workbench.personal-workspace.main");
+  assert.ok(mirror && mirror.includes("Renamed work map"), "the rename persisted to the Work device mirror");
+
+  /* 8 — the strip the panel leaves visible closes it, and Home restores the
+        Work chrome + footer. */
+  await click($("[data-mindmap-panel-scrim]"), "the strip the panel leaves visible");
+  await settle(60);
+  assert.equal($("[data-mindmap-left-panel]"), null, "tapping the visible strip closes the panel");
+  await click($("[data-mindmap-read-home]"), "the tray's home button");
+  await settle(80);
+  assert.ok($("[data-course-mindmap-home]"), "back on the map home page");
+  assert.ok(workHeader(), "the Work header returns on the home page");
   assert.equal(surface()?.getAttribute("data-work-immersive"), "false");
   assert.equal(
     immersiveReports().at(-1),

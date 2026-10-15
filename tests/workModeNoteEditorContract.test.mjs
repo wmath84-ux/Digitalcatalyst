@@ -61,9 +61,10 @@ test("the editor design has no storage-only fork: same chrome in Work and Course
   assert.match(notesPanel, /data-note-left-panel/);
   assert.match(notesPanel, /w-\[calc\(100%-2\.5rem\)\]/, "almost the full page, a thin strip left visible");
   assert.match(notesPanel, /data-note-panel-scrim/, "the visible strip is the way out");
-  // 4 — read mode's bottom navigation; 3 — it swaps out for the editing pill,
-  // whose FIRST control is the black Read capsule.
-  assert.match(editorBranch, /\{readView \? \([\s\S]{0,1200}?data-note-read-nav/);
+  // 4 — read mode's bottom navigation (visible until one tap on the page hides
+  // it); 3 — it swaps out for the editing pill, whose FIRST control is the eye.
+  assert.match(editorBranch, /\{readView && readChromeVisible \? \([\s\S]{0,1600}?data-note-read-nav/);
+  assert.match(editorBranch, /setReadChromeVisible\(\(visible\) => !visible\)/);
   assert.match(editorBranch, /data-note-view-mode=\{readView \? "read" : "edit"\}/);
   assert.ok(notesPanel.includes("data-note-edit-read-float"), "the floating Read capsule keeps edit mode escapable");
   assert.ok(notesPanel.includes("onClick={enterReadMode}"));

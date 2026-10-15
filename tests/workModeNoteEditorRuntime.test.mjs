@@ -14,14 +14,16 @@
 //      shared Work footer navigation;
 //   4. read mode's bottom pill carries library · prev · next | new · edit |
 //      home (the 3-dot drawer button is gone); Edit flips the SAME document to
-//      editable and the editing pill takes the bottom, the black Read capsule
-//      pinned at its front and the tools in their own sliding tray;
+//      editable and the editing pill takes the bottom — the EYE tile pinned at
+//      its front, in the same design as every tool beside it, and the tools in
+//      their own sliding tray;
 //   5. saving is AUTOMATIC: bolding the body stores the note through Work's
 //      device-only onEdit with no Save anywhere;
 //   6. a long press on a row opens Rename / Delete, and Rename turns that
 //      row's own name into an input that writes through Work's onEdit;
-//   7. the Read capsule returns to the read view; Home returns to the notes
-//      home page, where the Work header and footer come back.
+//   7. the eye tile returns to the read view; ONE tap on the page hides read
+//      mode's bottom tray and the next tap brings it back; Home returns to the
+//      notes home page, where the Work header and footer come back.
 //
 // The toolbar's full tool set/geometry and the keyboard rules are pinned by
 // tests/coursePlayerNoteToolbarCaretRuntime.test.mjs and
@@ -270,6 +272,20 @@ const focus = async (element) => {
     await sleep(20);
   });
 };
+/** ONE tap on the page itself — never on the chrome it carries. */
+const tapPage = async () => {
+  const page = panel();
+  assert.ok(page, "expected the writing page to tap");
+  await act(async () => {
+    page.dispatchEvent(new window.MouseEvent("pointerdown", { bubbles: true, cancelable: true, clientX: 5, clientY: 5 }));
+    await sleep(10);
+  });
+  await act(async () => {
+    page.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true, clientX: 5, clientY: 5 }));
+    await sleep(40);
+  });
+};
+
 /** A finger held on a row: pointerdown, a pause past the long-press window, up. */
 const longPress = async (element) => {
   assert.ok(element, "expected a row to press");
@@ -357,6 +373,14 @@ test("Work Note Editor: headless pages, ONE library panel, read-first notes, aut
   assert.equal($("[data-note-read-more]"), null, "the 3-dot drawer button is gone");
   assert.equal($("[data-note-dock]"), null, "no editing toolbar in read mode");
 
+  /* 4b — ONE tap on the page hides the tray (the side-panel button and the
+        rest); the next tap brings it straight back. */
+  await tapPage();
+  assert.equal($("[data-note-read-nav]"), null, "a tap on the page hides read mode's tray");
+  assert.equal($("[data-note-read-library]"), null, "…including the side-panel button");
+  await tapPage();
+  assert.ok($("[data-note-read-nav]"), "and the next tap shows it again");
+
   /* 5 — Edit flips the SAME document; the editing pill takes the bottom with
         the black Read capsule pinned at its front. */
   await click($("[data-note-read-edit]"), "the read pill's pencil");
@@ -366,14 +390,22 @@ test("Work Note Editor: headless pages, ONE library panel, read-first notes, aut
   await focus($(".bn-editor"));
   const dock = $("[data-note-dock]");
   assert.ok(dock, "the editing pill is up once the note has a cursor");
-  const readCapsule = dock.querySelector("[data-note-edit-read]");
+  const readEye = dock.querySelector("[data-note-edit-read]");
   const tools = dock.querySelector("[data-note-dock-tools]");
-  assert.ok(readCapsule, "the black Read capsule leads the pill");
+  assert.ok(readEye, "the read control leads the pill");
   assert.ok(tools, "the tools have a tray of their own");
   assert.ok(
-    (readCapsule.compareDocumentPosition(tools) & window.Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+    (readEye.compareDocumentPosition(tools) & window.Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
     "Read is pinned before the sliding tray, so it can never scroll away",
   );
+  // The SAME design as every tool next to it: BlockNote's own toolbar button
+  // (the class the dock sizes to a 36px round tile), an icon and no label —
+  // the black "Read" capsule is gone.
+  assert.ok(readEye.classList.contains("bn-ak-button"), "the read control is a toolbar tile like the rest");
+  assert.equal(readEye.getAttribute("aria-label"), "Read mode");
+  assert.ok(readEye.querySelector("svg"), "…with the eye for its glyph");
+  assert.equal(readEye.textContent.trim(), "", "…and no text capsule beside it");
+  assert.ok(!readEye.classList.contains("dc-note-dock-read"), "the black Read capsule is gone");
   const toolLabels = Array.from(tools.querySelectorAll(".bn-ak-button")).map(
     (button) => button.getAttribute("aria-label") || button.textContent.trim(),
   );
@@ -409,7 +441,7 @@ test("Work Note Editor: headless pages, ONE library panel, read-first notes, aut
   assert.match(lastEdit() ?? "", /<strong>Alpha body words here\.<\/strong>/, "the Bold formatting is in the saved HTML");
 
   /* Leaving edit mode for the read view is a save point as well. */
-  await click(readCapsule, "the tray's Read capsule");
+  await click(readEye, "the tray's eye tile");
   await settle(80);
   assert.equal(panel()?.getAttribute("data-note-view-mode"), "read", "Read returns to the read view");
   assert.ok($("[data-note-read-nav]"), "the read tray is back");

@@ -72,10 +72,12 @@
   max-width: 100%;
 }
 
-/* The black Read capsule the floating fallback shows when the docked tray is
-   not on screen (the tray follows the caret; the way back never disappears). */
+/* The floating fallback the writing page shows when the docked tray is not on
+   screen (the tray follows the caret; the way back never disappears): the same
+   EYE glyph as the tile at the head of the dock, so the two read-mode controls
+   are one control in two places. */
 [data-note-edit-read-float] {
-  letter-spacing: 0.01em;
+  -webkit-tap-highlight-color: transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -130,11 +130,15 @@ header.course-page-header {
   [data-course-music-panel],
   [data-course-personal-modules],
   [data-course-player-panel],
-  [data-course-mindmap-library],
   [data-course-overlay-tab="paid"]
 ) {
   background: var(--dc-course-page-bg, #f2f2f2) !important;
 }
+
+/* The mind map is NOT in the list above on purpose: its pages are headless
+   now (the map library is the ONE left panel, and the home is three centred
+   buttons), so they wear their own `--mm-*` palette — which follows the mind
+   map's own Light / Dark theme, not the player's page plate. */
 
 /* The Notes list used to own a pure-white plate with `!important`
    (study-light-surfaces.css). As a Course Player page it now sits on the

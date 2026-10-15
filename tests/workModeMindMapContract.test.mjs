@@ -1,17 +1,21 @@
 // tests/workModeMindMapContract.test.mjs
 //
-// Work Mode's Mind Map Editor is the Course Player's updated mind map
+// Work Mode's Mind Map Editor is the Course Player's redesigned mind map
 // surface (the same MindMapPanel) with Work's shell rules around it:
 //
-//   1. preview/read mode never unlocks editing from a double-tap;
+//   1. preview/read mode never unlocks editing from a double-tap — editing is
+//      entered from read mode's tray and left with the toolbar's EYE;
 //   2. node movement exists only in edit mode;
-//   3. the editing toolbar is one opaque pill at the bottom of the screen;
+//   3. the editing toolbar is one CENTRED opaque pill at the bottom of the
+//      screen, and read mode's tray is the note page's read navigation;
 //   4. its sizing/design matches the Note Editor's pill while the mind
 //      map's own icons stay;
-//   5. top-left / top-right side-panel buttons are the canvas's top chrome;
-//   6. a map renames from the side panel through Work's device-only store;
+//   5. the map library is the ONE side panel — no header button opens it, and
+//      there is no second (options) drawer;
+//   6. a map renames from the panel's row popup through Work's device-only
+//      store;
 //   7. the Work footer navigation hides while the canvas is open and
-//      returns on the map library.
+//      returns on the map home.
 //
 // Behaviour is driven for real in workModeMindMapRuntime; the toolbar
 // geometry lives in CSS and is pinned here and in
@@ -40,9 +44,9 @@ test("Work mounts the shared MindMapPanel device-only, with rename and editor si
 });
 
 test("1 — preview never unlocks editing: no double-tap path into edit mode", () => {
-  // Edit mode is entered explicitly only: the Map options "Edit map" button
-  // or Enter/F2 on the canvas.
-  assert.match(panel, /data-course-mindmap-edit[\s\S]{0,160}?enterEditMode\(\)/);
+  // Edit mode is entered explicitly only: read mode's tray pencil, or Enter/F2
+  // on the canvas.
+  assert.match(panel, /data-mindmap-read-edit[\s\S]{0,160}?enterEditMode/);
   assert.match(panel, /\(event\.key === "Enter" \|\| event\.key === "F2"\)\) \{\s+event\.preventDefault\(\);\s+enterEditMode\(\);/);
   // Node taps are inert while the canvas is read-only, and React Flow's own
   // double-click zoom (the other accidental unlock) is off.
@@ -73,18 +77,34 @@ test("3+4 — the editing toolbar: one opaque pill at the exact bottom, Note-Edi
   assert.match(css, /\.mm-tool \{[^}]*width: var\(--mm-tool-size\);[^}]*height: var\(--mm-tool-size\);/);
   // …with the mind map's own glyphs preserved (save state, arrange, fit…).
   assert.match(panel, /data-course-mindmap-save/);
-  assert.match(panel, /data-course-mindmap-done/);
+  // The eye leads that bar, in the same tile design as every other control.
+  assert.match(panel, /className="mm-tool"[\s\S]{0,160}?data-mindmap-edit-read/);
+  assert.match(panel, /<Eye size=\{16\} aria-hidden="true" \/>/);
   assert.match(panel, /storageOnly\s*\? <HardDrive \/>/);
+  // …and read mode's tray is the note page's read navigation: the side-panel
+  // button, New mind map, the pencil and Home.
+  assert.match(panel, /data-mindmap-read-tray/);
+  assert.match(panel, /data-mindmap-read-library/);
+  assert.match(panel, /data-mindmap-read-new/);
+  assert.match(panel, /data-mindmap-read-home/);
+  assert.match(panel, /const READ_TAP_SLOP_PX = 10;/, "ONE tap on the canvas hides the tray");
+  assert.match(css, /\.mm-read-tray \{[\s\S]{0,500}?bottom: calc\(max\(0\.5rem, env\(safe-area-inset-bottom\)\) \+ var\(--dc-note-footer-inset, 0px\)\);/);
 });
 
-test("5+6 — corner side-panel buttons; rename lives in the right panel", () => {
-  assert.match(panel, /data-mindmap-open-left-panel[\s\S]{0,200}?setSidePanel\("left"\)/);
-  assert.match(panel, /data-mindmap-open-right-panel[\s\S]{0,200}?setSidePanel\("right"\)/);
-  assert.match(panel, /\{!libraryOpen \? \(\s+<div className="flex h-11 shrink-0 items-center justify-between px-2" data-mindmap-editor-chrome>/);
-  assert.match(panel, /data-mindmap-rename-input/);
-  assert.match(panel, /data-mindmap-rename-save/);
-  const rightPanel = panel.slice(panel.indexOf("data-mindmap-right-panel"), panel.indexOf("data-mindmap-right-panel") + 7000);
-  assert.match(rightPanel, /onRenameMap\?\.\(activeMapKey, next\)/, "rename saves the open map through the panel's callback");
+test("5+6 — no corner buttons; the ONE panel is the library, and rename lives in its rows", () => {
+  assert.doesNotMatch(panel, /data-mindmap-open-left-panel|data-mindmap-open-right-panel|data-mindmap-editor-chrome/);
+  assert.doesNotMatch(panel, /CoursePageHeader/, "the mind map is headless like the notes page");
+  assert.match(panel, /data-mindmap-left-panel/);
+  assert.match(panel, /w-\[calc\(100%-2\.5rem\)\]/, "nearly a whole page, a thin strip still visible");
+  const headAt = panel.indexOf("data-mindmap-panel-head");
+  const libraryHead = panel.slice(panel.lastIndexOf("<div", headAt), panel.indexOf("data-course-mindmap-map-list"));
+  assert.match(libraryHead, /justify-center/, "the filter sits at its top centre");
+  assert.match(libraryHead, /storageOnly \? \([\s\S]{0,200}?My mind maps/);
+  assert.match(libraryHead, /data-course-mindmap-collections/);
+  assert.match(panel, /leafActionMenu="long-press"/, "a row's actions open on a long press");
+  assert.match(panel, /onRename: \(nextTitle\) => onRenameMap\?\.\(entry\.mapKey, nextTitle\)/, "rename saves through the library's own callback");
+  assert.match(panel, /data-mindmap-panel-new/, "and the panel's ONE bottom button creates a map");
+  assert.doesNotMatch(panel, /data-mindmap-panel-library/);
   // Leaving edit mode flushes the pending save first (rename + edits land
   // in Work's device-only store, never the cloud).
   assert.match(panel, /const handleDone = useCallback\(\(\) => \{[\s\S]{0,200}?onFlush\?\.\(\);/);

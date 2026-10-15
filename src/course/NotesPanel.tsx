@@ -18,10 +18,12 @@
 //     Rename turns that row's own label into an input.
 //   · THE WRITING PAGE — the note itself, in READ mode or EDIT mode:
 //       read mode's bottom pill:  library(→panel) · prev · next | new · edit | home
-//       edit mode's bottom tray: READ (black, pinned) + the sliding tool tray
+//       edit mode's bottom tray: EYE + the sliding tool tray
 //     No top corner buttons at all. A note opened from the library ALWAYS lands
 //     in read mode first (double tap, Enter/F2 or the pencil switches to
-//     editing); the tray's black Read capsule switches back.
+//     editing); the tray's EYE — one more 36px tile at the front of the tool
+//     row — switches back. Tap the page once and the read tray hides; tap it
+//     again and it returns.
 //
 // ── Saving is automatic (the owner's brief: "automatic save") ─────────────
 // There is no Save / Cancel button anymore. The editor's batched draft is
@@ -47,7 +49,7 @@ import { useDoubleTapToEdit } from "./useDoubleTapToEdit";
 import { Component, Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import "./study-light-surfaces.css";
 import "./notesLibrary.css";
-import { BookOpen, ChevronLeft, ChevronRight, FileText, House, Library, NotebookPen, Pencil, Plus } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Eye, FileText, House, Library, NotebookPen, Pencil, Plus } from "lucide-react";
 import "katex/dist/katex.min.css";
 import type { CourseModule, CoursePlayerNote, MasterCourseNote } from "../types/course";
 import type { PersonalCourseModule } from "../types/personalCourse";
@@ -74,6 +76,10 @@ const loadNoteEditor = () => import("./NoteEditor");
 const NoteEditor = lazy(loadNoteEditor);
 
 /** Quiet time before a draft is committed, and the longest a burst may defer it. */
+// A read-mode "tap" that hides the tray must be a STILL finger: a press that
+// travelled further than this was a drag (selecting text, panning), not a tap.
+const READ_TAP_SLOP_PX = 10;
+
 const AUTOSAVE_IDLE_MS = 1200;
 const AUTOSAVE_MAX_WAIT_MS = 5000;
 
@@ -360,6 +366,12 @@ export default function NotesPanel({
   // header button anywhere that opens this one — the home page's two library
   // buttons and the read pill's library button are its only ways in.
   const [libraryOpen, setLibraryOpen] = useState(false);
+  // Read mode's bottom tray. ONE tap anywhere on the page hides it — the page
+  // becomes the note and nothing else — and the next tap brings it straight
+  // back (owner brief). Every way INTO read mode re-arms it, so the tray is
+  // always there when a note is opened, and only a deliberate tap removes it.
+  const [readChromeVisible, setReadChromeVisible] = useState(true);
+  const readTapStartRef = useRef<{ x: number; y: number } | null>(null);
   // The docked editing toolbar's state, reported by the editor (see below).
   const [dockUp, setDockUp] = useState(false);
 
@@ -469,6 +481,7 @@ export default function NotesPanel({
 
   /** Leave the writing page for the notes home — after committing the draft. */
   const goHome = useCallback(() => {
+    setReadChromeVisible(true);
     saveNowRef.current();
     discardingRef.current = true;
     clearAutosaveTimers();
@@ -500,6 +513,7 @@ export default function NotesPanel({
   // Read ↔ edit on the SAME document: flip the panel state and the live
   // editor together. Entering EDIT always starts from the committed note.
   const enterEditMode = useCallback(() => {
+    setReadChromeVisible(true);
     discardingRef.current = false;
     focusAfterEditRef.current = true;
     setSelfReadOnly(false);
@@ -507,12 +521,13 @@ export default function NotesPanel({
     editorRef.current?.focusBody();
   }, []);
   /**
-   * The tray's black Read capsule. Leaving the editor is a SAVE POINT: the
+   * The tray's eye button. Leaving the editor is a SAVE POINT: the
    * draft is committed first, so the read view always shows what was written.
    * A brand-new note with nothing in it has nothing to read (and nothing to
    * store), so it simply returns to the notes home.
    */
   const enterReadMode = useCallback(() => {
+    setReadChromeVisible(true);
     saveNowRef.current();
     if (!editingIdRef.current) { goHome(); return; }
     setSelfReadOnly(true);
@@ -663,6 +678,7 @@ export default function NotesPanel({
   const openNote = (note: CoursePlayerNote) => {
     selectCollection("self");
     setLibraryOpen(false);
+    setReadChromeVisible(true);
     discardingRef.current = false;
     addBlockedRef.current = false;
     clearAutosaveTimers();
@@ -1002,12 +1018,27 @@ export default function NotesPanel({
         tabIndex={readView ? 0 : undefined}
         aria-label={readView ? "Saved note. Double tap or press Enter to edit." : undefined}
         {...editGesture}
+        onPointerDown={(event) => { readTapStartRef.current = { x: event.clientX, y: event.clientY }; }}
+        onClick={(event) => {
+          if (!readView || libraryOpen) return;
+          const start = readTapStartRef.current;
+          readTapStartRef.current = null;
+          if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > READ_TAP_SLOP_PX) return;
+          const target = event.target as HTMLElement | null;
+          if (target?.closest("[data-note-read-nav], [data-note-library-panel], [data-course-confirm-delete]")) return;
+          setReadChromeVisible((visible) => !visible);
+        }}
         onKeyDown={(event) => {
           if (event.key === "Escape" && libraryOpen) { closeLibrary(); return; }
           if (event.key === "Escape" && readView) { goHome(); return; }
           editGesture.onKeyDown(event);
         }}
       >
+        {/* ONE tap on the page in read mode hides the bottom tray, and the next
+            tap brings it back (owner brief). A press that TRAVELLED is not a
+            tap — dragging across the note to select text, or a swipe — so only
+            a still pointer counts; and the chrome itself (the tray, the library
+            panel, a dialog) is never a tap on the page. */}
         <div className="flex min-h-0 flex-1 flex-col" data-course-notes-composer>
           {/* Saving is automatic, so the page has NO Top chrome: no header, no
               corner buttons — only this quiet status chip, centred, and it
@@ -1086,8 +1117,8 @@ export default function NotesPanel({
         {/* Read mode's bottom navigation: library (opens the panel) · previous ·
             next | new · edit | home. The 3-dot drawer button is gone — the
             library panel is the only panel there is, and this is its way in. */}
-        {readView ? (
-          <div className="pointer-events-none absolute inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 flex justify-center px-4">
+        {readView && readChromeVisible ? (
+          <div className="pointer-events-none absolute inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 flex justify-center px-4" data-note-read-tray>
             <nav
               className={`pointer-events-auto flex items-center gap-0.5 rounded-full border px-2 py-1.5 shadow-lg backdrop-blur ${darkNote ? "border-slate-700 bg-slate-900/95 text-slate-200 shadow-black/40" : "border-slate-200 bg-white/95 text-slate-600 shadow-slate-950/15"}`}
               aria-label="Note navigation"
@@ -1123,20 +1154,22 @@ export default function NotesPanel({
           </div>
         ) : null}
 
-        {/* In edit mode the docked tray carries the black Read capsule — but the
-            tray follows the CARET, so a floating one keeps the way back on
-            screen whenever that tray is not up. */}
+        {/* In edit mode the docked tray carries the eye at the front of its row
+            of tools — but the tray follows the CARET, so a floating one keeps
+            the way back on screen whenever that tray is not up. */}
         {!readView && !dockUp ? (
           <div className="pointer-events-none absolute inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 flex justify-center px-4">
             <button
               type="button"
-              className="pointer-events-auto inline-flex h-9 items-center gap-1.5 rounded-full bg-slate-900 px-3.5 text-[13px] font-black text-white shadow-lg transition hover:bg-slate-800 active:bg-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-300"
+              className={`pointer-events-auto grid h-10 w-10 place-items-center rounded-full border shadow-lg transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400 ${
+                darkNote ? "border-slate-700 bg-slate-900/95 text-slate-200 hover:bg-slate-800" : "border-slate-200 bg-white/95 text-slate-700 hover:bg-slate-50"
+              }`}
               data-note-edit-read-float
               aria-label="Read mode"
               title="Read mode"
               onClick={enterReadMode}
             >
-              <BookOpen size={15} aria-hidden="true" /> Read
+              <Eye size={16} aria-hidden="true" />
             </button>
           </div>
         ) : null}
