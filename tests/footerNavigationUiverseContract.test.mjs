@@ -17,13 +17,15 @@ const notificationsCss = read("src/components/header-navigation.css");
 const chromeCss = read("src/light-theme-pages.css");
 
 test("the new footer is the default and the existing magnifying dock remains selectable", () => {
-  assert.match(preference, /type FooterNavigationStyle = "youtube" \| "uiverse" \| "glass-dock"/);
+  assert.match(preference, /type FooterNavigationStyle = "youtube" \| "uiverse" \| "glass-dock" \| "work-pill"/);
   assert.match(preference, /DEFAULT_STYLE: FooterNavigationStyle = "youtube"/);
   assert.match(preference, /localStorage\.getItem\(STORAGE_KEY\)/);
   assert.match(preference, /localStorage\.setItem\(STORAGE_KEY, next\)/);
   assert.match(sharedFooter, /useFooterNavigationStyle\(\)/);
   assert.match(sharedFooter, /navigationStyle === "uiverse"/);
   assert.match(sharedFooter, /<UiverseFooterNav/);
+  assert.match(sharedFooter, /navigationStyle === "work-pill"/);
+  assert.match(sharedFooter, /<WorkFooterNav/);
   assert.match(sharedFooter, /if \(peek\)/, "the classic peek mode remains in the glass-dock branch");
   assert.match(sharedFooter, /<SitePeekFooter/);
   assert.match(settings, /setFooterNavigationStyle\("youtube"\)/);
@@ -33,6 +35,7 @@ test("the new footer is the default and the existing magnifying dock remains sel
   assert.match(settings, /setFooterNavigationStyle\("glass-dock"\)/);
   assert.match(settings, /aria-checked=\{footerNavigationStyle === "uiverse"\}/);
   assert.match(settings, /aria-checked=\{footerNavigationStyle === "glass-dock"\}/);
+  assert.match(settings, /setFooterNavigationStyle\("work-pill"\)/);
 });
 
 test("the four-tab pill keeps the measured footer hook and the required destinations", () => {
@@ -54,6 +57,7 @@ test("the four-tab pill keeps the measured footer hook and the required destinat
 
 test("Profile opens the four animated learning shortcuts once and Profile on a double click/tap", () => {
   for (const [route, label] of [
+    ["work", "Work Mode"],
     ["my-day", "My Day"],
     ["study-library", "My Study Library"],
     ["revision", "Revision"],
@@ -61,7 +65,8 @@ test("Profile opens the four animated learning shortcuts once and Profile on a d
   ]) {
     assert.ok(uiverseFooter.includes(`id: "${route}"`), `${label} shortcut exists`);
   }
-  assert.match(uiverseFooter, /navigate\(`#\/\$\{id\}`\)/, "shortcut selection routes to the matching page");
+  assert.match(uiverseFooter, /navigate\(route\)/, "shortcut selection routes to the explicit destination");
+  assert.match(uiverseFooter, /route: "#\/work"/);
   assert.match(uiverseFooter, /className="dc-compact-glass-window dc-uiverse-profile-menu"/);
   assert.match(uiverseFooter, /data-open=\{profileMenuOpen \? "true" : "false"\}/);
   assert.match(uiverseFooter, /now - previous <= 340/);
@@ -89,12 +94,12 @@ test("Notifications replaces the header avatar action without duplicating the be
   assert.doesNotMatch(notificationsCss, /box-shadow:[^;]*,\s*0\s*\d+px/);
 });
 
-test("header bars lose exterior shadows/glow but keep their inset glass edge", () => {
+test("non-Home header bars lose exterior shadows/glow", () => {
   const reset = chromeCss.slice(chromeCss.lastIndexOf("Navigation refresh"));
   for (const hook of ["[data-site-header]", "[data-revision-app-header]", "[data-rev-bank-header]", "[data-desktop-topbar]"]) {
     assert.ok(reset.includes(hook), `${hook} is covered by the reset`);
   }
-  assert.match(reset, /box-shadow:\s*var\(--dc-chrome-glass-rim/);
+  assert.match(reset, /box-shadow:\s*none !important/);
   assert.match(reset, /\.mobile-header-glow::before/);
   assert.match(reset, /\.mobile-header-glow::after/);
   assert.match(reset, /display:\s*none\s*!important/);

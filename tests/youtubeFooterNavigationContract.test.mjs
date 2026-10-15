@@ -11,16 +11,19 @@ const settings = read("src/settings/SettingsPage.tsx");
 const settingsCss = read("src/settings/settings.css");
 
 test("edge-to-edge footer is the default while both previous footer designs remain selectable", () => {
-  assert.match(preference, /type FooterNavigationStyle = "youtube" \| "uiverse" \| "glass-dock"/);
+  assert.match(preference, /type FooterNavigationStyle = "youtube" \| "uiverse" \| "glass-dock" \| "work-pill"/);
   assert.match(preference, /DEFAULT_STYLE: FooterNavigationStyle = "youtube"/);
   assert.match(shared, /navigationStyle === "youtube"/);
   assert.match(shared, /<YoutubeFooterNav/);
   assert.match(shared, /navigationStyle === "uiverse"/);
   assert.match(shared, /<UiverseFooterNav/);
+  assert.match(shared, /navigationStyle === "work-pill"/);
+  assert.match(shared, /<WorkFooterNav/);
   assert.match(shared, /<GlassDock siteFooter/);
   assert.match(settings, /aria-checked=\{footerNavigationStyle === "youtube"\}/);
   assert.match(settings, /aria-checked=\{footerNavigationStyle === "uiverse"\}/);
   assert.match(settings, /aria-checked=\{footerNavigationStyle === "glass-dock"\}/);
+  assert.match(settings, /aria-checked=\{footerNavigationStyle === "work-pill"\}/);
 });
 
 test("the bar is edge-attached, safe-area aware, and blue-highlights the active route", () => {
@@ -41,17 +44,19 @@ test("the bar is edge-attached, safe-area aware, and blue-highlights the active 
 });
 
 test("the center quick-action menu retains secondary app destinations and keyboard dismissal", () => {
-  for (const destination of ["myday", "study-library", "revision", "flowpath"]) {
+  for (const destination of ["work", "myday", "study-library", "revision", "flowpath"]) {
     assert.ok(footer.includes('"' + destination + '"'), "missing quick route " + destination);
   }
   assert.match(footer, /aria-haspopup="menu"/);
   assert.match(footer, /aria-expanded=\{menuOpen\}/);
-  assert.match(footer, /event.key !== "Escape"/);
+  assert.match(footer, /if \(event.key === "Escape"\)/);
   assert.match(footer, /window\.location\.hash = item\.route/);
 });
 
 test("Settings shows a preview of the new five-slot navigation", () => {
-  assert.match(settings, /3 styles/);
+  assert.match(settings, /4 styles/);
+  assert.match(settings, /Work pill/);
+  assert.match(settingsCss, /\.settings-navigation-preview--work/);
   assert.match(settings, /settings-navigation-preview--youtube/);
   assert.match(settingsCss, /\.settings-navigation-preview--youtube/);
   assert.match(settingsCss, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);

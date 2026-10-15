@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Library } from "lucide-react";
+import { BriefcaseBusiness, Library } from "lucide-react";
 import { BagIcon, CalendarIcon, FlowPathIcon, HomeIcon, SparkBookIcon, StoreIcon, UserIcon } from "./icons";
 import { PopoverItem } from "./ui/glass-popover";
 import "./uiverse-footer-nav.css";
@@ -15,10 +15,11 @@ type Props = {
 };
 
 const PROFILE_SHORTCUTS = [
-  { id: "my-day", label: "My Day", Icon: CalendarIcon },
-  { id: "study-library", label: "My Study Library", Icon: Library },
-  { id: "revision", label: "Revision", Icon: SparkBookIcon },
-  { id: "flowpath", label: "FlowPath", Icon: FlowPathIcon },
+  { id: "work", label: "Work Mode", route: "#/work", Icon: BriefcaseBusiness },
+  { id: "my-day", label: "My Day", route: "#/my-day", Icon: CalendarIcon },
+  { id: "study-library", label: "My Study Library", route: "#/study-library", Icon: Library },
+  { id: "revision", label: "Revision", route: "#/revision", Icon: SparkBookIcon },
+  { id: "flowpath", label: "FlowPath", route: "#/flowpath", Icon: FlowPathIcon },
 ] as const;
 
 function routeForTab(tab: FooterTab): string {
@@ -37,7 +38,7 @@ function activeTabForHash(hash: string): FooterTab | null {
   ) return "store";
   if (
     hash.startsWith("#/profile") || hash.startsWith("#/settings") || hash.startsWith("#/usage-limits")
-    || hash.startsWith("#/my-day") || hash.startsWith("#/study-library") || hash.startsWith("#/revision")
+    || hash.startsWith("#/work") || hash.startsWith("#/my-day") || hash.startsWith("#/study-library") || hash.startsWith("#/revision")
     || hash.startsWith("#/flowpath")
   ) return "profile";
   return null;
@@ -205,7 +206,7 @@ export default function UiverseFooterNav({
             aria-label="Profile shortcuts"
             aria-hidden={!profileMenuOpen}
           >
-            {PROFILE_SHORTCUTS.map(({ id, label: itemLabel, Icon }) => (
+            {PROFILE_SHORTCUTS.map(({ id, route, label: itemLabel, Icon }) => (
               <PopoverItem
                 key={id}
                 role="menuitem"
@@ -218,7 +219,7 @@ export default function UiverseFooterNav({
                   clickTimeRef.current = null;
                   if (clickExpiryRef.current !== null) window.clearTimeout(clickExpiryRef.current);
                   clickExpiryRef.current = null;
-                  navigate(`#/${id}`);
+                  navigate(route);
                 }}
               >
                 <Icon aria-hidden="true" className="dc-footer-profile-icon" />

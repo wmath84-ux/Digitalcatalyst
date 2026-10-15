@@ -86,6 +86,8 @@ export interface UseCourseMindMapInput {
   rootTopic?: string;
   /** Milliseconds of quiet before a pending edit is written. */
   debounceMs?: number;
+  /** Keep this map library on this device; never read or write Firestore. */
+  storageOnly?: boolean;
 }
 
 export interface UseCourseMindMapResult {
@@ -267,6 +269,7 @@ interface MapSession extends MapOutbox {
   productId: string;
   moduleId: string;
   scoped: boolean;
+  storageOnly: boolean;
   rootTopic: string;
   activeMapKey: string;
   summaries: MindMapSummary[];
@@ -337,24 +340,24 @@ const describeMapError = (thrown: unknown): string => {
 };
 
 export default function useCourseMindMap(input: UseCourseMindMapInput): UseCourseMindMapResult {
-  const { uid, productId, moduleId, rootTopic = "", debounceMs = DEFAULT_DEBOUNCE_MS } = input;
-  const scoped =
-    Boolean(uid)
-    && productId != null
-    && String(productId).trim().length > 0
-    && moduleId != null
-    && String(moduleId).trim().length > 0;
-  const uidText = String(uid || "");
+  const { uid, productId, moduleId, rootTopic = "", debounceMs = DEFAULT_DEBOUNCE_MS, storageOnly = false } = input;
+  const uidText = String(uid || (storageOnly ? "device" : ""));
   const productText = String(productId ?? "");
   const moduleText = String(moduleId ?? "");
+  const scoped =
+    Boolean(uidText)
+    && productId != null
+    && productText.trim().length > 0
+    && moduleId != null
+    && moduleText.trim().length > 0;
 
   // Every module/account has its OWN drafts, revisions and queues. Changing
   // the visible scope cannot redirect an old timeout or promise to a new doc.
   const session = useMemo<MapSession>(() => {
-    const outbox = scoped ? readOutbox(outboxKey(uidText, productText, moduleText)) : { uploads: new Set<string>(), deletes: new Set<string>() };
+    const outbox = scoped && !storageOnly ? readOutbox(outboxKey(uidText, productText, moduleText)) : { uploads: new Set<string>(), deletes: new Set<string>() };
     const rows = scoped ? readLocalIndex(indexKey(uidText, productText, moduleText)).filter((row) => !outbox.deletes.has(row.mapKey) || outbox.uploads.has(row.mapKey)) : [];
     return {
-      uid: uidText, productId: productText, moduleId: moduleText, scoped, rootTopic,
+      uid: uidText, productId: productText, moduleId: moduleText, scoped, storageOnly, rootTopic,
       ...outbox, activeMapKey: scoped ? storedActiveKey(uidText, productText, moduleText) : MIND_MAP_DEFAULT_KEY,
       summaries: rows.length ? sortSummaries(rows) : scoped ? [seedSummary(rootTopic || "Central idea")] : [],
       drafts: new Map(), deletions: new Map(), retiredKeys: new Set(outbox.deletes),
@@ -363,7 +366,7 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
     };
     // rootTopic only seeds a new scope; changing a title must not reload a diagram.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scoped, uidText, productText, moduleText]);
+  }, [scoped, uidText, productText, moduleText, storageOnly]);
   const scopeRef = useRef(session);
   scopeRef.current = session;
   const [version, setVersion] = useState(0);
@@ -396,16 +399,25 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
     draft.revision += 1;
     draft.updatedAt = Math.max(Date.now(), draft.updatedAt + 1);
     draft.hasLocal = true;
-    draft.status = "pending";
+    draft.status = scope.storageOnly ? "saving" : "pending";
     draft.errorMessage = null;
     draft.attempts = 0;
     if (draft.retry) { clearTimeout(draft.retry); draft.retry = null; }
-    scope.uploads.add(draft.mapKey);
-    if (!writeLocalMindMap(scopeLocalKey(scope, draft.mapKey), mind, draft.updatedAt)) {
-      draft.status = "error";
-      draft.errorMessage = "Device storage is full or unavailable. Keep this page open and use Save now for cloud backup.";
+    const savedOnDevice = writeLocalMindMap(scopeLocalKey(scope, draft.mapKey), mind, draft.updatedAt);
+    if (scope.storageOnly) {
+      if (savedOnDevice) draft.savedRevision = draft.revision;
+      draft.hasStoredMap = savedOnDevice;
+      draft.lastSavedAt = savedOnDevice ? draft.updatedAt : null;
+      draft.status = savedOnDevice ? "saved" : "error";
+      draft.errorMessage = savedOnDevice ? null : "Device storage is full or unavailable. Export your maps before leaving this page.";
+    } else {
+      scope.uploads.add(draft.mapKey);
+      if (!savedOnDevice) {
+        draft.status = "error";
+        draft.errorMessage = "Device storage is full or unavailable. Keep this page open and use Save now for cloud backup.";
+      }
+      persistOutbox(scope);
     }
-    persistOutbox(scope);
     touchSummary(scope, draft);
     notify(scope);
   }, [notify]);
@@ -413,6 +425,22 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
   const persist = useCallback((scope: MapSession, draft: MapDraft) => {
     if (!scope.scoped || draft.deleted || draft.revision === draft.savedRevision) return;
     if (draft.timer) { clearTimeout(draft.timer); draft.timer = null; }
+    if (scope.storageOnly) {
+      const saved = writeLocalMindMap(scopeLocalKey(scope, draft.mapKey), draft.mind, draft.updatedAt);
+      if (saved) {
+        draft.savedRevision = draft.revision;
+        draft.hasStoredMap = true;
+        draft.lastSavedAt = Date.now();
+        draft.status = "saved";
+        draft.errorMessage = null;
+      } else {
+        draft.status = "error";
+        draft.errorMessage = "Device storage is full or unavailable. Export your maps before leaving this page.";
+      }
+      touchSummary(scope, draft);
+      notify(scope);
+      return;
+    }
     if (scope.deletes.has(draft.mapKey)) {
       // A new main map may reuse a just-deleted id. Delete the old document
       // AFTER its in-flight write and BEFORE saving the replacement.
@@ -529,6 +557,16 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
   const loadDraft = useCallback((scope: MapSession, draft: MapDraft): Promise<void> => {
     if (!scope.scoped || draft.deleted || draft.loaded) return Promise.resolve();
     if (draft.loadPromise) return draft.loadPromise;
+    if (scope.storageOnly) {
+      draft.loaded = true;
+      draft.hasStoredMap = draft.hasLocal;
+      draft.lastSavedAt = draft.updatedAt || null;
+      draft.status = draft.hasLocal ? "saved" : "ready";
+      draft.errorMessage = null;
+      touchSummary(scope, draft);
+      notify(scope);
+      return Promise.resolve();
+    }
     const revisionAtRead = draft.revision;
     const docKey = mindMapDocId(scope.uid, scope.productId, scope.moduleId, draft.mapKey);
     draft.loadPromise = (async () => {
@@ -596,6 +634,13 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
   // Course Player. A failed list read is visible, not just a console warning.
   useEffect(() => {
     if (!session.scoped) return undefined;
+    if (session.storageOnly) {
+      session.mapsLoading = false;
+      session.listReadFailed = false;
+      session.listError = null;
+      notify(session);
+      return undefined;
+    }
     let cancelled = false;
     session.mapsLoading = true;
     const list = query(collection(db, "users", uidText, "mindMaps"), where("productId", "==", productText), where("moduleId", "==", moduleText));
@@ -759,9 +804,11 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
     draft.deleted = true;
     draft.revision += 1;
     scope.uploads.delete(key);
-    scope.deletes.add(key);
+    if (!scope.storageOnly) {
+      scope.deletes.add(key);
+      scope.deletions.set(key, { predecessor: draft, inFlight: false, retry: null, attempts: 0 });
+    }
     scope.retiredKeys.add(key);
-    scope.deletions.set(key, { predecessor: draft, inFlight: false, retry: null, attempts: 0 });
     try { localStorage.removeItem(scopeLocalKey(scope, key)); } catch { /* private mode */ }
     scope.summaries = scope.summaries.filter((row) => row.mapKey !== key);
     if (!scope.summaries.length) scope.summaries = [seedSummary(scope.rootTopic || "Central idea")];
@@ -777,9 +824,11 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
       }
     }
     persistIndex(scope);
-    persistOutbox(scope);
+    if (!scope.storageOnly) {
+      persistOutbox(scope);
+      deleteRef.current(scope, key);
+    }
     notify(scope);
-    deleteRef.current(scope, key);
   }, [session, notify]);
 
   // Lifecycle belongs to the session. Flush captured outgoing drafts on a

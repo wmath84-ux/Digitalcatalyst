@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react";
-import { Cloud, CloudOff, LoaderCircle, MoreHorizontal, PanelLeft, Pencil, Pin, PinOff } from "lucide-react";
+import { Cloud, CloudOff, HardDrive, LoaderCircle, MoreHorizontal, PanelLeft, Pencil, Pin, PinOff } from "lucide-react";
 import { tierLte } from "../lib/tier";
 import type { AIModel, Chat, Tier } from "../lib/types";
 import { cn } from "../utils/cn";
@@ -15,14 +15,20 @@ function SyncBadge({
   state,
   compact,
   onRetry,
+  storageOnly = false,
 }: {
   state: LumenChatSyncState;
   compact: boolean;
   onRetry?: () => void;
+  storageOnly?: boolean;
 }) {
   if (state === "idle") return null;
-  const label =
-    state === "error" ? "Not saved"
+  const label = storageOnly
+    ? state === "error" ? "Device save needs attention"
+      : state === "saving" ? "Saving on this device…"
+        : state === "loading" ? "Loading device history…"
+          : "Saved on this device"
+    : state === "error" ? "Not saved"
       : state === "saving" ? "Saving…"
         : state === "saved" ? "Saved to cloud"
           : state === "loading" ? "Loading…"
@@ -31,8 +37,12 @@ function SyncBadge({
     state === "error" ? "text-[--err-text]"
       : state === "saving" || state === "loading" ? "text-[--ink-3]"
         : "text-[--ok-text]";
-  const Icon = state === "error" ? CloudOff : state === "saving" || state === "loading" ? LoaderCircle : Cloud;
-  const titleText = state === "error" ? "Cloud save failed — tap to retry" : label;
+  const Icon = state === "saving" || state === "loading"
+    ? LoaderCircle
+    : storageOnly ? HardDrive : state === "error" ? CloudOff : Cloud;
+  const titleText = state === "error"
+    ? storageOnly ? "Device save failed — tap to retry" : "Cloud save failed — tap to retry"
+    : label;
   const className = cn(
     "inline-flex flex-none items-center gap-1 rounded-full px-1.5 py-[1px] text-[10.5px] font-semibold transition-colors",
     tone,
@@ -69,6 +79,7 @@ function Header({
   syncState = "idle",
   syncError = null,
   onRetrySync,
+  storageOnly = false,
 }: {
   models: AIModel[];
   selectedSource: string;
@@ -84,6 +95,7 @@ function Header({
   syncState?: LumenChatSyncState;
   syncError?: string | null;
   onRetrySync?: () => void;
+  storageOnly?: boolean;
   /** Current theme mode. */
   theme?: "light" | "dark";
   /** Callback to toggle between light and dark themes. */
@@ -176,8 +188,8 @@ function Header({
                 <div className="mt-px flex items-center gap-1.5 text-[11.5px] leading-tight text-[--ink-3]">
                   <span className="truncate">{chat.course}</span>
                   {syncError
-                    ? <SyncBadge state="error" compact={false} onRetry={onRetrySync} />
-                    : <SyncBadge state={syncState} compact={false} onRetry={syncState === "error" ? onRetrySync : undefined} />}
+                    ? <SyncBadge state="error" compact={false} onRetry={onRetrySync} storageOnly={storageOnly} />
+                    : <SyncBadge state={syncState} compact={false} onRetry={syncState === "error" ? onRetrySync : undefined} storageOnly={storageOnly} />}
                 </div>
               )}
             </button>
@@ -189,6 +201,7 @@ function Header({
             state={syncError ? "error" : syncState}
             compact
             onRetry={syncError ? onRetrySync : syncState === "error" ? onRetrySync : undefined}
+            storageOnly={storageOnly}
           />
         )}
 

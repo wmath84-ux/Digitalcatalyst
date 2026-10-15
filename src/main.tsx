@@ -94,6 +94,7 @@ const ProfilePreview = lazyRoute(() => import("./profile/ProfilePreview"));
 const MindMapPreview = lazyRoute(() => import("./course/MindMapPreview"));
 const GlassPreviewPage = lazyRoute(() => import("./GlassPreview"));
 const CourseRouteGuard = lazyRoute(() => import("./components/CourseRouteGuard"));
+const WorkApp = lazyRoute(() => import("./work/WorkApp"));
 const CartWishlistApp = lazyRoute(() => import("./CartWishlistApp"));
 const SubscriptionApp = lazyRoute(() => import("./subscription/App"));
 const AuthApp = lazyRoute(() => import("./AuthApp"));
@@ -144,6 +145,8 @@ import { isMyCourseEditorRoute, isMyCoursePlayerRoute, readMyCourseId, requiresA
 import { applyGlassTier, detectGlassTier } from "./lib/glass";
 import { applyGlassScheme } from "./lib/glassScheme";
 import { initThemeMode } from "./lib/theme";
+import WorkLaunchChooser from "./work/WorkLaunchChooser";
+import { getWorkLaunchChoice } from "./work/storage/workPrefs";
 import AppShell from "./components/AppShell";
 import PageSkeleton, { type PageSkeletonBlock } from "./components/PageSkeleton";
 import PageEnter, { pageEnterAppKey } from "./components/PageEnter";
@@ -231,6 +234,7 @@ if (typeof window !== "undefined") {
 
 const LANDING_HASH = "#/landing";
 const HOME_HASH = "#/home";
+const WORK_HASH = "#/work";
 const AUTH_HASH = "#/auth";
 const STORE_HASH = "#/store";
 const PRODUCT_HASH = "#/product/";
@@ -594,6 +598,7 @@ function Root() {
             <RootPage />
           </Suspense>
         </DesktopAppHost>
+        <WorkLaunchChooser />
         <OfflineGate />
       </>
     </BackgroundPreferenceProvider>
@@ -624,6 +629,7 @@ function RouteChunkFallback() {
  */
 function routeChunkFor(hash: string): { preload: () => Promise<unknown> } | null {
   if (!hash || hash.startsWith(LANDING_HASH)) return null; // statically imported
+  if (hash.startsWith(WORK_HASH)) return WorkApp;
   if (hash.startsWith(HOME_HASH)) return HomeApp;
   if (hash.startsWith(AUTH_HASH)) return AuthApp;
   if (hash.startsWith(ADMIN_LOGIN_HASH)) return AdminLoginApp;
@@ -750,6 +756,7 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
   if (
     !hash
     || hash.startsWith(LANDING_HASH)
+    || hash.startsWith(WORK_HASH)
     || hash.startsWith("#/checkout")
     || hash.startsWith("#/auth")
     || hash.startsWith("#/admin")
@@ -920,8 +927,12 @@ function RootPage(): ReactNode {
 
   useEffect(() => {
     if (!skipLandingForInstalledApp) return;
-    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${HOME_HASH}`);
-    setHash(HOME_HASH);
+    // A learner who selected "Always open Work" should land in the immersive
+    // workspace even on an installed PWA / Capacitor cold start. "Ask" and
+    // "Always Home" still get a real Home surface underneath the chooser.
+    const destination = getWorkLaunchChoice() === "work" ? WORK_HASH : HOME_HASH;
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${destination}`);
+    setHash(destination);
   }, [skipLandingForInstalledApp]);
 
   useEffect(() => {
@@ -954,6 +965,23 @@ function RootPage(): ReactNode {
   }, []);
 
   useEffect(() => {
+    if (!isAndroidNative()) return undefined;
+    let cancelled = false;
+    let listener: Awaited<ReturnType<typeof onLocalAlarmTap>> = null;
+    void onLocalAlarmTap((url) => {
+      const hashIndex = url.indexOf("#");
+      if (hashIndex >= 0) window.location.hash = url.slice(hashIndex);
+    }).then((handle) => {
+      if (cancelled) void handle?.remove();
+      else listener = handle;
+    });
+    return () => {
+      cancelled = true;
+      void listener?.remove();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!user || !systemNotificationsEnabled || !isNativeApp()) return undefined;
     void ensureReminderChannel();
     void registerForPush(async () => {
@@ -969,13 +997,6 @@ function RootPage(): ReactNode {
         return null;
       }
     }, { requestPermission: false, uid: user.id });
-    // Tapping a local notification deep-links to its URL — the data we
-    // pass when scheduling the alarm carries the same hash routes the
-    // web uses (e.g. "/#/my-day?section=tasks&item=abc").
-    void onLocalAlarmTap((url) => {
-      const hashIndex = url.indexOf("#");
-      if (hashIndex >= 0) window.location.hash = url.slice(hashIndex);
-    });
     return undefined;
   }, [user?.id, systemNotificationsEnabled]);
 
@@ -1952,6 +1973,7 @@ function RootPage(): ReactNode {
   if (hash.startsWith(OPENING_PREVIEW_HASH)) return <OpeningAnimationPreview />;
   if (hash.startsWith(BRAIN_DECK_PREVIEW_HASH)) return <BrainDeckPreview />;
   if (hash.startsWith(MINDMAP_PREVIEW_HASH)) return <MindMapPreview />;
+  if (hash.startsWith(WORK_HASH)) return <WorkApp />;
   if (hash.startsWith(COURSE_HASH)) {
     // The catalog for this deep link is still streaming in: show the course
     // page's own dummy layout instead of a blank screen — the real player

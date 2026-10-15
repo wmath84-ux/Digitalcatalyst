@@ -18,15 +18,16 @@ test('note library owns its white plate, navigation ink and all empty/sync state
   assert.match(css, /--bm-ink: var\(--dc-ink, #0f172a\)/);
   for (const hook of ['study-library-empty', 'study-library-notice__message', 'study-library-notice__retry', 'data-course-notes-add']) assert.ok(css.includes(hook));
 });
-test('Brain uses the shared hierarchy and keeps the practice deck without a sidebar', () => {
+test('Brain uses clean Read-style practice rows and keeps the deck without a sidebar', () => {
   const panel = read('src/course/CourseBrainPanel.tsx');
-  assert.match(panel, /<BranchedMenu/);
-  assert.match(panel, /makeLibraryTree\(sets, false\)/);
-  assert.match(panel, /makeLibraryTree\(selfSets, true\)/);
-  assert.match(panel, /onSelect=\{\(value\) => startSet\(value\)\}/);
+  assert.match(panel, /data-brain-library-rows/);
+  assert.match(panel, /data-brain-library-row/);
+  assert.match(panel, /data-brain-library-context/);
+  assert.match(panel, /data-brain-set=\{set.id\}/);
   assert.match(panel, /<BrainQuestionDeck/);
   assert.match(panel, /record.best|completedFileIds/);
-  assert.doesNotMatch(panel, /<aside|<Sidebar|brain-library-grid|data-brain-library-intro/);
+  assert.match(css, /\[data-brain-library-row\]/);
+  assert.doesNotMatch(panel, /<BranchedMenu|<aside|<Sidebar|brain-library-grid|data-brain-library-intro/);
 });
 test('Brain creation and submit overlays use readable light fields, feedback and actions', () => {
   assert.match(read('src/course/SelfPracticeSetComposer.tsx'), /data-brain-composer-surface/);

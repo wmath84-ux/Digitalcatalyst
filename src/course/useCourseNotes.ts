@@ -71,6 +71,8 @@ export interface UseCourseNotesInput {
   productId?: string | number | null;
   /** Milliseconds of quiet before pending edits are committed. */
   debounceMs?: number;
+  /** Keep the entire notes scope on this device; never read or write Firestore. */
+  storageOnly?: boolean;
 }
 
 export interface UseCourseNotesResult {
@@ -134,6 +136,7 @@ interface NotesSession {
   uid: string;
   productId: string;
   scoped: boolean;
+  storageOnly: boolean;
   notes: CoursePlayerNote[];
   dirty: Set<string>;
   deleted: Set<string>;
@@ -162,22 +165,26 @@ interface NotesView {
 const noteTime = (note: CoursePlayerNote) => note.updatedAt || note.createdAt || 0;
 const nextNoteTime = (note: CoursePlayerNote) => Math.max(Date.now(), noteTime(note) + 1);
 const initialView = (session: NotesSession): NotesView => ({
-  session, notes: session.notes, status: session.scoped ? "loading" : "idle",
-  errorMessage: null, lastSavedAt: null, loading: session.scoped && session.notes.length === 0,
+  session,
+  notes: session.notes,
+  status: !session.scoped ? "idle" : session.storageOnly ? "ready" : "loading",
+  errorMessage: null,
+  lastSavedAt: null,
+  loading: session.scoped && !session.storageOnly && session.notes.length === 0,
 });
 
 export default function useCourseNotes(input: UseCourseNotesInput): UseCourseNotesResult {
-  const { uid, productId, debounceMs = DEFAULT_DEBOUNCE_MS } = input;
-  const scoped = Boolean(uid) && productId != null && String(productId).length > 0;
-  const uidText = String(uid || "");
+  const { uid, productId, debounceMs = DEFAULT_DEBOUNCE_MS, storageOnly = false } = input;
+  const uidText = String(uid || (storageOnly ? "device" : ""));
   const productText = String(productId ?? "");
+  const scoped = Boolean(uidText) && productId != null && productText.length > 0;
   const session = useMemo<NotesSession>(() => ({
-    uid: uidText, productId: productText, scoped,
+    uid: uidText, productId: productText, scoped, storageOnly,
     notes: scoped ? byRecency(loadLocalNotes(uidText, productText)) : [],
-    dirty: new Set(), deleted: new Set(scoped ? loadDeletedNoteIds(uidText, productText) : []),
+    dirty: new Set(), deleted: new Set(scoped && !storageOnly ? loadDeletedNoteIds(uidText, productText) : []),
     writing: new Set(), timer: null, retry: null, attempts: 0, inFlight: false,
     flushWanted: false, disposed: false, listenerFailed: false, deviceSaved: true, lastCloudReadAt: 0,
-  }), [uidText, productText, scoped]);
+  }), [uidText, productText, scoped, storageOnly]);
   const scopeRef = useRef(session);
   scopeRef.current = session;
   const [state, setState] = useState<NotesView>(() => initialView(session));
@@ -217,11 +224,21 @@ export default function useCourseNotes(input: UseCourseNotesInput): UseCourseNot
     scope.notes = sorted;
     const deviceSaved = persistLocalNotes(scope.uid, scope.productId, sorted);
     scope.deviceSaved = deviceSaved;
-    for (const id of dirtyIds) if (id && !scope.deleted.has(id)) scope.dirty.add(id);
+    if (!scope.storageOnly) {
+      for (const id of dirtyIds) if (id && !scope.deleted.has(id)) scope.dirty.add(id);
+    }
     scope.attempts = 0;
     if (scope.retry) { clearTimeout(scope.retry); scope.retry = null; }
-    publish(scope, { notes: sorted, status: !deviceSaved ? "error" : dirtyIds.length ? "pending" : "ready", errorMessage: deviceSaved ? null : "Device storage is full or unavailable. Keep this page open until cloud backup succeeds." });
-    if (dirtyIds.length) {
+    if (scope.storageOnly) scope.lastCloudReadAt = 0;
+    publish(scope, {
+      notes: sorted,
+      status: !deviceSaved ? "error" : scope.storageOnly ? "saved" : dirtyIds.length ? "pending" : "ready",
+      errorMessage: deviceSaved ? null : scope.storageOnly
+        ? "Device storage is full or unavailable. Export your notes before leaving this page."
+        : "Device storage is full or unavailable. Keep this page open until cloud backup succeeds.",
+      lastSavedAt: deviceSaved && scope.storageOnly ? Date.now() : undefined,
+    });
+    if (dirtyIds.length && !scope.storageOnly) {
       // A child editor can commit during passive teardown AFTER this hook's
       // cleanup. Save that captured outgoing bucket, never the new board.
       if (scope.disposed || !deviceSaved) flushRef.current(scope);
@@ -232,6 +249,14 @@ export default function useCourseNotes(input: UseCourseNotesInput): UseCourseNot
   const flushNow = useCallback((scope: NotesSession) => {
     if (!scope.scoped) return;
     if (scope.timer) { clearTimeout(scope.timer); scope.timer = null; }
+    if (scope.storageOnly) {
+      // `applyLocal` has already synchronously mirrored the full list. There is
+      // deliberately no retry queue, network fallback, or cloud write here.
+      scope.dirty.clear();
+      scope.deleted.clear();
+      publish(scope, { status: scope.deviceSaved ? "saved" : "error", loading: false });
+      return;
+    }
     if (scope.inFlight) { scope.flushWanted = true; return; }
     const uploads = Array.from(scope.dirty)
       .map((id) => scope.notes.find((note) => note.id === id && !scope.deleted.has(id)))
@@ -301,6 +326,17 @@ export default function useCourseNotes(input: UseCourseNotesInput): UseCourseNot
     if (!session.scoped) { setState(initialView(session)); return undefined; }
     let cancelled = false;
     session.listenerFailed = false;
+    if (session.storageOnly) {
+      // The local mirror is the source of truth in Work mode. Do not start a
+      // cloud read, listener, retry timer, or synchronization queue.
+      publish(session, {
+        notes: session.notes,
+        loading: false,
+        status: "ready",
+        errorMessage: null,
+      });
+      return () => { cancelled = true; };
+    }
     publish(session, { notes: session.notes, loading: session.notes.length === 0, status: session.notes.length ? "ready" : "loading", errorMessage: null });
     void fetchCloudNotes(uidText, productText).then((cloud) => {
       if (cancelled || scopeRef.current !== session) return;
@@ -374,8 +410,13 @@ export default function useCourseNotes(input: UseCourseNotesInput): UseCourseNot
     if (!scope.scoped || !noteId) return;
     const result = removeNoteFromSet(scope.notes, noteId);
     scope.dirty.delete(noteId);
-    scope.deleted.add(noteId);
-    persistDeletedNoteIds(scope.uid, scope.productId, Array.from(scope.deleted));
+    if (scope.storageOnly) {
+      scope.deleted.delete(noteId);
+      persistDeletedNoteIds(scope.uid, scope.productId, []);
+    } else {
+      scope.deleted.add(noteId);
+      persistDeletedNoteIds(scope.uid, scope.productId, Array.from(scope.deleted));
+    }
     const next = toPlayerNotes(result.notes).map((note) => result.changed.includes(note.id) ? {
       ...note, updatedAt: nextNoteTime(note),
     } : note);
@@ -404,8 +445,14 @@ export default function useCourseNotes(input: UseCourseNotesInput): UseCourseNot
         (before.updatedAt || 0) !== note.updatedAt || (before.links || []).join("|") !== note.links.join("|");
     }).map((note) => note.id);
     const removedIds = Array.from(known.keys()).filter((id) => !normalized.some((note) => note.id === id));
-    for (const id of removedIds) { scope.deleted.add(id); scope.dirty.delete(id); }
-    if (removedIds.length) persistDeletedNoteIds(scope.uid, scope.productId, Array.from(scope.deleted));
+    for (const id of removedIds) {
+      scope.dirty.delete(id);
+      if (scope.storageOnly) scope.deleted.delete(id);
+      else scope.deleted.add(id);
+    }
+    if (removedIds.length || scope.storageOnly) {
+      persistDeletedNoteIds(scope.uid, scope.productId, scope.storageOnly ? [] : Array.from(scope.deleted));
+    }
     applyLocal(toPlayerNotes(normalized).map((note) => dirty.includes(note.id) && known.has(note.id) ? {
       ...note, updatedAt: Math.max(note.updatedAt || 0, nextNoteTime(known.get(note.id)!)),
     } : note), dirty);

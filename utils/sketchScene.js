@@ -210,7 +210,7 @@ export const sanitizeSketchFiles = (raw, budget = MAX_SKETCH_FILE_CHARS) => {
  * EMPTY board rather than crashing the editor — and the caller can tell the
  * difference, because a corrupt parse reports zero elements.
  */
-export const parseSketchScene = (raw) => {
+export const parseSketchScene = (raw, options = {}) => {
   if (raw == null) return createSketchScene();
   let source = raw;
   if (typeof source === "string") {
@@ -228,7 +228,10 @@ export const parseSketchScene = (raw) => {
     }
   }
   if (!isPlainObject(source)) return createSketchScene();
-  const { files } = sanitizeSketchFiles(source.files);
+  const fileBudget = typeof options?.fileBudget === "number" && Number.isFinite(options.fileBudget)
+    ? Math.max(0, options.fileBudget)
+    : MAX_SKETCH_FILE_CHARS;
+  const { files } = sanitizeSketchFiles(source.files, fileBudget);
   return {
     version: SKETCH_SCENE_VERSION,
     elements: sanitizeSketchElements(source.elements),

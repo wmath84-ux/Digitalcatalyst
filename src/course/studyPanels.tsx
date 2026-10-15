@@ -65,6 +65,7 @@ import {
   KEY_STEP,
   KEY_STEP_FINE,
   PEEK_RAIL_PX,
+  PARK_THRESHOLD,
   SNAP_TOLERANCE,
   SPLIT_DOCK_MIN_PX,
   SPLIT_MAX,
@@ -349,6 +350,11 @@ interface SplitDividerProps {
   onSwap: () => void;
   /** The split controls (wide stages only). Empty at every other size. */
   actions?: SplitDividerAction[];
+  /** Extra hit area beyond the visible divider strip. */
+  grabInset?: number;
+  /** Accessible range; the player's nested dividers keep their 15–85 defaults. */
+  minimum?: number;
+  maximum?: number;
   /** "main" = the region divider; "nested" = a divider inside a region. */
   kind?: "main" | "nested";
 }
@@ -368,6 +374,9 @@ function SplitDivider({
   swapped,
   onSwap,
   actions = [],
+  grabInset = 10,
+  minimum = SPLIT_MIN,
+  maximum = SPLIT_MAX,
   kind = "main",
 }: SplitDividerProps) {
   const dividerRef = useRef<HTMLDivElement | null>(null);
@@ -411,14 +420,15 @@ function SplitDivider({
           ? "Split deck divider — drag to resize the lesson and study panes"
           : "Region divider — drag to resize the two parts of this area"
       }
-      aria-valuemin={SPLIT_MIN}
-      aria-valuemax={SPLIT_MAX}
+      aria-valuemin={minimum}
+      aria-valuemax={maximum}
       aria-valuenow={ariaNow}
       data-course-split-divider=""
       data-divider-kind={kind}
       data-axis={axis}
       data-dragging={dragging ? "true" : "false"}
       data-collapsed={collapsed ?? "none"}
+      data-grab-inset={grabInset}
       className={`group relative z-30 flex shrink-0 items-center justify-center ${
         row ? "h-full cursor-col-resize flex-col" : "w-full cursor-row-resize"
       }`}
@@ -432,7 +442,8 @@ function SplitDivider({
         // The panes are reordered with `order` when they are swapped (see the
         // deck below); the divider always keeps the middle slot.
         order: 1,
-      }}
+        "--course-divider-grab-inset": `${grabInset}px`,
+      } as CSSProperties}
       onPointerDown={handlePointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={handlePointerUp}
@@ -794,6 +805,22 @@ export interface SplitDeckProps {
    * that is not on screen twice — the owner's "vah empty nahin rahega" rule.
    */
   extraPaneTab?: (used: string[]) => string;
+  /**
+   * Initial / parked study-pane percent. Omit to keep the Course Player's
+   * existing per-axis 40% / 45% defaults. Work passes 100: the main divider
+   * sits at the top edge and the study (second / bottom) page fills the screen.
+   */
+  restRatio?: number;
+  /** True allows the divider to use the full 0–100% band instead of the
+   *  Course Player's 15–85% (phone portrait 30–85%) split band. */
+  fullRange?: boolean;
+  /** False removes the 28px peek rail at a collapsed edge; the divider itself
+   *  remains the affordance (Work's parked edge). */
+  railAtEdge?: boolean;
+  /** Extra invisible grab distance beyond the divider, in px. */
+  grabInset?: number;
+  /** Called only after a real pointer drag starts (not on a tap / swap reveal). */
+  onSplitStart?: () => void;
 }
 
 /** Narrow phone OR a phone turned sideways (a short viewport). Both are the
@@ -820,7 +847,13 @@ export function SplitDeck({
   keyboardExpandEnabled = false,
   renderExtraPane,
   extraPaneTab,
+  restRatio,
+  fullRange = false,
+  railAtEdge = true,
+  grabInset = 10,
+  onSplitStart,
 }: SplitDeckProps) {
+  const parkedRatio = Math.max(0, Math.min(100, restRatio ?? DEFAULT_SPLIT_RATIO[axis]));
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const lessonRef = useRef<HTMLDivElement | null>(null);
   const studyRef = useRef<HTMLDivElement | null>(null);
@@ -863,13 +896,15 @@ export function SplitDeck({
     return () => observer.disconnect();
   }, []);
   const dockFloor =
-    axis === "row" && deckWidth > 0 ? clampSplitRatio((SPLIT_DOCK_MIN_PX / deckWidth) * 100) : 0;
-  const floor = Math.max(specFloor, dockFloor);
+    !fullRange && axis === "row" && deckWidth > 0
+      ? clampSplitRatio((SPLIT_DOCK_MIN_PX / deckWidth) * 100)
+      : 0;
+  const floor = fullRange ? 0 : Math.max(specFloor, dockFloor);
 
-  /** The study pane's percent — the one number the whole deck animates. It
-   *  starts at the entry value so the very first painted frame is already the
-   *  "grown from nothing" state the entry spring then takes over from. */
-  const ratio = useMotionValue(ENTRY_START);
+  /** The study pane's percent — the one number the whole deck animates. The
+   *  Course Player keeps its entry spring from 5%; Work starts at its parked
+   *  100% edge (divider at the top, full-page content below). */
+  const ratio = useMotionValue(fullRange ? parkedRatio : ENTRY_START);
   const [collapsed, setCollapsed] = useState<SplitSide | null>(null);
   /**
    * The divider's switch: `true` = the two panes have traded places, i.e. the
@@ -883,7 +918,7 @@ export function SplitDeck({
   const swappedRef = useRef(false);
   swappedRef.current = swapped;
   const [dragging, setDragging] = useState(false);
-  const [ariaNow, setAriaNow] = useState(100 - ENTRY_START);
+  const [ariaNow, setAriaNow] = useState(Math.round(100 - (fullRange ? parkedRatio : ENTRY_START)));
   /** While dragging, the smaller pane leans on its divider-side edge. */
   const [compressed, setCompressed] = useState<SplitSide | null>(null);
 
@@ -998,6 +1033,8 @@ export function SplitDeck({
   collapsedRef.current = collapsed;
   const lastRatioRef = useRef(DEFAULT_SPLIT_RATIO[axis]);
   const dragPointerRef = useRef<number | null>(null);
+  const splitStartRatioRef = useRef<number | null>(null);
+  const splitStartNotifiedRef = useRef(false);
   const controlsRef = useRef<AnimationPlaybackControls | null>(null);
 
   const stopAnimation = useCallback(() => {
@@ -1037,8 +1074,14 @@ export function SplitDeck({
   // entry choreography runs once on mount: the study pane grows from ~0 with
   // the entry spring while the lesson pane shrinks in the very same tick.
   useLayoutEffect(() => {
-    const stored = loadSplitRatio(courseId, axis, floor);
-    const storedCollapsed = loadSplitCollapsed(courseId, axis);
+    const stored = loadSplitRatio(
+      courseId,
+      axis,
+      floor,
+      fullRange ? 100 : SPLIT_MAX,
+      fullRange ? parkedRatio : DEFAULT_SPLIT_RATIO[axis],
+    );
+    const storedCollapsed = fullRange ? null : loadSplitCollapsed(courseId, axis);
     // The extra panes come back with the course and the axis (a third pane
     // that fits a laptop has no place on a phone in portrait).
     setExtras(loadSplitExtras(courseId, axis));
@@ -1048,6 +1091,13 @@ export function SplitDeck({
     setAriaNow(Math.round(100 - (storedCollapsed ? (storedCollapsed === "study" ? 0 : 100) : stored)));
     if (storedCollapsed) {
       ratio.set(storedCollapsed === "study" ? 0 : 100);
+    } else if (fullRange) {
+      // A brand-new Work deck paints its first page full-screen immediately —
+      // no 5% entry flash. A previously adjusted ratio still restores with the
+      // same spring the Course Player uses.
+      ratio.set(parkedRatio);
+      if (Math.abs(stored - parkedRatio) > 0.01) animateRatio(stored, SPRING_ENTRY);
+      else ratio.set(stored);
     } else {
       ratio.set(ENTRY_START);
       animateRatio(stored, SPRING_ENTRY);
@@ -1077,8 +1127,14 @@ export function SplitDeck({
     axisRunsRef.current += 1;
     // The first run is the mount, which the layout effect above already did.
     if (axisRunsRef.current === 1) return;
-    const stored = loadSplitRatio(courseId, axis, floor);
-    const storedCollapsed = loadSplitCollapsed(courseId, axis);
+    const stored = loadSplitRatio(
+      courseId,
+      axis,
+      floor,
+      fullRange ? 100 : SPLIT_MAX,
+      fullRange ? parkedRatio : DEFAULT_SPLIT_RATIO[axis],
+    );
+    const storedCollapsed = fullRange ? null : loadSplitCollapsed(courseId, axis);
     setExtras(loadSplitExtras(courseId, axis));
     lastRatioRef.current = stored;
     setCollapsed(storedCollapsed);
@@ -1090,7 +1146,7 @@ export function SplitDeck({
       setAriaNow(Math.round(100 - stored));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [axis, courseId, floor]);
+  }, [axis, courseId, floor, fullRange, parkedRatio]);
 
   useEffect(() => () => stopAnimation(), [stopAnimation]);
 
@@ -1103,6 +1159,20 @@ export function SplitDeck({
       setAriaNow(side === "study" ? 100 : 0);
     },
     [animateRatio, axis, courseId],
+  );
+
+  /** Work's edge-to-edge park: unlike the Course Player's collapsed rail, an
+   *  end stop has no 28px preview strip. The page in the full pane stays live. */
+  const parkAt = useCallback(
+    (percent: number) => {
+      const target = Math.min(100, Math.max(0, percent));
+      setCollapsed(null);
+      collapsedRef.current = null;
+      saveSplitCollapsed(courseId, axis, null);
+      animateRatio(target, SPRING_SETTLE);
+      commit(target);
+    },
+    [animateRatio, axis, commit, courseId],
   );
 
   const restore = useCallback(() => {
@@ -1166,8 +1236,20 @@ export function SplitDeck({
 
   const settleAfterDrag = useCallback(
     (raw: number) => {
-      // Dragged to an edge → that side fills to 100% and the other becomes a
-      // peek rail (the old CLOSE_THRESHOLD idea).
+      if (fullRange) {
+        // Work's top-parked layout has genuine edge-to-edge ratios: at 100 the
+        // page in the bottom slot fills the screen and the divider is at the
+        // top; at 0 the top slot fills the screen. No collapsed 28px rails.
+        if (raw <= PARK_THRESHOLD) { parkAt(0); return; }
+        if (raw >= 100 - PARK_THRESHOLD) { parkAt(100); return; }
+        const snap = SPLIT_SNAP_POINTS.find((point) => Math.abs(point - raw) <= SNAP_TOLERANCE);
+        const target = clampSplitRatio(snap ?? raw, 0, 100);
+        if (Math.abs(target - raw) > 0.01) animateRatio(target, SPRING_SETTLE);
+        commit(target);
+        return;
+      }
+      // Course Player: dragged to an edge → that side fills to 100% and the
+      // other becomes its familiar 28px peek rail.
       if (raw <= FILL_THRESHOLD) { collapseTo("study"); return; }
       if (raw >= 100 - FILL_THRESHOLD) { collapseTo("lesson"); return; }
       const snap = SPLIT_SNAP_POINTS.find((point) => Math.abs(point - raw) <= SNAP_TOLERANCE);
@@ -1176,7 +1258,7 @@ export function SplitDeck({
       if (Math.abs(target - raw) > 0.01) animateRatio(target, SPRING_SETTLE);
       commit(target);
     },
-    [animateRatio, collapseTo, commit, floor],
+    [animateRatio, collapseTo, commit, floor, fullRange, parkAt],
   );
 
   const onSplitPointerDown = useCallback(
@@ -1187,6 +1269,8 @@ export function SplitDeck({
       stopAnimation();
       try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* fine without capture */ }
       dragPointerRef.current = event.pointerId;
+      splitStartRatioRef.current = value;
+      splitStartNotifiedRef.current = false;
       // Dragging a collapsed rail wakes the pane up: the finger takes over
       // from the very percent the deck is at.
       if (collapsedRef.current) {
@@ -1204,9 +1288,18 @@ export function SplitDeck({
       if (dragPointerRef.current !== event.pointerId) return;
       const value = ratioFromPointer(event.clientX, event.clientY);
       if (value == null) return;
+      // A tap only reveals the swap button. Load the previous page into the
+      // primary/top region only once the pointer has genuinely moved the line.
+      if (
+        onSplitStart && !splitStartNotifiedRef.current && splitStartRatioRef.current != null
+        && Math.abs(value - splitStartRatioRef.current) > 1
+      ) {
+        splitStartNotifiedRef.current = true;
+        onSplitStart();
+      }
       applySplitPercent(value);
     },
-    [applySplitPercent, ratioFromPointer],
+    [applySplitPercent, onSplitStart, ratioFromPointer],
   );
 
   const endDrag = useCallback(
@@ -1215,9 +1308,16 @@ export function SplitDeck({
       dragPointerRef.current = null;
       setDragging(false);
       try { event.currentTarget.releasePointerCapture?.(event.pointerId); } catch { /* ignore */ }
-      settleAfterDrag(ratio.get());
+      const endRatio = ratio.get();
+      if (
+        onSplitStart && !splitStartNotifiedRef.current && splitStartRatioRef.current != null
+        && Math.abs(endRatio - splitStartRatioRef.current) > 1
+      ) onSplitStart();
+      splitStartRatioRef.current = null;
+      splitStartNotifiedRef.current = false;
+      settleAfterDrag(endRatio);
     },
-    [ratio, settleAfterDrag],
+    [onSplitStart, ratio, settleAfterDrag],
   );
 
   const onSplitKeyDown = useCallback(
@@ -1229,7 +1329,7 @@ export function SplitDeck({
           setCollapsed(null);
           saveSplitCollapsed(courseId, axis, null);
         }
-        const target = clampSplitRatio(base + delta, floor);
+        const target = clampSplitRatio(base + delta, floor, fullRange ? 100 : SPLIT_MAX);
         animateRatio(target, SPRING_SETTLE);
         commit(target);
       };
@@ -1247,14 +1347,16 @@ export function SplitDeck({
           stepRatio(-step);
           break;
         case "Home":
-          // Lesson full, study becomes a peek rail.
+          // Lesson full; Work parks at the top-slot edge without a peek rail.
           event.preventDefault();
-          collapseTo("study");
+          if (fullRange) parkAt(0);
+          else collapseTo("study");
           break;
         case "End":
-          // Study full, lesson becomes a peek rail.
+          // Study full; Work parks at its configured rest edge.
           event.preventDefault();
-          collapseTo("lesson");
+          if (fullRange) parkAt(100);
+          else collapseTo("lesson");
           break;
         case "Enter":
         case " ":
@@ -1266,7 +1368,7 @@ export function SplitDeck({
           break;
       }
     },
-    [animateRatio, axis, collapseTo, commit, courseId, fiftyFifty, floor, ratio],
+    [animateRatio, axis, collapseTo, commit, courseId, fiftyFifty, floor, fullRange, parkAt, ratio],
   );
 
   // ── Soft keyboard: keep the writing surface above it ───────────────────
@@ -1392,7 +1494,7 @@ export function SplitDeck({
             {lesson}
           </div>
         )}
-        {collapsed === "lesson" ? (
+        {collapsed === "lesson" && railAtEdge ? (
           <PeekRail
             side="lesson"
             glowSide={swapped ? "study" : "lesson"}
@@ -1424,6 +1526,9 @@ export function SplitDeck({
           swapped={swapped}
           onSwap={toggleSwap}
           actions={mainActions}
+          grabInset={grabInset}
+          minimum={fullRange ? 0 : SPLIT_MIN}
+          maximum={fullRange ? 100 : SPLIT_MAX}
         />
       )}
 
@@ -1485,7 +1590,7 @@ export function SplitDeck({
             </motion.div>
           )}
         </GlassSurface>
-        {collapsed === "study" ? (
+        {collapsed === "study" && railAtEdge ? (
           <PeekRail
             side="study"
             glowSide={swapped ? "lesson" : "study"}

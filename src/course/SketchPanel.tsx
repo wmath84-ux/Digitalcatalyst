@@ -62,7 +62,7 @@ import type { CoursePlayerTheme } from "./playerPreferences";
 import type { SketchScene } from "../../utils/sketchScene";
 // The learner's PERSONAL LIBRARY (the editor ships the panel but no storage —
 // see the hook's header) plus the "Add to Excalidraw" return link it installs.
-import { useSketchLibrary } from "./useSketchLibrary";
+import { useSketchLibrary, type SketchLibraryDeviceStore } from "./useSketchLibrary";
 import { isAllowedExcalidrawLibraryUrl } from "../../utils/excalidrawLibraryLink.js";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import PerfectFreehandSketch from "../components/PerfectFreehandSketch";
@@ -290,6 +290,10 @@ export interface SketchPanelProps {
   resourceName?: string | null;
   /** Player chrome theme for the shared delete dialog; independent of canvasColor. */
   playerTheme?: CoursePlayerTheme;
+  /** Keep the scene, files and personal library on this device only. */
+  storageOnly?: boolean;
+  /** IndexedDB adapter used by Work for the potentially large library. */
+  libraryDeviceStore?: SketchLibraryDeviceStore;
 }
 
 /**
@@ -501,12 +505,14 @@ function SketchColourCluster({
 }
 
 /** Library account state stays in the Clean Look sidebar, not in the header. */
-function SketchLibraryPill({ library }: { library: ReturnType<typeof useSketchLibrary> }) {
+function SketchLibraryPill({ library, storageOnly = false }: { library: ReturnType<typeof useSketchLibrary>; storageOnly?: boolean }) {
   return (
     <span
       data-course-sketch-library={library.state}
       data-course-sketch-library-count={library.itemCount}
-      title={library.importError || library.error || "Your personal library — saved to your account and synced to your other devices"}
+      title={library.importError || library.error || (storageOnly
+        ? "Your personal library is stored only on this device."
+        : "Your personal library — saved to your account and synced to your other devices")}
       className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${
         library.importState === "importing"
           ? "border-white/25 text-white/70"
@@ -538,6 +544,8 @@ function SketchStatus({
   status,
   pendingSync,
   errorMessage,
+  storageOnly = false,
+  theme = "light",
   boardName,
   deviceSaved = true,
   scoped,
@@ -548,6 +556,8 @@ function SketchStatus({
   status: SketchSaveStatus;
   pendingSync: boolean;
   errorMessage: string | null;
+  storageOnly?: boolean;
+  theme?: CoursePlayerTheme;
   boardName?: string;
   deviceSaved?: boolean;
   /** False when no module is open — the scene is a device draft then. */
@@ -560,7 +570,13 @@ function SketchStatus({
 }) {
   let label = "Sketch";
   let tone: "muted" | "ok" | "warn" = "muted";
-  if (scoped === false) {
+  if (storageOnly) {
+    if (status === "loading") label = "Loading from this device…";
+    else if (status === "pending" || status === "saving") label = "Saving on this device…";
+    else if (status === "error") { label = "Device save needs attention"; tone = "warn"; }
+    else if (status === "saved") { label = "Saved on this device"; tone = "ok"; }
+    else label = "Device only · ready";
+  } else if (scoped === false) {
     // No module open: there is no cloud board, so "Saved" would be a lie and
     // "Ready" says nothing. The scene is kept on this device (the draft).
     label = "Kept on this device";
@@ -584,11 +600,14 @@ function SketchStatus({
   } else if (status === "ready") {
     label = "Ready";
   }
+  const workLight = storageOnly && theme === "light";
   const dot = tone === "warn" ? "bg-amber-400" : tone === "ok" ? "bg-emerald-400" : "bg-slate-400";
-  const text = tone === "warn" ? "text-amber-300" : tone === "ok" ? "text-emerald-300" : "text-white/55";
+  const text = workLight
+    ? tone === "warn" ? "text-amber-700" : tone === "ok" ? "text-emerald-700" : "text-slate-600"
+    : tone === "warn" ? "text-amber-300" : tone === "ok" ? "text-emerald-300" : "text-white/55";
   return (
     <div
-      className="relative flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-1"
+      className={`relative flex shrink-0 items-center gap-2 border-b px-3 py-1 ${workLight ? "border-slate-200 bg-white" : "border-white/10"}`}
       data-course-sketch-status={status}
       data-course-sketch-pending={pendingSync ? "true" : "false"}
     >
@@ -606,7 +625,7 @@ function SketchStatus({
         <button
           type="button"
           onClick={onRetry}
-          title={errorMessage ?? "Retry saving to your account"}
+          title={errorMessage ?? (storageOnly ? "Retry saving on this device" : "Retry saving to your account")}
           data-course-sketch-retry
           className="flex shrink-0 items-center gap-1 rounded-md border border-amber-400/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-200 transition-colors hover:bg-amber-400/10"
         >
@@ -616,7 +635,7 @@ function SketchStatus({
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
         {children}
         {boardName ? (
-          <span className="hidden min-w-0 max-w-32 truncate text-[10px] font-semibold text-white/35 sm:block" data-course-sketch-board>
+          <span className={`hidden min-w-0 max-w-32 truncate text-[10px] font-semibold sm:block ${workLight ? "text-slate-400" : "text-white/35"}`} data-course-sketch-board>
             {boardName}
           </span>
         ) : null}
@@ -654,6 +673,8 @@ export default function SketchPanel({
   resourceId = null,
   resourceName = null,
   playerTheme = "light",
+  storageOnly = false,
+  libraryDeviceStore,
 }: SketchPanelProps) {
   /** The editor's imperative API (canvas colour + the library adapter). */
   const apiRef = useRef<ExcalidrawAPI | null>(null);
@@ -663,8 +684,8 @@ export default function SketchPanel({
    * would leave the library adapter mounted with a null editor.
    */
   const [excalidrawApi, setExcalidrawApi] = useState<ExcalidrawAPI | null>(null);
-  /** The learner's own library — stored and synced by `useSketchLibrary`. */
-  const library = useSketchLibrary({ uid });
+  /** The learner's own library — cloud-backed in Courses, Dexie-only in Work. */
+  const library = useSketchLibrary({ uid, storageOnly, deviceStore: libraryDeviceStore });
   /** The canvas colour as the learner currently sees it (null = theme). */
   const [canvasColour, setCanvasColour] = useState<string | null>(canvasColor);
   /** §30 deletion is a two-step act: the trash opens this confirmation, which
@@ -793,6 +814,7 @@ export default function SketchPanel({
    * re-render caused by the save line (or by a divider drag) can never hand
    * the editor a new object and never remounts it.
    */
+  const sketchTheme = storageOnly ? playerTheme : "light";
   const initialData = useMemo(() => {
     const scene = getScene();
     const saved = (scene.appState ?? {}) as Record<string, unknown>;
@@ -802,15 +824,12 @@ export default function SketchPanel({
     return {
       elements: scene.elements as never,
       appState: {
-        // Preserve drawing colours and viewport, but never restore dark UI.
+        // Course Player remains deliberately light-only. Work supplies its
+        // scoped theme; a saved canvas colour remains in appState separately.
         viewBackgroundColor: "#ffffff",
-        // A remembered canvas colour (the board's own, else the learner's
-        // device preference) opens on a LIGHT board — the dark theme would
-        // invert the colour. `...saved` last: the board's own saved state
-        // always wins over the defaults.
-        ...(canvasColor ? { theme: "light", viewBackgroundColor: canvasColor } : {}),
+        ...(canvasColor ? { viewBackgroundColor: canvasColor } : {}),
         ...saved,
-        theme: "light",
+        theme: sketchTheme,
       } as never,
       files: scene.files as never,
       scrollToContent: !hasViewport,
@@ -818,7 +837,7 @@ export default function SketchPanel({
     // Deliberately keyed to the scene's identity, not to `scene`: Excalidraw
     // reads this once per mount and the hook mutates the live scene in place.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sceneKey]);
+  }, [sceneKey, sketchTheme]);
 
   /**
    * The Quick Sketch / Full Editor switch — the ONE control both chrome bars
@@ -833,7 +852,9 @@ export default function SketchPanel({
       className={`flex h-9 w-[5.5rem] shrink-0 items-center justify-center whitespace-nowrap rounded-lg px-1 text-[11px] font-bold transition-colors ${
         quickMode
           ? "bg-orange-500 text-white"
-          : "border border-white/15 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+          : storageOnly && playerTheme === "light"
+            ? "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+            : "border border-white/15 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
       }`}
       data-course-sketch-mode={mode}
       title={quickMode ? "Switch to Full Editor (Excalidraw)" : "Switch to Quick Sketch (pressure-sensitive pen)"}
@@ -846,7 +867,7 @@ export default function SketchPanel({
     <button type="button" data-course-sketch-edit-toggle
       aria-pressed={editing}
       onClick={() => setEditing(value => !value)}
-      className="flex h-9 w-[5.5rem] shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold text-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+      className={`flex h-9 w-[5.5rem] shrink-0 items-center justify-center whitespace-nowrap rounded-lg border px-2 text-xs font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${storageOnly && playerTheme === "dark" ? "border-zinc-700 bg-zinc-900 text-white" : "border-slate-300 bg-white text-black"}`}>
       {editing ? "Done" : "Edit sketch"}
     </button>
   );
@@ -855,6 +876,7 @@ export default function SketchPanel({
     <div
       className="relative flex h-full min-h-0 w-full flex-col overflow-hidden"
       data-course-sketch-panel
+      data-work-storage-only={storageOnly ? "true" : undefined}
       data-sketch-editing={editing ? "true" : "false"}
       data-course-theme={playerTheme}
       data-sketch-scope={scoped ? "module" : "none"}
@@ -872,7 +894,7 @@ export default function SketchPanel({
            way back to the full editor — no Excalidraw state, no library pill,
            no second canvas list. */
         <div
-          className="flex shrink-0 items-center justify-end border-b border-white/10 px-3 py-1"
+          className={`flex shrink-0 items-center justify-end border-b px-3 py-1 ${storageOnly && playerTheme === "light" ? "border-slate-200 bg-white" : "border-white/10"}`}
           data-course-sketch-quick-bar
         >
           {editToggle}
@@ -882,6 +904,8 @@ export default function SketchPanel({
       <SketchStatus
         status={status}
         pendingSync={pendingSync}
+        storageOnly={storageOnly}
+        theme={playerTheme}
         scoped={scoped}
         errorMessage={errorMessage}
         boardName={boardName}
@@ -929,6 +953,8 @@ export default function SketchPanel({
              to the full editor loses nothing: both halves persist separately. */
           <PerfectFreehandSketch
             readOnly={!editing}
+            localOnly={storageOnly}
+            theme={playerTheme}
             uid={uid}
             productId={productId}
             moduleId={moduleId}
@@ -940,7 +966,7 @@ export default function SketchPanel({
             <Excalidraw
               key={sceneKey}
               initialData={initialData}
-              theme="light"
+              theme={sketchTheme}
               viewModeEnabled={!editing}
               onChange={handleChange}
               name={[boardName, boards.length > 1 ? activeBoardTitle : ""].filter(Boolean).join(" — ") || "Sketch"}
@@ -1000,7 +1026,7 @@ export default function SketchPanel({
                     {modeToggle}
                     {quickMode ? null : (
                       <>
-                        <SketchLibraryPill library={library} />
+                        <SketchLibraryPill library={library} storageOnly={storageOnly} />
                         <SketchColourCluster canvasColour={canvasColour} onPick={applyCanvasColour} />
                       </>
                     )}
@@ -1011,15 +1037,17 @@ export default function SketchPanel({
                       data-course-sketch-clean-status={status}
                       title={errorMessage ?? undefined}
                     >
-                      {!scoped
-                        ? "Kept on this device"
-                        : status === "saving" ? "Saving…" : status === "pending" ? "Unsaved changes…" : status === "error" ? "Sync paused" : status === "saved" ? "Saved" : "Ready"}
+                      {storageOnly
+                        ? status === "saving" || status === "pending" ? "Saving on this device…" : status === "error" ? "Device save needs attention" : status === "saved" ? "Saved on this device" : "Device only · ready"
+                        : !scoped
+                          ? "Kept on this device"
+                          : status === "saving" ? "Saving…" : status === "pending" ? "Unsaved changes…" : status === "error" ? "Sync paused" : status === "saved" ? "Saved" : "Ready"}
                     </span>
                     {status === "error" && onRetry ? (
                       <button
                         type="button"
                         onClick={onRetry}
-                        title={errorMessage ?? "Retry saving to your account"}
+                        title={errorMessage ?? (storageOnly ? "Retry saving on this device" : "Retry saving to your account")}
                         data-course-sketch-retry
                         className="flex items-center gap-1 rounded-md border border-amber-400/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-200 transition-colors hover:bg-amber-400/10"
                       >

@@ -59,8 +59,21 @@ export interface SketchLibraryEditorApi {
   updateScene?(payload: unknown): void;
 }
 
+export interface SketchLibraryDeviceSnapshot {
+  items: unknown[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Optional IndexedDB adapter for device-only Work libraries. */
+export interface SketchLibraryDeviceStore {
+  read: (uid: string) => Promise<SketchLibraryDeviceSnapshot | null>;
+  write: (uid: string, row: SketchLibraryDeviceSnapshot) => Promise<void>;
+}
+
 export interface SketchLibraryController {
   uid: string | null;
+  storageOnly: boolean;
   adapter: SketchLibraryAdapter;
   state: SketchLibraryState;
   error: string | null;
@@ -171,7 +184,15 @@ const fitLibraryPayload = (items: unknown[]) => {
   return { items: kept, json, truncated: kept.length !== (Array.isArray(items) ? items.length : 0) };
 };
 
-export function useSketchLibrary({ uid: uidHint }: { uid?: string | null } = {}): SketchLibraryController {
+export function useSketchLibrary({
+  uid: uidHint,
+  storageOnly = false,
+  deviceStore,
+}: {
+  uid?: string | null;
+  storageOnly?: boolean;
+  deviceStore?: SketchLibraryDeviceStore;
+} = {}): SketchLibraryController {
   const uid = String(uidHint || "").trim() || null;
   const [state, setState] = useState<SketchLibraryState>(uid ? "loading" : "idle");
   const [error, setError] = useState<string | null>(null);
@@ -195,6 +216,7 @@ export function useSketchLibrary({ uid: uidHint }: { uid?: string | null } = {})
     disposed: false,
     importedUrl: "",
   });
+  const readyRef = useRef<Promise<void>>(Promise.resolve());
 
   // ── Load once per learner ──────────────────────────────────────────────
   useEffect(() => {
@@ -207,6 +229,32 @@ export function useSketchLibrary({ uid: uidHint }: { uid?: string | null } = {})
     session.uid = uid;
     session.disposed = false;
     setState("loading");
+    if (storageOnly) {
+      let cancelled = false;
+      const loadOnDevice = (async () => {
+        try {
+          const local = deviceStore ? await deviceStore.read(uid) : readLocal(uid);
+          if (cancelled || session.disposed) return;
+          session.items = local?.items || [];
+          session.createdAt = local?.createdAt || 0;
+          session.updatedAt = local?.updatedAt || 0;
+          session.loaded = true;
+          setItemCount(session.items.length);
+          setLastSavedAt(session.updatedAt || null);
+          setState("ready");
+          setError(null);
+        } catch (thrown) {
+          if (cancelled || session.disposed) return;
+          session.items = [];
+          session.loaded = true;
+          setState("error");
+          setError(thrown instanceof Error ? thrown.message : "Could not load the device-only sketch library.");
+        }
+      })();
+      readyRef.current = loadOnDevice;
+      return () => { cancelled = true; };
+    }
+    readyRef.current = Promise.resolve();
     const local = readLocal(uid);
     if (local) {
       session.items = local.items;
@@ -256,7 +304,7 @@ export function useSketchLibrary({ uid: uidHint }: { uid?: string | null } = {})
     // `queueCloudSave` is defined below; the indirection through a ref keeps
     // this effect's dependency list honest without re-running on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uid]);
+  }, [uid, storageOnly, deviceStore]);
 
   const saveRef = useRef<(session: typeof sessionRef.current) => void>(() => undefined);
 
@@ -277,6 +325,38 @@ export function useSketchLibrary({ uid: uidHint }: { uid?: string | null } = {})
     if (session.disposed || session.saving) return;
     if (!session.dirty) return;
     session.maxWaitAt = 0;
+    if (storageOnly) {
+      const now = Date.now();
+      const createdAt = session.createdAt || now;
+      const snapshot = [...session.items];
+      session.saving = true;
+      session.dirty = false;
+      void (async () => {
+        try {
+          if (deviceStore) {
+            await deviceStore.write(session.uid, { items: snapshot, createdAt, updatedAt: now });
+          } else {
+            writeLocal(session.uid, snapshot, createdAt, now);
+          }
+          session.saving = false;
+          if (session.disposed) return;
+          session.createdAt = createdAt;
+          session.updatedAt = now;
+          setItemCount(session.items.length);
+          setLastSavedAt(now);
+          setState("ready");
+          setError(null);
+          if (session.dirty) queueCloudSave(session);
+        } catch (thrown) {
+          session.saving = false;
+          if (session.disposed) return;
+          session.dirty = true;
+          setState("error");
+          setError(thrown instanceof Error ? thrown.message : "Could not save your sketch library on this device.");
+        }
+      })();
+      return;
+    }
     const owner = cloudUid(session.uid);
     if (!owner) {
       setError(describeError({ code: "unauthenticated" }));
@@ -330,6 +410,10 @@ export function useSketchLibrary({ uid: uidHint }: { uid?: string | null } = {})
     () => ({
       load: async ({ source }) => {
         const session = sessionRef.current;
+        if (storageOnly) {
+          await readyRef.current;
+          return session.items.length ? { libraryItems: session.items } : null;
+        }
         const owner = cloudUid(session.uid);
         // `source === "save"` is the editor reconciling before a write: answer
         // from what we already hold instead of paying a second round-trip.
@@ -357,17 +441,18 @@ export function useSketchLibrary({ uid: uidHint }: { uid?: string | null } = {})
       },
       save: async ({ libraryItems }) => {
         const session = sessionRef.current;
+        if (storageOnly) await readyRef.current;
         const rows = Array.isArray(libraryItems) ? libraryItems : [];
         session.items = rows;
         session.loaded = true;
         session.updatedAt = Date.now();
         if (!session.createdAt) session.createdAt = session.updatedAt;
-        writeLocal(session.uid, rows, session.createdAt, session.updatedAt);
+        if (!storageOnly) writeLocal(session.uid, rows, session.createdAt, session.updatedAt);
         setItemCount(rows.length);
         queueCloudSave(session);
       },
     }),
-    [],
+    [storageOnly],
   );
 
   // ── Flush points: page hide, tab switch, unmount ───────────────────────
@@ -391,7 +476,7 @@ export function useSketchLibrary({ uid: uidHint }: { uid?: string | null } = {})
       if (session.timer) clearTimeout(session.timer);
       session.timer = null;
     };
-  }, [uid]);
+  }, [uid, storageOnly]);
 
   // ── "Add to Excalidraw" return link ────────────────────────────────────
   useEffect(() => {
@@ -467,6 +552,7 @@ export function useSketchLibrary({ uid: uidHint }: { uid?: string | null } = {})
   return useMemo(
     () => ({
       uid,
+      storageOnly,
       adapter,
       state,
       error,
@@ -480,6 +566,7 @@ export function useSketchLibrary({ uid: uidHint }: { uid?: string | null } = {})
     }),
     [
       uid,
+      storageOnly,
       adapter,
       state,
       error,

@@ -79,6 +79,8 @@ export interface UsePerfectFreehandSketchInput {
   resourceName?: string | null;
   /** Milliseconds of quiet before a pending edit reaches Firestore. */
   debounceMs?: number;
+  /** Keep Quick Sketch boards device-only; no Firestore read, write, or delete. */
+  localOnly?: boolean;
 }
 
 export interface UsePerfectFreehandSketchResult {
@@ -195,7 +197,7 @@ const readLocalBoard = (key: string): QuickSketchBoardDoc | null => {
 // ── Hook ──────────────────────────────────────────────────────────────────
 
 export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): UsePerfectFreehandSketchResult {
-  const { uid, productId, moduleId, resourceId, resourceName, debounceMs = DEFAULT_DEBOUNCE_MS } = input;
+  const { uid, productId, moduleId, resourceId, resourceName, debounceMs = DEFAULT_DEBOUNCE_MS, localOnly = false } = input;
 
   const [state, dispatch] = useReducer(reducer, {
     strokes: [],
@@ -227,7 +229,7 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
   const createGuardRef = useRef(0);
 
   const scoped = Boolean(uid && productId && moduleId);
-  const scopeKey = `${uid || ""}__${String(productId ?? "")}__${String(moduleId ?? "")}`;
+  const scopeKey = `${uid || ""}__${String(productId ?? "")}__${String(moduleId ?? "")}__${localOnly ? "local" : "cloud"}`;
 
   const clearTimers = useCallback(() => {
     if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
@@ -298,6 +300,39 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
     if (!scoped) return;
     const board = boardDocument();
     dispatch({ type: "SET_STATUS", status: "saving" });
+    if (localOnly) {
+      try {
+        localStorage.setItem(quickSketchLocalKey(board.uid, board.productId, board.moduleId, board.sketchKey), JSON.stringify(board));
+        dispatch({ type: "SET_DEVICE_SAVED", saved: true });
+        dispatch({ type: "SET_STATUS", status: "saved" });
+        dispatch({ type: "SET_PENDING_SYNC", pending: false });
+        dispatch({ type: "SET_LAST_SAVED", at: board.updatedAt });
+        dispatch({ type: "SET_BOARD_STATS", key: board.sketchKey, strokeCount: board.strokes.length, updatedAt: board.updatedAt });
+        const key = quickSketchIndexKey(board.uid, board.productId, board.moduleId);
+        try {
+          const raw = localStorage.getItem(key);
+          const existing = raw ? JSON.parse(raw) as QuickSketchBoardSummary[] : [];
+          const summary = {
+            sketchKey: board.sketchKey,
+            title: board.title,
+            strokeCount: board.strokes.length,
+            updatedAt: board.updatedAt,
+            createdAt: board.createdAt,
+          };
+          const rows = Array.isArray(existing) ? existing.filter((row) => row?.sketchKey !== board.sketchKey) : [];
+          rows.push(summary);
+          rows.sort((a, b) => a.createdAt - b.createdAt);
+          localStorage.setItem(key, JSON.stringify(rows));
+          dispatch({ type: "SET_BOARDS", boards: rows });
+        } catch {
+          // The board itself is already safe; only the switcher index failed.
+        }
+      } catch {
+        dispatch({ type: "SET_DEVICE_SAVED", saved: false });
+        dispatch({ type: "SET_STATUS", status: "error", errorMessage: "Could not save this Quick Sketch on the device." });
+      }
+      return;
+    }
     try {
       // `users/{uid}/quickSketches/…`, exactly like the Excalidraw boards:
       // inside the learner's own namespace, and covered by the matching
@@ -320,7 +355,7 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
         dispatch({ type: "SET_PENDING_SYNC", pending: true });
       }
     }
-  }, [boardDocument, moduleId, productId, scoped, uid]);
+  }, [boardDocument, localOnly, moduleId, productId, scoped, uid]);
 
   // ── Opening a canvas ──────────────────────────────────────────────────
 
@@ -387,6 +422,29 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
       const product = String(productId);
       const module = String(moduleId);
       const localKey = quickSketchLocalKey(uid!, product, module, sketchKey);
+      if (localOnly) {
+        const local = readLocalBoard(localKey);
+        const strokesFromBoard = quickSketchStrokesFrom(local?.strokes);
+        const draft = strokesFromBoard.length === 0 ? takeDraftForBoard() : null;
+        const strokes = draft ? draft.strokes : strokesFromBoard;
+        strokesRef.current = strokes;
+        boardRef.current = {
+          key: sketchKey,
+          title: draft?.title || local?.title || (sketchKey === QUICK_SKETCH_DEFAULT_KEY ? "Sketch 1" : sketchKey),
+          createdAt: (draft?.createdAt || local?.createdAt) || Date.now(),
+        };
+        dispatch({ type: "SET_STROKES", strokes });
+        dispatch({ type: "SET_ACTIVE_BOARD", key: sketchKey, title: boardRef.current.title });
+        dispatch({ type: "SET_STATUS", status: local || draft ? "saved" : "ready" });
+        dispatch({ type: "SET_PENDING_SYNC", pending: false });
+        if (local?.updatedAt) dispatch({ type: "SET_LAST_SAVED", at: local.updatedAt });
+        dispatch({ type: "SET_DEVICE_SAVED", saved: true });
+        dispatch({ type: "SET_BOARD_STATS", key: sketchKey, strokeCount: strokes.length, updatedAt: local?.updatedAt || Date.now() });
+        try { localStorage.setItem(quickSketchActiveKey(uid!, product, module), sketchKey); } catch { /* device preference only */ }
+        if (draft) adoptDraft(draft, { product, module, localKey, sketchKey });
+        dispatch({ type: "SET_LOADING", loading: false });
+        return;
+      }
       try {
         const snap = await getDoc(
           doc(db, "users", uid!, QUICK_SKETCH_COLLECTION, quickSketchDocId(uid!, product, module, sketchKey)),
@@ -449,7 +507,7 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
         dispatch({ type: "SET_LOADING", loading: false });
       }
     },
-    [adoptDraft, clearTimers, moduleId, productId, saveToFirestore, saveToLocalStorage, scoped, takeDraftForBoard, uid],
+    [adoptDraft, clearTimers, localOnly, moduleId, productId, saveToFirestore, saveToLocalStorage, scoped, takeDraftForBoard, uid],
   );
 
   // ── Opening the module: the remembered canvas, then its index ─────────
@@ -498,6 +556,32 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
 
     const loadIndex = async () => {
       dispatch({ type: "SET_BOARDS_LOADING", loading: true });
+      if (localOnly) {
+        try {
+          const raw = localStorage.getItem(quickSketchIndexKey(uid!, product, module));
+          const stored = raw ? JSON.parse(raw) as QuickSketchBoardSummary[] : [];
+          const rows = Array.isArray(stored) ? [...stored] : [];
+          if (!rows.some((row) => row?.sketchKey === boardRef.current.key)) {
+            rows.unshift({
+              sketchKey: boardRef.current.key,
+              title: boardRef.current.title,
+              strokeCount: strokesRef.current.length,
+              updatedAt: Date.now(),
+              createdAt: boardRef.current.createdAt || Date.now(),
+            });
+          }
+          rows.sort((a, b) => a.createdAt - b.createdAt);
+          if (!cancelled) dispatch({ type: "SET_BOARDS", boards: rows });
+        } catch {
+          if (!cancelled) dispatch({
+            type: "SET_BOARDS",
+            boards: [{ sketchKey: boardRef.current.key, title: boardRef.current.title, strokeCount: strokesRef.current.length, updatedAt: Date.now(), createdAt: boardRef.current.createdAt || Date.now() }],
+          });
+        } finally {
+          if (!cancelled) dispatch({ type: "SET_BOARDS_LOADING", loading: false });
+        }
+        return;
+      }
       try {
         const snap = await getDocs(
           query(
@@ -581,7 +665,7 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
         return;
       }
       dispatch({ type: "SET_STATUS", status: "pending" });
-      dispatch({ type: "SET_PENDING_SYNC", pending: true });
+      dispatch({ type: "SET_PENDING_SYNC", pending: !localOnly });
 
       if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = window.setTimeout(() => {
@@ -600,7 +684,7 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
       // The device mirror is faster, and it is what survives a failed write.
       scheduleLocalMirror();
     },
-    [debounceMs, saveToFirestore, scheduleLocalMirror, scoped, uid],
+    [debounceMs, localOnly, saveToFirestore, scheduleLocalMirror, scoped, uid],
   );
 
   // ── Canvases ──────────────────────────────────────────────────────────
@@ -630,7 +714,7 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
     dispatch({ type: "SET_STROKES", strokes: [] });
     dispatch({ type: "SET_ACTIVE_BOARD", key, title });
     dispatch({ type: "SET_STATUS", status: "pending" });
-    dispatch({ type: "SET_PENDING_SYNC", pending: true });
+    dispatch({ type: "SET_PENDING_SYNC", pending: !localOnly });
     try {
       localStorage.setItem(quickSketchActiveKey(uid!, String(productId), String(moduleId)), key);
     } catch {
@@ -638,7 +722,7 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
     }
     void saveToFirestore();
     return key;
-  }, [moduleId, productId, saveToFirestore, scoped, state.boards, uid]);
+  }, [localOnly, moduleId, productId, saveToFirestore, scoped, state.boards, uid]);
 
   const deleteBoard = useCallback(
     (sketchKey: string) => {
@@ -652,16 +736,19 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
       }
       const remaining = state.boards.filter((board) => board.sketchKey !== sketchKey);
       dispatch({ type: "SET_BOARDS", boards: remaining });
-      void deleteDoc(doc(db, "users", uid!, QUICK_SKETCH_COLLECTION, quickSketchDocId(uid!, product, module, sketchKey))).catch(() => {
-        // A failed cloud delete is reported by the switcher the next time the
-        // module's index loads; the local canvas is already gone.
-      });
+      try { localStorage.setItem(quickSketchIndexKey(uid!, product, module), JSON.stringify(remaining)); } catch { /* scene copies remain local */ }
+      if (!localOnly) {
+        void deleteDoc(doc(db, "users", uid!, QUICK_SKETCH_COLLECTION, quickSketchDocId(uid!, product, module, sketchKey))).catch(() => {
+          // A failed cloud delete is reported by the switcher the next time the
+          // module's index loads; the local canvas is already gone.
+        });
+      }
       if (boardRef.current.key === sketchKey) {
         void openBoard(remaining[0].sketchKey, { flushCurrent: false });
       }
       return true;
     },
-    [moduleId, openBoard, productId, scoped, state.boards, uid],
+    [localOnly, moduleId, openBoard, productId, scoped, state.boards, uid],
   );
 
   // ── Flush / retry / teardown ──────────────────────────────────────────

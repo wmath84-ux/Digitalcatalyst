@@ -152,8 +152,12 @@ test("pending notes are flushed when the learner leaves, hides the tab or unmoun
   assert.match(hook, /scope\.inFlight/);
 });
 
-test("an empty course id is not a scope, so notes can never pool together", () => {
-  assert.match(hook, /const scoped = Boolean\(uid\) && productId != null && String\(productId\)\.length > 0;/);
+test("an empty course id is not a scope, while an explicit device-only scope remains local", () => {
+  assert.match(hook, /const uidText = String\(uid \|\| \(storageOnly \? "device" : ""\)\);/);
+  assert.match(hook, /const scoped = Boolean\(uidText\) && productId != null && productText\.length > 0;/);
+  const deviceOnlyBranch = hook.indexOf("if (session.storageOnly) {");
+  const cloudRead = hook.indexOf("void fetchCloudNotes(uidText, productText)", deviceOnlyBranch);
+  assert.ok(deviceOnlyBranch >= 0 && cloudRead > deviceOnlyBranch, "device-only scope must return before any cloud read");
 });
 
 // ---------------------------------------------------------------------------

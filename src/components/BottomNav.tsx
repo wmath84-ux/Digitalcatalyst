@@ -1,9 +1,9 @@
-import { Library } from "lucide-react";
+import { BriefcaseBusiness, Library } from "lucide-react";
 import { BagIcon, CalendarIcon, FlowPathIcon, HomeIcon, SparkBookIcon, StoreIcon } from "./icons";
 import SiteFooterNav from "./SiteFooterNav";
 import { type GlassDockItem } from "./glass-dock/GlassDock";
 
-export type TabKey = "home" | "myday" | "store" | "purchases" | "profile" | "revision" | "flowpath" | "study-library";
+export type TabKey = "home" | "myday" | "store" | "purchases" | "profile" | "revision" | "flowpath" | "study-library" | "work";
 
 type BottomNavProps = {
   active: TabKey | null;
@@ -25,6 +25,7 @@ const TABS: { key: TabKey; label: string; icon: GlassDockItem["icon"]; color: st
   { key: "study-library", label: "My Study Library", icon: Library, color: "#06D6A0" },
   { key: "revision", label: "Revision", icon: SparkBookIcon, color: "#3A86FF" },
   { key: "flowpath", label: "FlowPath", icon: FlowPathIcon, color: "#B388FF" },
+  { key: "work", label: "Work", icon: BriefcaseBusiness, color: "#7C3AED" },
 ];
 
 /**
@@ -46,7 +47,8 @@ export default function BottomNav({ active, onChange, storeBadge, purchasesBadge
       items={items}
       onSelect={(id) => {
         const key = id as TabKey;
-        if (key === "study-library") window.location.hash = "#/study-library";
+        if (key === "work") window.location.hash = "#/work";
+        else if (key === "study-library") window.location.hash = "#/study-library";
         else if (key === "flowpath") window.location.hash = "#/flowpath";
         else if (key === "revision") window.location.hash = "#/revision";
         else onChange(key);

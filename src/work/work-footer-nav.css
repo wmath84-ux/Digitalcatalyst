@@ -1,0 +1,283 @@
+/* src/work/work-footer-nav.css
+ *
+ * The footer navigation design the owner picked for Work mode:
+ *
+ *     https://uiverse.io/asgardOP/great-badger-21   ("Radio", MIT)
+ *
+ * Owner brief (2026-10-14): "footer navigation ka yah naya design add kiya
+ * jaaye aur ismein button ko replace kiya jaaye aur sabhi button add kiye
+ * jaayen."
+ *
+ * The reference, verbatim:
+ *
+ *     #navbody { width:300px; height:60px; background-color:#fff;
+ *       border-radius:40px; box-shadow:0 10px 15px rgba(0,0,0,.041);
+ *       align-items:center; justify-content:center; display:flex; }
+ *     .ul { list-style:none; width:100%; display:flex;
+ *       justify-content:space-between; margin-top:5px; }
+ *     .svg { width:70px; height:70px; opacity:80%; cursor:pointer;
+ *       padding:13px 20px; transition:.2s; }
+ *     .ul .li .svg:hover { transition:.1s; color:rgb(235,40,176);
+ *       position:relative; margin-top:-4px; opacity:100%; }
+ *     .radio:checked + label .li .svg { color:rgb(235,40,176); }
+ *
+ * What is kept EXACTLY: the 60px pill, the 40px radius, the soft
+ * `0 10px 15px rgba(0,0,0,.041)` shadow, the centred row with its 5px drop,
+ * the 70px-tall icon boxes that overflow the pill, the 80% → 100% opacity ramp,
+ * the −4px lift, and the 0.2s / 0.1s transition pair.
+ *
+ * What is deliberately different, and why:
+ *
+ *   · ICONS REPLACED (the brief): the reference's home / search / bookmark /
+ *     settings / profile glyphs become this app's own destinations — see
+ *     src/work/workPages.ts. Because six cells of 70px cannot fit a 360px phone,
+ *     the cell width scales with the count (56 → 52 → 46px) while the pill
+ *     height, radius, shadow and lift stay the reference's. Tap targets remain
+ *     ≥ 44px, the rule src/components/SiteFooterNav.tsx already enforces.
+ *   · `margin-top:-4px` → `transform: translateY(-4px)`: identical pixels, but
+ *     this repo animates only transform / opacity / box-shadow (splitMotion.ts
+ *     states the rule), and a layout-affecting margin on six cells would reflow
+ *     the pill on every hover.
+ *   · the reference's pink `rgb(235,40,176)` → `--work-nav-active`, which is
+ *     this app's indigo in light and violet in dark (work-theme.css). One token
+ *     restores the original pink.
+ *   · radio inputs → `<button aria-current="page">`: the app's footers are
+ *     buttons (see YoutubeFooterNav's menu/aria discipline), which keeps
+ *     keyboard routing and screen readers working.
+ *
+ * The wrapper follows the ONE site-footer contract (docs/footer-nav-unification.md):
+ * `[data-site-footer-nav]` outside, `[data-site-footer]` inside, so
+ * src/utils/footerNavSpace.ts measures the real height and every scroller clears
+ * it with `--dc-footer-nav-h` — no page ever guesses the clearance.
+ */
+
+[data-work-global-footer] {
+  --work-nav-h: 60px;
+  --work-nav-cell: 56px;
+  --work-nav-active: #4f46e5;
+  --work-nav-plate: #ffffff;
+  --work-nav-shadow: 0 10px 15px rgba(0, 0, 0, 0.041);
+  --surface-bg: #ffffff;
+  --text-secondary: #6b7280;
+  --text-tertiary: #9ca3af;
+  --border-color: #e5e7eb;
+}
+
+[data-work-global-footer] [data-site-footer] {
+  --work-nav-n: 5;
+}
+
+[data-work-footer-nav] {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  /* The reference pill floats; it never paints a bar behind itself. */
+  overflow: visible;
+  padding: 6px 12px max(10px, env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+[data-work-footer-nav][data-position="fixed"] {
+  position: fixed;
+}
+
+/* WorkApp's pill is a real flex sibling below the deck, not an overlay. */
+[data-work-footer-nav][data-position="flow"] {
+  position: relative;
+  inset: auto;
+  flex: 0 0 auto;
+}
+
+/* ── The pill ─────────────────────────────────────────────────────────────── */
+
+[data-work-footer-nav] [data-site-footer] {
+  --work-nav-n: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(calc(100vw - 24px), calc(var(--work-nav-n) * var(--work-nav-cell) + 16px));
+  height: var(--work-nav-h, 60px);
+  border-radius: 40px;
+  background-color: var(--work-nav-plate, #ffffff);
+  box-shadow: var(--work-nav-shadow, 0 10px 15px rgba(0, 0, 0, 0.041));
+  overflow: visible;
+  pointer-events: auto;
+  box-sizing: border-box;
+}
+
+/* The reference's own row: full width, space-between, dropped 5px. */
+[data-work-footer-nav] [data-work-nav-row] {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 5px;
+  background: transparent;
+  list-style: none;
+  padding: 0 8px;
+  margin-inline: 0;
+}
+
+/* ── Cells ────────────────────────────────────────────────────────────────── */
+
+[data-work-footer-nav] [data-work-nav-cell] {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: var(--work-nav-cell);
+  /* The reference's 70px icon box inside a 60px pill — it overflows on purpose,
+     which is what gives the lift somewhere to go. */
+  height: 70px;
+  padding: 13px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary, #6b6b6b);
+  opacity: 0.8;
+  cursor: pointer;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  transition: 0.2s;
+  transition-property: color, opacity, transform;
+}
+
+[data-work-footer-nav] [data-work-nav-cell] > svg,
+[data-work-footer-nav] [data-work-nav-cell] [data-work-nav-icon] > svg {
+  display: block;
+  width: 26px;
+  height: 26px;
+}
+
+/* Hover / active — the reference's `.svg:hover` and `:checked` rules. */
+@media (hover: hover) and (pointer: fine) {
+  [data-work-footer-nav] [data-work-nav-cell]:hover {
+    transition-duration: 0.1s;
+    color: var(--work-nav-active);
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+
+[data-work-footer-nav] [data-work-nav-cell]:active {
+  transition-duration: 0.1s;
+  color: var(--work-nav-active);
+  opacity: 1;
+  transform: translateY(-2px) scale(0.94);
+}
+
+[data-work-footer-nav] [data-work-nav-cell][aria-current="page"] {
+  color: var(--work-nav-active);
+  opacity: 1;
+}
+
+[data-work-footer-nav] [data-work-nav-cell]:focus-visible {
+  outline: 2px solid var(--work-nav-active);
+  outline-offset: -4px;
+  opacity: 1;
+}
+
+/* The badge — the reference has none, so it wears the uploaded Obsidian
+   toolbar's badge grammar (h-4, min-w-16px, 10px, accent, white ink). */
+[data-work-footer-nav] [data-work-nav-badge] {
+  position: absolute;
+  top: 8px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--work-nav-active);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* ── Count rhythm (six destinations must fit a 360px phone) ───────────────── */
+
+[data-work-footer-nav] [data-site-footer][data-nav-count="1"],
+[data-work-footer-nav] [data-site-footer][data-nav-count="2"],
+[data-work-footer-nav] [data-site-footer][data-nav-count="3"],
+[data-work-footer-nav] [data-site-footer][data-nav-count="4"],
+[data-work-footer-nav] [data-site-footer][data-nav-count="5"] {
+  --work-nav-cell: 56px;
+}
+
+[data-work-footer-nav] [data-site-footer][data-nav-count="6"] {
+  --work-nav-cell: 52px;
+}
+
+[data-work-footer-nav] [data-site-footer][data-nav-count="7"],
+[data-work-footer-nav] [data-site-footer][data-nav-count="8"] {
+  --work-nav-cell: 46px;
+}
+
+/* A global Work pill may carry the app's seven/eight-item dock. On phone
+   widths, scale each cell to the available width before the first/last icon can
+   escape the reference pill; Work mode itself remains the fixed six-tab list. */
+@media (max-width: 429px) {
+  [data-work-global-footer] [data-site-footer][data-nav-count="7"] {
+    --work-nav-cell: clamp(40px, calc((100vw - 40px) / 7), 46px);
+  }
+  [data-work-global-footer] [data-site-footer][data-nav-count="8"] {
+    --work-nav-cell: clamp(36px, calc((100vw - 32px) / 8), 46px);
+  }
+  [data-work-global-footer] [data-site-footer][data-nav-count="8"] [data-work-nav-row] {
+    padding-inline: 4px;
+  }
+}
+
+/* Narrow phones: the same rhythm rule SiteFooterNav uses (COMPACT_FIT_QUERY). */
+@media (max-width: 349px) {
+  [data-work-footer-nav] {
+    padding-inline: 8px;
+  }
+  [data-work-footer-nav] [data-site-footer] {
+    --work-nav-h: 54px;
+    --work-nav-cell: 44px;
+    border-radius: 34px;
+  }
+  [data-work-footer-nav] [data-work-nav-cell] {
+    height: 62px;
+    padding: 11px 9px;
+  }
+  [data-work-footer-nav] [data-work-nav-cell] > svg,
+  [data-work-footer-nav] [data-work-nav-cell] [data-work-nav-icon] > svg {
+    width: 23px;
+    height: 23px;
+  }
+}
+
+/* Wide stages: the pill keeps its natural size and centres — the same rule the
+   course player's strip nav uses (`justify-content: safe center`), so a desktop
+   never gets a stretched bar. */
+@media (min-width: 900px) {
+  [data-work-footer-nav] [data-site-footer] {
+    width: calc(var(--work-nav-n) * var(--work-nav-cell) + 16px);
+  }
+}
+
+/* ── The editor variant (brief 10: "footer navigation mein keval delete ka
+      option aur back ka") — same pill, two cells, nothing else. ───────────── */
+
+[data-work-footer-nav][data-variant="editor"] [data-site-footer] {
+  --work-nav-n: 2;
+  gap: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-work-footer-nav] button {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}

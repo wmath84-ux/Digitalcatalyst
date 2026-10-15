@@ -1,0 +1,96 @@
+/* Work Revision page-local styling. Everything is scoped below the Work page. */
+
+[data-work-revision] {
+  color: var(--text-primary);
+  background: var(--workspace-bg);
+  color-scheme: inherit;
+}
+
+[data-work-revision] button,
+[data-work-revision] input,
+[data-work-revision] textarea,
+[data-work-revision] select {
+  font: inherit;
+}
+
+[data-work-revision] :focus-visible {
+  outline-color: var(--accent-color);
+}
+
+.work-revision-strip {
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.work-revision-strip:hover {
+  border-color: color-mix(in srgb, var(--accent-color) 38%, var(--border-color));
+}
+
+.work-revision-rating-again {
+  border-color: rgb(244 63 94 / 26%);
+  background: rgb(244 63 94 / 9%);
+  color: #be123c;
+}
+
+.work-revision-rating-hard {
+  border-color: rgb(249 115 22 / 25%);
+  background: rgb(249 115 22 / 9%);
+  color: #c2410c;
+}
+
+.work-revision-rating-good {
+  border-color: rgb(16 185 129 / 26%);
+  background: rgb(16 185 129 / 9%);
+  color: #047857;
+}
+
+.work-revision-rating-easy {
+  border-color: rgb(59 130 246 / 24%);
+  background: rgb(59 130 246 / 9%);
+  color: #1d4ed8;
+}
+
+/* Keep the convertible card face in Brain's solid-card palette in either Work theme. */
+.work-revision-card-face {
+  --dc-brand: var(--accent-color);
+  --dc-brand-soft: #dbeafe;
+  --dc-ink: #191c1e;
+  --dc-ink-3: #475569;
+  --dc-bg-primary: #f5f1e8;
+  --dc-bg-muted: #f8fafc;
+  --text-primary: #191c1e;
+  --text-secondary: #475569;
+  --text-tertiary: #64748b;
+  --border-color: rgb(17 17 17 / 14%);
+  --surface-bg: #fff;
+  --input-bg: #f8fafc;
+  --hover-bg: rgb(17 17 17 / 6%);
+}
+
+[data-work-shell][data-work-theme="dark"] .work-revision-rating-again { color: #fda4af; }
+[data-work-shell][data-work-theme="dark"] .work-revision-rating-hard { color: #fdba74; }
+[data-work-shell][data-work-theme="dark"] .work-revision-rating-good { color: #6ee7b7; }
+[data-work-shell][data-work-theme="dark"] .work-revision-rating-easy { color: #93c5fd; }
+
+/* The reused Brain deck retains its solid, no-glass card language while its
+   light plates pick up Work's page and accent tokens. */
+[data-work-shell][data-work-theme="dark"] [data-work-revision-brain-root] {
+  --dc-bg-primary: #18181b;
+  --dc-bg-muted: #0d0d0d;
+  --dc-ink: #e6e6e6;
+  --dc-ink-3: #b4b4bd;
+  --dc-ink-sub: #c8c8ce;
+  --dc-ink-label: #a1a1aa;
+  --dc-brand-soft: #dbeafe;
+  --dc-brand: var(--accent-color);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .work-revision-strip,
+  .work-revision-action-card {
+    transition: none !important;
+  }
+  .work-revision-strip:hover,
+  .work-revision-action-card:hover {
+    transform: none !important;
+  }
+}

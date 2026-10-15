@@ -495,7 +495,7 @@ test("advancing the stack preserves each question's own colour", async () => {
 });
 
 
-test("shared Brain library retains hierarchy, question counts, scores, completion and SELF creation", async () => {
+test("shared Brain library retains module context, question counts, scores, completion and SELF creation", async () => {
   window.localStorage.setItem("dc:courseBrain:p1", JSON.stringify({ "set-1": { attempts: 2, best: 80, last: 60, at: Date.now() } }));
   const host = window.document.getElementById("brain");
   host.innerHTML = "";

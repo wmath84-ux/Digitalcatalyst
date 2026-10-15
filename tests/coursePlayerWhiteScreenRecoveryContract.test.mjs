@@ -20,6 +20,17 @@ test('the Course Player route contains render failures instead of blanking the a
   assert.match(boundary, /window\.addEventListener\("hashchange"/);
 });
 
+test('course audio is initialized before the study pane eagerly creates the Music tab', () => {
+  const player = read('src/CoursePlayerApp.tsx');
+  const audioDeclaration = player.indexOf('const courseAudio = useMemo(');
+  const studyPaneBuild = player.indexOf('const studyOverlay = buildStudyPane(');
+
+  assert.ok(audioDeclaration >= 0, 'the access-scoped course audio collection remains memoized');
+  assert.ok(studyPaneBuild >= 0, 'the main study pane is built during render');
+  assert.ok(audioDeclaration < studyPaneBuild, 'buildStudyPane eagerly reads courseAudio while creating its MusicPanel element');
+  assert.match(player, /<MusicPanel uid=\{user\?\.id \?\? null\} courseAudio=\{courseAudio\} \/>/);
+});
+
 test('the player reuses the guard’s resolved access instead of opening a second loading gate', () => {
   const guard = read('src/components/CourseRouteGuard.tsx');
   const player = read('src/CoursePlayerApp.tsx');

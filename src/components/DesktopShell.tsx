@@ -34,6 +34,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import useScreenSize from "@/hooks/useScreenSize";
 import {
+  BriefcaseBusiness,
   CalendarDays,
   ChevronDown,
   Crown,
@@ -807,6 +808,17 @@ export default function DesktopShell({
                   </button>
                 </div>
               ) : null}
+              <button
+                type="button"
+                data-work-mode-entry=""
+                onClick={() => handleNavigate("#/work")}
+                aria-label="Open Work mode"
+                title="Work mode"
+                className="mr-1 hidden h-10 shrink-0 items-center gap-1.5 rounded-full border border-indigo-400/40 bg-gradient-to-r from-indigo-500/25 to-violet-500/25 px-3.5 text-[22px] leading-[26px] font-black text-white shadow-sm transition hover:brightness-110 active:scale-95 sm:inline-flex"
+              >
+                <BriefcaseBusiness size={30} aria-hidden="true" />
+                <span>Work</span>
+              </button>
               <button
                 type="button"
                 onClick={() => handleNavigate("#/subscription")}

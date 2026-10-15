@@ -123,8 +123,8 @@ test("The dock lives inside the study pane in both orientations", () => {
 test("Rotation mid-session keeps the deck's identity and its stored layout", () => {
   // The lesson pane is the same viewer stack before and after a rotation — the
   // deck only re-reads the other axis's stored ratio.
-  assert.match(studyPanels, /\}, \[axis, courseId, floor\]\);/);
-  assert.match(studyPanels, /loadSplitRatio\(courseId, axis, floor\)/);
+  assert.match(studyPanels, /\}, \[axis, courseId, floor, fullRange, parkedRatio\]\);/);
+  assert.match(studyPanels, /loadSplitRatio\(\s*courseId,\s*axis,\s*floor,\s*fullRange \? 100 : SPLIT_MAX,\s*fullRange \? parkedRatio : DEFAULT_SPLIT_RATIO\[axis\],\s*\)/);
   assert.match(studyPanels, /loadSplitCollapsed\(courseId, axis\)/);
   // The divider's line redraws along the new axis instead of stretching.
   assert.match(studyPanels, /key=\{axis\}/);

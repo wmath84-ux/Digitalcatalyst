@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Library, Plus } from "lucide-react";
+import { BriefcaseBusiness, Library, Plus } from "lucide-react";
 import { BagIcon, CalendarIcon, FlowPathIcon, HomeIcon, SparkBookIcon, StoreIcon, UserIcon } from "./icons";
 import type { GlassDockItem } from "./glass-dock/GlassDock";
 import "./youtube-footer-nav.css";
@@ -14,6 +14,7 @@ type Props = {
 };
 
 const QUICK_ACTIONS = [
+  { id: "work", label: "Work Mode", route: "#/work", Icon: BriefcaseBusiness },
   { id: "myday", label: "My Day", route: "#/my-day", Icon: CalendarIcon },
   { id: "study-library", label: "My Study Library", route: "#/study-library", Icon: Library },
   { id: "revision", label: "Revision", route: "#/revision", Icon: SparkBookIcon },
@@ -39,13 +40,14 @@ function activeFromHash(hash: string): string | null {
     || hash.startsWith("#/learner")
   ) return "profile";
   if (
-    hash.startsWith("#/my-day") || hash.startsWith("#/study-library")
+    hash.startsWith("#/work") || hash.startsWith("#/my-day") || hash.startsWith("#/study-library")
     || hash.startsWith("#/revision") || hash.startsWith("#/flowpath")
   ) return "quick";
   return null;
 }
 
 function shortcutFromHash(hash: string): string | null {
+  if (hash.startsWith("#/work")) return "work";
   if (hash.startsWith("#/my-day")) return "myday";
   if (hash.startsWith("#/study-library")) return "study-library";
   if (hash.startsWith("#/revision")) return "revision";
