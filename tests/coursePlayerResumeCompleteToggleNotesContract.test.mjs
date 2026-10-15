@@ -114,7 +114,9 @@ test("Direct video pauses on module switch and resumes at the stored second", ()
 });
 
 test("Audio pauses on module switch and resumes at the stored second", () => {
-  assert.match(audioPlayer, /active = true, resumeAt = 0, onProgress/);
+  // …after the music page's own presentation prop (a default, so every
+  // existing lesson call site is unchanged).
+  assert.match(audioPlayer, /active = true,\n  resumeAt = 0,\n  onProgress,/);
   assert.match(audioPlayer, /if \(!audio \|\| active\) return;/);
   assert.match(audioPlayer, /audio\.pause\(\);/);
   assert.match(audioPlayer, /audio\.currentTime = Math\.min\(resumeRef\.current/);

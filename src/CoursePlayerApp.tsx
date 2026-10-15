@@ -2402,8 +2402,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       // library (course audio, their own files, saved links). Main pane only:
       // a second player in an extra part would fight the first one for the
       // speaker, so an extra part never mounts it.
+      //
+      // `active` is the pane's own tab truth: leaving the Music tab pauses a
+      // song (the glass player banks its position) and unmounts a video embed,
+      // so nothing sings behind a Notes page. Inside the tab, going back to the
+      // library page never stops the song — the player stays mounted.
       musicPanel={opts.extra ? undefined : (
-        <MusicPanel uid={user?.id ?? null} courseAudio={courseAudio} />
+        <MusicPanel uid={user?.id ?? null} courseAudio={courseAudio} active={paneTab === "music"} />
       )}
       aiPanel={opts.extra ? undefined : (
         user?.id && aiOpened ? (

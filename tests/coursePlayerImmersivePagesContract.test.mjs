@@ -12,8 +12,9 @@
 //   Footer navigation — hidden on the Note Editor, the Mind Map Editor,
 //   the Brain Card / Brain Practice answer page, the Live Experiment
 //   Viewer, the Sketch Editor, the Read Library's PDF viewer and the
-//   Annotations viewer; back on every library page; the Music Player's
-//   footer behaviour untouched. The panels publish their sub-page into
+//   Annotations viewer — and an OPEN PLAYER on the Music tab (the library
+//   page keeps it); back on every library page. The panels publish their
+//   sub-page into
 //   coursePanelSession; both footer homes (the parent-rendered Workspace
 //   pill and the Split Deck's in-flow dock) apply the one resolver.
 
@@ -61,7 +62,7 @@ test("3 — the pdf.js side panel hides on an outside click", () => {
   assert.match(pdfViewer, /frameDocument\.removeEventListener\("pointerdown", dismissViewsHandler, true\)/);
 });
 
-test("4 — one resolver names every immersive page (and never Music)", () => {
+test("4 — one resolver names every immersive page (Music's player included)", () => {
   assert.match(session, /case "notes":\s*\n?\s*return state\.notesEditorOpen;/);
   assert.match(session, /case "mindmap":\s*\n?\s*return state\.mindMapView === "canvas";/);
   assert.match(session, /case "brain":\s*\n?\s*return state\.brainView === "answer";/);
@@ -69,13 +70,16 @@ test("4 — one resolver names every immersive page (and never Music)", () => {
   // The Sketch tab IS the editor: no library page, always immersive.
   assert.match(session, /case "sketch":[\s\S]{0,140}?return true;/);
   assert.match(session, /case "read":\s*\n?\s*return state\.readView === "reader";/);
-  // Music keeps its footer: it is never a hidden case.
-  assert.doesNotMatch(session, /case "music"/);
+  // Music is its own kind of page: the LIBRARY page keeps the footer, an OPEN
+  // PLAYER (the full-area audio player / the YouTube player with its divider)
+  // hides it — the owner asked for exactly that.
+  assert.match(session, /case "music":[\s\S]{0,200}?return state\.musicView === "player";/);
   // Library defaults: leaving the player resets every sub-page.
   assert.match(session, /notesEditorOpen: false/);
   assert.match(session, /readView: "library"/);
   assert.match(session, /brainView: "home"/);
   assert.match(session, /experimentView: "library"/);
+  assert.match(session, /musicView: "library"/);
 });
 
 test("5 — every immersive page publishes its sub-page", () => {

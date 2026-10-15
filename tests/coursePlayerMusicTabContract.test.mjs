@@ -1,10 +1,19 @@
-// The Music tab's wiring: one more button in the footer navigation, the SAME
-// glass player inside it, a LIBRARY behind that, and honest sourcing rules.
+// The Music tab's wiring, pinned to the REDESIGN the owner asked for
+// (2026-10-15):
+//
+//   "music page open hote hi header ki jagah per search bar hoga YouTube wala
+//    aur use search bar ke niche horizontal tray hoga jiska color pura white
+//    hoga aur use tray per sabhi button honge jo abhi already hain filter
+//    button aur usmein ek aur button add karna hai URL ka, aur ine button per
+//    click karne ke according list badlegi."
 //
 // These are source-shape assertions on purpose: the tab has to live in the SAME
-// TABS list the strip renders (no second list to drift), the pane must render
-// the EXISTING player component (no fork), every embed must come from the
-// platform's official surface, and no file may carry a scraper.
+// TABS list the strip renders (no second list to drift), the ONE search box has
+// to change its behaviour with the filter, the ONE white tray has to render the
+// ONE filter list (All first), every empty page has to come from
+// `musicFilters.ts`, the player has to be the EXISTING AudioPlayer (no fork),
+// every embed has to come from the platform's official surface, and no file may
+// carry a scraper.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -16,6 +25,10 @@ const overlay = read('src/course/CourseOverlay.tsx');
 const strip = read('src/course/CoursePeekDock.tsx');
 const player = read('src/CoursePlayerApp.tsx');
 const panel = read('src/course/MusicPanel.tsx');
+const list = read('src/course/MusicTrackList.tsx');
+const filters = read('src/course/musicFilters.ts');
+const audioPlayer = read('src/course/AudioPlayer.tsx');
+const session = read('src/course/coursePanelSession.ts');
 const library = read('src/course/musicLibrary.ts');
 const db = read('src/course/musicDb.ts');
 const search = read('src/course/musicSearch.ts');
@@ -30,131 +43,231 @@ test('Music is a real dock tab, appended last so no existing tab or shortcut mov
   // ⌘/Ctrl+1…9 shortcut) is untouched.
   assert.match(overlay, /icon: Music \},\n\];/);
   assert.match(overlay, /import \{ BookOpen, Brain, File, FileText, FlaskConical, LockKeyhole, Music, Network, NotebookPen, PenLine, ShoppingBag, Sparkles \} from "lucide-react";/);
-  // The footer renders THAT list — it never keeps a copy of its own — and
-  // each cell is the tab's own icon (the Music glyph included) at the
-  // Workspace pill's 26px, not a letter plate of its own.
+  // The footer renders THAT list — it never keeps a copy of its own.
   assert.match(strip, /const items = TABS\.filter\(item => !hiddenTabs\.includes\(item\.key\)\)/);
   assert.match(strip, /data-work-nav-cell=\{item\.key\}/);
   assert.match(strip, /<Icon size=\{26\} \/>/);
 });
 
-test('the pane is the EXISTING glass music player — the lesson design, not a copy', () => {
-  assert.match(panel, /import AudioPlayer from "\.\/AudioPlayer";/);
-  assert.match(panel, /<AudioPlayer url=\{playUrl\} name=\{current\.title\} active=\{active\} \/>/);
-  // No second vinyl / disc / transport implementation in the pane.
-  assert.doesNotMatch(codeOnly(panel), /vinyl|Vinyl|disc-|rounded-full bg-gradient-to-br/);
-  // And the pane never builds an embed URL itself: every provider URL is made
-  // in the library module, next to the parser that validated it.
-  assert.doesNotMatch(codeOnly(panel), /youtube-nocookie\.com|w\.soundcloud\.com|open\.spotify\.com\/embed/);
-  assert.match(library, /import \{ extractYouTubeId, getCourseEmbed \} from "\.\.\/utils\/courseEmbed";/);
-  assert.match(library, /export const youTubeEmbedUrl = \(id: string\): string =>\n  getCourseEmbed\(/);
+test('the page opens on ONE search bar over ONE pure-white tray, the All button first', () => {
+  // The search bar takes the place a header would have: it comes BEFORE the
+  // tray in the DOM the pane builds.
+  const barAt = panel.indexOf('data-music-searchbar');
+  const trayAt = panel.indexOf('data-music-tray');
+  assert.ok(barAt > 0 && trayAt > barAt, 'the search bar must sit above the white tray');
+  assert.match(panel, /data-music-tray data-music-tray-theme="white"/);
+  assert.match(panel, /className="shrink-0 bg-white px-2 py-2 sm:px-4"/);
+  // ONE filter list — All FIRST — and the tray renders THAT list, never a copy.
+  assert.match(filters, /export const MUSIC_FILTERS: readonly MusicFilter\[\] = \["all", "course", "device", "online", "url"\] as const;/);
+  assert.match(panel, /\{MUSIC_FILTERS\.map\(\(key\) => \{/);
+  assert.match(panel, /data-music-filter=\{key\}/);
+  assert.match(panel, /aria-pressed=\{activeBtn\}/);
+  assert.match(panel, /\{MUSIC_FILTER_LABEL\[key\]\}/);
+  assert.match(panel, /\{musicFilterCount\(key, counts\)\}/);
+  // …and the URL button is the NEW one in that list.
+  assert.match(filters, /url: "URL",/);
+  assert.match(panel, /url: <Link2 size=\{14\} \/>,/);
+  assert.match(panel, /\{FILTER_ICON\[key\]\}/);
+  // The tray scrolls sideways on a phone and stays centred on a wide pane.
+  assert.match(panel, /flex min-w-0 flex-1 items-center gap-1\.5 overflow-x-auto rounded-full border border-slate-200 bg-white p-1/);
+  assert.match(panel, /mx-auto flex w-full max-w-3xl items-center gap-2/);
+  // Appended last in the dock, appended last among the filters: All is FIRST.
+  assert.equal(filters.indexOf('"all", "course", "device", "online", "url"') > 0, true);
 });
 
-test('the LIBRARY button opens three shelves, and a song is always one tap away', () => {
-  assert.match(panel, /data-course-music-panel/);
-  assert.match(panel, /<button type="button" data-music-library-toggle onClick=\{\(\) => setSheetOpen\(\(open\) => !open\)\}/);
-  assert.match(panel, /aria-expanded=\{sheetOpen\} aria-label=\{sheetOpen \? "Close the music library" : "Open the music library"\}/);
-  assert.match(panel, /data-music-library-sheet/);
-  assert.match(panel, /\{ shelf: "course", tracks: filterMusicTracks\(courseTracks, query\) \}/);
-  assert.match(panel, /\{ shelf: "upload", tracks: filterMusicTracks\(uploads, query\) \}/);
-  assert.match(panel, /\{ shelf: "link", tracks: filterMusicTracks\(links, query\) \}/);
-  assert.match(panel, /data-music-section=\{shelf\} data-music-section-count=\{tracks\.length\}/);
-  assert.match(panel, /data-music-track=\{track\.id\}/);
-  // A row says where it came from, and the learner can bin it again.
-  assert.match(panel, /\{musicRowBadge\(track\)\}/);
-  assert.match(panel, /track\.source !== "course" && \(/);
-});
-
-test('the redesigned pane is one light, full-space, responsive music workspace', () => {
-  // No separate Course Player page header inside Music: the player surface
-  // itself owns the Library control.
-  assert.doesNotMatch(panel, /CoursePageHeader|<header/);
-  assert.match(panel, /data-music-library-toggle/);
-  assert.match(panel, /data-music-layout=\{layoutMode\}/);
-  assert.match(panel, /new ResizeObserver\(update\)/);
-  assert.match(panel, /node\.clientWidth >= 640 \? "wide" : "compact"/);
-  assert.match(panel, /gridTemplateColumns: sheetOpen \? "minmax\(300px, 42%\) minmax\(0, 1fr\)"/);
-  assert.match(panel, /gridTemplateRows: sheetOpen \? "minmax\(240px, 42%\) minmax\(0, 1fr\)"/);
-  // Library opens white/light, search first, filters directly below it.
-  assert.match(panel, /data-music-library-sheet data-music-theme="light"/);
-  assert.match(panel, /data-music-search placeholder/);
-  assert.match(panel, /data-music-filters/);
-  for (const filter of ['course', 'device', 'online']) {
-    assert.match(panel, new RegExp(`data-music-filter=\\{filter\\.key\\}`));
-    assert.match(panel, new RegExp(`label: "${filter === 'course' ? 'Course' : filter === 'device' ? 'Device' : 'Online'}"`));
+test('the ONE search box changes behaviour with the filter (URL becomes a URL input)', () => {
+  assert.match(filters, /export const isUrlFilter = \(filter: MusicFilter\): boolean => filter === "url";/);
+  assert.match(panel, /const urlMode = isUrlFilter\(filter\);/);
+  assert.match(panel, /placeholder=\{MUSIC_SEARCH_PLACEHOLDER\[filter\]\}/);
+  assert.match(panel, /\{\.\.\.\(urlMode \? \{ "data-music-url": "", "data-music-link": "" \} : \{ "data-music-search": "" \}\)\}/);
+  // The arrow appears with the first character, and Enter does the same.
+  assert.match(panel, /\{urlMode && query\.trim\(\) \? \(/);
+  assert.match(panel, /data-music-url-add/);
+  assert.match(panel, /data-music-add-link/);
+  assert.match(panel, /<ArrowRight size=\{16\} \/>/);
+  assert.match(panel, /onSubmit=\{\(event\) => \{ event\.preventDefault\(\); void submitSearch\(\); \}\}/);
+  assert.match(panel, /if \(isUrlFilter\(filter\)\) \{ await addLink\(query\); return; \}/);
+  // Course + Device: the same box only FILTERS that shelf — no online search.
+  assert.match(panel, /const canSearchOnline = filter === "all" \|\| filter === "online";/);
+  assert.match(panel, /musicQueryFilter\(shelfTracks\(source\), effectiveQuery\)/);
+  assert.match(panel, /const effectiveQuery = urlMode \? "" : query;/);
+  // One placeholder per filter, so a learner always knows what the box does.
+  for (const placeholder of ['Songs, videos, course — dhoondo…', 'Course ke audio mein dhoondo…', 'Device ke songs mein dhoondo…', 'Online songs dhoondo…']) {
+    assert.ok(filters.includes(placeholder), `the ${placeholder} hint is spelled out`);
   }
-  // The direct search-page view option makes online music YouTube-like:
-  // a large 16:9 thumbnail with the title underneath.
-  assert.match(panel, /data-music-search-view/);
-  assert.match(panel, /data-music-view-option="youtube"/);
-  assert.match(panel, /Bade thumbnails/);
-  assert.match(panel, /data-music-result-thumbnail/);
-  assert.match(panel, /data-music-track-thumbnail/);
-  assert.match(panel, /aspect-video w-full overflow-hidden/);
 });
 
-test('YouTube can be heard audio-style or watched in its embedded player', () => {
-  assert.match(panel, /data-music-youtube-player data-music-youtube-mode=\{youTubeMode\}/);
-  assert.match(panel, /data-music-youtube-mode-option="audio"/);
-  assert.match(panel, /data-music-youtube-mode-option="video"/);
-  assert.match(panel, /data-music-youtube-audio/);
-  assert.match(panel, /data-music-youtube-thumbnail/);
-  assert.match(panel, /data-music-youtube-play-toggle/);
-  assert.match(panel, /sendYouTubeCommand\(next \? "playVideo" : "pauseVideo"\)/);
-  assert.match(panel, /data-music-embed=\{current\.provider\}/);
+test('every filter has its honest empty page, and All opens a column of options', () => {
+  // The owner's own wording: "jaise kuchh nahin hai to simple search to view
+  // library likha ho page per … jaise course ka open karta hai vahan per agar
+  // koi nahin hai to simple there is no audio from course."
+  assert.match(filters, /all: "Search to view library",/);
+  assert.match(filters, /course: "There is no audio from this course\.",/);
+  assert.match(filters, /device: "There is no music from this device yet\.",/);
+  assert.match(filters, /online: "There is no online music yet\.",/);
+  assert.match(filters, /url: "There is no saved link yet\.",/);
+  assert.match(panel, /<MusicEmptyPage/);
+  assert.match(panel, /title=\{query\.trim\(\) && !urlMode \? MUSIC_NO_MATCH : MUSIC_EMPTY_TITLE\[filter\]\}/);
+  // The All filter's centred column: Search online · Device · Course audio · URL.
+  assert.match(panel, /data-music-start-options/);
+  assert.match(panel, /data-music-start-option=\{option\.id\}/);
+  assert.match(filters, /\{ id: "search-online", filter: "online", title: "Search online"/);
+  assert.match(filters, /\{ id: "device", filter: "device", title: "Device"/);
+  assert.match(filters, /\{ id: "course", filter: "course", title: "Course audio"/);
+  assert.match(filters, /\{ id: "url", filter: "url", title: "URL"/);
+  // …and it is shown ONLY while the library is empty.
+  assert.match(filters, /export const musicStartOptionsVisible = \(filter: MusicFilter, counts: MusicLibraryCounts\): boolean =>\n  filter === "all" && counts\.total === 0;/);
+  assert.match(panel, /const startOptions = musicStartOptionsVisible\(filter, counts\) && !query\.trim\(\);/);
 });
 
-test('a pasted link plays here; an unsupported one is refused with a sentence', () => {
-  assert.match(panel, /data-music-link placeholder="YouTube \/ Spotify \/ SoundCloud \/ \.mp3 link paste karo"/);
-  assert.match(panel, /const added = addMusicLink\(uid, raw\);/);
-  assert.match(panel, /data-music-notice/);
-  assert.match(panel, /setNotice\("That link is not playable here\./);
-  assert.match(panel, /onKeyDown=\{\(event\) => \{ if \(event\.key === "Enter"\) void addLink\(\); \}\}/);
-  // The platform's own oEmbed names the row — best effort, never blocking.
-  assert.match(panel, /const title = await resolveMusicTitle\(added\.track\);/);
-});
-
-test('the learner\'s own files stay on the learner\'s device', () => {
-  assert.match(panel, /import \{ listLocalSongs, removeLocalSong, songObjectUrl, storeLocalSong \} from "\.\/musicDb";/);
-  assert.match(panel, /accept="audio\/\*" className="hidden" data-music-file/);
+test('the Device filter owns the bottom-right ＋ button, and files stay on the device', () => {
+  assert.match(filters, /export const musicAddFabVisible = \(filter: MusicFilter\): boolean => filter === "device";/);
+  assert.match(panel, /const addFab = musicAddFabVisible\(filter\) \? \(/);
+  assert.match(panel, /data-music-add-fab/);
+  assert.match(panel, /data-music-upload/);
+  assert.match(panel, /className="absolute bottom-4 right-4 z-30 grid h-14 w-14 place-items-center rounded-full bg-slate-950 text-white/);
+  assert.match(panel, /onClick=\{\(\) => fileRef\.current\?\.click\(\)\}/);
+  assert.match(panel, /if \(id === "device"\) fileRef\.current\?\.click\(\);/);
   assert.match(panel, /const track = await storeLocalSong\(uid, file\);/);
+  assert.match(panel, /accept="audio\/\*"/);
   assert.match(panel, /URL\.revokeObjectURL\(blobUrlRef\.current\)/);
   assert.match(db, /super\("eduvora-music-tracks"\)/);
   assert.match(db, /this\.version\(1\)\.stores\(\{ songs: "\[uid\+id\], uid" \}\);/);
   assert.match(db, /blob: file\.slice\(0, file\.size/);
   // Local means local: no cloud write anywhere in the music feature.
-  for (const [name, source] of [['MusicPanel', panel], ['musicLibrary', library], ['musicDb', db], ['musicSearch', search]]) {
+  for (const [name, source] of [['MusicPanel', panel], ['MusicTrackList', list], ['musicFilters', filters], ['musicLibrary', library], ['musicDb', db], ['musicSearch', search]]) {
     assert.doesNotMatch(codeOnly(source), /from "firebase|firebase\/|getFirestore|getStorage/, `${name} must not reach the cloud`);
   }
+});
+
+test('artwork is never washed over — a song without a picture gets an audio plate', () => {
+  // The reported bug: a white-ish overlay over the search thumbnails.
+  assert.doesNotMatch(codeOnly(list), /bg-white\/\d/, 'no translucent white layer over a thumbnail');
+  assert.match(list, /className="absolute inset-0 h-full w-full object-cover"/);
+  assert.match(list, /data-music-track-thumbnail/);
+  // A song with no artwork is a real tile with its provider glyph…
+  assert.match(list, /data-music-audio-tile/);
+  assert.match(list, /linear-gradient\(140deg, #1f2937 0%, #0b1220 52%, #4c1d95 100%\)/);
+  // …and the only thing over a picture is a hairline ring + a dark play chip.
+  assert.match(list, /ring-1 ring-inset ring-white\/10/);
+  assert.match(list, /bg-slate-950\/80 text-white/);
+  // Two presentations, chosen by room: compact rows, or thumbnail cards.
+  assert.match(list, /variant: "list" \| "grid"/);
+  assert.match(list, /repeat\(auto-fit, minmax\(min\(215px, 100%\), 1fr\)\)/);
+  assert.match(panel, /variant=\{source === "link" && densityMode === "grid" \? "grid" : "list"\}/);
+  assert.match(panel, /data-music-view-option="list"/);
+  assert.match(panel, /data-music-view-option="grid"/);
+});
+
+test('a tap opens the lesson player at FULL AREA — no card, back arrow, library glyph', () => {
+  assert.match(panel, /import AudioPlayer from "\.\/AudioPlayer";/);
+  assert.match(panel, /presentation="full"/);
+  assert.match(panel, /onBack=\{backToLibrary\}/);
+  assert.match(panel, /onOpenLibrary=\{\(\) => setSheetOpen\(\(open\) => !open\)\}/);
+  // The player itself grew the second presentation…
+  assert.match(audioPlayer, /presentation\?: "card" \| "full";/);
+  assert.match(audioPlayer, /const full = presentation === "full";/);
+  assert.match(audioPlayer, /if \(full\) \{/);
+  assert.match(audioPlayer, /data-course-audio-back/);
+  assert.match(audioPlayer, /data-course-audio-library/);
+  assert.match(audioPlayer, /data-audio-full-player="true"/);
+  // …which fills its pane instead of wearing a card: no frame, no scaler.
+  assert.match(audioPlayer, /publishVar\(stage, "--audio-ui", String\(audioStageScale\(width, height\)\)\);/);
+  assert.match(audioPlayer, /publishVar\(stage, "--audio-stage-min", `\$\{Math\.min\(width, height\)\}px`\);/);
+  assert.match(audioPlayer, /publishVar\(stage, "--audio-body-direction", audioStageDirection\(width, height\)\);/);
+  assert.match(audioPlayer, /clamp\(104px, calc\(var\(--audio-stage-min, 300px\) \* 0\.44\), 320px\)/);
+  assert.match(read('src/course/panelFit.ts'), /export function audioStageScale\(width: number, height: number\): number \{/);
+  // The LESSON card is untouched: same width, same frame, same scaler.
+  assert.match(audioPlayer, /className="relative isolate w-\[320px\] overflow-hidden rounded-\[32px\]"/);
+  assert.match(audioPlayer, /data-course-audio-frame/);
+  assert.match(audioPlayer, /data-course-audio-scaler/);
+  // And the music pane still never builds an embed URL of its own.
+  assert.doesNotMatch(codeOnly(panel), /youtube-nocookie\.com|w\.soundcloud\.com|open\.spotify\.com\/embed/);
+  assert.match(library, /import \{ extractYouTubeId, getCourseEmbed \} from "\.\.\/utils\/courseEmbed";/);
+  assert.match(library, /export const youTubeEmbedUrl = \(id: string\): string =>\n  getCourseEmbed\(/);
+});
+
+test('a video opens COMPACT: official player, draggable divider, library below', () => {
+  // The divider is the app's own divider language, horizontal, and draggable.
+  assert.match(panel, /data-music-player-divider/);
+  assert.match(panel, /role="separator"/);
+  assert.match(panel, /aria-orientation="horizontal"/);
+  assert.match(panel, /onPointerDown=\{onDividerPointerDown\}/);
+  assert.match(panel, /onPointerMove=\{onDividerPointerMove\}/);
+  assert.match(panel, /style=\{\{ height: DIVIDER_HIT, touchAction: "none" \} as CSSProperties\}/);
+  assert.match(panel, /background: DIVIDER_LINE/);
+  // …and the library really is the lower half.
+  assert.match(panel, /data-music-video-library/);
+  assert.match(panel, /librarySurface\(\{ mode: "video", onOpenFullPage: openFullLibrary \}\)/);
+  // Full screen hides the divider AND the library; coming back brings both.
+  assert.match(panel, /data-music-video-fullscreen=\{fullscreen \? "true" : "false"\}/);
+  assert.match(panel, /data-music-fullscreen-toggle/);
+  assert.match(panel, /\{fullscreen \? \(\n        <div className="relative min-h-0 flex-1" data-music-video-pane>/);
+  assert.match(panel, /const fullscreen = immersive \|\| nativeFull;/);
+  assert.match(panel, /try \{ await stageRef\.current\?\.requestFullscreen\?\.\(\); \}/);
+  // The compact search bar is shorter and carries the arrow to the full page.
+  assert.match(panel, /data-music-searchbar-layout=\{compact \? "compact" : "full"\}/);
+  assert.match(panel, /searchBar\(\{ compact: mode === "video", onOpenFullPage \}\)/);
+  assert.match(panel, /data-music-open-library/);
+  assert.match(panel, /const openFullLibrary = useCallback\(\(\) => \{\n    backToLibrary\(\);\n    chooseFilter\("all"\);/);
+  // The platform's own official surface, never a rebuilt player.
+  assert.match(panel, /data-music-embed=\{current\.provider\}/);
+  assert.match(panel, /allow="autoplay; encrypted-media; picture-in-picture; fullscreen"/);
+  assert.match(panel, /allowFullScreen/);
+});
+
+test('the footer navigation hides on a player and returns on the library page', () => {
+  // One session field, published by the pane…
+  assert.match(session, /export type MusicPanelSessionView = "library" \| "player";/);
+  assert.match(session, /musicView: MusicPanelSessionView;/);
+  assert.match(session, /musicView: "library",/);
+  assert.match(session, /export const setMusicSessionView = \(view: MusicPanelSessionView\) => \{/);
+  assert.match(panel, /import \{ setMusicSessionView \} from "\.\/coursePanelSession";/);
+  assert.match(panel, /setMusicSessionView\(view === "player" \? "player" : "library"\);/);
+  assert.match(panel, /return \(\) => setMusicSessionView\("library"\);/);
+  assert.match(panel, /data-music-view=\{view\}/);
+  // …read by the ONE resolver both footer homes already share.
+  assert.match(session, /case "music":[\s\S]{0,200}?return state\.musicView === "player";/);
+  assert.match(overlay, /const immersivePage = useFooterHiddenPage\(tab\);/);
+  assert.match(overlay, /\$\{keyboardVisible \|\| immersivePage \? "hidden" : ""\}/);
+  assert.match(strip, /const immersivePage = useFooterHiddenPage\(tab\)/);
+  assert.match(strip, /if \(keyboardVisible \|\| immersivePage\) return null/);
 });
 
 test('search is key-gated, and without a key it hands the query to YouTube itself', () => {
   assert.match(search, /export const youTubeSearchUrl = \(query: string\): string =>/);
   assert.match(search, /https:\/\/www\.youtube\.com\/results\?search_query=/);
-  // The key is read as STATE now, so a key injected into a live browser is
-  // noticed without a reload (the pane re-subscribes to the key event).
+  // The key is read as STATE, so a key injected into a live browser is noticed
+  // without a reload (the pane re-subscribes to the key event).
   assert.match(panel, /const \[searchKeyReady, setSearchKeyReady\] = useState\(youTubeSearchAvailable\);/);
-  assert.match(panel, /onClick=\{runSearch\} disabled=\{busy \|\| !query\.trim\(\)\} data-music-search-run/);
-  assert.match(panel, /<a href=\{youTubeSearchUrl\(query\)\} target="_blank" rel="noopener noreferrer"\n                data-music-search-external/);
+  assert.match(panel, /data-music-search-mode=\{searchKeyReady \? "api" : "external"\}/);
+  assert.match(panel, /data-music-search-run/);
+  assert.match(panel, /<a\s*\n?\s*href=\{youTubeSearchUrl\(query\)\} target="_blank" rel="noopener noreferrer"\s*\n?\s*data-music-search-external/);
   assert.match(panel, /data-music-results/);
-  assert.match(panel, /data-music-result onClick=\{/);
+  assert.match(panel, /onPlay=\{playResult\}/);
   // The API call uses the official endpoint and a video id, nothing else.
   assert.match(search, /new URL\("https:\/\/www\.googleapis\.com\/youtube\/v3\/search"\)/);
   assert.match(search, /endpoint\.searchParams\.set\("type", "video"\)/);
 });
 
+test('a key search that finds nothing hands the query back to YouTube', () => {
+  assert.match(panel, /setNotice\(found\.length \? "" : "YouTube se results nahin mile/);
+  assert.match(panel, /data-music-no-results/);
+  assert.match(panel, /<a href=\{youTubeSearchUrl\(query\)\} target="_blank" rel="noopener noreferrer" data-music-search-external/);
+});
+
 test('the pane pauses a video embed when its tab is left, and keeps a song alive', () => {
-  // Embeds only mount while the music tab is the visible one.
+  // A video embed only exists while the player page is the one on screen.
+  assert.match(panel, /const videoStage = isVideoCurrent && playerShown \? \(/);
   assert.match(panel, /data-music-embed=\{current\.provider\}/);
-  assert.match(panel, /allow="autoplay; encrypted-media; picture-in-picture; fullscreen"/);
-  assert.match(panel, /current\.provider === "audio" \|\| !stageVisible \? \(/);
-  // Direct audio stays mounted through a tab switch (the glass player banks its
-  // position), so the pane itself is a PERSISTENT sibling of the keyed body.
+  // Direct audio is hidden, never unmounted: the song survives the library page.
+  assert.match(panel, /\$\{playerShown \? "flex" : "hidden"\}/);
+  assert.ok(panel.includes('{showLibrary ? librarySurface({ mode: "page" }) : null}'), 'the library page is its own surface');
+  // The player's own tab truth comes from the player, not from a second guess.
+  assert.match(player, /active=\{paneTab === "music"\}/);
+  // The pane is a PERSISTENT sibling of the keyed body (the overlay's trick).
   assert.match(overlay, /data-course-music-tab/);
-  assert.match(overlay, /\{props\.musicPanel \? \(\n        <div\n          className=\{`h-full min-h-0 flex-1 flex-col overflow-hidden \$\{props\.tab === "music" \? "flex" : "hidden"\}`\}/);
-  assert.match(overlay, /hidden=\{props\.tab !== "music"\}/);
   assert.match(overlay, /const hideKeyedBody = \(Boolean\(props\.aiPanel\) && props\.tab === "ai"\) \|\| props\.tab === "read"\n    \|\| \(Boolean\(props\.musicPanel\) && props\.tab === "music"\);/);
-  // A call site with no panel still gets a hint, never a blank surface.
   assert.match(overlay, /export const MUSIC_FALLBACK = \(/);
   assert.match(overlay, /musicPanel \?\? MUSIC_FALLBACK/);
   assert.match(overlay, /musicPanel=\{props\.musicPanel\}/);
@@ -164,31 +277,23 @@ test('the player hands the pane the course audio and the learner, main pane only
   assert.match(player, /import MusicPanel from "\.\/course\/MusicPanel";/);
   assert.match(player, /import \{ collectCourseAudio \} from "\.\/course\/musicLibrary";/);
   assert.match(player, /const courseAudio = useMemo\(\n    \(\) => collectCourseAudio\(modules, resolution\.accessibleModuleIds\),\n    \[modules, resolution\.accessibleModuleIds\],\n  \);/);
-  assert.match(player, /musicPanel=\{opts\.extra \? undefined : \(\n        <MusicPanel uid=\{user\?\.id \?\? null\} courseAudio=\{courseAudio\} \/>\n      \)\}/);
+  assert.match(player, /musicPanel=\{opts\.extra \? undefined : \(\n        <MusicPanel uid=\{user\?\.id \?\? null\} courseAudio=\{courseAudio\} active=\{paneTab === "music"\} \/>\n      \)\}/);
   // One speaker per screen: an extra pane never mounts the music tab.
   assert.match(player, /\(\["modules", "notes", "read", "paid"\] as DockTab\[\]\)\.filter\(\(tab\) => !hiddenTabs\.includes\(tab\)\)/);
 });
 
 test('the optional YouTube key is INJECTED from the environment — never hard-coded', () => {
-  // Build: `VITE_YOUTUBE_API_KEY` reaches the client as one plain constant, so
-  // the feature module stays free of `import.meta` and still loads in node.
   assert.match(vite, /import \{ defineConfig, loadEnv \} from "vite";/);
   assert.match(vite, /const env = loadEnv\(mode, process\.cwd\(\), ""\);/);
   assert.match(vite, /__DC_YOUTUBE_API_KEY__: JSON\.stringify\(env\.VITE_YOUTUBE_API_KEY \|\| ""\),/);
   assert.match(envExample, /VITE_YOUTUBE_API_KEY=/);
-  // Dev has no identifier replacement, so the key rides in on the document —
-  // with the placeholder treated as "not configured".
   assert.match(indexHtml, /window\.__DC_YOUTUBE_API_KEY__ = "%VITE_YOUTUBE_API_KEY%";/);
   assert.match(search, /const cleanKey = \(value: unknown\): string => \{/);
-  assert.match(search, /return key && !\/\^%\.\*%\$\/\.test\(key\) \? key : "";/);
-  // The three sources, in order: build constant → served global → local override.
-  assert.match(search, /declare const __DC_YOUTUBE_API_KEY__: string \| undefined;/);
+  // and the un-substituted placeholder is not a key (plain text: no escaping to drift).
+  assert.ok(search.includes('!/^%.*%$/.test(key)'), 'the placeholder is never a key');
   assert.match(search, /export const MUSIC_YOUTUBE_KEY_STORAGE = "dc\.music\.youtubeKey";/);
   assert.match(search, /export function subscribeYouTubeKey\(listener: \(\) => void\): \(\) => void \{/);
-  // The pane re-reads it live, so a key set in a live browser shows the button.
-  assert.match(panel, /const \[searchKeyReady, setSearchKeyReady\] = useState\(youTubeSearchAvailable\);/);
   assert.match(panel, /useEffect\(\(\) => subscribeYouTubeKey\(\(\) => setSearchKeyReady\(youTubeSearchAvailable\(\)\)\), \[\]\);/);
-  assert.match(panel, /data-music-search-mode=\{searchKeyReady \? "api" : "external"\}/);
   // A key never appears in the source, and is never logged.
   for (const source of [search, panel, library]) {
     assert.doesNotMatch(codeOnly(source), /AIza[0-9A-Za-z_-]{10,}/);
@@ -196,14 +301,8 @@ test('the optional YouTube key is INJECTED from the environment — never hard-c
   }
 });
 
-test('a key search that finds nothing hands the query back to YouTube', () => {
-  assert.match(panel, /setNotice\(found\.length \? "" : "YouTube se results nahin mile/);
-  assert.match(panel, /data-music-no-results/);
-  assert.match(panel, /<a href=\{youTubeSearchUrl\(query\)\} target="_blank" rel="noopener noreferrer" data-music-search-external/);
-});
-
 test('nothing in the feature scrapes a stream or bypasses a platform player', () => {
-  for (const [name, source] of [['MusicPanel', panel], ['musicLibrary', library], ['musicDb', db], ['musicSearch', search]]) {
+  for (const [name, source] of [['MusicPanel', panel], ['MusicTrackList', list], ['musicFilters', filters], ['musicLibrary', library], ['musicDb', db], ['musicSearch', search]]) {
     assert.doesNotMatch(codeOnly(source), /youtube-dl|ytdl|ytmp3|googlevideo|jiosaavn|saavn|gaana\.|soundcloud\.com\/[^"']*\.mp3/i, `${name} must play through official surfaces only`);
   }
   // https only, and a hard per-file ceiling.

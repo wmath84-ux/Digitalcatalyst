@@ -1,20 +1,27 @@
-// The Music tab, driven as real UI in a real DOM.
+// The Music tab, driven as real UI in a real DOM — the REDESIGNED page
+// (owner brief, 2026-10-15).
 //
 // The source-shape rules live in tests/coursePlayerMusicTabContract.test.mjs;
-// this file mounts the ACTUAL pane and proves the owner's brief end to end:
+// this file mounts the ACTUAL pane and proves the brief behaves:
 //
-//   "click karne par music ka vahi already design UI jo course player ke andar
-//    hai vahi open ho, aur usmein LIBRARY ka button ho. Library par click karte
-//    hi user har tarah ka song — poori library ka, internet ka koi bhi song —
-//    play kar sake."
-//
-//   1. the pane opens on its library, and the Library button toggles it;
-//   2. a course track plays through the REAL glass player (the lesson design);
-//   3. a pasted YouTube link becomes a library row and an official embed;
-//   4. a link we cannot play is refused with a sentence, and nothing is stored;
-//   5. a saved song comes back on the next mount (the library persists);
-//   6. with no YouTube key the search hands the query to YouTube itself;
-//   7. the library search filters all three shelves at once.
+//   1. the tab opens on the library page — the YouTube-style search bar, then
+//      the pure-white tray with All FIRST and the NEW URL button;
+//   2. an empty library says the right thing in every filter ("Search to view
+//      library", "There is no audio from this course.", …), and the All filter
+//      centres its column of ways to start;
+//   3. the ONE search box follows the filter: a plain filter for Course/Device,
+//      a URL input for URL (arrow + Enter = add);
+//   4. the Device filter owns the bottom-right ＋ button;
+//   5. an audio tap opens the lesson player at FULL AREA — no card, back arrow
+//      on the left, library glyph on the right, and the library page's return
+//      never unmounts the song;
+//   6. a YouTube tap opens the official embed COMPACT: player, draggable
+//      divider, library below; full screen hides both and coming back restores
+//      them; the compact search bar's arrow jumps to the full library page;
+//   7. the footer navigation's session value follows the player/library rule;
+//   8. search results carry real artwork with NO wash over it, online keeps
+//      what the learner searched, and no key hands the query to YouTube itself;
+//   9. the pane's shape comes from the PANE's width, not the viewport.
 
 import test, { after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
@@ -27,18 +34,18 @@ import { JSDOM } from "jsdom";
 const require = createRequire(import.meta.url);
 const ROOT = process.cwd();
 
-/* ── fixture: the real Music pane ────────────────────────────────────────── */
+/* ── fixture: the real Music pane (+ the real session store) ─────────────── */
 
 const FIXTURE = `
 import * as React from "react";
 import { createRoot } from "react-dom/client";
 import { act } from "react";
 import MusicPanel from ${JSON.stringify(path.join(ROOT, "src/course/MusicPanel.tsx"))};
+import { getCoursePanelSession } from ${JSON.stringify(path.join(ROOT, "src/course/coursePanelSession.ts"))};
 
 // ONE root for the whole file. React 18 refuses a second createRoot() on a
 // container it has already seen, so a fresh visit is a fresh KEY — the same
-// thing React does when a learner signs out and back in: the pane remounts,
-// its state starts from storage again.
+// thing React does when a learner signs out and back in.
 let root = null;
 let visits = 0;
 
@@ -47,11 +54,11 @@ export function mountMusic(host, options = {}) {
   visits += 1;
   act(() => {
     root.render(
-      <MusicPanel
-        key={options.key || \`visit-\${visits}\`}
-        uid={options.uid || "learner-1"}
-        courseAudio={options.courseAudio || []}
-      />,
+      React.createElement(MusicPanel, {
+        key: options.key || ("visit-" + visits),
+        uid: options.uid === undefined ? "learner-1" : options.uid,
+        courseAudio: options.courseAudio || [],
+      }),
     );
   });
 }
@@ -60,6 +67,9 @@ export function unmountMusic() {
   if (root) act(() => root.unmount());
   root = null;
 }
+
+/** The footer-navigation rule's own source of truth. */
+export const panelSession = () => getCoursePanelSession();
 
 export { act };
 `;
@@ -105,8 +115,8 @@ define("document", window.document);
 define("navigator", window.navigator);
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 for (const key of [
-  "HTMLElement", "HTMLButtonElement", "HTMLInputElement", "HTMLMediaElement", "HTMLAnchorElement",
-  "SVGElement", "Element", "Node", "Event", "MouseEvent", "PointerEvent", "KeyboardEvent",
+  "HTMLElement", "HTMLButtonElement", "HTMLInputElement", "HTMLFormElement", "HTMLMediaElement", "HTMLAnchorElement",
+  "SVGElement", "Element", "Node", "Event", "MouseEvent", "PointerEvent", "KeyboardEvent", "SubmitEvent",
   "requestAnimationFrame", "cancelAnimationFrame", "getComputedStyle", "MutationObserver", "localStorage",
 ]) {
   define(key, window[key]);
@@ -121,13 +131,41 @@ if (!window.matchMedia) {
 define("matchMedia", window.matchMedia);
 define("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
 window.ResizeObserver = globalThis.ResizeObserver;
-window.Element.prototype.getBoundingClientRect = () => ({
-  x: 0, y: 0, left: 0, top: 0, right: 900, bottom: 700, width: 900, height: 700, toJSON: () => ({}),
+
+/** jsdom lays nothing out, so the test owns the ONE box every measurement reads. */
+let paneWidth = 900;
+let paneHeight = 800;
+window.HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
+  return { x: 0, y: 0, left: 0, top: 0, right: paneWidth, bottom: paneHeight, width: paneWidth, height: paneHeight, toJSON: () => ({}) };
+};
+Object.defineProperty(window.HTMLElement.prototype, "clientWidth", {
+  configurable: true,
+  get() { return paneWidth; },
 });
+Object.defineProperty(window.HTMLElement.prototype, "clientHeight", {
+  configurable: true,
+  get() { return paneHeight; },
+});
+
+/* Pointer capture the way a browser behaves: the capturing element keeps
+ * receiving that pointer's moves. */
+const captured = new Map();
+window.Element.prototype.setPointerCapture = function setPointerCapture(pointerId) { captured.set(pointerId, this); };
+window.Element.prototype.releasePointerCapture = function releasePointerCapture(pointerId) {
+  if (captured.get(pointerId) === this) captured.delete(pointerId);
+};
+
+// The file picker is never really opened in a test — it is counted instead.
+let pickerOpens = 0;
+window.HTMLInputElement.prototype.click = function click() {
+  if (String(this.type).toLowerCase() === "file") pickerOpens += 1;
+};
+
 // jsdom has no media stack: the glass player must mount without trying to play.
 window.HTMLMediaElement.prototype.play = () => Promise.resolve();
 window.HTMLMediaElement.prototype.pause = () => undefined;
 window.HTMLMediaElement.prototype.load = () => undefined;
+
 // No network in a unit test: a switchable stub, so a test can answer either
 // like a platform's oEmbed or like the YouTube Data API.
 let fetchResponder = () => Promise.reject(new Error("offline"));
@@ -152,12 +190,31 @@ const settle = async (ms = 40) => {
 const host = () => window.document.getElementById("music");
 const q = (selector) => window.document.querySelector(selector);
 const qa = (selector) => [...window.document.querySelectorAll(selector)];
+const text = (selector) => (q(selector)?.textContent || "");
 
 function typeInto(input, value) {
   const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
   act(() => {
     setter.call(input, String(value));
     input.dispatchEvent(new window.Event("input", { bubbles: true }));
+  });
+}
+
+function click(el) {
+  return act(async () => { el.dispatchEvent(new window.MouseEvent("click", { bubbles: true })); });
+}
+
+/** Enter/arrow on the URL box: jsdom has no implicit form submission. */
+function submitForm() {
+  return act(async () => {
+    q("[data-music-searchbar]").dispatchEvent(new window.SubmitEvent("submit", { bubbles: true, cancelable: true }));
+  });
+}
+
+function pointerEvent(type, x, y, pointerId) {
+  return new window.PointerEvent(type, {
+    bubbles: true, cancelable: true, clientX: x, clientY: y, pointerId, isPrimary: true,
+    pointerType: "mouse", button: 0, buttons: type === "pointerup" ? 0 : 1,
   });
 }
 
@@ -172,14 +229,31 @@ const COURSE_TRACK = {
   addedAt: 0,
 };
 
+const COURSE_TRACK_2 = {
+  id: "course-f2",
+  provider: "audio",
+  title: "Outro theme",
+  subtitle: "Wrap up",
+  url: "https://cdn.example.test/outro.mp3",
+  embedUrl: "",
+  source: "course",
+  addedAt: 0,
+};
+
+const YOUTUBE_EMBED =
+  "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0&modestbranding=1&playsinline=1&controls=1&fs=1&enablejsapi=1";
+
 /** A fresh visit to the tab — new component state, same browser storage. */
 function mount(options = {}) {
-  fixture.mountMusic(host(), { courseAudio: [COURSE_TRACK], ...options });
+  fixture.mountMusic(host(), { courseAudio: [COURSE_TRACK, COURSE_TRACK_2], ...options });
 }
 
 // Every test starts offline; a test that wants an answer sets its own responder.
 beforeEach(() => {
   fetchResponder = () => Promise.reject(new Error("offline"));
+  pickerOpens = 0;
+  paneWidth = 900;
+  paneHeight = 800;
 });
 
 after(() => {
@@ -192,138 +266,294 @@ after(() => {
 
 /* ── the tests ───────────────────────────────────────────────────────────── */
 
-test("the Music pane opens on its library, and the Library button toggles it", async () => {
+test("the tab opens on the library page: the search bar, then the white tray, All first", async () => {
   window.localStorage.clear();
   mount();
   await settle();
   assert.ok(Boolean(q("[data-course-music-panel]")), "the pane renders");
-  assert.equal(q("[data-course-music-panel]").getAttribute("data-music-active"), "true");
-  // Nothing played yet → the library is what the tab opens on.
-  assert.equal(Boolean(q("[data-music-library-sheet]")), true, "the library is open on first visit");
-  assert.equal(q("[data-music-library-toggle]").getAttribute("aria-expanded"), "true");
-
-  await act(async () => { q("[data-music-library-toggle]").click(); });
-  await settle();
-  assert.equal(Boolean(q("[data-music-library-sheet]")), false, "the button closes the library");
-  assert.ok(Boolean(q("[data-music-empty]")), "and the empty stage asks for a library");
-
-  await act(async () => { q("[data-music-empty] button").click(); });
-  await settle();
-  assert.equal(Boolean(q("[data-music-library-sheet]")), true, "the empty stage opens the library again");
+  assert.equal(q("[data-course-music-panel]").getAttribute("data-music-view"), "library");
+  assert.equal(q("[data-course-music-panel]").getAttribute("data-music-filter"), "all");
+  assert.ok(Boolean(q("[data-music-searchbar]")), "a YouTube-style search bar takes the header's place");
+  assert.ok(Boolean(q("[data-music-tray]")), "…and the tray sits under it");
+  assert.equal(q("[data-music-tray]").getAttribute("data-music-tray-theme"), "white");
+  // The bar really is ABOVE the tray.
+  const bar = q("[data-music-searchbar]");
+  const tray = q("[data-music-tray]");
+  assert.equal(bar.compareDocumentPosition(tray) & window.Node.DOCUMENT_POSITION_FOLLOWING, window.Node.DOCUMENT_POSITION_FOLLOWING, "the tray follows the bar");
+  // All FIRST, then the four the page has always had plus the NEW URL button.
+  assert.equal(
+    qa("[data-music-filters] [data-music-filter]").map((el) => el.getAttribute("data-music-filter")).join(","),
+    "all,course,device,online,url",
+  );
+  assert.equal(q('[data-music-filters] [data-music-filter="all"]').getAttribute("data-active"), "true");
+  assert.equal(q('[data-music-filters] [data-music-filter="url"]').getAttribute("data-active"), "false");
+  // The library page is where the footer navigation belongs.
+  assert.equal(fixture.panelSession().musicView, "library");
+  assert.ok(Boolean(q('[data-music-library="page"]')), "the library is the page itself — no sheet, no pill button");
+  assert.equal(Boolean(q("[data-music-library-toggle]")), false, "the old floating Library button is gone");
 });
 
-test("the library lists the course's own audio, and one tap plays it in the glass player", async () => {
+test("an empty library says the right thing in every filter, and All centres its options", async () => {
+  window.localStorage.clear();
+  mount({ courseAudio: [] });
+  await settle();
+
+  // All + nothing at all → the centred column of ways to start.
+  assert.ok(Boolean(q("[data-music-start-options]")), "the All filter opens the start column");
+  assert.match(text("[data-music-start-options]"), /Search to view library/);
+  assert.equal(
+    qa("[data-music-start-option]").map((el) => el.getAttribute("data-music-start-option")).join(","),
+    "search-online,device,course,url",
+  );
+
+  await click(q('[data-music-filter="course"]'));
+  await settle();
+  assert.equal(text("[data-music-empty-page]"), "There is no audio from this course.Is course mein abhi koi audio lesson nahin hai.");
+  assert.equal(Boolean(q("[data-music-start-options]")), false);
+
+  await click(q('[data-music-filter="device"]'));
+  await settle();
+  assert.match(text("[data-music-empty-page]"), /There is no music from this device yet\./);
+
+  await click(q('[data-music-filter="online"]'));
+  await settle();
+  assert.match(text("[data-music-empty-page]"), /There is no online music yet\./);
+
+  await click(q('[data-music-filter="url"]'));
+  await settle();
+  assert.match(text("[data-music-empty-page]"), /There is no saved link yet\./);
+  // The URL filter turns the search box into a URL input.
+  assert.ok(Boolean(q("[data-music-url]")), "the one box became a URL input");
+  assert.equal(Boolean(q("[data-music-search]")), false);
+
+  await click(q('[data-music-filter="all"]'));
+  await settle();
+  assert.ok(Boolean(q("[data-music-start-options]")), "back on All, the start column is there again");
+});
+
+test("the All column starts a filter, and the Device filter owns the ＋ button", async () => {
+  window.localStorage.clear();
+  mount({ courseAudio: [] });
+  await settle();
+
+  // No ＋ button until the learner is IN the device filter.
+  assert.equal(Boolean(q("[data-music-add-fab]")), false);
+  await click(q('[data-music-start-option="device"]'));
+  await settle();
+  assert.equal(q("[data-course-music-panel]").getAttribute("data-music-filter"), "device");
+  assert.ok(Boolean(q("[data-music-add-fab]")), "the device filter shows the bottom-right ＋");
+  assert.equal(pickerOpens > 0, true, "choosing Device from the column opens the learner's picker");
+
+  // The ＋ opens the file picker; no other filter keeps it.
+  const before = pickerOpens;
+  await click(q("[data-music-add-fab]"));
+  assert.equal(pickerOpens, before + 1);
+  await click(q('[data-music-filter="course"]'));
+  await settle();
+  assert.equal(Boolean(q("[data-music-add-fab]")), false);
+
+  // The URL row routes to the URL filter (the box is ready to paste).
+  await click(q('[data-music-filter="all"]'));
+  await settle();
+  await click(q('[data-music-start-option="url"]'));
+  await settle();
+  assert.equal(q("[data-course-music-panel]").getAttribute("data-music-filter"), "url");
+  assert.ok(Boolean(q("[data-music-url]")));
+});
+
+test("the one search box filters the filter's own shelf — and All lists every shelf", async () => {
+  window.localStorage.clear();
+  mount();
+  await settle();
+
+  // A library with music in it never shows the start column.
+  assert.equal(Boolean(q("[data-music-start-options]")), false);
+  assert.equal(Boolean(q("[data-music-section=\"course\"]")), true);
+  assert.equal(q('[data-music-section="course"]').getAttribute("data-music-section-count"), "2");
+  assert.ok(Boolean(q('[data-music-track="course-f1"]')), "the course audio is listed");
+
+  await click(q('[data-music-filter="course"]'));
+  await settle();
+  assert.equal(q('[data-music-section="course"]').getAttribute("data-music-section-count"), "2");
+  assert.equal(Boolean(q('[data-music-section="link"]')), false, "Course shows only the course shelf");
+
+  typeInto(q("[data-music-search]"), "outro");
+  await settle();
+  assert.equal(q('[data-music-section="course"]').getAttribute("data-music-section-count"), "1");
+  assert.equal(Boolean(q('[data-music-track="course-f1"]')), false);
+
+  await click(q('[data-music-filter="device"]'));
+  await settle();
+  // The query is dropped when the filter changes: each filter starts clean.
+  assert.equal(q("[data-music-search]").value, "");
+  assert.match(text("[data-music-empty-page]"), /There is no music from this device yet\./);
+});
+
+test("the URL filter adds a link with the arrow, and it plays in the official embed", async () => {
+  window.localStorage.clear();
+  mount();
+  await settle();
+  await click(q('[data-music-filter="url"]'));
+  await settle();
+
+  typeInto(q("[data-music-url]"), "https://youtu.be/dQw4w9WgXcQ?si=abc");
+  await settle();
+  // The arrow appears with the text ("jaise hi user inter kare … arrow ka nishan").
+  assert.ok(Boolean(q("[data-music-url-add]")), "the arrow is there once there is something to add");
+
+  await submitForm();
+  await settle();
+
+  // Enter/the arrow plays it straight away — in the platform's own player.
+  assert.equal(q("[data-course-music-panel]").getAttribute("data-music-view"), "player");
+  assert.equal(fixture.panelSession().musicView, "player", "an open player hides the footer");
+  const frame = q('[data-music-embed="youtube"]');
+  assert.ok(Boolean(frame), "the official embed takes over");
+  assert.equal(frame.getAttribute("src"), YOUTUBE_EMBED);
+  assert.match(frame.getAttribute("allow"), /encrypted-media/);
+  assert.equal(frame.hasAttribute("allowfullscreen"), true);
+  assert.equal(q("[data-course-music-panel]").getAttribute("data-music-stage"), "youtube");
+
+  // …and the link is on the shelf for the next visit.
+  const saved = JSON.parse(window.localStorage.getItem("dc.music.library.v1:learner-1"));
+  assert.equal(saved.tracks.length, 1);
+  assert.equal(saved.tracks[0].url, "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+
+  // A link we cannot play is refused with a sentence, and stores nothing.
+  await click(q("[data-music-back]"));
+  await settle();
+  assert.equal(fixture.panelSession().musicView, "library");
+  assert.equal(q("[data-course-music-panel]").getAttribute("data-music-filter"), "url", "the filter is where it was");
+  await click(q('[data-music-filter="url"]'));
+  await settle();
+  typeInto(q("[data-music-url]"), "https://example.test/some/page.html");
+  await submitForm();
+  await settle();
+  assert.match(text("[data-music-notice]"), /not playable here/);
+  assert.equal(JSON.parse(window.localStorage.getItem("dc.music.library.v1:learner-1")).tracks.length, 1);
+});
+
+test("an audio tap opens the lesson player at FULL AREA — no card, back arrow, library glyph", async () => {
   window.localStorage.clear();
   mount();
   await settle();
   const row = q('[data-music-track="course-f1"]');
   assert.ok(Boolean(row), "the course shelf lists the lesson's audio");
-  assert.equal(row.getAttribute("data-music-track-source"), "course");
-  assert.match(row.textContent, /Intro theme/);
-  assert.match(row.textContent, /Basics/);
-  // A course row is not the learner's to delete.
-  assert.equal(Boolean(row.querySelector('button[aria-label^="Remove"]')), false);
-
-  await act(async () => { row.querySelector('button[aria-label^="Play"]').click(); });
+  await click(row.querySelector('button[aria-label^="Play"]'));
   await settle();
-  assert.equal(q("[data-music-stage]").getAttribute("data-music-stage"), "audio");
+
+  assert.equal(q("[data-course-music-panel]").getAttribute("data-music-view"), "player");
+  assert.equal(fixture.panelSession().musicView, "player");
+  assert.ok(Boolean(q('[data-music-player="audio"]')), "the Music page's player is the audio one");
+  // The REAL glass player, in its page (not card) presentation.
   assert.ok(Boolean(q("[data-course-audio-player]")), "the REAL glass player mounts");
-  assert.ok(Boolean(q("[data-course-audio-disc]")), "…with its disc");
-  assert.equal(Boolean(q("[data-music-library-sheet]")), false, "playing a song returns to the stage");
-  // The song is remembered per learner.
-  const stored = JSON.parse(window.localStorage.getItem("dc.music.last.v1:learner-1"));
-  assert.equal(stored.id, "course-f1");
-  assert.equal(stored.title, "Intro theme");
+  assert.ok(Boolean(q("[data-course-audio-disc]")), "…with its vinyl");
+  assert.equal(q("[data-course-audio-player]").getAttribute("data-audio-full-player"), "true");
+  assert.equal(Boolean(q("[data-course-music-player]")), false, "…and no card wrapper at all");
+  assert.equal(Boolean(q("[data-music-library=\"page\"]")), false, "the library page gives way to the player");
+  // Top-left is the BACK arrow now; the library glyph sits on the same row.
+  const back = q("[data-course-audio-back]");
+  assert.ok(Boolean(back), "the top-left control is the back arrow");
+  assert.equal(back.getAttribute("aria-label"), "Back to library");
+  assert.ok(Boolean(q("[data-course-audio-library]")), "a library glyph is on the player");
+
+  // The glyph opens the library OVER the player — the same audio element keeps
+  // playing (a song must not stop because the learner browsed).
+  const audioBefore = q("[data-course-audio-element]");
+  await click(q("[data-course-audio-library]"));
+  await settle();
+  assert.ok(Boolean(q("[data-music-library-panel]")), "the library opens over the player");
+  assert.equal(Boolean(q('[data-music-library="sheet"]')), true);
+  assert.ok(Boolean(q("[data-music-searchbar]")), "…with the same search box");
+  assert.equal(q("[data-course-audio-element]") === audioBefore, true, "the same audio element keeps its playback");
+
+  // …and its arrow goes straight to the full library page (still playing).
+  assert.ok(Boolean(q("[data-music-library-panel] [data-music-open-library]")), "the panel carries the full-page shortcut");
+  await click(q("[data-music-library-panel] [data-music-open-library]"));
+  await settle();
+  assert.equal(Boolean(q("[data-music-library-panel]")), false);
+  assert.ok(Boolean(q('[data-music-library="page"]')), "…the full library page");
+  assert.equal(q("[data-course-audio-element]") === audioBefore, true, "and the song never stopped");
+
+  // The library glyph opens the panel again — the close button shuts it.
+  await click(q("[data-course-audio-library]"));
+  await settle();
+  assert.ok(Boolean(q("[data-music-library-panel]")));
+  await click(q("[data-music-panel-close]"));
+  await settle();
+  assert.equal(Boolean(q("[data-music-library-panel]")), false);
+
+  // The back arrow returns to the library page — without unmounting the song.
+  await click(q("[data-course-audio-back]"));
+  await settle();
+  assert.equal(q("[data-course-music-panel]").getAttribute("data-music-view"), "library");
+  assert.equal(fixture.panelSession().musicView, "library", "the footer navigation comes back");
+  assert.ok(Boolean(q('[data-music-library="page"]')));
+  assert.equal(q("[data-course-audio-element]") === audioBefore, true, "the song is still mounted, just hidden");
 });
 
-test("a pasted YouTube link becomes a library row and the official embed", async () => {
+test("a video opens compact: official player, a draggable divider, the library below", async () => {
   window.localStorage.clear();
   mount();
   await settle();
-  typeInto(q("[data-music-link]"), "https://youtu.be/dQw4w9WgXcQ?si=abc");
-  await act(async () => { q("[data-music-add-link]").click(); });
+  await click(q('[data-music-filter="url"]'));
+  await settle();
+  typeInto(q("[data-music-url]"), "https://youtu.be/dQw4w9WgXcQ");
+  await submitForm();
   await settle();
 
-  const frame = q('[data-music-embed="youtube"]');
-  assert.ok(Boolean(frame), "the embed stage takes over");
-  assert.equal(q("[data-music-stage]").getAttribute("data-music-stage"), "youtube");
-  assert.equal(
-    frame.getAttribute("src"),
-    "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0&modestbranding=1&playsinline=1&controls=1&fs=1&enablejsapi=1",
-  );
-  assert.match(frame.getAttribute("allow"), /encrypted-media/);
-  assert.equal(frame.hasAttribute("allowfullscreen"), true);
+  // The library is the LOWER half, and the divider really separates them.
+  assert.ok(Boolean(q("[data-music-player-divider]")), "the divider exists");
+  assert.ok(Boolean(q("[data-music-video-library]")), "the library is below the player");
+  const divider = q("[data-music-player-divider]");
+  assert.equal(divider.getAttribute("role"), "separator");
+  assert.equal(divider.getAttribute("aria-orientation"), "horizontal");
+  // It is COMPACT by default: nothing is full screen.
+  assert.equal(q("[data-course-music-panel]").getAttribute("data-music-view"), "player");
+  assert.equal(q('[data-music-player="video"]').getAttribute("data-music-video-fullscreen"), "false");
 
-  // …and the link is on the shelf, saved for the next visit.
-  const saved = JSON.parse(window.localStorage.getItem("dc.music.library.v1:learner-1"));
-  assert.equal(saved.tracks.length, 1);
-  assert.equal(saved.tracks[0].provider, "youtube");
-  assert.equal(saved.tracks[0].url, "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  // The compact search bar is shorter and carries the arrow to the full page.
+  assert.ok(Boolean(q("[data-music-open-library]")), "the arrow to the full library page");
+  assert.equal(q("[data-music-searchbar]").getAttribute("data-music-searchbar-layout"), "common".replace("common", "compact"));
+
+  // ── Drag the divider: 100px → 400px of an 800px stage = 50%.
+  const topBefore = q("[data-music-video-pane]");
+  assert.equal(Number.isFinite(Number.parseFloat(topBefore.style.flexGrow)), true);
+  await act(async () => {
+    divider.dispatchEvent(pointerEvent("pointerdown", 400, 100, 7));
+    divider.dispatchEvent(pointerEvent("pointermove", 400, 400, 7));
+  });
+  assert.equal(Number.parseFloat(q("[data-music-video-pane]").style.flexGrow), 50, "the live drag writes the new share");
+  await act(async () => {
+    divider.dispatchEvent(pointerEvent("pointerup", 400, 400, 7));
+  });
+  await settle();
+  assert.equal(q("[data-music-player-divider]").getAttribute("aria-valuenow"), "50", "…and it is committed");
+
+  // ── Full screen hides the divider AND the library; coming back restores both.
+  await click(q("[data-music-fullscreen-toggle]"));
+  await settle();
+  assert.equal(q('[data-music-player="video"]').getAttribute("data-music-video-fullscreen"), "true");
+  assert.equal(Boolean(q("[data-music-player-divider]")), false, "full screen hides the divider");
+  assert.equal(Boolean(q("[data-music-video-library]")), false, "…and the library");
+  assert.ok(Boolean(q('[data-music-embed="youtube"]')), "the player keeps playing");
+  await click(q("[data-music-fullscreen-toggle]"));
+  await settle();
+  assert.equal(q('[data-music-player="video"]').getAttribute("data-music-video-fullscreen"), "false");
+  assert.ok(Boolean(q("[data-music-player-divider]")), "leaving full screen brings the divider back");
+  assert.ok(Boolean(q("[data-music-video-library]")), "…and the library");
+
+  // ── The arrow in the compact search bar jumps to the full library page.
+  await click(q("[data-music-open-library]"));
+  await settle();
+  assert.equal(q("[data-course-music-panel]").getAttribute("data-music-view"), "library");
+  assert.equal(q("[data-course-music-panel]").getAttribute("data-music-filter"), "all");
+  assert.ok(Boolean(q('[data-music-library="page"]')), "…the full-page library");
+  assert.equal(fixture.panelSession().musicView, "library");
+  assert.ok(Boolean(q('[data-music-track]')), "and the saved link is on the shelf");
 });
 
-test("a saved song opens with the pane again — the library survives the visit", async () => {
-  window.localStorage.clear();
-  mount();
-  await settle();
-  typeInto(q("[data-music-link]"), "https://cdn.example.test/Ghost_Love.mp3");
-  await act(async () => { q("[data-music-add-link]").click(); });
-  await settle();
-  assert.equal(q("[data-music-stage]").getAttribute("data-music-stage"), "audio");
-
-  // A brand-new mount (the learner comes back tomorrow) starts on that song.
-  mount();
-  await settle();
-  assert.equal(q("[data-music-stage]").getAttribute("data-music-stage"), "audio");
-  assert.equal(Boolean(q("[data-music-library-sheet]")), false, "a remembered song skips the library");
-  assert.match(q("[data-course-audio-player]").textContent || "", /Ghost Love|/); // the player is mounted on it
-
-  await act(async () => { q("[data-music-library-toggle]").click(); });
-  await settle();
-  const row = qa('[data-music-track]').find((element) => /Ghost Love/.test(element.textContent));
-  assert.ok(Boolean(row), "and the row is still on the shelf");
-  assert.equal(row.getAttribute("data-music-track-source"), "link");
-
-  // Removing it takes it off the shelf AND out of storage.
-  await act(async () => { row.querySelector('button[aria-label^="Remove"]').click(); });
-  await settle();
-  assert.equal(qa('[data-music-track]').some((element) => /Ghost Love/.test(element.textContent)), false);
-  const saved = JSON.parse(window.localStorage.getItem("dc.music.library.v1:learner-1") || '{"tracks":[]}');
-  assert.equal(saved.tracks.length, 0);
-});
-
-test("a link we cannot play is refused with a sentence and stores nothing", async () => {
-  window.localStorage.clear();
-  mount();
-  await settle();
-  typeInto(q("[data-music-link]"), "https://example.test/some/page.html");
-  await act(async () => { q("[data-music-add-link]").click(); });
-  await settle();
-
-  const notice = q("[data-music-notice]");
-  assert.ok(Boolean(notice), "the refusal is visible");
-  assert.match(notice.textContent, /not playable here/);
-  assert.match(notice.textContent, /YouTube, Spotify or SoundCloud/);
-  assert.equal(Boolean(q("[data-music-embed]")), false, "no embed was created");
-  assert.equal(q('[data-music-section="link"]').getAttribute("data-music-section-count"), "0");
-  assert.equal(window.localStorage.getItem("dc.music.library.v1:learner-1"), null);
-});
-
-test("with no YouTube key, search hands the query to YouTube itself", async () => {
-  window.localStorage.clear();
-  mount();
-  await settle();
-  typeInto(q("[data-music-search]"), "arijit singh songs");
-  await settle();
-  const link = q("[data-music-search-external]");
-  assert.ok(Boolean(link), "an anchor, not a silent button");
-  assert.equal(link.getAttribute("target"), "_blank");
-  assert.equal(link.getAttribute("rel"), "noopener noreferrer");
-  assert.equal(link.getAttribute("href"), "https://www.youtube.com/results?search_query=arijit%20singh%20songs");
-  // A per-tab result button only exists when an API key is configured.
-  assert.equal(Boolean(q("[data-music-search-run]")), false);
-});
-
-test("with a YouTube key, search happens INSIDE the player and its results play here", async () => {
+test("online search keeps what the learner looked at, with clean artwork", async () => {
   window.localStorage.clear();
   // The owner's override slot — the same switch `VITE_YOUTUBE_API_KEY` feeds.
   window.localStorage.setItem("dc.music.youtubeKey", "test-key");
@@ -336,147 +566,114 @@ test("with a YouTube key, search happens INSIDE the player and its results play 
       ],
     }),
   });
-  mount();
+  mount({ courseAudio: [] });
   await settle();
-  assert.equal(q("[data-music-search-mode]").getAttribute("data-music-search-mode"), "api");
-  assert.equal(Boolean(q("[data-music-search-run]")), true);
-  assert.equal(Boolean(q("[data-music-search-external]")), false, "no hand-off needed when a key exists");
+  assert.equal(q("[data-music-searchbar]").getAttribute("data-music-search-mode"), "api");
+  assert.ok(Boolean(q("[data-music-search-run]")), "with a key the pane searches inside itself");
 
   typeInto(q("[data-music-search]"), "koi bhi gaana");
-  await act(async () => { q("[data-music-search-run]").click(); });
+  await click(q("[data-music-search-run]"));
   await settle();
+
+  // A search IS an online act: the results land in the online list.
+  assert.equal(q("[data-course-music-panel]").getAttribute("data-music-filter"), "online");
   const results = qa("[data-music-result]");
   assert.equal(results.length, 2);
   assert.match(results[0].textContent, /Never Gonna Give You Up/);
-  assert.match(results[0].textContent, /Rick Astley/);
-  assert.equal(
-    results[0].querySelector("[data-music-result-thumbnail] img").getAttribute("src"),
-    "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
-  );
 
-  // The direct view option on the search/filter page switches the same
-  // results to the large YouTube-style thumbnail + title presentation.
-  await act(async () => { q('[data-music-view-option="youtube"]').click(); });
-  await settle();
-  assert.equal(q("[data-music-results]").getAttribute("data-music-results-view"), "youtube");
-  assert.ok(Boolean(qa("[data-music-result]")[0].querySelector("[data-music-result-thumbnail] img")));
+  // The artwork is a real <img>, edge to edge — nothing washed over it.
+  const image = q("[data-music-result-thumbnail] img");
+  assert.ok(Boolean(image));
+  assert.equal(image.getAttribute("src"), "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg");
+  assert.match(image.className, /object-cover/);
+  let node = image.parentElement;
+  while (node && node !== window.document.body) {
+    assert.doesNotMatch(String(node.className || ""), /bg-white\//, "no white layer over the picture");
+    node = node.parentElement;
+  }
+  assert.equal(Boolean(q("[data-music-result-thumbnail] img")), true, "no overlay element replaces it");
 
-  // Tapping a result plays it right here and keeps it on the shelf.
-  await act(async () => { results[1].click(); });
+  // Leaving Online and coming back keeps what was searched.
+  await click(q('[data-music-filter="course"]'));
   await settle();
-  const frame = q('[data-music-embed="youtube"]');
-  assert.equal(Boolean(frame), true);
-  assert.match(frame.getAttribute("src"), /youtube-nocookie\.com\/embed\/9bZkp7q19f0/);
+  assert.equal(Boolean(q("[data-music-result]")), false);
+  await click(q('[data-music-filter="online"]'));
+  await settle();
+  assert.equal(qa("[data-music-result]").length, 2, "online keeps the results the learner has seen");
+  assert.match(text("[data-music-results]"), /koi bhi gaana/);
+
+  // …and All shows them too: a searched library is not an empty one.
+  await click(q('[data-music-filter="all"]'));
+  await settle();
+  assert.equal(Boolean(q("[data-music-start-options]")), false, "the start column belongs to an EMPTY library");
+  assert.equal(qa("[data-music-result]").length, 2);
+  await click(q('[data-music-filter="online"]'));
+  await settle();
+
+  // Tapping one plays it here AND keeps it on the shelf.
+  await click(qa("[data-music-result]")[1].querySelector('button[aria-label^="Play"]'));
+  await settle();
+  assert.match(q('[data-music-embed="youtube"]').getAttribute("src"), /youtube-nocookie\.com\/embed\/9bZkp7q19f0/);
   const saved = JSON.parse(window.localStorage.getItem("dc.music.library.v1:learner-1"));
   assert.equal(saved.tracks.length, 1);
   assert.equal(saved.tracks[0].url, "https://www.youtube.com/watch?v=9bZkp7q19f0");
 });
 
-test("a key that returns nothing says so and offers the YouTube hand-off", async () => {
+test("with no key the query goes to YouTube itself — and never from the URL box", async () => {
   window.localStorage.clear();
+  mount();
+  await settle();
+  typeInto(q("[data-music-search]"), "arijit singh songs");
+  await settle();
+  const link = q("[data-music-search-external]");
+  assert.ok(Boolean(link), "an anchor, not a silent button");
+  assert.equal(link.getAttribute("target"), "_blank");
+  assert.equal(link.getAttribute("rel"), "noopener noreferrer");
+  assert.equal(link.getAttribute("href"), "https://www.youtube.com/results?search_query=arijit%20singh%20songs");
+  assert.equal(Boolean(q("[data-music-search-run]")), false);
+
+  // The URL filter is a paste box, never a search hand-off.
+  await click(q('[data-music-filter="url"]'));
+  await settle();
+  assert.equal(Boolean(q("[data-music-search-external]")), false);
+  assert.ok(Boolean(q("[data-music-url]")));
+
+  // A key that finds nothing says so and offers the hand-off.
+  await click(q('[data-music-filter="online"]'));
+  await settle();
   window.localStorage.setItem("dc.music.youtubeKey", "test-key");
+  await act(async () => { window.dispatchEvent(new window.Event("dc:music-youtube-key")); });
+  await settle();
   fetchResponder = () => ({ ok: false, status: 403, json: () => Promise.resolve({}) });
-  mount();
-  await settle();
   typeInto(q("[data-music-search]"), "quota khatam");
-  await act(async () => { q("[data-music-search-run]").click(); });
+  await click(q("[data-music-search-run]"));
   await settle();
-  assert.equal(Boolean(q("[data-music-no-results]")), true);
-  assert.match(q("[data-music-notice]").textContent, /quota ya network/);
-  assert.equal(
-    q("[data-music-no-results] a").getAttribute("href"),
-    "https://www.youtube.com/results?search_query=quota%20khatam",
-  );
+  assert.ok(Boolean(q("[data-music-no-results]")), "the pane says so");
+  assert.match(text("[data-music-notice]"), /quota ya network/);
+  assert.equal(q("[data-music-no-results] a").getAttribute("href"), "https://www.youtube.com/results?search_query=quota%20khatam");
 });
 
-test("Course, Device and Online filters show one shelf at a time", async () => {
+test("the pane's shape follows the PANE, not the viewport", async () => {
   window.localStorage.clear();
+  // A narrow split column (a phone, or a hard-dragged divider) → rows.
+  paneWidth = 380;
   mount();
   await settle();
-  typeInto(q("[data-music-link]"), "https://cdn.example.test/Filter_Song.mp3");
-  await act(async () => { q("[data-music-add-link]").click(); });
+  assert.equal(q("[data-course-music-panel]").getAttribute("data-music-layout"), "compact");
+  await click(q('[data-music-filter="url"]'));
   await settle();
-  await act(async () => { q("[data-music-library-toggle]").click(); });
+  typeInto(q("[data-music-url]"), "https://cdn.example.test/Filter_Song.mp3");
+  await submitForm();
   await settle();
+  await click(q("[data-course-audio-back]"));
+  await settle();
+  assert.equal(q('[data-music-list="list"]')?.getAttribute("data-music-list"), "list", "a narrow pane lists rows");
 
-  await act(async () => { q('[data-music-filter="online"]').click(); });
+  // A wide pane gets the thumbnail grid (and a fresh visit to prove it).
+  paneWidth = 1200;
+  mount({ key: "wide-visit" });
   await settle();
-  assert.equal(Boolean(q('[data-music-section="course"]')), false);
-  assert.equal(Boolean(q('[data-music-section="upload"]')), false);
-  assert.equal(q('[data-music-section="link"]').getAttribute("data-music-section-count"), "1");
-
-  await act(async () => { q('[data-music-filter="device"]').click(); });
-  await settle();
-  assert.equal(q('[data-music-section="upload"]').getAttribute("data-music-section-count"), "0");
-  assert.equal(Boolean(q('[data-music-section="link"]')), false);
-
-  await act(async () => { q('[data-music-filter="course"]').click(); });
-  await settle();
-  assert.equal(q('[data-music-section="course"]').getAttribute("data-music-section-count"), "1");
-  assert.equal(Boolean(q('[data-music-section="upload"]')), false);
-});
-
-test("opening the library does not unmount the playing glass player", async () => {
-  window.localStorage.clear();
-  mount();
-  await settle();
-  const row = q('[data-music-track="course-f1"]');
-  await act(async () => { row.querySelector('button[aria-label^="Play"]').click(); });
-  await settle();
-  const playerBefore = q("[data-course-audio-player]");
-  const audioBefore = q("[data-course-audio-element]");
-  assert.ok(Boolean(playerBefore));
-
-  await act(async () => { q("[data-music-library-toggle]").click(); });
-  await settle();
-  assert.equal(Boolean(q("[data-music-library-sheet]")), true);
-  assert.equal(q("[data-course-audio-player]") === playerBefore, true, "the same player stays mounted");
-  assert.equal(q("[data-course-audio-element]") === audioBefore, true, "the same audio element keeps its playback state");
-});
-
-test("a YouTube song can switch between audio-style and embedded video", async () => {
-  window.localStorage.clear();
-  mount();
-  await settle();
-  typeInto(q("[data-music-link]"), "https://youtu.be/dQw4w9WgXcQ");
-  await act(async () => { q("[data-music-add-link]").click(); });
-  await settle();
-  assert.equal(q("[data-music-youtube-player]").getAttribute("data-music-youtube-mode"), "video");
-  const frameBefore = q('[data-music-embed="youtube"]');
-
-  await act(async () => { q('[data-music-youtube-mode-option="audio"]').click(); });
-  await settle();
-  assert.equal(q("[data-music-youtube-player]").getAttribute("data-music-youtube-mode"), "audio");
-  assert.ok(Boolean(q("[data-music-youtube-audio]")), "the audio-style surface is shown");
-  assert.equal(q("[data-music-youtube-thumbnail]").getAttribute("src"), "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg");
-  assert.ok(Boolean(q("[data-music-youtube-play-toggle]")), "audio mode has its own play control");
-  assert.equal(q('[data-music-embed="youtube"]') === frameBefore, true, "switching presentation does not replace the official embed");
-
-  await act(async () => { q('[data-music-youtube-mode-option="video"]').click(); });
-  await settle();
-  assert.equal(q("[data-music-youtube-player]").getAttribute("data-music-youtube-mode"), "video");
-});
-
-test("the library's search filters every shelf at once", async () => {
-  window.localStorage.clear();
-  mount();
-  await settle();
-  typeInto(q("[data-music-link]"), "https://cdn.example.test/Only_Song.mp3");
-  await act(async () => { q("[data-music-add-link]").click(); });
-  await settle();
-  await act(async () => { q("[data-music-library-toggle]").click(); });
-  await settle();
-
-  assert.equal(q('[data-music-section="course"]').getAttribute("data-music-section-count"), "1");
-  assert.equal(q('[data-music-section="link"]').getAttribute("data-music-section-count"), "1");
-
-  typeInto(q("[data-music-search]"), "only");
-  await settle();
-  assert.equal(q('[data-music-section="course"]').getAttribute("data-music-section-count"), "0");
-  assert.equal(q('[data-music-section="link"]').getAttribute("data-music-section-count"), "1");
-
-  typeInto(q("[data-music-search]"), "nothing matches this");
-  await settle();
-  assert.equal(q('[data-music-section="link"]').getAttribute("data-music-section-count"), "0");
-  assert.match(host().textContent, /Kuch nahin mila/);
+  assert.equal(q("[data-course-music-panel]").getAttribute("data-music-layout"), "wide");
+  assert.equal(q('[data-music-list="grid"]')?.getAttribute("data-music-list"), "grid", "a wide pane shows thumbnail cards");
+  assert.equal(q("[data-music-open-library]"), null, "the full library page needs no shortcut for itself");
 });

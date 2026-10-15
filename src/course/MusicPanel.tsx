@@ -1,60 +1,91 @@
 // src/course/MusicPanel.tsx
 //
-// Course Player → the MUSIC tab of the footer navigation.
+// Course Player → the MUSIC tab. Rebuilt to the owner's brief (2026-10-15):
 //
-// Owner brief (2026-10-14):
+//   "music page open hote hi header ki jagah per search bar hoga YouTube wala
+//    aur use search bar ke niche horizontal tray hoga jiska color pura white
+//    hoga aur use tray per sabhi button honge jo abhi already hain filter
+//    button aur usmein ek aur button add karna hai URL ka … aur filter ke
+//    according actual mein sabhi pages per jo bhi audio ya video hongi
+//    accordingly list ya thumbnail format mein proper dekhe … aur jab user
+//    kisi bhi audio per click karega to kaisa interface open hoga — agar koi
+//    audio hai to audio player mein open hoga jo already course ka audio player
+//    hai … aur agar koi YouTube ka video hai ya koi online URL hai, matlab
+//    jiska video chal sakta hai, vah vaise hi YouTube player ke sath open ho."
 //
-//   "Course player mein footer navigation mein ek aur button add karo music
-//    ka — click karne par music ka vahi already design UI jo course player ke
-//    andar hai vahi open ho, aur usmein LIBRARY ka button ho. Library par click
-//    karte hi user har tarah ka song — poori library ka, internet ka koi bhi
-//    song — play kar sake."
+// ── ONE page, ONE search box, ONE white tray ──────────────────────────────
+// The pane has exactly two places to be:
 //
-// ── Same player, no fork ──────────────────────────────────────────────────
-// The "already designed UI" is the AI Canvas Glass Music Player the lessons
-// use (`src/course/AudioPlayer.tsx`). This pane renders THAT component — no
-// copy, no restyle — so the disc, the transport row and the per-song colour
-// are byte-identical to the lesson player, and a fix there lands here too.
+//   LIBRARY (the page the tab opens on — and the page the footer navigation
+//   belongs to)
+//     1. the YouTube-style search bar, where a header used to be. It is the
+//        SAME box in every filter, and its behaviour follows the filter
+//        (`musicFilters.ts`): a library/online search, a plain filter for
+//        Course and Device, and a real URL input for URL — where the arrow
+//        appears the moment something is pasted and Enter adds it straight
+//        away;
+//     2. the horizontal tray under it: pure white, every filter button in ONE
+//        list with the All button FIRST (All · Course · Device · Online · URL),
+//        scrolling sideways on a narrow phone and centring on a wide pane;
+//     3. the list the filter asks for — rows on a narrow pane, thumbnail
+//        cards on a wide one, a proper audio tile for a song with no artwork,
+//        NEVER a white wash over a picture (the reported bug);
+//     4. the bottom-right ＋ button, which belongs to the Device filter: tap
+//        it and the learner's own file picker opens;
+//     5. the honest empty page per filter ("Search to view library", "There is
+//        no audio from this course.", …) and, while the whole library IS empty,
+//        the All filter's centred column of options (Search online · Device ·
+//        Course audio · URL) to start from.
 //
-// ── The LIBRARY (the button inside the player) ────────────────────────────
-// One responsive library workspace, three shelves, all of it playable:
+//   PLAYER (what a tap opens — the footer navigation hides here)
+//     · AUDIO  → the course's own glass player, in its FULL-AREA presentation
+//       (`AudioPlayer presentation="full"`): no card, the whole pane, laid out
+//       live from the pane's own measurement so a divider drag really widens
+//       it. Top-left is the BACK arrow (back to the library page) and a
+//       library glyph opens the library over it — the learner's own files,
+//       saved links and course audio stay one tap away while a song plays.
+//     · VIDEO (YouTube / Spotify / SoundCloud) → that platform's OWN official
+//       player on top, the library below it, and a DRAGGABLE HORIZONTAL
+//       divider in between. Full screen hides the divider and the library;
+//       coming back brings both straight back. In this compact shape the
+//       search bar is shorter and carries an ARROW on its right — one tap and
+//       the learner is on the full library page.
 //
-//   · COURSE AUDIO — every `type: "audio"` resource in this course, with its
-//     module path. Already in the player; now it is one tap away.
-//   · MY FILES     — the learner's own songs, picked off the device. They are
-//     stored locally (IndexedDB, `musicDb.ts`) and never uploaded anywhere.
-//   · LINKS        — a pasted YouTube / Spotify / SoundCloud / direct-audio
-//     URL. Each one plays through that platform's OWN official surface: the
-//     same youtube-nocookie embed the lessons use, Spotify's embed player,
-//     SoundCloud's widget, or the glass player itself for a plain file.
+// The library panel (over the audio player) and the video player's lower half
+// are the SAME surface as the library page — one implementation, three homes —
+// so every search/filter/empty-state rule holds everywhere by construction.
 //
-// Search goes through YouTube's official Data API when a key is configured
-// (`musicSearch.ts`) and otherwise hands the query to YouTube's own search
-// page, whose link the learner pastes straight back — which this library
-// plays. Nothing here scrapes a stream or bypasses a platform's player.
-//
-// ── Playing while the learner studies ─────────────────────────────────────
-// The pane takes the same `active` flag every player surface does: leaving the
-// tab pauses a song (the glass player banks its position; an embed is
-// unmounted so it cannot keep singing behind a Notes page) and coming back
-// resumes it.
+// Sources are unchanged and honest: course audio, the learner's own device
+// files (local IndexedDB), pasted links, and every online song played in the
+// platform's OFFICIAL embed. Nothing here scrapes a stream (pinned by tests).
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AudioLines, ExternalLink, LayoutGrid, Library, Link2, LoaderCircle, MonitorPlay, Music, Music2,
-  Pause, Play, Rows3, Search, Trash2, Upload, X,
+  useCallback, useEffect, useMemo, useRef, useState,
+  type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode,
+} from "react";
+import {
+  ArrowLeft, ArrowRight, AudioLines, ChevronRight, ExternalLink, Globe, LayoutGrid, Link2, LoaderCircle,
+  Maximize2, Minimize2, Music, Plus, Rows3, Search, X,
 } from "lucide-react";
 import AudioPlayer from "./AudioPlayer";
 import { toast } from "../components/ui/glass-toast";
 import {
-  MUSIC_UPLOAD_MAX_BYTES, addMusicLink, filterMusicTracks, loadLastMusic, loadMusicLinks,
-  musicRowBadge, removeMusicLink, saveLastMusic, saveMusicLinks, youTubeIdFrom,
-  youTubeThumbnailUrl, type MusicTrack,
+  MUSIC_UPLOAD_MAX_BYTES, addMusicLink, loadLastMusic, loadMusicLinks, removeMusicLink, saveLastMusic,
+  saveMusicLinks, type MusicSource, type MusicTrack,
 } from "./musicLibrary";
 import { listLocalSongs, removeLocalSong, songObjectUrl, storeLocalSong } from "./musicDb";
 import {
   resolveMusicTitle, searchYouTube, subscribeYouTubeKey, youTubeSearchAvailable, youTubeSearchUrl,
 } from "./musicSearch";
+import {
+  MUSIC_EMPTY_HINT, MUSIC_EMPTY_TITLE, MUSIC_FILTERS, MUSIC_FILTER_HINT, MUSIC_FILTER_LABEL, MUSIC_NO_MATCH,
+  MUSIC_SEARCH_PLACEHOLDER, MUSIC_SHELF_TITLE, MUSIC_START_OPTIONS, isUrlFilter, musicAddFabVisible,
+  musicFilterCount, musicQueryFilter, musicShelvesForFilter, musicStartOptionsVisible,
+  type MusicFilter, type MusicLibraryCounts,
+} from "./musicFilters";
+import { MusicEmptyPage, MusicTrackList } from "./MusicTrackList";
+import { setMusicSessionView } from "./coursePanelSession";
+import { DIVIDER_HIT, DIVIDER_LINE } from "./splitMotion";
 
 interface MusicPanelProps {
   /** The signed-in learner — the library and the local songs are keyed on it. */
@@ -65,83 +96,104 @@ interface MusicPanelProps {
   active?: boolean;
 }
 
-type Shelf = "course" | "upload" | "link";
-type LibraryFilter = "all" | "course" | "device" | "online";
-type OnlineView = "list" | "youtube";
-type YouTubeDisplayMode = "audio" | "video";
-type MusicLayoutMode = "compact" | "wide";
+/** The pane's two places: the library page, and an open player. */
+type MusicView = "library" | "player";
+/** `auto` = rows on a narrow pane, thumbnail cards on a wide one. */
+type Density = "auto" | "list" | "grid";
+type SurfaceMode = "page" | "sheet" | "video";
 
-const SHELF_TITLE: Record<Shelf, string> = {
-  course: "Course",
-  upload: "Device",
-  link: "Online",
+/** How much of the pane the video player may take (%). */
+const MIN_PLAYER_SHARE = 26;
+const MAX_PLAYER_SHARE = 84;
+/** The pane is "wide" from here: cards, side-by-side layouts, no cramping. */
+const WIDE_PANE_PX = 620;
+
+const FILTER_ICON: Record<MusicFilter, ReactNode> = {
+  all: <LayoutGrid size={14} />,
+  course: <AudioLines size={14} />,
+  device: <Music size={14} />,
+  online: <Globe size={14} />,
+  url: <Link2 size={14} />,
 };
 
-const SHELF_EMPTY: Record<Shelf, string> = {
-  course: "This course has no audio lesson yet.",
-  upload: "No songs from your device yet.",
-  link: "No links saved yet.",
+const START_ICON: Record<string, ReactNode> = {
+  "search-online": <Search size={18} />,
+  device: <Plus size={18} />,
+  course: <AudioLines size={18} />,
+  url: <Link2 size={18} />,
 };
-
-const providerIcon = (track: MusicTrack) =>
-  track.provider === "youtube" ? <Play size={15} />
-    : track.provider === "soundcloud" ? <Music2 size={15} />
-    : track.provider === "spotify" ? <Music size={15} />
-    : <AudioLines size={15} />;
-
-/** Search artwork travels with the row; older/pasted YouTube rows derive it. */
-const thumbnailForTrack = (track: MusicTrack): string =>
-  track.thumbnailUrl || (track.provider === "youtube" ? youTubeThumbnailUrl(youTubeIdFrom(track.url)) : "");
 
 export default function MusicPanel({ uid = null, courseAudio = [], active = true }: MusicPanelProps) {
   const [links, setLinks] = useState<MusicTrack[]>(() => loadMusicLinks(uid));
   const [uploads, setUploads] = useState<MusicTrack[]>([]);
   const [current, setCurrent] = useState<MusicTrack | null>(() => loadLastMusic(uid));
-  const [sheetOpen, setSheetOpen] = useState(() => !loadLastMusic(uid));
+  const [view, setView] = useState<MusicView>("library");
+  const [filter, setFilter] = useState<MusicFilter>("all");
   const [query, setQuery] = useState("");
-  const [linkDraft, setLinkDraft] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<MusicTrack[]>([]);
+  const [searched, setSearched] = useState(false);
+  /** The query that produced the results — kept apart from the box's text, so
+   *  the Online list keeps what the learner has already searched even after
+   *  they switch filters (which clears the box). */
+  const [searchedQuery, setSearchedQuery] = useState("");
   const [playUrl, setPlayUrl] = useState("");
   const [resolving, setResolving] = useState(false);
+  /** The library, opened OVER the audio player by the library glyph. */
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [density, setDensity] = useState<Density>("auto");
+  const [layout, setLayout] = useState<"compact" | "wide">("compact");
+  const [playerShare, setPlayerShare] = useState(58);
+  const [dragging, setDragging] = useState(false);
+  /** Our own full-area mode (the toggle the learner presses). */
+  const [immersive, setImmersive] = useState(false);
+  /** The browser's Fullscreen API — the same element, the platform's button. */
+  const [nativeFull, setNativeFull] = useState(false);
+  const [searchKeyReady, setSearchKeyReady] = useState(youTubeSearchAvailable);
+
+  const panelRef = useRef<HTMLElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   /** The blob URL currently held for a local song — revoked before the next one. */
   const blobUrlRef = useRef("");
-  /**
-   * A YouTube Data API key is what turns the search box into an in-player
-   * result list (`musicSearch.ts`). It is read at render, and re-read the
-   * moment a key is injected or cleared, so the owner can set one in a live
-   * browser and watch the button appear.
-   */
-  const [searchKeyReady, setSearchKeyReady] = useState(youTubeSearchAvailable);
-  const [searched, setSearched] = useState(false);
-  const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>("all");
-  const [onlineView, setOnlineView] = useState<OnlineView>("list");
-  const [youTubeMode, setYouTubeMode] = useState<YouTubeDisplayMode>("video");
-  const [youTubePlaying, setYouTubePlaying] = useState(false);
-  const [layoutMode, setLayoutMode] = useState<MusicLayoutMode>("compact");
-  const panelRef = useRef<HTMLElement>(null);
-  const youTubeFrameRef = useRef<HTMLIFrameElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const paneTopRef = useRef<HTMLDivElement>(null);
+  const paneLibraryRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<number | null>(null);
+  const shareRef = useRef(playerShare);
+
+  const fullscreen = immersive || nativeFull;
 
   useEffect(() => subscribeYouTubeKey(() => setSearchKeyReady(youTubeSearchAvailable())), []);
 
   /**
-   * The split pane — not the browser viewport — decides the workspace shape.
-   * A wide pane puts the library beside the player; a narrow one stacks the
-   * library inside the same available area, below the player. Watching the
-   * panel itself means dragging the Course Player divider reflows it live.
+   * The pane — not the viewport — decides the workspace shape: a wide pane
+   * gets thumbnail cards and side-by-side layouts, a narrow one stays a
+   * comfortable column. Watching the panel itself means dragging the Course
+   * Player divider reflows the music page live.
    */
   useEffect(() => {
     const node = panelRef.current;
     if (!node) return undefined;
-    const update = () => setLayoutMode(node.clientWidth >= 640 ? "wide" : "compact");
+    const update = () => setLayout(node.clientWidth >= WIDE_PANE_PX ? "wide" : "compact");
     update();
     if (typeof ResizeObserver === "undefined") return undefined;
     const observer = new ResizeObserver(update);
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
+
+  /**
+   * The footer navigation rule: while a PLAYER is open this pane hides it, and
+   * the moment the learner is back on a library page it returns
+   * (coursePanelSession.ts → `isFooterHiddenPage`). Leaving the tab resets it,
+   * so the footer can never be left hidden.
+   */
+  useEffect(() => {
+    setMusicSessionView(view === "player" ? "player" : "library");
+    return () => setMusicSessionView("library");
+  }, [view]);
 
   /**
    * Load the learner's own files. A local database that refuses (private
@@ -158,8 +210,7 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
   /**
    * A different learner (or a sign-out) starts from THEIR shelf. This must not
    * run on the first render — the initial state already read storage, and
-   * re-reading here would force the library open over a song the learner had
-   * left playing (pinned by the music pane runtime test).
+   * re-reading here would throw away a song the learner had left playing.
    */
   const uidRef = useRef(uid);
   useEffect(() => {
@@ -167,11 +218,14 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
     uidRef.current = uid;
     setLinks(loadMusicLinks(uid));
     setCurrent(loadLastMusic(uid));
-    setSheetOpen(true);
+    setView("library");
+    setFilter("all");
+    setQuery("");
+    setSheetOpen(false);
   }, [uid]);
 
   /**
-   * Resolve what the stage actually plays: a stored song needs a blob URL from
+   * Resolve what the player actually plays: a stored song needs a blob URL from
    * the local database; every other provider already carries its URL.
    */
   useEffect(() => {
@@ -191,85 +245,78 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
     return () => { cancelled = true; };
   }, [uid, current]);
 
+  /** The URL box is the one box that must be ready to paste the moment it appears. */
+  useEffect(() => {
+    if (filter !== "url" || view !== "library") return;
+    const id = window.setTimeout(() => searchRef.current?.focus(), 30);
+    return () => window.clearTimeout(id);
+  }, [filter, view]);
+
+  /** The platform's own fullscreen button (and ours) both land here. */
+  useEffect(() => {
+    const doc = typeof document === "undefined" ? null : document;
+    if (!doc?.addEventListener) return undefined;
+    const onChange = () => {
+      const element = doc.fullscreenElement || null;
+      setNativeFull(Boolean(element) && Boolean(stageRef.current && (stageRef.current === element || stageRef.current.contains(element))));
+    };
+    doc.addEventListener("fullscreenchange", onChange);
+    return () => doc.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  /** Leave the browser's fullscreen, wherever it was entered from. */
+  const exitNativeFullscreen = useCallback(() => {
+    if (typeof document === "undefined") return;
+    if (!document.fullscreenElement) return;
+    try { void document.exitFullscreen?.(); } catch { /* the pane is already back */ }
+  }, []);
+
+  /** Unmounting the pane (leaving the Course Player) leaves full screen too. */
+  useEffect(() => exitNativeFullscreen, [exitNativeFullscreen]);
+
+  const backToLibrary = useCallback(() => {
+    setView("library");
+    setSheetOpen(false);
+    setImmersive(false);
+    setNativeFull(false);
+    exitNativeFullscreen();
+  }, [exitNativeFullscreen]);
+
   const select = useCallback((track: MusicTrack) => {
     setCurrent(track);
     saveLastMusic(uid, track);
     setNotice("");
-    // Wide workspaces keep the library beside the playing song. Compact
-    // workspaces return to the full player so the chosen song gets the area.
-    if (layoutMode === "compact") setSheetOpen(false);
-  }, [layoutMode, uid]);
+    setSheetOpen(false);
+    setImmersive(false);
+    setView("player");
+  }, [uid]);
 
-  const courseTracks = courseAudio;
-  const shelves: Array<{ shelf: Shelf; tracks: MusicTrack[] }> = useMemo(() => ([
-    { shelf: "course", tracks: filterMusicTracks(courseTracks, query) },
-    { shelf: "upload", tracks: filterMusicTracks(uploads, query) },
-    { shelf: "link", tracks: filterMusicTracks(links, query) },
-  ]), [courseTracks, uploads, links, query]);
-
-  const total = courseTracks.length + uploads.length + links.length;
-  const visibleShelves = shelves.filter(({ shelf }) =>
-    libraryFilter === "all"
-    || (libraryFilter === "course" && shelf === "course")
-    || (libraryFilter === "device" && shelf === "upload")
-    || (libraryFilter === "online" && shelf === "link"));
-  const showSearchResults = results.length > 0 && (libraryFilter === "all" || libraryFilter === "online");
-  const libraryFilters: Array<{ key: LibraryFilter; label: string; count: number }> = [
-    { key: "all", label: "All", count: total },
-    { key: "course", label: "Course", count: courseTracks.length },
-    { key: "device", label: "Device", count: uploads.length },
-    { key: "online", label: "Online", count: links.length },
-  ];
-
-  useEffect(() => {
-    setYouTubePlaying(false);
-  }, [current?.id]);
-
-  /** The official embed accepts the IFrame API's own command channel. */
-  const sendYouTubeCommand = useCallback((func: "playVideo" | "pauseVideo") => {
-    const frame = youTubeFrameRef.current;
-    if (!frame?.contentWindow) return;
-    let origin = "*";
-    try {
-      origin = new URL(frame.src).origin;
-    } catch {
-      /* the frame's own origin is only a postMessage target, never a URL we build */
-    }
-    frame.contentWindow.postMessage(
-      JSON.stringify({ event: "command", func, args: [] }),
-      origin,
-    );
+  const chooseFilter = useCallback((next: MusicFilter) => {
+    setFilter(next);
+    setQuery("");
+    setNotice("");
   }, []);
 
-  const chooseYouTubeMode = useCallback((mode: YouTubeDisplayMode) => {
-    setYouTubeMode(mode);
-    if (mode === "audio") {
-      // Start from a known state under the artwork: the learner presses the
-      // large audio control when they want the sound to begin.
-      setYouTubePlaying(false);
-      sendYouTubeCommand("pauseVideo");
-    }
-  }, [sendYouTubeCommand]);
+  const openFullLibrary = useCallback(() => {
+    backToLibrary();
+    chooseFilter("all");
+  }, [backToLibrary, chooseFilter]);
 
-  const toggleYouTubePlayback = useCallback(() => {
-    const next = !youTubePlaying;
-    setYouTubePlaying(next);
-    sendYouTubeCommand(next ? "playVideo" : "pauseVideo");
-  }, [sendYouTubeCommand, youTubePlaying]);
+  /* ── Adding music ─────────────────────────────────────────────────────── */
 
   /** Add a pasted link, then rename the row from the platform's own oEmbed. */
-  const addLink = useCallback(async () => {
-    const raw = linkDraft.trim();
-    if (!raw) return;
-    const added = addMusicLink(uid, raw);
+  const addLink = useCallback(async (raw: string) => {
+    const value = String(raw || "").trim();
+    if (!value) return;
+    const added = addMusicLink(uid, value);
     if (!added) {
       setNotice("That link is not playable here. Paste a YouTube, Spotify or SoundCloud link, or a direct .mp3 / .m4a file.");
       return;
     }
-    setLinkDraft("");
+    setQuery("");
+    setNotice("");
     setLinks(added.tracks);
     select(added.track);
-    setNotice("");
     // The platform's own oEmbed knows the real song name — ask it once, and
     // rename the row in place. A failure just leaves the fallback title.
     if (added.track.provider !== "audio") {
@@ -279,9 +326,9 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
       const next = loadMusicLinks(uid).map((row) => (row.id === renamed.id ? renamed : row));
       saveMusicLinks(uid, next);
       setLinks(next);
-      setCurrent((current) => (current && current.id === renamed.id ? renamed : current));
+      setCurrent((value) => (value && value.id === renamed.id ? renamed : value));
     }
-  }, [linkDraft, uid, select]);
+  }, [uid, select]);
 
   const onPickFile = useCallback(async (file: File | null | undefined) => {
     if (!file) return;
@@ -312,409 +359,700 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
     if (current?.id === track.id) { setCurrent(null); saveLastMusic(uid, null); }
   }, [uid, current]);
 
+  /* ── Searching online (key-gated, never a scraper) ────────────────────── */
+
   const runSearch = useCallback(async () => {
     const text = query.trim();
     if (!text || !searchKeyReady) return;
     setBusy(true);
+    // A search is an ONLINE act: the results are shown in the Online list, and
+    // they stay there for the rest of the visit — "online filter mein vah
+    // sabhi dikhenge jo user search karke dekh chuka hai".
+    if (filter === "all") setFilter("online");
     const found = await searchYouTube(text);
     setResults(found);
     setSearched(true);
-    setLibraryFilter("online");
-    // A key can be valid and still return nothing (quota, offline, a
-    // filter). Say so, and hand the query to YouTube itself.
+    setSearchedQuery(text);
+    // A key can be valid and still return nothing (quota, offline, a filter).
+    // Say so, and hand the query to YouTube itself.
     setNotice(found.length ? "" : "YouTube se results nahin mile (quota ya network). Neeche wale link se YouTube par search karo, phir link yahan paste kar do.");
     setBusy(false);
-  }, [query, searchKeyReady]);
+  }, [filter, query, searchKeyReady]);
 
-  const stageVisible = Boolean(current) && active;
-  const embed = current && current.provider !== "audio" ? current.embedUrl : "";
+  const submitSearch = useCallback(async () => {
+    if (isUrlFilter(filter)) { await addLink(query); return; }
+    if (filter === "all" || filter === "online") await runSearch();
+  }, [addLink, filter, query, runSearch]);
 
-  const workspaceStyle = layoutMode === "wide"
-    ? { gridTemplateColumns: sheetOpen ? "minmax(300px, 42%) minmax(0, 1fr)" : "minmax(0, 1fr)" }
-    : { gridTemplateRows: sheetOpen ? "minmax(240px, 42%) minmax(0, 1fr)" : "minmax(0, 1fr)" };
+  const playResult = useCallback((track: MusicTrack) => {
+    const added = addMusicLink(uid, track.url);
+    if (added) setLinks(added.tracks);
+    select(track);
+  }, [uid, select]);
 
-  return (
-    <section ref={panelRef} className="flex h-full min-h-0 flex-col overflow-hidden bg-[#f6f7f9] text-slate-900" data-course-music-panel data-music-active={active ? "true" : "false"}>
-      {/* No separate page header: the player itself owns the whole surface,
-          and its Library control lives inside that surface. On a wide split
-          the library takes the neighbouring column; on a narrow split it
-          takes the lower part of this same workspace. The stage stays in
-          the same grid cell either way, so opening the library never
-          unmounts a playing song. */}
-      <div
-        className="grid min-h-0 min-w-0 flex-1"
-        data-music-layout={layoutMode}
-        data-music-library-open={sheetOpen ? "true" : "false"}
-        style={workspaceStyle}
+  const chooseStartOption = useCallback((id: string, nextFilter: MusicFilter) => {
+    chooseFilter(nextFilter);
+    if (id === "device") fileRef.current?.click();
+  }, [chooseFilter]);
+
+  /* ── Full screen + the draggable divider ──────────────────────────────── */
+
+  const toggleFullscreen = useCallback(async () => {
+    if (fullscreen) {
+      setImmersive(false);
+      setNativeFull(false);
+      exitNativeFullscreen();
+      return;
+    }
+    setImmersive(true);
+    try { await stageRef.current?.requestFullscreen?.(); } catch { /* iOS: the in-app full area is the fallback */ }
+  }, [exitNativeFullscreen, fullscreen]);
+
+  const shareFromClientY = useCallback((clientY: number) => {
+    const stage = stageRef.current;
+    if (!stage) return null;
+    const rect = stage.getBoundingClientRect();
+    if (!rect.height) return null;
+    const share = Math.min(MAX_PLAYER_SHARE, Math.max(MIN_PLAYER_SHARE, ((clientY - rect.top) / rect.height) * 100));
+    shareRef.current = share;
+    return share;
+  }, []);
+
+  const onDividerPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    dragRef.current = event.pointerId;
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* fine without capture */ }
+    setDragging(true);
+  }, []);
+
+  const onDividerPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (dragRef.current !== event.pointerId) return;
+    const share = shareFromClientY(event.clientY);
+    if (share === null) return;
+    // The live drag writes straight to the DOM (no React re-render per frame);
+    // the committed value lands in state on pointer-up.
+    if (paneTopRef.current) paneTopRef.current.style.flexGrow = String(share);
+    if (paneLibraryRef.current) paneLibraryRef.current.style.flexGrow = String(100 - share);
+  }, [shareFromClientY]);
+
+  const onDividerPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (dragRef.current !== event.pointerId) return;
+    dragRef.current = null;
+    setDragging(false);
+    setPlayerShare(shareRef.current);
+    try { event.currentTarget.releasePointerCapture?.(event.pointerId); } catch { /* ignore */ }
+    if (paneTopRef.current) paneTopRef.current.style.removeProperty("flex-grow");
+    if (paneLibraryRef.current) paneLibraryRef.current.style.removeProperty("flex-grow");
+  }, []);
+
+  const onDividerKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    event.preventDefault();
+    const step = event.key === "ArrowDown" ? 6 : -6;
+    const next = Math.min(MAX_PLAYER_SHARE, Math.max(MIN_PLAYER_SHARE, shareRef.current + step));
+    shareRef.current = next;
+    setPlayerShare(next);
+  }, []);
+
+  /* ── What every surface is built from ─────────────────────────────────── */
+
+  const courseTracks = courseAudio;
+  const shelfTracks = useCallback((source: MusicSource): MusicTrack[] =>
+    source === "course" ? courseTracks : source === "upload" ? uploads : links, [courseTracks, uploads, links]);
+
+  /** Search results the learner has not saved yet — the Online list's top half. */
+  const freshResults = useMemo(
+    () => results.filter((row) => !links.some((saved) => saved.url === row.url)),
+    [results, links],
+  );
+
+  const counts: MusicLibraryCounts = {
+    // A searched (but not yet saved) result is music the learner has in front
+    // of them, so it counts: the All filter's start column is for a library
+    // that really is empty.
+    total: courseTracks.length + uploads.length + links.length + freshResults.length,
+    course: courseTracks.length,
+    device: uploads.length,
+    online: links.length + freshResults.length,
+    url: links.length,
+  };
+
+  const urlMode = isUrlFilter(filter);
+  /** The one search box: a live filter everywhere, a URL input in URL. */
+  const effectiveQuery = urlMode ? "" : query;
+  const shelves = musicShelvesForFilter(filter);
+  const startOptions = musicStartOptionsVisible(filter, counts) && !query.trim();
+  const densityMode: "list" | "grid" = density === "auto" ? (layout === "wide" ? "grid" : "list") : density;
+  // The results belong to the ONLINE shelf: they stay listed while the learner
+  // is on All or Online, whatever the search box currently says.
+  const showResults = (filter === "all" || filter === "online") && searched;
+  const noResults = showResults && results.length === 0 && searchKeyReady;
+  const showCardsToggle = shelves.includes("link") || showResults;
+
+  const visibleSections = shelves
+    .map((source) => ({ source, tracks: musicQueryFilter(shelfTracks(source), effectiveQuery) }))
+    .filter(({ tracks }) => tracks.length > 0);
+  const rowsVisible = visibleSections.length > 0 || (showResults && freshResults.length > 0);
+
+  /* ── The pieces ───────────────────────────────────────────────────────── */
+
+  const searchBar = ({ compact, onOpenFullPage }: { compact: boolean; onOpenFullPage?: () => void }) => {
+    const height = compact ? "h-10" : "h-11";
+    const canSearchOnline = filter === "all" || filter === "online";
+    return (
+      <form
+        onSubmit={(event) => { event.preventDefault(); void submitSearch(); }}
+        className="flex w-full min-w-0 items-center gap-2"
+        data-music-searchbar
+        data-music-searchbar-layout={compact ? "compact" : "full"}
+        data-music-search-mode={searchKeyReady ? "api" : "external"}
       >
-      {/* ── Stage: the full-space music player ─────────────────────────── */}
-      <div
-        className={`relative grid min-h-0 min-w-0 place-items-center overflow-hidden ${layoutMode === "wide" && sheetOpen ? "border-r border-slate-200" : ""} ${layoutMode === "compact" && sheetOpen ? "border-b border-slate-200" : ""}`}
-        style={{
-          background:
-            "radial-gradient(circle at 12% 0%, rgba(244, 114, 182, 0.20), transparent 34%), radial-gradient(circle at 88% 8%, rgba(99, 102, 241, 0.18), transparent 36%), linear-gradient(145deg, #ffffff 0%, #eef2ff 56%, #fdf2f8 100%)",
-        }}
-        data-music-stage={current ? current.provider : "empty"}
-      >
-        {!current ? (
-          <div className="grid max-w-md gap-3 px-5 py-16 text-center" data-music-empty>
-            <span className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] bg-slate-950 text-white shadow-xl shadow-indigo-200">
-              <AudioLines size={28} />
-            </span>
-            <p className="text-xl font-black tracking-tight text-slate-950">Apna music library kholo</p>
-            <p className="text-sm font-medium leading-6 text-slate-500">
-              Course ke audio lessons, device ke apne songs, aur YouTube / Spotify / SoundCloud links — sab ek jagah.
-            </p>
-            <button type="button" onClick={() => setSheetOpen(true)}
-              className="mx-auto inline-flex h-10 items-center gap-2 rounded-full bg-slate-950 px-4 text-xs font-black text-white shadow-lg shadow-slate-300 hover:bg-slate-800">
-              <Library size={15} /> Library kholo
+        <span className={`relative flex min-w-0 flex-1 items-center rounded-full border border-slate-300 bg-white ${height} shadow-[0_2px_10px_rgba(15,23,42,0.06)] focus-within:border-slate-950 focus-within:ring-2 focus-within:ring-slate-950/10`}>
+          {urlMode
+            ? <Link2 size={16} className="ml-3.5 shrink-0 text-slate-400" />
+            : <Search size={16} className="ml-3.5 shrink-0 text-slate-400" />}
+          <input
+            ref={searchRef}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={MUSIC_SEARCH_PLACEHOLDER[filter]}
+            aria-label={urlMode ? "Paste a song link" : "Search the music library"}
+            // Two names for the one URL box: `data-music-url` is this design's,
+            // `data-music-link` is what the first cut of the pane called it.
+            {...(urlMode ? { "data-music-url": "", "data-music-link": "" } : { "data-music-search": "" })}
+            className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400"
+          />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              aria-label="Clear the search box"
+              className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            >
+              <X size={14} />
             </button>
-          </div>
-        ) : resolving ? (
-          <span className="inline-flex items-center gap-2 rounded-full bg-white/85 px-3.5 py-2 text-[11px] font-semibold text-slate-600 shadow-sm">
-            <LoaderCircle size={15} className="animate-spin" /> Song load ho raha hai…
+          ) : null}
+          {urlMode && query.trim() ? (
+            // "Jaise hi user inter karke uske samne box mein arrow ka nishan
+            // bhi ho aur direct keyboard Enter se add ho jaaye." — the arrow
+            // appears with the first character, and Enter does the same thing.
+            <button
+              type="submit"
+              data-music-url-add
+              data-music-add-link
+              aria-label="Add this link"
+              className="mr-1.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-950 text-white hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+            >
+              <ArrowRight size={16} />
+            </button>
+          ) : null}
+        </span>
+
+        {!urlMode && canSearchOnline && searchKeyReady ? (
+          <button
+            type="submit"
+            data-music-search-run
+            disabled={busy || !query.trim()}
+            className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-slate-950 text-[11px] font-black text-white shadow-md shadow-slate-200 hover:bg-slate-800 disabled:opacity-40 ${compact ? "h-10 w-10" : "h-11 px-[13px]"}`}
+          >
+            {busy ? <LoaderCircle size={15} className="animate-spin" /> : <Search size={15} />}
+            {compact ? null : <span>YouTube</span>}
+          </button>
+        ) : null}
+        {!urlMode && canSearchOnline && !searchKeyReady ? (
+          // No API key: hand the query to YouTube itself. An ANCHOR, so it opens
+          // correctly in a browser, a PWA and the native shell alike.
+          <a
+            href={youTubeSearchUrl(query)}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-music-search-external
+            aria-label="Search this on YouTube"
+            className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-slate-300 bg-white text-[11px] font-black text-slate-800 shadow-sm hover:bg-slate-50 ${compact ? "h-10 w-10" : "h-11 px-[13px]"}`}
+          >
+            <ExternalLink size={15} />
+            {compact ? null : <span>YouTube</span>}
+          </a>
+        ) : null}
+        {onOpenFullPage ? (
+          <button
+            type="button"
+            onClick={onOpenFullPage}
+            data-music-open-library
+            aria-label="Open the full music library"
+            title="Open the full music library"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-950 text-white shadow-md shadow-slate-200 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+          >
+            <ChevronRight size={18} />
+          </button>
+        ) : null}
+      </form>
+    );
+  };
+
+  const tray = () => (
+    <div className="shrink-0 bg-white px-2 py-2 sm:px-4" data-music-tray data-music-tray-theme="white">
+      <div className="mx-auto flex w-full max-w-3xl items-center gap-2">
+        <div
+          role="group"
+          aria-label="Music library filters"
+          data-music-filters
+          className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto rounded-full border border-slate-200 bg-white p-1 shadow-[0_2px_10px_rgba(15,23,42,0.05)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {MUSIC_FILTERS.map((key) => {
+            const activeBtn = filter === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => chooseFilter(key)}
+                data-music-filter={key}
+                data-active={activeBtn ? "true" : "false"}
+                aria-pressed={activeBtn}
+                className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-[11px] font-black transition ${
+                  activeBtn ? "bg-slate-950 text-white shadow-md shadow-slate-200" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                }`}
+              >
+                {FILTER_ICON[key]}
+                {MUSIC_FILTER_LABEL[key]}
+                <span className={`rounded-full px-1.5 py-0.5 text-[9px] leading-none ${activeBtn ? "bg-white/15 text-white" : "bg-slate-100 text-slate-500"}`}>
+                  {musicFilterCount(key, counts)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {showCardsToggle ? (
+          <span className="flex shrink-0 rounded-full border border-slate-200 bg-white p-1 shadow-[0_2px_10px_rgba(15,23,42,0.05)]" data-music-search-view>
+            <button
+              type="button"
+              onClick={() => setDensity("list")}
+              data-music-view-option="list"
+              aria-pressed={densityMode === "list"}
+              aria-label="List view"
+              className={`grid h-7 w-7 place-items-center rounded-full ${densityMode === "list" ? "bg-slate-950 text-white" : "text-slate-500 hover:bg-slate-100"}`}
+            >
+              <Rows3 size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setDensity("grid")}
+              data-music-view-option="grid"
+              aria-pressed={densityMode === "grid"}
+              aria-label="Thumbnail view"
+              className={`grid h-7 w-7 place-items-center rounded-full ${densityMode === "grid" ? "bg-slate-950 text-white" : "text-slate-500 hover:bg-slate-100"}`}
+            >
+              <LayoutGrid size={14} />
+            </button>
           </span>
-        ) : current.provider === "youtube" && stageVisible && embed ? (
-          <div className="absolute inset-0 min-h-0 overflow-hidden bg-black" data-music-youtube-player data-music-youtube-mode={youTubeMode}>
-            {youTubeMode === "audio" ? (
-              <div className="absolute inset-0 overflow-y-auto bg-[#f8fafc] px-5 pb-16 pt-14 text-center" data-music-youtube-audio>
-                <div className="mx-auto flex min-h-full w-full max-w-xl flex-col items-center justify-center">
-                  <div className="relative aspect-video w-full overflow-hidden rounded-[26px] bg-slate-950 shadow-2xl shadow-slate-300">
-                    {thumbnailForTrack(current) ? (
-                      <img src={thumbnailForTrack(current)} alt="" className="h-full w-full object-cover" data-music-youtube-thumbnail />
-                    ) : (
-                      <span className="grid h-full w-full place-items-center text-white"><Play size={44} /></span>
-                    )}
-                    <span className="absolute inset-0 bg-slate-950/10" aria-hidden="true" />
-                  </div>
-                  <h2 className="mt-5 line-clamp-2 text-xl font-black leading-tight tracking-tight text-slate-950">{current.title}</h2>
-                  <p className="mt-1 max-w-full truncate text-sm font-semibold text-slate-500">{current.subtitle}</p>
-                  <button type="button" onClick={toggleYouTubePlayback} data-music-youtube-play-toggle
-                    aria-label={youTubePlaying ? `Pause ${current.title}` : `Play ${current.title}`}
-                    className="mt-5 grid h-16 w-16 place-items-center rounded-full bg-slate-950 text-white shadow-xl shadow-slate-300 transition hover:scale-105 hover:bg-slate-800">
-                    {youTubePlaying ? <Pause size={25} fill="currentColor" /> : <Play size={25} fill="currentColor" className="ml-1" />}
-                  </button>
-                  <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Audio mode · official YouTube player</p>
-                </div>
-              </div>
-            ) : null}
+        ) : null}
+      </div>
+    </div>
+  );
+
+  /** Every song list in the pane comes out of here — sections, empty page, options. */
+  const body = () => {
+    if (startOptions) {
+      return (
+        <div className="grid place-items-center px-3 py-6 text-center" data-music-start-options>
+          <p className="text-lg font-black tracking-tight text-slate-950">{MUSIC_EMPTY_TITLE.all}</p>
+          <p className="mt-1 max-w-[36ch] text-[11.5px] font-medium leading-5 text-slate-500">{MUSIC_FILTER_HINT.all}</p>
+          <div className="mt-4 grid w-full max-w-sm gap-2.5">
+            {MUSIC_START_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                data-music-start-option={option.id}
+                onClick={() => chooseStartOption(option.id, option.filter)}
+                className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-slate-950 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950"
+              >
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-slate-950 text-white">{START_ICON[option.id]}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-black text-slate-950">{option.title}</span>
+                  <span className="block truncate text-[11px] font-semibold text-slate-500">{option.hint}</span>
+                </span>
+                <ChevronRight size={16} className="shrink-0 text-slate-400" />
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (!rowsVisible) {
+      return (
+        <>
+          {noResults ? (
+            <p className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800" data-music-no-results>
+              YouTube se kuch nahin mila.{" "}
+              <a href={youTubeSearchUrl(query)} target="_blank" rel="noopener noreferrer" data-music-search-external
+                className="underline decoration-amber-400 underline-offset-2">
+                YouTube par khud search karo
+              </a>{" "}
+              aur link yahan paste kar do — library usi ko chala degi.
+            </p>
+          ) : null}
+          <MusicEmptyPage
+            title={query.trim() && !urlMode ? MUSIC_NO_MATCH : MUSIC_EMPTY_TITLE[filter]}
+            hint={query.trim() && !urlMode ? MUSIC_FILTER_HINT[filter] : MUSIC_EMPTY_HINT[filter]}
+            glyph={filter === "online" || filter === "url" ? "link" : "music"}
+          />
+        </>
+      );
+    }
+
+    return (
+      <>
+        {noResults ? (
+          <p className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800" data-music-no-results>
+            YouTube se kuch nahin mila.{" "}
+            <a href={youTubeSearchUrl(query)} target="_blank" rel="noopener noreferrer" data-music-search-external
+              className="underline decoration-amber-400 underline-offset-2">
+              YouTube par khud search karo
+            </a>{" "}
+            aur link yahan paste kar do — library usi ko chala degi.
+          </p>
+        ) : null}
+
+        {showResults && freshResults.length > 0 ? (
+          <div className="mb-4" data-music-results data-music-results-view={densityMode}>
+            <p className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+              YouTube results
+              {searchedQuery ? <span className="truncate normal-case tracking-normal text-slate-500">“{searchedQuery}”</span> : null}
+              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] text-slate-500">{freshResults.length}</span>
+            </p>
+            <MusicTrackList
+              asResult
+              tracks={freshResults}
+              variant={densityMode}
+              currentId={current?.id ?? null}
+              playing={Boolean(current)}
+              onPlay={playResult}
+            />
+          </div>
+        ) : null}
+
+        {visibleSections.map(({ source, tracks }) => (
+          <div key={source} className="mb-4" data-music-section={source} data-music-section-count={tracks.length}>
+            <p className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+              {MUSIC_SHELF_TITLE[source]}
+              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] text-slate-500">{tracks.length}</span>
+            </p>
+            <MusicTrackList
+              tracks={tracks}
+              variant={source === "link" && densityMode === "grid" ? "grid" : "list"}
+              currentId={current?.id ?? null}
+              playing={Boolean(current)}
+              onPlay={select}
+              onRemove={source === "course" ? undefined : forget}
+            />
+          </div>
+        ))}
+      </>
+    );
+  };
+
+  const addFab = musicAddFabVisible(filter) ? (
+    <button
+      type="button"
+      onClick={() => fileRef.current?.click()}
+      disabled={busy}
+      data-music-add-fab
+      data-music-upload
+      aria-label="Add music from this device"
+      title="Add music from this device"
+      className="absolute bottom-4 right-4 z-30 grid h-14 w-14 place-items-center rounded-full bg-slate-950 text-white shadow-[0_14px_34px_rgba(15,23,42,0.38)] transition hover:scale-105 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-60"
+    >
+      {busy ? <LoaderCircle size={22} className="animate-spin" /> : <Plus size={24} />}
+    </button>
+  ) : null;
+
+  /**
+   * ONE library surface, three homes: the page itself, the panel over the audio
+   * player, and the lower half of the video player. Same search box, same white
+   * tray, same list, same ＋ button, same empty pages.
+   */
+  const librarySurface = ({
+    mode,
+    onOpenFullPage,
+    onClose,
+  }: {
+    mode: SurfaceMode;
+    onOpenFullPage?: () => void;
+    onClose?: () => void;
+  }) => (
+    <div className="flex h-full min-h-0 w-full flex-col bg-white" data-music-library={mode}>
+      {mode === "sheet" ? (
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-3 py-2.5">
+          <p className="min-w-0 flex-1 truncate text-[13px] font-black tracking-tight text-slate-950">Music library</p>
+          {onOpenFullPage ? (
+            // The same shortcut the video player's compact bar carries: straight
+            // to the full library page (the song keeps playing behind it).
+            <button
+              type="button"
+              onClick={onOpenFullPage}
+              data-music-open-library
+              aria-label="Open the full music library"
+              title="Open the full music library"
+              className="grid h-8 w-8 place-items-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+            >
+              <ChevronRight size={16} />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onClose}
+            data-music-panel-close
+            aria-label="Close the music library"
+            className="grid h-8 w-8 place-items-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      ) : null}
+
+      <div className={`shrink-0 bg-white ${mode === "video" ? "px-2 pt-2" : "px-3 pt-3 sm:px-5"}`}>
+        <div className={`mx-auto w-full ${mode === "video" ? "" : "max-w-3xl"}`}>
+          {searchBar({ compact: mode === "video", onOpenFullPage })}
+        </div>
+      </div>
+
+      {tray()}
+
+      {notice ? (
+        <p className="shrink-0 border-y border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800" data-music-notice>
+          {notice}
+        </p>
+      ) : null}
+
+      <div className="relative min-h-0 flex-1">
+        <div className={`h-full overflow-y-auto px-2.5 pt-2 ${mode === "video" ? "pb-20" : "pb-24"} sm:px-4`} data-music-body>
+          <div className={`mx-auto w-full ${mode === "video" ? "" : "max-w-5xl"}`}>{body()}</div>
+        </div>
+        {addFab}
+      </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="audio/*"
+        className="hidden"
+        data-music-file
+        aria-label="Choose an audio file from this device"
+        onChange={(event) => void onPickFile(event.target.files?.[0])}
+      />
+    </div>
+  );
+
+  /* ── The player: audio (a page) or video (official embed + library) ────── */
+
+  const isAudioCurrent = Boolean(current && current.provider === "audio");
+  const isVideoCurrent = Boolean(current && current.provider !== "audio");
+  const showAudioPlayer = isAudioCurrent && Boolean(playUrl);
+  const showLibrary = view === "library";
+  const playerShown = view === "player";
+
+  const noticePill = notice ? (
+    <p className="absolute left-1/2 top-3 z-40 max-w-[80%] -translate-x-1/2 rounded-full bg-slate-950/85 px-3.5 py-2 text-center text-[11px] font-semibold text-white shadow-lg" data-music-player-notice>
+      {notice}
+    </p>
+  ) : null;
+
+  const videoStage = isVideoCurrent && playerShown ? (
+    <div
+      ref={stageRef}
+      className="relative flex min-h-0 flex-1 flex-col bg-slate-950"
+      data-music-player="video"
+      data-music-player-provider={current?.provider}
+      data-music-video-fullscreen={fullscreen ? "true" : "false"}
+    >
+      {fullscreen ? (
+        <div className="relative min-h-0 flex-1" data-music-video-pane>
+          {current?.embedUrl ? (
             <iframe
-              ref={youTubeFrameRef}
-              key={embed}
+              key={current.embedUrl}
               data-music-embed={current.provider}
-              src={embed}
+              src={current.embedUrl}
               title={current.title}
               loading="lazy"
               referrerPolicy="strict-origin-when-cross-origin"
               allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
               allowFullScreen
-              onLoad={() => { if (youTubeMode === "audio") sendYouTubeCommand("pauseVideo"); }}
-              className={youTubeMode === "video"
-                ? "absolute inset-0 h-full w-full border-0 bg-black"
-                : "pointer-events-none absolute bottom-2 right-2 h-[2px] w-[2px] border-0 opacity-0"}
+              className="absolute inset-0 h-full w-full border-0 bg-black"
             />
-            <div className="absolute left-3 top-3 z-30 flex rounded-full border border-white/60 bg-white/90 p-1 shadow-lg shadow-slate-950/10 backdrop-blur" data-music-youtube-mode-control>
-              <button type="button" onClick={() => chooseYouTubeMode("audio")} data-music-youtube-mode-option="audio"
-                aria-pressed={youTubeMode === "audio"}
-                className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[11px] font-black ${youTubeMode === "audio" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-white"}`}>
-                <AudioLines size={13} /> Audio
-              </button>
-              <button type="button" onClick={() => chooseYouTubeMode("video")} data-music-youtube-mode-option="video"
-                aria-pressed={youTubeMode === "video"}
-                className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[11px] font-black ${youTubeMode === "video" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-white"}`}>
-                <MonitorPlay size={13} /> Video
-              </button>
-            </div>
-          </div>
-        ) : current.provider === "audio" || !stageVisible ? (
-          // A direct file (course lesson or the learner's own upload) keeps the
-          // glass player MOUNTED through a tab switch — it pauses and banks its
-          // position, exactly like an audio lesson does.
-          current.provider === "audio" && playUrl ? (
-            <AudioPlayer url={playUrl} name={current.title} active={active} />
           ) : (
-            <p data-music-paused className="mx-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3.5 py-2 text-[11px] font-bold text-slate-700 shadow-sm">
-              <Pause size={14} /> Playback paused — {current.title}
-            </p>
-          )
-        ) : embed ? (
-          // The platform's own player, framed. `allow` carries exactly what a
-          // media embed needs and nothing more.
-          <iframe
-            key={embed}
-            data-music-embed={current.provider}
-            src={embed}
-            title={current.title}
-            loading="lazy"
-            referrerPolicy="strict-origin-when-cross-origin"
-            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-            allowFullScreen
-            className="absolute inset-0 h-full w-full border-0 bg-black"
-          />
-        ) : (
-          <p className="px-5 text-center text-[11px] font-semibold text-slate-500">Ye song abhi load nahi ho paya.</p>
-        )}
-
-        {/* The Library control belongs to the player surface itself — never
-            to a separate page header. */}
-        <button type="button" data-music-library-toggle onClick={() => setSheetOpen((open) => !open)}
-          aria-expanded={sheetOpen} aria-label={sheetOpen ? "Close the music library" : "Open the music library"}
-          className="absolute right-3 top-3 z-40 inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-white/70 bg-white/90 px-3.5 text-[11px] font-black text-slate-800 shadow-lg shadow-slate-950/10 backdrop-blur hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">
-          {sheetOpen ? <X size={14} /> : <Library size={14} />}
-          Library
-        </button>
-      </div>
-
-      {/* ── Library: white, light, and searched from the very top ─────── */}
-      {sheetOpen && (
-        <aside className="flex min-h-0 min-w-0 flex-col bg-white text-slate-900" data-music-library-sheet data-music-theme="light">
-          <div className="shrink-0 space-y-3 border-b border-slate-200 bg-white px-3 pb-3 pt-3 sm:px-4">
-            <div className="flex items-center gap-2"
-              data-music-search-mode={searchKeyReady ? "api" : "external"}>
-              <span className="relative min-w-0 flex-1">
-                <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input value={query} onChange={(event) => setQuery(event.target.value)}
-                  onKeyDown={(event) => { if (event.key === "Enter" && searchKeyReady) void runSearch(); }}
-                  data-music-search placeholder="Library mein dhoondo…" aria-label="Search the music library"
-                  className="h-11 w-full rounded-full border border-slate-300 bg-white pl-10 pr-9 text-sm text-slate-900 shadow-[0_2px_10px_rgba(15,23,42,0.06)] outline-none placeholder:text-slate-400 focus:border-slate-950 focus:ring-2 focus:ring-slate-950/10" />
-                {query ? (
-                  <button type="button" onClick={() => setQuery("")} aria-label="Clear music search"
-                    className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-                    <X size={14} />
-                  </button>
-                ) : null}
-              </span>
-              {searchKeyReady ? (
-                <button type="button" onClick={runSearch} disabled={busy || !query.trim()} data-music-search-run
-                  className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-slate-950 px-4 text-[11px] font-black text-white shadow-md shadow-slate-200 hover:bg-slate-800 disabled:opacity-50">
-                  {busy ? <LoaderCircle size={14} className="animate-spin" /> : <Play size={14} />} YouTube
-                </button>
-              ) : (
-                // No API key: hand the query to YouTube itself. An ANCHOR, so it
-                // opens correctly in a browser, a PWA and the native shell alike.
-                <a href={youTubeSearchUrl(query)} target="_blank" rel="noopener noreferrer"
-                data-music-search-external
-                  className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-4 text-[11px] font-black text-slate-800 shadow-sm hover:bg-slate-50">
-                  <ExternalLink size={14} /> YouTube
-                </a>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Music library filters" data-music-filters>
-              {libraryFilters.map((filter) => (
-                <button key={filter.key} type="button" onClick={() => setLibraryFilter(filter.key)}
-                  data-music-filter={filter.key} data-active={libraryFilter === filter.key ? "true" : "false"}
-                  aria-pressed={libraryFilter === filter.key}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[11px] font-black transition ${libraryFilter === filter.key ? "bg-slate-950 text-white shadow-md shadow-slate-200" : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"}`}>
-                  {filter.label}
-                  <span className={`rounded-full px-1.5 py-0.5 text-[9px] leading-none ${libraryFilter === filter.key ? "bg-white/15 text-white" : "bg-white text-slate-400"}`}>{filter.count}</span>
-                </button>
-              ))}
-              <span className="ml-auto hidden text-[10px] font-semibold text-slate-400 min-[420px]:inline">
-                {total} saved & course song{total === 1 ? "" : "s"}
-              </span>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-2" data-music-search-view>
-                <span className="text-[11px] font-bold text-slate-500">Online results ka view</span>
-                <span className="flex rounded-full bg-slate-100 p-1">
-                  <button type="button" onClick={() => setOnlineView("list")} data-music-view-option="list"
-                    aria-pressed={onlineView === "list"}
-                    className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[10px] font-black ${onlineView === "list" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>
-                    <Rows3 size={13} /> List
-                  </button>
-                  <button type="button" onClick={() => setOnlineView("youtube")} data-music-view-option="youtube"
-                    aria-pressed={onlineView === "youtube"}
-                    className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[10px] font-black ${onlineView === "youtube" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>
-                    <LayoutGrid size={13} /> Bade thumbnails
-                  </button>
-                </span>
-            </div>
-
-            {/* Add rows stay available under the filters: a link, or a file
-                off the device. */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="relative min-w-[180px] flex-1">
-                <Link2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input value={linkDraft} onChange={(event) => setLinkDraft(event.target.value)}
-                  onKeyDown={(event) => { if (event.key === "Enter") void addLink(); }}
-                  data-music-link placeholder="YouTube / Spotify / SoundCloud / .mp3 link paste karo"
-                  aria-label="Paste a song link"
-                  className="h-9 w-full rounded-full border border-slate-200 bg-slate-50 pl-8 pr-2.5 text-xs text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-400 focus:bg-white" />
-              </span>
-              <button type="button" onClick={() => void addLink()} disabled={!linkDraft.trim()} data-music-add-link
-                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-slate-950 px-3.5 text-[11px] font-black text-white hover:bg-slate-800 disabled:opacity-50">
-                <Play size={14} /> Add
-              </button>
-              <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} data-music-upload
-                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-                {busy ? <LoaderCircle size={14} className="animate-spin" /> : <Upload size={14} />} Device se
-              </button>
-              <input ref={fileRef} type="file" accept="audio/*" className="hidden" data-music-file
-                aria-label="Choose an audio file from this device"
-                onChange={(event) => void onPickFile(event.target.files?.[0])} />
-            </div>
-          </div>
-
-          {notice && (
-            <p className="shrink-0 border-b border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800" data-music-notice>
-              {notice}
+            <p className="grid h-full place-items-center px-4 text-center text-[11px] font-semibold text-white/70">
+              Ye song abhi load nahi ho paya.
             </p>
           )}
-
-          <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-2.5">
-            {searchKeyReady && searched && results.length === 0 && (
-              <p className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800" data-music-no-results>
-                YouTube se kuch nahin mila.{" "}
-                <a href={youTubeSearchUrl(query)} target="_blank" rel="noopener noreferrer" data-music-search-external
-                  className="underline decoration-amber-400 underline-offset-2">
-                  YouTube par khud search karo
-                </a>{" "}
-                aur link yahan paste kar do — library usi ko chala degi.
+          {chrome()}
+        </div>
+      ) : (
+        <>
+          <div
+            ref={paneTopRef}
+            className="relative min-h-0 w-full"
+            style={{ flexGrow: playerShare, flexBasis: 0 }}
+            data-music-video-pane
+          >
+            {current?.embedUrl ? (
+              <iframe
+                key={current.embedUrl}
+                data-music-embed={current.provider}
+                src={current.embedUrl}
+                title={current.title}
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                allowFullScreen
+                className="absolute inset-0 h-full w-full border-0 bg-black"
+              />
+            ) : (
+              <p className="grid h-full place-items-center px-4 text-center text-[11px] font-semibold text-white/70">
+                Ye song abhi load nahi ho paya.
               </p>
             )}
-            {showSearchResults && (
-              <div className="mb-4" data-music-results data-music-results-view={onlineView}>
-                <p className="mb-2 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">YouTube results</p>
-                <ul
-                  className={onlineView === "youtube" ? "grid gap-3" : "grid gap-1.5"}
-                  style={onlineView === "youtube" ? { gridTemplateColumns: "repeat(auto-fit, minmax(min(230px, 100%), 1fr))" } : undefined}
-                >
-                  {results.map((track) => {
-                    const thumbnail = thumbnailForTrack(track);
-                    return (
-                      <li key={track.id}>
-                        <button type="button" data-music-result onClick={() => { setLinks(addMusicLink(uid, track.url)?.tracks ?? links); select(track); }}
-                          className={onlineView === "youtube"
-                            ? "block w-full overflow-hidden rounded-[20px] border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950"
-                            : "flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-2 text-left shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950"}>
-                          {onlineView === "youtube" ? (
-                            <>
-                              <span className="relative block aspect-video w-full overflow-hidden bg-slate-950" data-music-result-thumbnail>
-                                {thumbnail ? <img src={thumbnail} alt="" className="h-full w-full object-cover" /> : null}
-                                <span className="absolute inset-0 grid place-items-center bg-slate-950/15 text-white">
-                                  <span className="grid h-11 w-11 place-items-center rounded-full bg-slate-950/85 shadow-xl"><Play size={19} fill="currentColor" className="ml-0.5" /></span>
-                                </span>
-                                <span className="absolute bottom-2 left-2 rounded-full bg-slate-950/80 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-white">YouTube</span>
-                              </span>
-                              <span className="block p-3">
-                                <span className="block line-clamp-2 min-h-10 text-sm font-black leading-5 text-slate-950">{track.title}</span>
-                                <span className="mt-1 block truncate text-[11px] font-semibold text-slate-500">{track.subtitle}</span>
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="relative aspect-video w-20 shrink-0 overflow-hidden rounded-xl bg-slate-950 text-white" data-music-result-thumbnail>
-                                {thumbnail ? <img src={thumbnail} alt="" className="h-full w-full object-cover" /> : null}
-                                <span className="absolute inset-0 grid place-items-center bg-slate-950/10"><Play size={16} fill="currentColor" /></span>
-                              </span>
-                              <span className="min-w-0 flex-1">
-                                <span className="block truncate text-[12px] font-bold text-slate-900">{track.title}</span>
-                                <span className="block truncate text-[10px] font-semibold text-slate-500">{track.subtitle}</span>
-                              </span>
-                            </>
-                          )}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
-
-            {visibleShelves.map(({ shelf, tracks }) => (
-              <div key={shelf} className="mb-4" data-music-section={shelf} data-music-section-count={tracks.length}>
-                <p className="mb-2 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
-                  {SHELF_TITLE[shelf]} · {tracks.length}
-                </p>
-                {tracks.length === 0 ? (
-                  <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-[11px] font-medium text-slate-500">
-                    {query ? "Kuch nahin mila." : SHELF_EMPTY[shelf]}
-                  </p>
-                ) : (
-                  <ul
-                    className={shelf === "link" && onlineView === "youtube" ? "grid gap-3" : "grid gap-1.5"}
-                    style={shelf === "link" && onlineView === "youtube" ? { gridTemplateColumns: "repeat(auto-fit, minmax(min(230px, 100%), 1fr))" } : undefined}
-                  >
-                    {tracks.map((track) => {
-                      const thumbnail = thumbnailForTrack(track);
-                      const large = shelf === "link" && onlineView === "youtube";
-                      const playing = current?.id === track.id;
-                      return (
-                        <li key={track.id}>
-                          <div
-                            data-music-track={track.id}
-                            data-music-track-source={track.source}
-                            data-music-playing={playing ? "true" : "false"}
-                            className={large
-                              ? `overflow-hidden rounded-[20px] border bg-white shadow-sm ${playing ? "border-slate-950 ring-1 ring-slate-950" : "border-slate-200"}`
-                              : `group flex items-center gap-3 rounded-2xl border p-2 shadow-sm ${playing ? "border-slate-950 bg-slate-50 ring-1 ring-slate-950" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"}`}>
-                            {large ? (
-                              <>
-                                <button type="button" onClick={() => select(track)} aria-label={`Play ${track.title}`}
-                                  className="relative block aspect-video w-full overflow-hidden bg-slate-950 text-left text-white">
-                                  {thumbnail ? <img src={thumbnail} alt="" className="h-full w-full object-cover" data-music-track-thumbnail /> : null}
-                                  <span className="absolute inset-0 grid place-items-center bg-slate-950/15">
-                                    <span className="grid h-11 w-11 place-items-center rounded-full bg-slate-950/85 shadow-xl">{providerIcon(track)}</span>
-                                  </span>
-                                  <span className="absolute bottom-2 left-2 rounded-full bg-slate-950/80 px-2 py-1 text-[9px] font-black uppercase tracking-wider">
-                                    {musicRowBadge(track)}
-                                  </span>
-                                </button>
-                                <div className="flex items-start gap-2 p-3">
-                                  <span className="min-w-0 flex-1">
-                                    <span className="block line-clamp-2 min-h-10 text-sm font-black leading-5 text-slate-950">{track.title}</span>
-                                    <span className="mt-1 block truncate text-[11px] font-semibold text-slate-500">{track.subtitle}</span>
-                                  </span>
-                                  {track.source !== "course" && (
-                                    <button type="button" onClick={() => void forget(track)} aria-label={`Remove ${track.title}`}
-                                      className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600">
-                                      <Trash2 size={14} />
-                                    </button>
-                                  )}
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <button type="button" onClick={() => select(track)} aria-label={`Play ${track.title}`}
-                                  className={shelf === "link"
-                                    ? "relative aspect-video w-20 shrink-0 overflow-hidden rounded-xl bg-slate-950 text-white"
-                                    : "relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-2xl bg-slate-950 text-white shadow-md shadow-slate-200 hover:bg-slate-800"}>
-                                  {thumbnail ? <img src={thumbnail} alt="" className="absolute inset-0 h-full w-full object-cover" data-music-track-thumbnail /> : null}
-                                  <span className="absolute inset-0 grid place-items-center bg-slate-950/10">{providerIcon(track)}</span>
-                                </button>
-                                <span className="min-w-0 flex-1">
-                                  <span className="block truncate text-[12px] font-bold text-slate-900">{track.title}</span>
-                                  <span className="block truncate text-[10px] font-semibold text-slate-500">{track.subtitle}</span>
-                                </span>
-                                <span className="hidden shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[9px] font-bold text-slate-500 min-[420px]:inline-flex">
-                                  {musicRowBadge(track)}
-                                </span>
-                                {track.source !== "course" && (
-                                  <button type="button" onClick={() => void forget(track)} aria-label={`Remove ${track.title}`}
-                                    className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600">
-                                    <Trash2 size={14} />
-                                  </button>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-            ))}
-
-            <p className="pt-1 text-[10px] font-medium leading-relaxed text-slate-500">
-              YouTube, Spotify aur SoundCloud apne hi official player se chalte hain — DRM songs kisi doosre player mein chal hi nahi sakte.
-              Device se add kiye songs sirf is device par rehte hain, max {Math.round(MUSIC_UPLOAD_MAX_BYTES / (1024 * 1024))} MB per file.
-            </p>
+            {chrome()}
           </div>
-        </aside>
+
+          {/* The draggable horizontal divider: the app's one divider language —
+              a 2px yellow core line in a 10px grab strip — plus a keyboard
+              path (↑ / ↓) and a grip that appears on hover. */}
+          <div
+            role="separator"
+            tabIndex={0}
+            aria-orientation="horizontal"
+            aria-label="Video and library divider — drag to resize"
+            aria-valuemin={MIN_PLAYER_SHARE}
+            aria-valuemax={MAX_PLAYER_SHARE}
+            aria-valuenow={Math.round(playerShare)}
+            data-music-player-divider
+            data-dragging={dragging ? "true" : "false"}
+            onPointerDown={onDividerPointerDown}
+            onPointerMove={onDividerPointerMove}
+            onPointerUp={onDividerPointerUp}
+            onPointerCancel={onDividerPointerUp}
+            onKeyDown={onDividerKeyDown}
+            className="group relative z-30 flex w-full shrink-0 cursor-row-resize items-center justify-center bg-slate-950"
+            style={{ height: DIVIDER_HIT, touchAction: "none" } as CSSProperties}
+          >
+            <span
+              aria-hidden
+              className="h-[2px] w-full rounded-full"
+              style={{ background: DIVIDER_LINE, boxShadow: dragging ? `0 0 16px ${DIVIDER_LINE}` : `0 0 10px ${DIVIDER_LINE}66` }}
+            />
+            <span
+              aria-hidden
+              className="absolute left-1/2 top-1/2 h-1.5 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/60 opacity-0 transition group-hover:opacity-100"
+            />
+          </div>
+
+          <div
+            ref={paneLibraryRef}
+            className="min-h-0 w-full overflow-hidden"
+            style={{ flexGrow: 100 - playerShare, flexBasis: 0 }}
+            data-music-video-library
+          >
+            {librarySurface({ mode: "video", onOpenFullPage: openFullLibrary })}
+          </div>
+        </>
       )}
+      {noticePill}
+    </div>
+  ) : null;
+
+  /** The player's own chrome: back to the library, the title, full screen. */
+  function chrome() {
+    return (
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-gradient-to-b from-slate-950/85 via-slate-950/35 to-transparent p-2"
+        data-music-player-chrome
+      >
+        <button
+          type="button"
+          onClick={backToLibrary}
+          data-music-back
+          aria-label="Back to library"
+          className="pointer-events-auto grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-950/70 text-white backdrop-blur hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        >
+          <ArrowLeft size={17} />
+        </button>
+        <p className="pointer-events-none min-w-0 flex-1 truncate text-[12px] font-bold text-white drop-shadow">{current?.title}</p>
+        <button
+          type="button"
+          onClick={() => void toggleFullscreen()}
+          data-music-fullscreen-toggle
+          aria-pressed={fullscreen}
+          aria-label={fullscreen ? "Exit full screen" : "Full screen"}
+          className="pointer-events-auto grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-950/70 text-white backdrop-blur hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        >
+          {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+        </button>
       </div>
+    );
+  }
+
+  return (
+    <section
+      ref={panelRef}
+      className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-white text-slate-900"
+      data-course-music-panel
+      data-music-active={active ? "true" : "false"}
+      data-music-view={view}
+      data-music-filter={filter}
+      data-music-stage={current ? current.provider : "empty"}
+      data-music-layout={layout}
+    >
+      {/* The audio player stays MOUNTED while the library page is on top of it
+          (hidden, never unmounted): a song does not stop because the learner
+          went back to the list. */}
+      {showAudioPlayer ? (
+        <div
+          className={`relative min-h-0 flex-1 flex-col ${playerShown ? "flex" : "hidden"}`}
+          data-music-player="audio"
+          data-music-player-provider="audio"
+        >
+          <AudioPlayer
+            presentation="full"
+            url={playUrl}
+            name={current?.title || ""}
+            active={active}
+            onBack={backToLibrary}
+            onOpenLibrary={() => setSheetOpen((open) => !open)}
+          />
+          {resolving ? (
+            <span className="absolute left-1/2 top-1/2 z-40 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full bg-slate-950/85 px-3.5 py-2 text-[11px] font-semibold text-white shadow-lg">
+              <LoaderCircle size={15} className="animate-spin" /> Song load ho raha hai…
+            </span>
+          ) : null}
+          {noticePill}
+          {sheetOpen ? (
+            <div className="absolute inset-0 z-50 flex flex-col bg-slate-950/45 backdrop-blur-sm" data-music-library-panel>
+              <button
+                type="button"
+                onClick={() => setSheetOpen(false)}
+                aria-label="Close the music library"
+                className="min-h-0 flex-1 cursor-pointer"
+              />
+              <div className="flex h-[78%] max-h-[78%] min-h-0 w-full flex-col overflow-hidden rounded-t-[26px] bg-white shadow-[0_-20px_50px_rgba(2,6,23,0.45)] sm:mx-auto sm:w-[86%] sm:max-w-2xl">
+                {librarySurface({ mode: "sheet", onClose: () => setSheetOpen(false), onOpenFullPage: openFullLibrary })}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {videoStage}
+
+      {/* A track chosen but not playable (a signed-out local file) still says so. */}
+      {playerShown && isAudioCurrent && !playUrl ? (
+        <div className="grid min-h-0 flex-1 place-items-center bg-slate-950 px-4 text-center">
+          <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-2 text-[11px] font-bold text-white">
+            <LoaderCircle size={14} className={resolving ? "animate-spin" : ""} /> {notice || "Ye song abhi load nahi ho paya."}
+          </p>
+        </div>
+      ) : null}
+
+      {showLibrary ? librarySurface({ mode: "page" }) : null}
     </section>
   );
 }

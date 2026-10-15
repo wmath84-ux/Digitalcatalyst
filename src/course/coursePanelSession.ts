@@ -18,12 +18,13 @@
 // the player's unmount cleanup resets it between visits.
 //
 // The same store carries the panels' immersive sub-pages (notes editor,
-// mind map canvas, brain answer deck, experiment viewer, read reader) so
-// the footer navigation can hide while the learner is inside one of them
-// and come back the moment they return to a library page. Panels publish
-// their sub-page through the setters below; the two footer render sites
-// (the Split Deck's in-flow dock and the parent-rendered Workspace pill)
-// read it through `useFooterHiddenPage`, which subscribes reactively.
+// mind map canvas, brain answer deck, experiment viewer, read reader — and,
+// since 2026-10-15, the Music tab's open player) so the footer navigation can
+// hide while the learner is inside one of them and come back the moment they
+// return to a library page. Panels publish their sub-page through the setters
+// below; the two footer render sites (the Split Deck's in-flow dock and the
+// parent-rendered Workspace pill) read it through `useFooterHiddenPage`, which
+// subscribes reactively.
 
 import { useSyncExternalStore } from "react";
 
@@ -44,6 +45,16 @@ export type BrainPanelSessionView = "home" | "answer";
 /** Experiment tab: the experiment shelf ("library") or the live viewer. */
 export type ExperimentPanelSessionView = "library" | "viewer";
 
+/**
+ * Music tab: the LIBRARY page (the search bar + the white filter tray — where
+ * the footer navigation belongs) or an open PLAYER (the full-area audio player
+ * / the YouTube player with its draggable divider — where the owner asked for
+ * the footer to hide: "jab user audio player par ho ya YouTube video player par
+ * ho to footer navigation nahin dikhna chahiye … aur jaise hi user library page
+ * par aaye footer navigation wapas se dekhne lage").
+ */
+export type MusicPanelSessionView = "library" | "player";
+
 interface CoursePanelSessionState {
   notes: NotesPanelSessionView;
   /** A note is open full-panel (composing, editing, or reading a MASTER
@@ -54,6 +65,7 @@ interface CoursePanelSessionState {
   readView: ReadPanelSessionView;
   brainView: BrainPanelSessionView;
   experimentView: ExperimentPanelSessionView;
+  musicView: MusicPanelSessionView;
 }
 
 const defaultState = (): CoursePanelSessionState => ({
@@ -63,6 +75,7 @@ const defaultState = (): CoursePanelSessionState => ({
   readView: "library",
   brainView: "home",
   experimentView: "library",
+  musicView: "library",
 });
 
 let session: CoursePanelSessionState = defaultState();
@@ -75,7 +88,7 @@ let snapshot: CoursePanelSessionState = session;
 const listeners = new Set<() => void>();
 
 const projectionOf = (state: CoursePanelSessionState): string =>
-  [state.notes.view, state.notesEditorOpen, state.mindMapView, state.readView, state.brainView, state.experimentView].join("|");
+  [state.notes.view, state.notesEditorOpen, state.mindMapView, state.readView, state.brainView, state.experimentView, state.musicView].join("|");
 
 const emitIfProjectionChanged = (before: string) => {
   if (projectionOf(session) === before) return;
@@ -133,13 +146,21 @@ export const setExperimentSessionView = (view: ExperimentPanelSessionView) => {
   emitIfProjectionChanged(before);
 };
 
+export const setMusicSessionView = (view: MusicPanelSessionView) => {
+  const before = projectionOf(session);
+  session.musicView = view;
+  emitIfProjectionChanged(before);
+};
+
 /**
  * The Course Player pages its footer navigation must NOT cover: the Note
  * Editor, the Mind Map Editor, the Brain Card / Brain Practice answer
  * page, the Live Experiment Viewer, the Sketch Editor, the Read Library's
- * PDF viewer and the Annotations viewer (an opened learner PDF). Every
- * other page — every library/shelf page above all — keeps the footer, and
- * the Music Player keeps the footer behaviour it has always had.
+ * PDF viewer and the Annotations viewer (an opened learner PDF) — and, since
+ * 2026-10-15, an OPEN PLAYER on the Music tab (the full-area audio player or
+ * the YouTube player). Every other page — every library/shelf page above all,
+ * including the Music tab's own search-bar + white-tray library page — keeps
+ * the footer.
  *
  * `tab` is the dock tab key (CourseOverlay's DockTab); it is typed as a
  * plain string here so this module never has to import the overlay.
@@ -159,9 +180,11 @@ export const isFooterHiddenPage = (tab: string, state: CoursePanelSessionState):
       return true;
     case "read":
       return state.readView === "reader";
+    case "music":
+      // The Music tab's LIBRARY page keeps the footer; an open player hides it.
+      return state.musicView === "player";
     default:
-      // modules / paid / player / ai — and "music", whose footer behaviour
-      // is explicitly preserved.
+      // modules / paid / player / ai — libraries, always with the footer.
       return false;
   }
 };

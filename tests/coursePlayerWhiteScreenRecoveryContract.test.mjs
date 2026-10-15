@@ -28,7 +28,10 @@ test('course audio is initialized before the study pane eagerly creates the Musi
   assert.ok(audioDeclaration >= 0, 'the access-scoped course audio collection remains memoized');
   assert.ok(studyPaneBuild >= 0, 'the main study pane is built during render');
   assert.ok(audioDeclaration < studyPaneBuild, 'buildStudyPane eagerly reads courseAudio while creating its MusicPanel element');
-  assert.match(player, /<MusicPanel uid=\{user\?\.id \?\? null\} courseAudio=\{courseAudio\} \/>/);
+  assert.match(
+    player,
+    /<MusicPanel uid=\{user\?\.id \?\? null\} courseAudio=\{courseAudio\} active=\{paneTab === "music"\} \/>/,
+  );
 });
 
 test('the player reuses the guard’s resolved access instead of opening a second loading gate', () => {

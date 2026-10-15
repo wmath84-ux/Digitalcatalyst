@@ -188,6 +188,46 @@ export function audioFitScale(
   return quantize(Math.max(AUDIO_FIT_FLOOR, fit));
 }
 
+/* ── The music page's FULL player (owner brief, 2026-10-15) ─────────────── */
+
+/**
+ * "jo audio player hai vah card ki tarah dikhta hai, usko full screen page ka
+ *  jitna bhi area hai vah full screen mein open hona" — the music page's
+ * player is a page, not a card. It has no fixed artwork to scale: it FILLS the
+ * box it is given, and these three numbers are the box it was laid out for at
+ * 1× (a comfortable desktop pane: 620 × 430). Everything smaller shrinks the
+ * UI towards the floor, everything bigger grows it towards the ceiling — and
+ * because the box is the STUDY PANE, dragging the Course Player's divider
+ * re-lays the real player out instead of magnifying a card.
+ */
+export const AUDIO_STAGE_REFERENCE_WIDTH = 620;
+export const AUDIO_STAGE_REFERENCE_HEIGHT = 430;
+/** Below this the page's own type would stop reading comfortably. */
+export const AUDIO_STAGE_FLOOR = 0.8;
+/** A huge pane grows the player, but it never becomes a poster. */
+export const AUDIO_STAGE_CEIL = 1.6;
+/** At or above this width (and if the pane is wider than it is tall) the disc
+ *  moves BESIDE the controls instead of above them. */
+export const AUDIO_STAGE_SIDE_BY_SIDE_PX = 620;
+
+/**
+ * The one UI scale for the full player: the smaller of "how wide is this
+ * compared to the reference" and "how tall is this", clamped between the
+ * legibility floor and the sane ceiling. A missing / zero measurement returns
+ * 1 — the reference layout.
+ */
+export function audioStageScale(width: number, height: number): number {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return 1;
+  const fit = Math.min(width / AUDIO_STAGE_REFERENCE_WIDTH, height / AUDIO_STAGE_REFERENCE_HEIGHT);
+  return quantize(Math.min(AUDIO_STAGE_CEIL, Math.max(AUDIO_STAGE_FLOOR, fit)));
+}
+
+/** `row` when the disc belongs beside the controls, `column` when above them. */
+export function audioStageDirection(width: number, height: number): "row" | "column" {
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return "column";
+  return width >= AUDIO_STAGE_SIDE_BY_SIDE_PX && width >= height ? "row" : "column";
+}
+
 /** The px a box gives away to its own padding (computed style, jsdom-safe). */
 export function paddingOf(el: HTMLElement): { x: number; y: number } {
   if (typeof window === "undefined" || typeof window.getComputedStyle !== "function") return { x: 0, y: 0 };
