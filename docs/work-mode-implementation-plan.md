@@ -405,13 +405,51 @@ const [launchChoice, setLaunchChoice] = useState<WorkLaunchDecision | null>(null
     offers "always open Work").
 * Type scale + copy ramp copied from Home's own card language
   (`.dc-home-card`, `src/home/home.css` line 450) so it reads as the same app.
-* Home → `window.location.hash = "#/home"`; Work → `"#/work"`. Both resolve an
-  in-memory once-per-app-open ref, so an SPA route change never re-shows it but
-  a full reload / new cold start asks again when the preference is still `ask`.
+* Home → `window.location.hash = "#/home"`; Work → `"#/work"`. The answer is
+  resolved **once per loaded app instance and held in React state** — never in
+  `sessionStorage` (that survives a reload) and never in a ref (see below) — so
+  an SPA route change never re-shows the card but a full reload / new cold start
+  asks again while the preference is still `ask`.
 * Timing: it paints **under** the opening splash (`src/utils/openingSplash.ts`
   keeps its own lifecycle; the chooser never touches `#app-opening-splash`) and
   does not gate the Home chunk — `HomeApp` still preloads, so choosing Home is
   instant.
+
+#### One-shot answer = state, and the opening is released on hand-over (2026-10-15)
+
+Owner report: *"Home par click kare to Home page open hona chahiye aur dono
+initial options/overlays close ho jaane chahiye … sirf overlay ko visually hide
+karne ke bajay uske actual open/closed state ko bhi sahi tarah update karo."*
+
+The card was answered through `useRef(false)`, and that ref was the bug. The
+installed PWA and the APK boot on an **empty** hash; `RootPage` normalises it to
+`#/home` with `history.replaceState`, which raises **no `hashchange`**. The
+component's `hash` snapshot (taken on the first render) therefore still said
+`""` while an app that was already on Home rendered *behind* the card — and
+answering the card changed nothing React could see, so the card **and its
+full-screen backdrop** stayed on top and swallowed every tap on Home. (Proved in
+the browser: `document.elementFromPoint(centre)` returned the startup backdrop
+before the fix and Home's own skeleton after it.)
+
+Rules now in `src/work/WorkLaunchChooser.tsx`:
+
+* `answeredForThisBoot` is `useState`, set **before** the destination is routed
+  to, so the answer itself closes the pair (backdrop + card are children of one
+  portal) even when the hash already is `#/home` and no navigation event fires.
+* `window.location.hash` is only re-assigned when the destination is a different
+  route — an identical assignment is a no-op that raises nothing.
+* Answering also releases a **live** launch opening
+  (`attachOpeningSplash()` + `isOpeningVisible()` → `dismiss()`), through the
+  splash's single owner as `OfflineGate` does. A boot that already decided not
+  to show the clip (`skipped`: tap-only default, reduced motion card, offline,
+  `?opening=off`) is left completely untouched — no replay, no fetch, and the
+  `skipped` state the offline rescue keys off never changes.
+* The "Always open Home / Work" Settings answers hand over the same way on the
+  boot that uses them, so the card can never paint over the chosen space.
+
+Pinned by `tests/workLaunchHomeChoiceRuntime.test.mjs` (real component, real
+portal, real preference module; 5 of its 7 cases fail against the previous
+implementation) and `tests/workModeFoundationContract.test.mjs`.
 
 New preference module `src/work/storage/workPrefs.ts`, built exactly like
 `src/utils/footerNavigationStyle.ts` (localStorage + `useSyncExternalStore` +

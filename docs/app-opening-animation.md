@@ -169,6 +169,21 @@ whole clip despite the setting. `index.html` reads the same key pre-React, so
 there is no card flash before the controller can speak. "Do not show motion
 nobody asked for" stays intact: nothing is forced, it only remembers a request.
 
+### The Home/Work startup card ends the opening when it is answered (2026-10-15)
+
+The cold-start Home/Work card (`src/work/WorkLaunchChooser.tsx`) is the one overlay that legitimately
+paints **over** the opening, because it is the question the app is waiting on. Once it is answered the
+opening has no reason to keep covering the app — it owns the whole viewport at the same stacking level and
+would otherwise eat the learner's next taps on Home.
+
+So the chooser asks the controller to finish: `attachOpeningSplash()` → `isOpeningVisible(opening.state)` →
+`opening.dismiss()` — the same sanctioned path `OfflineGate` uses, never a competing `style.display` write.
+The guard matters as much as the call: a boot that already decided **not** to show the clip
+(`data-opening="skipped"`: the tap-only default, the reduced-motion brand card, offline, `?opening=off`)
+is left exactly as it is — `dismiss()` is not called, so nothing is replayed, nothing is fetched, and the
+`skipped` state that the offline-rescue path keys off never changes. `replay()` is never called here: a
+launch opening is a launch opening, not something to restart on a Home tap.
+
 ## Rules for future edits
 
 * Do **not** add another place that hides the splash (`style.display`, a wrapper, a `hidden` attribute).

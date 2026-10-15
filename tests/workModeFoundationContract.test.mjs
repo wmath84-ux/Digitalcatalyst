@@ -35,11 +35,31 @@ test("Work is an immersive lazy route and the first-choice overlay only owns def
   assert.match(MAIN, /\|\| hash\.startsWith\(WORK_HASH\)/, "Work must bypass the desktop Home shell");
   assert.match(MAIN, /<WorkLaunchChooser \/>/);
   assert.match(LAUNCH, /hash === "#\/home"/);
-  assert.match(LAUNCH, /choice !== "ask"/);
-  assert.match(LAUNCH, /resolvedForThisBoot = useRef\(false\)/);
-  assert.match(LAUNCH, /resolvedForThisBoot\.current = true/);
+  assert.match(LAUNCH, /const asking = askPending && choice === "ask"/, "only the `ask` choice paints the card");
+  assert.match(LAUNCH, /if \(!asking\) return null/, "the card leaves the tree when the question is answered");
   assert.match(LAUNCH, /role="dialog"[\s\S]*?aria-modal="true"/);
   assert.match(LAUNCH, /setWorkLaunchChoice\(destination\)/);
+});
+
+test("answering the startup card closes it through real state (never a cosmetic hide)", () => {
+  // Owner report 2026-10-15: on the APK / installed PWA the app boots on an
+  // empty hash that RootPage normalises to #/home with replaceState — no
+  // `hashchange` is raised — so a ref-only "resolved" flag left the card and
+  // its full-screen backdrop mounted over Home, swallowing every tap on it.
+  assert.match(LAUNCH, /const \[answeredForThisBoot, setAnsweredForThisBoot\] = useState\(false\)/);
+  assert.doesNotMatch(LAUNCH, /resolvedForThisBoot/, "the once-per-boot answer must be state, not a ref");
+  // The answer is recorded BEFORE the destination is routed to, so the answer
+  // itself unblocks Home even when the hash already IS #/home.
+  assert.match(LAUNCH, /const setDestination = \(destination: "home" \| "work"\) => \{[\s\S]*?setAnsweredForThisBoot\(true\);[\s\S]*?launchTarget\(destination\)/);
+  assert.match(LAUNCH, /if \(window\.location\.hash !== target\) window\.location\.hash = target;/);
+  // The launch opening is the other half of the startup pair: it must be
+  // released through its single owner, and only while it is actually visible —
+  // a tap-only / skipped boot stays untouched.
+  assert.match(LAUNCH, /function dismissOpeningOverlay\(\): void \{[\s\S]*?attachOpeningSplash\(\)[\s\S]*?isOpeningVisible\(opening\.state\)[\s\S]*?opening\.dismiss\(\)/);
+  assert.match(LAUNCH, /dismissOpeningOverlay\(\);[\s\S]*?if \(remember\) setWorkLaunchChoice\(destination\)/);
+  // …and the Settings answers ("Always open Home" / "Always open Work") hand
+  // over the same way on the boot that uses them.
+  assert.match(LAUNCH, /useEffect\(\(\) => \{\s*if \(choice === "ask" \|\| !askPending\) return;[\s\S]*?dismissOpeningOverlay\(\);/);
 });
 
 test("launch, theme, last-page and history preferences are defensive device storage only", () => {
