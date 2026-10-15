@@ -366,7 +366,22 @@ test("Remember this device stores the answer and the next boot opens it directly
   }, { choice: "home" });
 });
 
-/* ── 7. deep links are still never interrupted ───────────────────────────── */
+/* ── 7. the website card's third option: the landing page ────────────────── */
+
+test("the website card offers the landing page as a third option, and it opens clean", async () => {
+  await bootApp(async () => {
+    assert.equal(cards(), 1);
+    assert.equal(window.document.querySelectorAll("[data-work-launch-card] button.dc-work-launch-choice").length, 3,
+      "Landing page · Home · Work are all on the card on the website");
+    const landing = window.document.querySelector(".dc-work-launch-choice--landing");
+    assert.ok(landing, "the landing option is on the card");
+    await click(landing);
+    assert.equal(window.location.hash, "#/landing", "the landing option opens the landing route");
+    assert.equal(startupNodes(), 0, "…and closes both startup options the same way");
+  });
+});
+
+/* ── 8. deep links are still never interrupted ───────────────────────────── */
 
 test("a deep link still opens on its own route with no startup overlay", async () => {
   await resetBoot();

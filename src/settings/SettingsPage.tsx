@@ -5,6 +5,7 @@ import {
   Bell,
   BriefcaseBusiness,
   Check,
+  Globe,
   Home,
   ChevronRight,
   Loader2,
@@ -65,6 +66,7 @@ function WorkLaunchPreference() {
     { value: "ask", label: "Ask every time", description: "Choose Home or Work when the app opens.", Icon: PanelsTopLeft },
     { value: "home", label: "Always open Home", description: "Skip the choice card and go to Home.", Icon: Home },
     { value: "work", label: "Always open Work", description: "Skip the choice card and open Work mode.", Icon: BriefcaseBusiness },
+    { value: "landing", label: "Always open Landing page", description: "Open the website landing page instead.", Icon: Globe },
   ];
   return (
     <section className="settings-section" aria-labelledby="settings-work-opening" data-work-launch-preference>

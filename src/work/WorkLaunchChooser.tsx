@@ -17,6 +17,11 @@
 // immediate Home, or the APK's Home — can paint behind the same card. It never
 // interrupts a deep link (`#/course/…`, `#/my-day`, a notification target, …).
 //
+// Owner brief (2026-10-15): the card offers THREE options on the website —
+// Landing page, Home and Work (`Landing page` is hidden inside the installed
+// PWA / APK, where the landing route is deliberately never painted) — and the
+// reminder about the reported Home bug follows.
+//
 // Owner report (2026-10-15): on the APK / installed PWA the card never went
 // away — Home opened UNDERNEATH it and the card's own backdrop kept swallowing
 // every tap on Home. Root cause and fix are documented on
@@ -24,20 +29,34 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowRight, BriefcaseBusiness, Check, Home, LockKeyhole } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, Check, Globe, Home, LockKeyhole } from "lucide-react";
 import { attachOpeningSplash, isOpeningVisible } from "@/utils/openingSplash";
+import { isInstalledMobilePwa } from "@/utils/pwaInstall";
+import { isNativeApp } from "@/utils/capacitorBridge";
 import { setWorkLaunchChoice, useWorkLaunchChoice } from "./storage/workPrefs";
 import "./work-launch.css";
 
 const WORK_HASH = "#/work";
 const HOME_HASH = "#/home";
+const LANDING_HASH = "#/landing";
 
 export const isDefaultLaunchHash = (hash: string): boolean =>
   !hash || hash === "#" || hash === "#/" || hash.startsWith("#/landing") || hash === "#/home";
 
-function launchTarget(choice: "home" | "work") {
-  return choice === "work" ? WORK_HASH : HOME_HASH;
+function launchTarget(choice: "home" | "work" | "landing") {
+  if (choice === "work") return WORK_HASH;
+  if (choice === "landing") return LANDING_HASH;
+  return HOME_HASH;
 }
+
+/**
+ * The marketing landing page is only a real destination on the website. The
+ * installed PWA and the APK deliberately never paint it (`RootPage`'s
+ * `skipLandingForInstalledApp` rewrites a landing boot to `#/home`), so the
+ * third option is offered exactly where it works and never as a dead end.
+ */
+const landingIsReachable = (): boolean =>
+  typeof window !== "undefined" && !isInstalledMobilePwa() && !isNativeApp();
 
 /**
  * The answer to this card is a hand-over: the learner has said which space to
@@ -63,6 +82,7 @@ export default function WorkLaunchChooser() {
   const choice = useWorkLaunchChoice();
   const [hash, setHash] = useState(() => typeof window === "undefined" ? "" : window.location.hash);
   const [remember, setRemember] = useState(false);
+  const [showLandingChoice] = useState(landingIsReachable);
   const homeChoiceRef = useRef<HTMLButtonElement | null>(null);
   // The ask-on-launch decision is once per loaded app instance, not once per
   // sessionStorage tab: a full reload/cold start mounts the module again and
@@ -108,7 +128,7 @@ export default function WorkLaunchChooser() {
     if (window.location.hash !== target) window.location.hash = target;
   }, [choice, askPending]);
 
-  const setDestination = (destination: "home" | "work") => {
+  const setDestination = (destination: "home" | "work" | "landing") => {
     setAnsweredForThisBoot(true);
     dismissOpeningOverlay();
     if (remember) setWorkLaunchChoice(destination);
@@ -138,7 +158,7 @@ export default function WorkLaunchChooser() {
         <h1 id="dc-work-launch-title">Where would you like to begin?</h1>
         <p id="dc-work-launch-description">Choose your learning space. You can switch any time.</p>
 
-        <div className="dc-work-launch-choices">
+        <div className="dc-work-launch-choices" data-work-launch-choices={showLandingChoice ? "3" : "2"}>
           <button ref={homeChoiceRef} type="button" className="dc-work-launch-choice dc-work-launch-choice--home" onClick={() => setDestination("home")}>
             <span className="dc-work-launch-icon"><Home size={22} aria-hidden="true" /></span>
             <span className="dc-work-launch-copy"><strong>Home</strong><small>Courses, store &amp; your day</small></span>
@@ -149,6 +169,13 @@ export default function WorkLaunchChooser() {
             <span className="dc-work-launch-copy"><strong>Work</strong><small>My Day, Notes, Mind map &amp; more</small></span>
             <ArrowRight className="dc-work-launch-arrow" size={17} aria-hidden="true" />
           </button>
+          {showLandingChoice ? (
+            <button type="button" className="dc-work-launch-choice dc-work-launch-choice--landing" onClick={() => setDestination("landing")}>
+              <span className="dc-work-launch-icon"><Globe size={22} aria-hidden="true" /></span>
+              <span className="dc-work-launch-copy"><strong>Landing page</strong><small>Website, features &amp; download</small></span>
+              <ArrowRight className="dc-work-launch-arrow" size={17} aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
 
         <div className="dc-work-launch-footer">
