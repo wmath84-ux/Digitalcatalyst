@@ -390,10 +390,13 @@ export default function CourseBrainPanel({
           <>
             {/* Course mode keeps its MASTER / SELF collection control. Work mode
                 renders a flat private set list instead. */}
-            <div className="flex items-center justify-between gap-2 pb-2" data-brain-collection="">
-              <div>
-                <p className="text-xs font-black uppercase tracking-wide text-[var(--dc-flat-ink-sub)]">Practice library</p>
-                <p className="mt-0.5 text-[11px] text-[var(--dc-flat-ink-label)]">Course practice and your own sets stay separate.</p>
+            <header className="flex items-center justify-between gap-2 pb-2" data-brain-collection="" data-library-header>
+              <div className="flex items-center gap-2">
+                <Brain size={15} aria-hidden="true" />
+                <div>
+                  <h2 className="text-[13px] font-black tracking-wide text-[var(--dc-flat-ink-sub)]">Brain</h2>
+                  <p className="mt-0.5 text-[11px] text-[var(--dc-flat-ink-label)]">Course practice and your own sets stay separate.</p>
+                </div>
               </div>
               <div className="flex items-center" style={{ gap: S(8) }}>
                 <MasterSelfControl

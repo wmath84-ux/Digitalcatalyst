@@ -2555,7 +2555,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
               : `Course progress ${progress}%`
           }
           title={canMarkCompleteTop ? (isDone ? "Tap to mark as not complete" : "Mark this lesson complete") : undefined}
-          className="relative flex w-1/2 cursor-pointer items-center gap-2 px-3 pb-[3px] outline-none disabled:cursor-default"
+          className="relative flex w-3/4 cursor-pointer items-center gap-2 px-3 pb-[3px] outline-none disabled:cursor-default"
           data-course-progress-bar
           data-progress-value={progress}
         >
@@ -2622,7 +2622,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           }}
           aria-label="Open Player settings"
           title="Player settings"
-          className="flex w-1/2 cursor-pointer items-center justify-center gap-2 px-3 pb-[3px] outline-none transition-colors hover:bg-white/5"
+          className="flex w-1/4 cursor-pointer items-center justify-center gap-2 px-3 pb-[3px] outline-none transition-colors hover:bg-white/5"
           data-course-settings-trigger
         >
           <Settings className="h-3.5 w-3.5 text-white/70" />
