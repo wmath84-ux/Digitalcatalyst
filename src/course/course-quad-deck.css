@@ -198,6 +198,59 @@
   width: 100%;
 }
 
+/* ── The squeeze: two blocks pressed together ─────────────────────────────
+   Dragged onto its clamp, a divider has compressed its blocks as far as the
+   deck allows. Owner (2026-10-16): "do pages ke window ko lakar compress karke
+   sata deta hai to unke bich mein ek chhota sa gap dikhna chahiye aur icon bhi
+   dikhe … click karne per vah apne previous area mein directly expand ho jata
+   tha." So the squeezed divider keeps a WIDER clean gap between the two blocks
+   (the strip itself carries no plate — only the 2px line) and ONE small icon at
+   its exact centre; the icon puts the divider back where it was. */
+.dc-quad-divider[data-squeezed="true"] {
+  z-index: 34;
+}
+
+.dc-quad-restore {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--course-ink, #0f172a);
+  background: var(--dc-chrome-glass, rgba(255, 255, 255, 0.72));
+  box-shadow: var(--dc-chrome-glass-rim, 0 0 0 1px rgba(15, 23, 42, 0.12));
+  backdrop-filter: var(--dc-chrome-glass-blur, blur(12px));
+  -webkit-backdrop-filter: var(--dc-chrome-glass-blur, blur(12px));
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.dc-quad-restore:hover {
+  transform: translate(-50%, -50%) scale(1.08);
+}
+
+.dc-quad-restore:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #6366f1 70%, transparent);
+}
+
+.dc-quad-restore:active {
+  transform: translate(-50%, -50%) scale(0.94);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-quad-restore {
+    transition: none;
+  }
+}
+
 /* Course view → a divider segment switched off: the line goes, the drag and
    the dot stay. */
 .dc-quad-segment[data-visible="false"] .dc-quad-segment__line {

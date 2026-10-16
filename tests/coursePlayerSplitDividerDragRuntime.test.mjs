@@ -553,6 +553,56 @@ test("a dragged ratio belongs to its course alone", async () => {
   back.unmount();
 });
 
+/* --------------------------------------------------------------------------- */
+/* 12. The collapsed edge: a clean gap with ONE small icon (no white strip)     */
+/* --------------------------------------------------------------------------- */
+
+/** Press a plain button the way a person would. */
+const clickEl = async (element) => {
+  await act(async () => {
+    element.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
+  });
+  await settle(420);
+};
+
+test("dragging to an edge leaves a clean gap with one small icon — pressing it restores the previous size", async () => {
+  window.localStorage.clear();
+  stageWidth = 1400;
+  const mounted = await mountDeck();
+
+  // A roomy split first: study 60 / lesson 40.
+  await dragTo(mainDivider(), [500, 400], [400, 400]);
+  const previous = share(lessonPane());
+  assert.ok(Math.abs(previous - 40) < 0.8, `expected a 40% lesson pane, got ${previous}`);
+
+  // Drag it to the far edge → the study pane compresses into the gap.
+  await dragTo(mainDivider(), [600, 400], [980, 400]);
+  await settle(620);
+  const rail = window.document.querySelector('[data-course-peek-rail][data-peek-side="study"]');
+  assert.ok(rail, "the collapsed pane leaves its seam");
+
+  // 1 · The white strip is GONE: no frosted plate, no rim shadow on the seam.
+  assert.equal(rail.style.background, "", "the seam carries no plate — that plate WAS the white strip");
+  assert.equal(rail.style.boxShadow, "");
+  assert.equal(rail.style.backdropFilter, "");
+  // 2 · The gap shows ONE small icon, centred in it.
+  assert.equal(rail.className.includes("items-center"), true, "the icon is centred on the cross axis");
+  assert.equal(rail.className.includes("justify-center"), true, "the icon is centred along the seam");
+  const icons = rail.querySelectorAll("[data-course-peek-icon]");
+  assert.equal(icons.length, 1, "exactly one small icon in the gap");
+  assert.ok(Number.parseFloat(icons[0].style.width) <= 26, `a SMALL icon, got ${icons[0].style.width}`);
+  // The accent hairline still marks the edge the divider used to sit on.
+  assert.ok(rail.querySelector("[data-peek-glow]"), "the accent hairline stays");
+
+  // 3 · One press and the pane is back at its PREVIOUS size — not a default.
+  await clickEl(rail);
+  assert.equal(window.document.querySelector("[data-course-peek-rail]"), null, "the pane is open again");
+  const restored = share(lessonPane());
+  assert.ok(Math.abs(restored - previous) < 1.5, `back to the previous ${previous}%, got ${restored}`);
+
+  mounted.unmount();
+});
+
 after(() => {
   dom.window.close();
   for (const handle of process._getActiveHandles?.() ?? []) {

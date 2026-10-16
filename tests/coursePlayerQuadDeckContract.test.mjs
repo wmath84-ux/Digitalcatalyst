@@ -84,7 +84,9 @@ test("both dividers are always draggable — no mode, no gate, no unlock", () =>
   // Keyboard parity, and no gate on the drag path at all.
   assert.match(DECK, /const QUAD_KEY_STEP = 2;/);
   assert.match(DECK, /if \(event\.key === "s" \|\| event\.key === "S"\) \{/);
-  assert.doesNotMatch(DECK, /wide|isTablet|SPLIT_WIDE_MIN_PX/);
+  // No width GATE on the drag path. (Word-bounded: the prose word "wider" in a
+  // comment is not a flag — the pin is about a `wide` variable/condition.)
+  assert.doesNotMatch(DECK, /\bwide\b|isTablet|SPLIT_WIDE_MIN_PX/);
 });
 
 /* ── 4 · the dots, the ONE cluster, and how it closes ───────────────────── */
@@ -327,6 +329,43 @@ test("the deck's state is persisted per course, so the player never opens fresh"
   assert.match(MODEL, /const storageKey = \(courseId: string\) => `dc\.course\.quadLayout\.v1\.\$\{courseId \|\| "course"\}`;/);
   assert.match(MODEL, /export function loadQuadLayout\(courseId: string\): QuadLayoutState \{/);
   assert.match(MODEL, /export function saveQuadLayout\(courseId: string, state: QuadLayoutState\): void \{/);
+});
+
+/* ── the squeeze: two blocks pressed together ───────────────────────────── */
+
+test("a divider pressed onto its clamp keeps a gap and offers ONE small way back", () => {
+  // The squeeze line and the wider gap.
+  assert.match(DECK, /const QUAD_SQUEEZE_EPS = 0\.6;/);
+  assert.match(DECK, /const QUAD_SQUEEZE_GAP = 18;/);
+  assert.match(DECK, /const squeezedCol = state\.col <= QUAD_COL_MIN \+ QUAD_SQUEEZE_EPS \|\| state\.col >= QUAD_COL_MAX - QUAD_SQUEEZE_EPS;/);
+  assert.match(DECK, /const squeezedRow = state\.row <= QUAD_ROW_MIN \+ QUAD_SQUEEZE_EPS \|\| state\.row >= QUAD_ROW_MAX - QUAD_SQUEEZE_EPS;/);
+  assert.match(DECK, /data-quad-squeezed=/);
+  // The way back is the PREVIOUS size of that axis, remembered while it was
+  // still roomy — never a default.
+  assert.match(DECK, /const lastColRef = useRef\(state\.col\);/);
+  assert.match(DECK, /const lastRowRef = useRef\(state\.row\);/);
+  assert.match(DECK, /if \(!squeezedCol\) lastColRef\.current = state\.col;/);
+  assert.match(DECK, /if \(!squeezedRow\) lastRowRef\.current = state\.row;/);
+  assert.match(DECK, /const restoreCol = \(\) => commit\(\{ \.\.\.state, col: clampQuadCol\(lastColRef\.current\) \}\);/);
+  assert.match(DECK, /const restoreRow = \(\) => commit\(\{ \.\.\.state, row: clampQuadRow\(lastRowRef\.current\) \}\);/);
+  assert.match(DECK, /squeezed=\{squeezedCol\}/);
+  assert.match(DECK, /onRestore=\{restoreCol\}/);
+  assert.match(DECK, /squeezed=\{squeezedRow\}/);
+  assert.match(DECK, /onRestore=\{restoreRow\}/);
+  // ONE small icon at the divider's centre, and the wider gap behind it.
+  assert.match(DECK, /data-course-quad-restore=\{axis\}/);
+  assert.match(DECK, /`\$\{squeezed \? QUAD_SQUEEZE_GAP : DIVIDER_HIT\}px`/);
+  assert.match(DECK, /Expand the squeezed blocks back to their previous width/);
+  assert.match(DECK, /Expand the squeezed blocks back to their previous height/);
+  assert.match(DECK, /data-squeezed=\{squeezed \? "true" : "false"\}/);
+  // The strip itself paints NOTHING (the line is the only chrome): what the
+  // learner sees between two pressed-together blocks is a gap, never a strip.
+  const strip = DECK_CSS.slice(DECK_CSS.indexOf(".dc-quad-divider {"), DECK_CSS.indexOf(".dc-quad-divider--v"));
+  assert.doesNotMatch(strip, /background/, "the divider strip stays transparent — no white strip at any edge");
+  assert.match(DECK_CSS, /\.dc-quad-divider\[data-squeezed="true"\] \{/);
+  assert.match(DECK_CSS, /\.dc-quad-restore \{/);
+  assert.match(DECK_CSS, /\.dc-quad-restore:hover \{/);
+  assert.match(DECK_CSS, /@media \(prefers-reduced-motion: reduce\) \{\n  \.dc-quad-restore \{/);
 });
 
 /* ── the nav-space rule ─────────────────────────────────────────────────── */

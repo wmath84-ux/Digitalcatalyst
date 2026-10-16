@@ -492,6 +492,47 @@ test("the horizontal divider drags too, and the panes never leave the band", asy
   deck.done();
 });
 
+test("a squeezed divider keeps a wider gap and ONE small icon — press it and it returns", async () => {
+  const deck = await mount();
+  // Roomy first: the vertical divider settles at 62.
+  await dragTo(dividerEl("v"), [500, 400], [620, 400]);
+  assert.equal(deckEl().getAttribute("data-quad-col"), "62");
+  assert.equal(deckEl().getAttribute("data-quad-squeezed"), "none", "roomy blocks are not squeezed");
+  assert.equal(query("[data-course-quad-restore]"), null, "no icon until the blocks are pressed together");
+
+  // Now press the two blocks together: the divider sits on its own clamp.
+  await dragTo(dividerEl("v"), [620, 400], [50, 400]);
+  assert.equal(deckEl().getAttribute("data-quad-col"), "20", "clamped at the owner's 20–80 band");
+  assert.equal(deckEl().getAttribute("data-quad-squeezed"), "v");
+  const restore = query('[data-course-quad-restore="v"]');
+  assert.ok(restore, "the gap carries the way back");
+  assert.equal(dividerEl("v").style.getPropertyValue("--quad-hit"), "18px", "the gap stays visible (18px vs the usual 10px)");
+  assert.equal(restore.getAttribute("title"), "Back to the previous size");
+
+  // ONE press → back to the size these blocks had before the squeeze (62),
+  // never a default.
+  await click(restore, "the squeeze icon");
+  assert.equal(deckEl().getAttribute("data-quad-col"), "62");
+  assert.equal(deckEl().getAttribute("data-quad-squeezed"), "none");
+  assert.equal(query("[data-course-quad-restore]"), null);
+  deck.done();
+});
+
+test("the horizontal divider squeezes the same way — and its own icon brings it back", async () => {
+  const deck = await mount();
+  // Dragging the horizontal divider DOWN grows the row value (it is measured
+  // from the bottom edge), so this lands at 78 of 85.
+  await dragTo(dividerEl("h"), [500, 400], [500, 620]);
+  assert.equal(deckEl().getAttribute("data-quad-row"), "78");
+  await dragTo(dividerEl("h"), [500, 620], [500, 770]);
+  assert.equal(deckEl().getAttribute("data-quad-row"), "85", "clamped at 15–85");
+  const restore = query('[data-course-quad-restore="h"]');
+  assert.ok(restore, "the horizontal gap carries its own way back");
+  await click(restore, "the horizontal squeeze icon");
+  assert.equal(deckEl().getAttribute("data-quad-row"), "78");
+  deck.done();
+});
+
 test("a hidden divider segment still drags (Course view never locks the layout)", async () => {
   const deck = await mount({
     view: { zoom: 100, dividers: { vTop: false, vBottom: true, hLeft: true, hRight: true } },

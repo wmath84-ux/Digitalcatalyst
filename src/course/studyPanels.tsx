@@ -47,7 +47,7 @@ import {
   type RefObject,
 } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useMotionValueEvent, type AnimationPlaybackControls, type MotionValue } from "framer-motion";
-import { ArrowLeftRight, ArrowUpDown, PanelBottom, PanelLeft, PanelRight, PanelTop, X } from "lucide-react";
+import { ArrowLeftRight, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, PanelBottom, PanelLeft, PanelRight, PanelTop, X } from "lucide-react";
 import { GlassSurface } from "../components/ui/glass";
 import {
   DEFAULT_SPLIT_RATIO,
@@ -106,6 +106,20 @@ const CHROME_GLASS: CSSProperties = {
 };
 
 /**
+ * The seam icon's own little plate: the chrome glass, at icon size — the strip
+ * itself never wears it any more (that plate WAS the white strip).
+ */
+const PEEK_ICON_STYLE: CSSProperties = {
+  width: 22,
+  height: 22,
+  ...CHROME_GLASS,
+  borderRadius: 999,
+  color: "var(--course-ink, #111827)",
+  display: "grid",
+  placeItems: "center",
+};
+
+/**
  * Soft-keyboard awareness for the study pane (the old overlay's behaviour,
  * ported): while an editable field INSIDE the deck has focus and the visual
  * viewport has shrunk, the deck reports how many px of its bottom edge the
@@ -154,6 +168,24 @@ const railGlowStyle = (axis: SplitAxis, side: SplitSide, accent: string): CSSPro
   return { position: "absolute", left: 0, right: 0, height: 2, ...(side === "lesson" ? { bottom: 0 } : { top: 0 }), ...glow };
 };
 
+/** The small icon a compressed pane shows, centred in the gap it leaves. */
+const PEEK_ICON_PX = 16;
+
+/**
+ * The compressed pane's way back.
+ *
+ * Owner (2026-10-16): "agar usko kisi bhi edge per le jaya jaye … to vah ek
+ * patla sa white strip create ho jata hai — isko remove karo … unke bich mein
+ * ek chhota sa gap dikhna chahiye aur icon bhi dikhe … use per click karne per
+ * vah apne previous area mein directly expand ho jata tha."
+ *
+ * So the frosted glass PLATE that used to fill this 28px strip (CHROME_GLASS —
+ * the white strip) is gone: what is left is a clean GAP between the two panes,
+ * carrying the accent hairline on the divider-facing edge and ONE small icon in
+ * the middle of the gap. The whole strip stays the tap target, and a press puts
+ * the pane back exactly where it was (`restore()` → the ratio it had before it
+ * collapsed, never a default).
+ */
 function PeekRail({
   side,
   glowSide,
@@ -171,6 +203,11 @@ function PeekRail({
   label: string;
   onRestore: () => void;
 }) {
+  // The icon points the way the pane will grow back: away from the deck edge
+  // it is parked on (both axes, both ends).
+  const SeamIcon = axis === "row"
+    ? (glowSide === "lesson" ? ChevronRight : ChevronLeft)
+    : (glowSide === "lesson" ? ChevronDown : ChevronUp);
   return (
     <motion.button
       type="button"
@@ -180,17 +217,25 @@ function PeekRail({
       data-course-peek-rail=""
       data-peek-side={side}
       data-axis={axis}
+      data-peek-gap=""
       className="absolute inset-0 z-20 flex cursor-pointer items-center justify-center overflow-hidden"
-      style={CHROME_GLASS}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.18, ease: EASE_OUT_MOTION }}
     >
-      {/* The rail carries NO icon (owner: the small glyph that appeared when
-          the divider reached the very top/bottom was unwanted). Only the 2px
-          accent glow on the divider-facing edge marks the collapsed pane;
-          the whole strip stays the tap target that restores it. */}
+      {/* The only chrome in the gap: the accent hairline on the edge the
+          divider used to sit on. */}
       <span aria-hidden style={railGlowStyle(axis, glowSide, accent)} data-peek-glow="" />
+      {/* ONE small icon at the centre of the gap — the way back to the pane's
+          previous size. */}
+      <span
+        aria-hidden
+        data-course-peek-icon=""
+        className="pointer-events-none relative grid place-items-center rounded-full"
+        style={PEEK_ICON_STYLE}
+      >
+        <SeamIcon size={PEEK_ICON_PX} strokeWidth={2.4} />
+      </span>
     </motion.button>
   );
 }

@@ -64,10 +64,14 @@ import { ArrowLeftRight, ArrowUpDown, Move } from "lucide-react";
 import { DIVIDER_HIT, DIVIDER_LINE, EASE_OUT_MOTION } from "./splitMotion";
 import type { CourseViewSettings } from "./courseViewSettings";
 import {
+  QUAD_COL_MAX,
+  QUAD_COL_MIN,
   QUAD_FORMAT_ORDER,
   QUAD_FORMATS,
   QUAD_PANE_ORDER,
   QUAD_PANE_SLOT,
+  QUAD_ROW_MAX,
+  QUAD_ROW_MIN,
   QUAD_SLOT_LABEL,
   clampQuadCol,
   clampQuadRow,
@@ -88,6 +92,18 @@ import "./course-quad-deck.css";
 
 /** How far one arrow-key step moves a divider. */
 const QUAD_KEY_STEP = 2;
+
+/**
+ * A divider this close to its own clamp has SQUEEZED its panes together: the
+ * deck then keeps a slightly wider gap between them and shows the small icon
+ * that puts the divider back where it was (owner: "do pages ke window ko lakar
+ * compress karke sata deta hai to unke bich mein ek chhota sa gap dikhna
+ * chahiye aur icon bhi dikhe … click karne per vah apne previous area mein
+ * directly expand ho jata tha").
+ */
+const QUAD_SQUEEZE_EPS = 0.6;
+/** The gap the deck keeps around a squeezed divider (vs the usual 10px). */
+const QUAD_SQUEEZE_GAP = 18;
 
 /** How long a pane glows after the navigation brings it back. */
 const QUAD_FOCUS_MS = 1600;
@@ -256,6 +272,23 @@ export default function QuadDeck({
   const hasVertical = rows.some((row) => row.length >= 2);
   const hasHorizontal = rows.length >= 2;
   const cross = hasVertical && hasHorizontal;
+
+  /* ── The squeeze: two blocks pressed together ───────────────────────────
+   * A divider sitting on its clamp has compressed its blocks as far as the
+   * deck allows. The last ROOMY value of each axis is remembered, so the small
+   * icon in the gap can put that divider straight back where it was. */
+  const squeezedCol = state.col <= QUAD_COL_MIN + QUAD_SQUEEZE_EPS || state.col >= QUAD_COL_MAX - QUAD_SQUEEZE_EPS;
+  const squeezedRow = state.row <= QUAD_ROW_MIN + QUAD_SQUEEZE_EPS || state.row >= QUAD_ROW_MAX - QUAD_SQUEEZE_EPS;
+  const lastColRef = useRef(state.col);
+  const lastRowRef = useRef(state.row);
+  useEffect(() => {
+    if (!squeezedCol) lastColRef.current = state.col;
+  }, [state.col, squeezedCol]);
+  useEffect(() => {
+    if (!squeezedRow) lastRowRef.current = state.row;
+  }, [state.row, squeezedRow]);
+  const restoreCol = () => commit({ ...state, col: clampQuadCol(lastColRef.current) });
+  const restoreRow = () => commit({ ...state, row: clampQuadRow(lastRowRef.current) });
 
   /* ── Drag: the two dividers ─────────────────────────────────────────────
    * Four half segments, one rule: the whole strip drags, always. During the
@@ -430,6 +463,7 @@ export default function QuadDeck({
       data-quad-nav-side={navSide}
       data-quad-zoom={view.zoom}
       data-quad-cross={cross ? "true" : "false"}
+      data-quad-squeezed={squeezedCol && squeezedRow ? "both" : squeezedCol ? "v" : squeezedRow ? "h" : "none"}
       style={
         {
           "--quad-col": `${state.col}%`,
@@ -480,6 +514,8 @@ export default function QuadDeck({
             dragging={dragging === "v"}
             visible={{ vTop: view.dividers.vTop, vBottom: view.dividers.vBottom }}
             openSegment={menu?.divider === "v" ? menu.segment : null}
+            squeezed={squeezedCol}
+            onRestore={restoreCol}
             onPointerDown={handlePointerDown("v")}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -499,6 +535,8 @@ export default function QuadDeck({
             dragging={dragging === "h"}
             visible={{ vTop: view.dividers.hLeft, vBottom: view.dividers.hRight }}
             openSegment={menu?.divider === "h" ? menu.segment : null}
+            squeezed={squeezedRow}
+            onRestore={restoreRow}
             onPointerDown={handlePointerDown("h")}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -653,6 +691,8 @@ function QuadDivider({
   dragging,
   visible,
   openSegment,
+  squeezed,
+  onRestore,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -667,6 +707,9 @@ function QuadDivider({
   dragging: boolean;
   visible: { vTop: boolean; vBottom: boolean };
   openSegment: "vTop" | "vBottom" | "hLeft" | "hRight" | null;
+  /** The blocks on this axis are pressed together — show the way back. */
+  squeezed: boolean;
+  onRestore: () => void;
   onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
@@ -700,7 +743,8 @@ function QuadDivider({
       data-dragging={dragging ? "true" : "false"}
       data-cross={cross ? "true" : "false"}
       className={`dc-quad-divider dc-quad-divider--${axis}`}
-      style={{ ["--quad-hit" as string]: `${DIVIDER_HIT}px` } as CSSProperties}
+      data-squeezed={squeezed ? "true" : "false"}
+      style={{ ["--quad-hit" as string]: `${squeezed ? QUAD_SQUEEZE_GAP : DIVIDER_HIT}px` } as CSSProperties}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -708,6 +752,29 @@ function QuadDivider({
       onDoubleClick={onDoubleClick}
       onKeyDown={onKeyDown(axis, firstSegment)}
     >
+      {/* Squeezed: ONE small icon at the divider's centre — the way back to
+          the size these blocks had before they were pressed together. */}
+      {squeezed ? (
+        <button
+          type="button"
+          className="dc-quad-restore"
+          data-course-quad-restore={axis}
+          aria-label={axis === "v"
+            ? "Expand the squeezed blocks back to their previous width"
+            : "Expand the squeezed blocks back to their previous height"}
+          title="Back to the previous size"
+          onPointerDown={(event) => event.stopPropagation()}
+          onDoubleClick={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRestore();
+          }}
+        >
+          <span aria-hidden data-quad-restore-icon>
+            {axis === "v" ? <ArrowLeftRight size={14} /> : <ArrowUpDown size={14} />}
+          </span>
+        </button>
+      ) : null}
       {segments.map((segment) => {
         const isFirst = segment === firstSegment;
         const share = axis === "v" ? state.row : state.col;
