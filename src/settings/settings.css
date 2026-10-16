@@ -961,6 +961,46 @@ html[data-theme="light"] [data-settings-page]:not([data-public-profile]) :is(a, 
   color: #c1baff;
 }
 
+/* ── When the footer navigation shows (owner, 2026-10-16) ────────────────
+   "Do option add karo … aur neeche ek chhota sa instruction line English
+   mein." One question, two options in the SAME card design as the styles
+   above, and the instruction line under them: the sentence names every page
+   where the footer navigation is not shown (with "accordingly"), which is
+   exactly what the footer rule implements. */
+.settings-navigation-visibility {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 1.15rem;
+}
+
+.settings-navigation-visibility__lead {
+  margin: 0;
+  color: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.settings-navigation-options--visibility {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-navigation-preview--always {
+  border-color: rgba(193, 186, 255, 0.62);
+  background: rgba(137, 120, 237, 0.24);
+}
+
+.settings-navigation-preview--accordingly {
+  opacity: 0.5;
+}
+
+.settings-navigation-visibility__note {
+  margin: 0;
+  color: var(--settings-muted);
+  font-size: 0.72rem;
+  line-height: 1.6;
+}
+
 .settings-navigation-preview {
   display: flex;
   min-height: 40px;
@@ -1045,6 +1085,15 @@ html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settin
 
 html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-navigation-choice-check {
   color: #004ac6;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-navigation-visibility__note {
+  color: #475569;
+}
+
+html[data-theme="light"] [data-settings-page]:not([data-public-profile]) .settings-navigation-preview--always {
+  border-color: rgba(0, 74, 198, 0.5);
+  background: rgba(0, 74, 198, 0.14);
 }
 
 @media (max-width: 520px) {

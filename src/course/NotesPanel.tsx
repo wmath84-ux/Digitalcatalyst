@@ -56,7 +56,7 @@ import type { PersonalCourseModule } from "../types/personalCourse";
 import RichTextEditor from "./RichTextEditor";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import { combineHtml } from "./notesStore";
-import { getCoursePanelSession, setNotesEditorOpen, setNotesSessionView } from "./coursePanelSession";
+import { getCoursePanelSession, setNotesEditMode, setNotesSessionView } from "./coursePanelSession";
 import { useCourseTheme, useMasterSelfPreference, type CoursePlayerTheme } from "./playerPreferences";
 import { firstRichTextBlock, isEmptyRichText, plainToRichText, richTextToPlain, splitFirstHeading, sanitizeRichText } from "../utils/richText";
 import { MAX_NOTE_HTML_LENGTH } from "../../utils/courseNotes";
@@ -615,16 +615,21 @@ export default function NotesPanel({
   useLayoutEffect(() => () => { saveNowRef.current(); }, []);
 
   const editorOpen = composing || Boolean(editingId) || Boolean(viewingMasterNote);
+  /**
+   * The footer rule, and ONLY this (owner, 2026-10-16: "yah tab nahin dikhega
+   * jab editor mode on hoga, bas"): the page is in WRITE mode when the editor
+   * is open on something the learner can actually write — a MASTER note opened
+   * for reading (`readView`, the same flag the eye button toggles) keeps the
+   * footer navigation exactly like the notes home does.
+   */
+  const notesEditMode = editorOpen && !(Boolean(editingId) && selfReadOnly);
 
   // Keep the session in sync on every render so the current view + draft are
   // immediately available to the next mount (tab switch) and to the player's
   // exit flush — even if this component unmounts before an effect fires.
   useEffect(() => {
     if (storageOnly) return;
-    // The writing page (the editor, or a MASTER note open for reading) is one
-    // of the player's immersive pages: the footer navigation hides while it is
-    // up and returns on the notes home / in the library panel.
-    setNotesEditorOpen(editorOpen);
+    setNotesEditMode(notesEditMode);
     if (composing) {
       setNotesSessionView({ view: "compose", draft, title: draftTitle });
     } else if (editingId) {

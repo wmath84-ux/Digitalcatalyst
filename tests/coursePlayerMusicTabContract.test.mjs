@@ -226,15 +226,18 @@ test('the footer navigation hides on a player and returns on the library page', 
   assert.match(session, /musicView: MusicPanelSessionView;/);
   assert.match(session, /musicView: "library",/);
   assert.match(session, /export const setMusicSessionView = \(view: MusicPanelSessionView\) => \{/);
-  assert.match(panel, /import \{ setMusicSessionView \} from "\.\/coursePanelSession";/);
+  assert.match(panel, /import \{ setMusicSessionView, setSearchScrolledAway, setSearchSurface \} from "\.\/coursePanelSession";/);
   assert.match(panel, /setMusicSessionView\(view === "player" \? "player" : "library"\);/);
   assert.match(panel, /return \(\) => setMusicSessionView\("library"\);/);
   assert.match(panel, /data-music-view=\{view\}/);
-  // …read by the ONE resolver both footer homes already share.
-  assert.match(session, /case "music":[\s\S]{0,200}?return state\.musicView === "player";/);
-  assert.match(overlay, /const immersivePage = useFooterHiddenPage\(tab\);/);
+  // …read by the ONE resolver both footer homes already share. Since
+  // 2026-10-16 the same case also carries the search page and the scroll
+  // half of a results page (see footerNavigationVisibilityContract), and
+  // Settings can overrule the lot with "Visible footer navigation always".
+  assert.match(session, /case "music":[\s\S]{0,400}?state\.musicView === "player"/);
+  assert.match(overlay, /const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways\(\);/);
   assert.match(overlay, /\$\{keyboardVisible \|\| immersivePage \? "hidden" : ""\}/);
-  assert.match(strip, /const immersivePage = useFooterHiddenPage\(tab\)/);
+  assert.match(strip, /const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways\(\)/);
   assert.match(strip, /if \(keyboardVisible \|\| immersivePage\) return null/);
 });
 
@@ -258,7 +261,7 @@ test('the search box wears the SHARED study-search experience, not one of its ow
   // ONE kit for both libraries — the Course Library's search page and this pane
   // cannot drift apart: the same sentence, the same one-second floor, the same
   // YouTube-shaped recent searches.
-  assert.match(panel, /import \{\n  SearchFlashScan, SearchHistoryList, SlidingSearchText, STUDY_SEARCH_SENTENCE, useStudySearch,\n\} from "\.\/searchExperience";/);
+  assert.match(panel, /import \{\n  SearchFlashScan, SearchHistoryList, SlidingSearchText, STUDY_SEARCH_SENTENCE,\n  useScrollAwayHidden, useStudySearch,\n\} from "\.\/searchExperience";/);
   assert.match(panel, /useStudySearch<MusicTrack\[\]>\(\{ namespace: "course-music", run: runMusicSearch \}\)/);
   assert.match(panel, /const searchLoading = search\.phase === "loading";/);
   assert.match(panel, /const searched = search\.phase === "results";/);

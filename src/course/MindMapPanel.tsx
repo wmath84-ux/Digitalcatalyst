@@ -192,7 +192,7 @@ import "./mindMapLibrary.css";
 import type { CourseModule } from "../types/course";
 import { createMindMap } from "../../utils/mindMapTree";
 import type { PersonalCourseModule } from "../types/personalCourse";
-import { getCoursePanelSession, setMindMapSessionView } from "./coursePanelSession";
+import { getCoursePanelSession, setMindMapEditMode, setMindMapSessionView } from "./coursePanelSession";
 import { useCourseTheme, useMasterSelfPreference } from "./playerPreferences";
 import MasterSelfControl from "./MasterSelfControl";
 import { StudyLibraryEmptyState, StudyLibraryNotice } from "./StudyLibraryStates";
@@ -1466,6 +1466,17 @@ function MindMapCanvas(props: MindMapPanelProps) {
   useEffect(() => {
     if (!storageOnly) setMindMapSessionView(libraryOpen ? "library" : "canvas");
   }, [libraryOpen, storageOnly]);
+
+  /**
+   * The footer rule (owner, 2026-10-16: hide only while EDITOR MODE is on):
+   * the map must be on the canvas AND in edit mode. A read canvas — the
+   * learner's own map being read, or a read-only MASTER map, which can never
+   * be edited — keeps the footer navigation, exactly like the mind map library
+   * does. `readOnlyCanvas` is the panel's own single source for both cases.
+   */
+  useEffect(() => {
+    if (!storageOnly) setMindMapEditMode(!libraryOpen && !readOnlyCanvas);
+  }, [libraryOpen, readOnlyCanvas, storageOnly]);
 
   // Parent chrome follows the same library/canvas boundary in every host.
   // Unlike the course session above, this callback is safe for storage-only

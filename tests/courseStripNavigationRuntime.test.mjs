@@ -14,6 +14,10 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const tabsSource = fs.readFileSync('src/course/CourseOverlay.tsx', 'utf8');
 const tabs = [...tabsSource.matchAll(/\{ key: "(\w+)", label: "([^"]+)", heading: "([^"]+)", hint: "[^"]*", color: "([^"]+)", icon: (\w+) \}/g)].map(([, key, label, heading, color]) => ({ key, label, heading, color, icon: (props) => React.createElement('svg', { 'data-icon-size': props.size }) }));
 let keyboardVisible = false;
+// The two things the dock reads: the Course Player's page rule, and the
+// Settings choice that overrules it ("Visible footer navigation always").
+let pageRuleHidesFooter = false;
+let footerAlwaysVisible = false;
 function load(file, resolver = require) {
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText;
   const mod = { exports: {} };
@@ -23,7 +27,8 @@ function load(file, resolver = require) {
 const Nav = load('src/course/CoursePeekDock.tsx', id => {
   if (id === './CourseOverlay') return { TABS: tabs };
   if (id === './useCourseKeyboard') return { useCourseKeyboard: () => ({ keyboardVisible }) };
-  if (id === './coursePanelSession') return { useFooterHiddenPage: () => false };
+  if (id === './coursePanelSession') return { useFooterHiddenPage: () => pageRuleHidesFooter };
+  if (id === '../utils/footerNavigationVisibility') return { useFooterNavigationAlways: () => footerAlwaysVisible };
   if (id.endsWith('.css')) return {};
   return require(id);
 }).default;
@@ -65,4 +70,41 @@ test('course feature preferences ignore old dark values without changing master/
   }
   prefs.persistMasterSelfMode('notes', 'self', 'learner');
   assert.equal(prefs.loadMasterSelfMode('notes', 'learner'), 'self');
+});
+
+test('the page rule hides the real strip — and Settings "always" brings it back', async () => {
+  // The first test left the soft keyboard open — the dock's own rule, not a
+  // page rule: this test is about the PAGES.
+  keyboardVisible = false;
+  // Its OWN container: the first test's root was already unmounted on this one.
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const render = () => root.render(React.createElement(Nav, { tab: 'notes', onTabChange: () => {} }));
+
+  // The rule alone: the dock is really gone (not merely styled away).
+  pageRuleHidesFooter = true;
+  footerAlwaysVisible = false;
+  await act(render);
+  assert.equal(document.querySelector('nav'), null, 'the page rule hides the strip');
+
+  // "Visible footer navigation always" (Settings → Footer navigation): the
+  // very same page, and the strip is back with all of its tools.
+  footerAlwaysVisible = true;
+  await act(render);
+  const nav = document.querySelector('nav');
+  assert.ok(nav, 'the Settings choice keeps it on the page');
+  assert.equal(nav.querySelectorAll('[data-course-strip]').length, 10, 'every tool is still there');
+
+  // Unticking it hands the page rule its say back.
+  footerAlwaysVisible = false;
+  await act(render);
+  assert.equal(document.querySelector('nav'), null);
+
+  pageRuleHidesFooter = false;
+  footerAlwaysVisible = false;
+  await act(render);
+  assert.ok(document.querySelector('nav'), 'a library page keeps the strip as before');
+  await act(() => root.unmount());
+  host.remove();
 });

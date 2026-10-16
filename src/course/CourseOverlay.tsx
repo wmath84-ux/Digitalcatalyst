@@ -59,6 +59,7 @@ import GlassDock, { type GlassDockItem } from "../components/glass-dock/GlassDoc
 import { EASE_OUT_MOTION } from "./splitMotion";
 import { useCourseKeyboard } from "./useCourseKeyboard";
 import { useFooterHiddenPage } from "./coursePanelSession";
+import { useFooterNavigationAlways } from "../utils/footerNavigationVisibility";
 import { AiTabIcon } from "./studyTabIcons";
 import CoursePageHeader from "./CoursePageHeader";
 import BranchedMenu, { useBranchedOpen, type BranchedMenuItem } from "../components/branched-menu/BranchedMenu";
@@ -954,12 +955,18 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // soft keyboard is open, whichever of its two homes is in use.
   const { keyboardVisible } = useCourseKeyboard();
 
-  // The immersive-page rule (coursePanelSession.ts): while the learner is
-  // inside the Note Editor, the Mind Map Editor, the Brain answer page, the
-  // Live Experiment Viewer, the Sketch Editor or the Read PDF / Annotations
-  // viewers, this footer navigation hides; it returns on the library pages,
-  // and the Music Player's footer behaves exactly as before.
-  const immersivePage = useFooterHiddenPage(tab);
+  // The page rule (coursePanelSession.ts → `isFooterHiddenPage`): the footer
+  // hides while an EDITOR is in edit mode (the notes page writing, the mind
+  // map or the sketch drawing — their read modes keep it), on the Brain answer
+  // deck, in a live experiment, in the Read PDF / annotations viewer, on the
+  // Music player or either search page — and on those two results pages it
+  // steps away by itself while the learner scrolls down. Everything else,
+  // every library and every shelf, keeps it.
+  //
+  // Settings can overrule all of that: "Visible footer navigation always"
+  // (src/utils/footerNavigationVisibility.ts) keeps the footer on every page.
+  const pageRuleHidesFooter = useFooterHiddenPage(tab);
+  const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways();
 
   // Read entries reuse the exact module-unlock resolver already used by the
   // Modules tab, plus the current paid-update ownership set for resource-level

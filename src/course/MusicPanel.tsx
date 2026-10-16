@@ -78,7 +78,8 @@ import {
   resolveMusicTitle, searchYouTube, subscribeYouTubeKey, youTubeSearchAvailable, youTubeSearchUrl,
 } from "./musicSearch";
 import {
-  SearchFlashScan, SearchHistoryList, SlidingSearchText, STUDY_SEARCH_SENTENCE, useStudySearch,
+  SearchFlashScan, SearchHistoryList, SlidingSearchText, STUDY_SEARCH_SENTENCE,
+  useScrollAwayHidden, useStudySearch,
 } from "./searchExperience";
 import {
   MUSIC_EMPTY_HINT, MUSIC_EMPTY_TITLE, MUSIC_FILTERS, MUSIC_FILTER_HINT, MUSIC_FILTER_LABEL, MUSIC_NO_MATCH,
@@ -87,7 +88,7 @@ import {
   type MusicFilter, type MusicLibraryCounts,
 } from "./musicFilters";
 import { MusicEmptyPage, MusicTrackList } from "./MusicTrackList";
-import { setMusicSessionView } from "./coursePanelSession";
+import { setMusicSessionView, setSearchScrolledAway, setSearchSurface } from "./coursePanelSession";
 import { DIVIDER_HIT, DIVIDER_LINE } from "./splitMotion";
 
 interface MusicPanelProps {
@@ -527,6 +528,34 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
     .filter(({ tracks }) => tracks.length > 0);
   const rowsVisible = visibleSections.length > 0 || (showResults && freshResults.length > 0);
 
+  /**
+   * The music page's own footer rule (owner, 2026-10-16 — the same one the
+   * Course Library's search page wears):
+   *
+   *   · the music LIBRARY page keeps the footer navigation;
+   *   · the SEARCH page does NOT — that is the ready-to-write box with the
+   *     recent searches open under it (YouTube's own search page shape) and
+   *     the flash scan while a search runs;
+   *   · once RESULTS are on screen the footer is back, and only the scroll
+   *     half below can step it away.
+   *
+   * The open PLAYER is the other half of the rule and is published above (an
+   * open audio player or YouTube player always takes the footer away).
+   */
+  const musicSearchView = searchLoading || showHistory ? "page" : searched ? "results" : "closed";
+  useEffect(() => {
+    setSearchSurface("music", musicSearchView);
+  }, [musicSearchView]);
+  useEffect(() => () => setSearchSurface("music", "closed"), []);
+
+  /** "Scroll down kare to hide, wapas top par aate hi dikhe" — the results
+   *  scroll in `[data-music-body]`, whichever of the three homes is up. */
+  const { scrollerRef: musicScrollerRef, hidden: resultsScrolledAway } =
+    useScrollAwayHidden(musicSearchView === "results");
+  useEffect(() => {
+    setSearchScrolledAway("music", resultsScrolledAway);
+  }, [resultsScrolledAway]);
+
   /* ── The pieces ───────────────────────────────────────────────────────── */
 
   const searchBar = ({ compact, onOpenFullPage }: { compact: boolean; onOpenFullPage?: () => void }) => {
@@ -895,7 +924,11 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
       ) : null}
 
       <div className="relative min-h-0 flex-1">
-        <div className={`h-full overflow-y-auto px-2.5 pt-2 ${mode === "video" ? "pb-20" : "pb-24"} sm:px-4`} data-music-body>
+        <div
+          className={`h-full overflow-y-auto px-2.5 pt-2 ${mode === "video" ? "pb-20" : "pb-24"} sm:px-4`}
+          data-music-body
+          ref={musicScrollerRef}
+        >
           <div className={`mx-auto w-full ${mode === "video" ? "" : "max-w-5xl"}`}>{body()}</div>
         </div>
         {addFab}

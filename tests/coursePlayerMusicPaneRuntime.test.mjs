@@ -796,3 +796,58 @@ test("the idle box slides the shared sentence, and the filter's placeholder retu
   assert.equal(Boolean(q("[data-dc-slide]")), false, "the caret hands the box back to the filter's own placeholder");
   assert.equal(q("[data-music-search]").getAttribute("placeholder"), "Songs, videos, course — dhoondo…");
 });
+
+test("the music search page takes the footer, the results give it back, a scroll down steps it away", async () => {
+  window.localStorage.clear();
+  window.localStorage.setItem("dc.music.youtubeKey", "test-key");
+  fetchResponder = () => ({
+    ok: true,
+    json: () => Promise.resolve({
+      items: [{ id: { videoId: "dQw4w9WgXcQ" }, snippet: { title: "Never Gonna Give You Up", channelTitle: "Rick Astley" } }],
+    }),
+  });
+  mount({ courseAudio: [] });
+  await settle();
+
+  // The music LIBRARY page keeps the footer navigation (the owner's rule).
+  assert.equal(fixture.panelSession().musicSearch, "closed");
+
+  // The flash scan IS the search page — the footer is away there too, and not
+  // because a player opened (musicView is still "library").
+  typeInto(q("[data-music-search]"), "purane gaane");
+  await click(q("[data-music-search-run]"));
+  await settle(60);
+  assert.equal(fixture.panelSession().musicSearch, "page", "the search page takes the footer");
+  assert.equal(fixture.panelSession().musicView, "library");
+
+  // The results give it back, at the top of the page.
+  await settle(1200);
+  assert.equal(fixture.panelSession().musicSearch, "results");
+  assert.equal(fixture.panelSession().musicSearchScrolledAway, false);
+
+  // "Scroll down kare to hide ho jaye, wapas top par aate hi dikh jaye."
+  const body = q("[data-music-body]");
+  const scrollTo = async (top, expected) => {
+    await act(async () => {
+      body.scrollTop = top;
+      body.dispatchEvent(new window.Event("scroll", { bubbles: true }));
+      const deadline = Date.now() + 600;
+      while (Date.now() < deadline && fixture.panelSession().musicSearchScrolledAway !== expected) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+    });
+  };
+  await scrollTo(180, true);
+  assert.equal(fixture.panelSession().musicSearchScrolledAway, true, "scrolled down → away");
+  await scrollTo(0, false);
+  assert.equal(fixture.panelSession().musicSearchScrolledAway, false, "back at the top → shown again");
+
+  // …and the ready-to-write box with the recent searches under it is the
+  // search PAGE again, not a results page.
+  await click(q('[data-music-searchbar] button[aria-label="Clear the search box"]'));
+  await act(async () => { q("[data-music-search]").focus(); });
+  await settle();
+  assert.equal(Boolean(q("[data-dc-search-history]")), true, "the history list is up");
+  assert.equal(fixture.panelSession().musicSearch, "page", "the search page takes the footer again");
+  assert.equal(fixture.panelSession().musicSearchScrolledAway, false, "…and never stays scrolled away");
+});

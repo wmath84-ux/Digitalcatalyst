@@ -66,8 +66,10 @@ import "./courseResourceLibrary.css";
 import { isVisibleFile } from "./fileVisibility";
 import { matchResources } from "./resourceSearch";
 import {
-  SearchFlashScan, SearchHistoryList, SlidingSearchText, STUDY_SEARCH_SENTENCE, useStudySearch,
+  SearchFlashScan, SearchHistoryList, SlidingSearchText, STUDY_SEARCH_SENTENCE,
+  useScrollAwayHidden, useStudySearch,
 } from "./searchExperience";
+import { setSearchScrolledAway, setSearchSurface } from "./coursePanelSession";
 import { searchYouTube, subscribeYouTubeKey, youTubeSearchAvailable, youTubeSearchUrl } from "./musicSearch";
 import type { MusicTrack } from "./musicLibrary";
 import { TrackArtwork } from "./MusicTrackList";
@@ -695,6 +697,37 @@ export default function CourseResourceLibrary({
   const libraryHits = searchResults?.local ?? [];
   const onlineHits = searchResults?.online ?? [];
 
+  /**
+   * The footer rule for this page (owner, 2026-10-16):
+   *
+   *   · the LIBRARY page keeps the footer navigation;
+   *   · the SEARCH page — the ready-to-write box, the recent searches and the
+   *     flash scan — does NOT ("search page par footer nahin");
+   *   · a RESULTS page shows it, and the scroll half below steps it away only
+   *     while the learner is scrolling down through the results.
+   */
+  const searchSurfaceView = !searchOpen
+    ? "closed"
+    : search.phase === "results"
+      ? "results"
+      : "page";
+  useEffect(() => {
+    setSearchSurface("library", searchSurfaceView);
+  }, [searchSurfaceView]);
+  // Leaving the tab (unmount) can never strand a hidden footer behind it.
+  useEffect(() => () => setSearchSurface("library", "closed"), []);
+
+  /**
+   * "Scroll down kare to hide ho jaye, wapas top par aate hi dikh jaye." The
+   * results live in `.library-body` (the page's own scroll host), so the
+   * shared rule reads that element and nothing else.
+   */
+  const { scrollerRef: searchScrollerRef, hidden: searchScrolledAway } =
+    useScrollAwayHidden(searchSurfaceView === "results");
+  useEffect(() => {
+    setSearchScrolledAway("library", searchScrolledAway);
+  }, [searchScrolledAway]);
+
   return (
     <div
       className="course-resource-library"
@@ -798,7 +831,7 @@ export default function CourseResourceLibrary({
         />
       )}
 
-      <div className="library-body" data-library-body>
+      <div className="library-body" data-library-body ref={searchScrollerRef}>
         {searchOpen ? (
           /* ── The nested search page ───────────────────────────────────── */
           <div className="library-search-page" data-library-search-page-body>

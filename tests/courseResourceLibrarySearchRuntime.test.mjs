@@ -39,6 +39,13 @@ import * as React from "react";
 import { createRoot } from "react-dom/client";
 import { act } from "react";
 import CourseResourceLibrary from ${JSON.stringify(path.join(ROOT, "src/course/CourseResourceLibrary.tsx"))};
+import { getCoursePanelSession } from ${JSON.stringify(path.join(ROOT, "src/course/coursePanelSession.ts"))};
+
+/** The live panel session — the two footer homes read exactly this. */
+export function footerSession() {
+  const { librarySearch, librarySearchScrolledAway } = getCoursePanelSession();
+  return { librarySearch, librarySearchScrolledAway };
+}
 
 let root = null;
 let visits = 0;
@@ -473,4 +480,56 @@ test("a query that matches nothing says so in both halves", async () => {
   assert.equal(Boolean(q("[data-library-search-no-library-hits]")), true);
   assert.equal(Boolean(q("[data-library-search-no-online-hits]")), true);
   assert.equal(Boolean(q("[data-library-search-external]")), true, "the hand-off is still offered");
+});
+
+test("the footer rule follows the search page: gone on the page, back with the results, away on a scroll down", async () => {
+  window.localStorage.clear();
+  window.localStorage.setItem("dc.music.youtubeKey", "test-key");
+  fetchResponder = () => ({ ok: true, json: () => Promise.resolve(YOUTUBE_ITEMS) });
+  mount();
+  await settle();
+
+  // The library page itself keeps the footer navigation.
+  assert.deepEqual(fixture.footerSession(), { librarySearch: "closed", librarySearchScrolledAway: false });
+
+  // The nested search page takes it away — the owner: "search page par nahin".
+  await click(q("[data-library-search-open-button]"));
+  await settle();
+  assert.equal(fixture.footerSession().librarySearch, "page");
+
+  // The flash scan is still the search page…
+  typeInto(q("[data-library-search-input]"), "algebra");
+  await pressEnter();
+  await settle(60);
+  assert.equal(fixture.footerSession().librarySearch, "page", "still scanning");
+  // …and the moment the results land the footer is back.
+  await settle(1100);
+  assert.equal(fixture.footerSession().librarySearch, "results");
+  assert.equal(fixture.footerSession().librarySearchScrolledAway, false, "a fresh results page starts at the top");
+
+  // Scrolling down steps the footer away; back at the top it returns. The
+  // scroll rule reads once per animation frame, so wait for the answer
+  // instead of guessing how many frames the host needs.
+  const body = q("[data-library-body]");
+  const scrollTo = async (top, expected) => {
+    await act(async () => {
+      body.scrollTop = top;
+      body.dispatchEvent(new window.Event("scroll", { bubbles: true }));
+      const deadline = Date.now() + 600;
+      while (Date.now() < deadline && fixture.footerSession().librarySearchScrolledAway !== expected) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+    });
+  };
+  await scrollTo(160, true);
+  assert.equal(fixture.footerSession().librarySearchScrolledAway, true, "scrolled down → away");
+  await scrollTo(0, false);
+  assert.equal(fixture.footerSession().librarySearchScrolledAway, false, "back at the top → shown again");
+
+  // …and closing the search page can never strand a hidden footer behind it.
+  await scrollTo(160, true);
+  assert.equal(fixture.footerSession().librarySearchScrolledAway, true);
+  await click(q("[data-library-search-back]"));
+  await settle();
+  assert.deepEqual(fixture.footerSession(), { librarySearch: "closed", librarySearchScrolledAway: false });
 });

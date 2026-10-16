@@ -35,6 +35,7 @@ import { TABS, type DockTab } from './CourseOverlay'
 const FOOTER_COLOR = '#4f46e5'
 import { useCourseKeyboard } from './useCourseKeyboard'
 import { useFooterHiddenPage } from './coursePanelSession'
+import { useFooterNavigationAlways } from '../utils/footerNavigationVisibility'
 // The Workspace footer's design, shared — imported FIRST so the course
 // strip's area/scroll overrides (course-strip-nav.css) win their ties.
 import '../work/work-footer-nav.css'
@@ -46,12 +47,17 @@ export default function CoursePeekDock({ tab, onTabChange, hiddenTabs = [] }: {
   hiddenTabs?: DockTab[]
 }) {
   const { keyboardVisible } = useCourseKeyboard()
-  // On the player's immersive pages (Note Editor, Mind Map Editor, Brain
-  // answer page, Live Experiment Viewer, Sketch Editor, the Read PDF /
-  // Annotations viewers) the footer navigation is not shown at all; it
-  // returns as soon as the learner is back on a library page. The Music
-  // Player is not one of those pages — its footer behaviour is unchanged.
-  const immersivePage = useFooterHiddenPage(tab)
+  // The ONE page rule (coursePanelSession.ts → `isFooterHiddenPage`): the
+  // footer is not shown while an editor is in EDIT mode (reading a note, a
+  // mind map or a sketch keeps it), on the Brain answer deck, in a live
+  // experiment, in the Read PDF / annotations viewer, on the Music player or
+  // on either search page — where a results page also slides it away while
+  // the learner scrolls down and brings it back at the top.
+  //
+  // Settings can overrule it: "Visible footer navigation always" keeps the
+  // footer navigation on every page.
+  const pageRuleHidesFooter = useFooterHiddenPage(tab)
+  const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways()
   const navRef = useRef<HTMLElement>(null)
   const items = TABS.filter(item => !hiddenTabs.includes(item.key))
   const moveFocus = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {

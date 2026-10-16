@@ -47,6 +47,111 @@ export const STUDY_SEARCH_SENTENCE =
  */
 export const SEARCH_MIN_LOADING_MS = 1000;
 
+/* ── The results page's footer handshake ─────────────────────────────────── */
+
+/**
+ * How far a results page must travel before the footer navigation steps away,
+ * in CSS pixels. Small enough that the first deliberate scroll is heard, big
+ * enough that a stranded pixel (a rubber-band, a reflow) never hides it.
+ */
+export const SEARCH_FOOTER_SCROLL_AWAY_PX = 28;
+
+/**
+ * The decision itself, pure and therefore testable without a DOM: given the
+ * page's current answer, where it is now and where it was a moment ago, say
+ * whether the footer navigation should be away.
+ */
+export function nextScrollAwayHidden(
+  current: boolean,
+  top: number,
+  previous: number,
+  threshold = SEARCH_FOOTER_SCROLL_AWAY_PX,
+): boolean {
+  if (top <= threshold) return false;   // at the top: always there
+  if (top > previous) return true;      // travelling down: step away
+  if (top < previous) return false;     // travelling up: come back
+  return current;                       // no movement: keep the answer
+}
+
+/**
+ * ONE scroll rule for both search result pages (the owner, 2026-10-16):
+ *
+ *   "search result page par footer dikhe, scroll down kare to hide ho jaye aur
+ *    wapas top par aate hi dikh jaye — music library ke search page aur result
+ *    page par bhi same behaviour."
+ *
+ * `enabled` is the caller's "there are results on screen right now". While it
+ * is true the hook watches the page's own scroll host and answers:
+ *
+ *   · scrolled DOWN from a position past the top → hidden;
+ *   · scrolled UP → shown again (immediately, so the footer is reachable the
+ *     moment the learner reaches for it), and
+ *   · at (or within `SEARCH_FOOTER_SCROLL_AWAY_PX` of) the top → shown, which
+ *     is the owner's own sentence: back at the top, it is there.
+ *
+ * The decision is read once per frame — `requestAnimationFrame` where the host
+ * has it, a 16 ms timer where it does not — and the listener is removed the
+ * moment the results are gone, so the state can never outlive its page.
+ *
+ * Hand `scrollerRef` to the scrolling element (the library's `.library-body`,
+ * the music page's `[data-music-body]`).
+ */
+export function useScrollAwayHidden(enabled: boolean): {
+  scrollerRef: (node: HTMLElement | null) => void;
+  hidden: boolean;
+} {
+  const [scroller, setScroller] = useState<HTMLElement | null>(null);
+  const [hidden, setHidden] = useState(false);
+
+  useEffect(() => {
+    if (!enabled || !scroller) {
+      setHidden(false);
+      return undefined;
+    }
+    let previous = scroller.scrollTop;
+    let queued = false;
+    let cancelQueued: (() => void) | null = null;
+    const settle = () => {
+      queued = false;
+      cancelQueued = null;
+      const top = scroller.scrollTop;
+      // Both facts are captured BEFORE the update: React may run the updater
+      // during a later render, and by then `previous` would already be `top` —
+      // the page would be compared with itself and the rule would answer
+      // "unchanged" for a real scroll (the assert-eager render `useState`
+      // does for an empty queue hid that, which is exactly why it must never
+      // read anything mutable).
+      const travelledFrom = previous;
+      previous = top;
+      setHidden((current) => nextScrollAwayHidden(current, top, travelledFrom));
+    };
+    const onScroll = () => {
+      if (queued) return;
+      queued = true;
+      // One read per frame. `requestAnimationFrame` where it exists (every
+      // browser); a plain timer where it does not (a bare DOM used by tests),
+      // so the rule can never depend on the host having animation frames.
+      if (typeof window.requestAnimationFrame === "function") {
+        const id = window.requestAnimationFrame(settle);
+        cancelQueued = () => window.cancelAnimationFrame(id);
+      } else {
+        const id = window.setTimeout(settle, 16);
+        cancelQueued = () => window.clearTimeout(id);
+      }
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    // Coming back to a results page that is already scrolled: stand by its
+    // position, so the footer never lands on top of a long list.
+    setHidden(scroller.scrollTop > SEARCH_FOOTER_SCROLL_AWAY_PX);
+    return () => {
+      scroller.removeEventListener("scroll", onScroll);
+      if (cancelQueued) cancelQueued();
+    };
+  }, [enabled, scroller]);
+
+  return { scrollerRef: setScroller, hidden };
+}
+
 /* ── The sliding sentence ────────────────────────────────────────────────── */
 
 /**

@@ -77,6 +77,7 @@ import { useCourseFooterInset } from "./useCourseFooterInset";
 import { COURSE_FOOTER_INSET_PROPERTY } from "./courseFooterInset";
 import { SKETCH_DEFAULT_KEY } from "../../utils/sketchScene";
 import "./sketchLibrary.css";
+import { setSketchEditMode } from "./coursePanelSession";
 
 /** Read mode's tray hides on ONE tap, and the next tap brings it back. */
 const READ_TAP_SLOP_PX = 10;
@@ -698,6 +699,18 @@ export default function SketchPanel({
     setReadChromeVisible(true);
     setPendingDeleteKey(null);
   }, [sceneKey, mode]);
+
+  /**
+   * The footer rule for the Sketch tab (owner, 2026-10-16: hide only while
+   * EDITOR MODE is on). The tab has NO library page — read mode is where the
+   * footer lives, so reading a sketch keeps it and the first real edit
+   * (the tray's pencil / eye, or the Quick Sketch chip's own) takes it away.
+   * `editing` is the panel's one flag for both surfaces, so the two editors
+   * can never disagree about it.
+   */
+  useEffect(() => {
+    if (!storageOnly) setSketchEditMode(editing);
+  }, [editing, storageOnly]);
   /** The canvas host: measures the tray's lift over the player's footer nav. */
   const canvasHostRef = useRef<HTMLDivElement | null>(null);
   const footerInset = useCourseFooterInset(!quickMode, canvasHostRef);
