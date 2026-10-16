@@ -222,7 +222,11 @@ export function HeaderNavView({
 export default function CourseHeaderNav({ tab, onTabChange, hiddenTabs = [], placement }: CourseHeaderNavProps) {
   const { keyboardVisible } = useCourseKeyboard();
   const pageRuleHidesFooter = useFooterHiddenPage(tab);
-  const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways();
+  // Unconditional hook call — see the same note in CourseOverlay: a hook
+  // inside the `&&` shifts every later hook's slot when the rule flips and
+  // crashes React ("Cannot read properties of undefined (reading 'length')").
+  const footerNavigationAlways = useFooterNavigationAlways();
+  const immersivePage = pageRuleHidesFooter && !footerNavigationAlways;
   const items = TABS.filter((item) => !hiddenTabs.includes(item.key));
 
   if (keyboardVisible || immersivePage) return null;

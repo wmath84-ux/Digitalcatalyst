@@ -241,7 +241,8 @@ test("the navigation is the same component everywhere: icons + labels, every tab
   assert.match(NAV, /items=\{items\}/);
   // The same visibility rule as the footer: keyboard up or an immersive page.
   assert.match(NAV, /const pageRuleHidesFooter = useFooterHiddenPage\(tab\);/);
-  assert.match(NAV, /const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways\(\);/);
+  assert.match(NAV, /const footerNavigationAlways = useFooterNavigationAlways\(\);/);
+  assert.match(NAV, /const immersivePage = pageRuleHidesFooter && !footerNavigationAlways;/);
   assert.match(NAV, /if \(keyboardVisible \|\| immersivePage\) return null;/);
   // Its own row, sized by the shrunken rhythm.
   assert.match(NAV, /style=\{footerNavigationSizeVars\(\) as CSSProperties\}/);

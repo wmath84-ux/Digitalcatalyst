@@ -86,7 +86,14 @@ export function useFooterNavigationAlways(): boolean {
 
 /*
  * The two footer homes read the pair themselves:
- *   const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways();
+ *   const footerNavigationAlways = useFooterNavigationAlways();
+ *   const immersivePage = pageRuleHidesFooter && !footerNavigationAlways;
  * — so "always" wins over every page rule by construction, and the keyboard
  * rule stays each home's own layout concern.
+ *
+ * NOTE: the hook MUST be called unconditionally (its own two lines, never
+ * `… && !useFooterNavigationAlways()`). A conditional call is skipped while
+ * the page rule is false, and the first render where it flips shifts every
+ * later hook's slot — React then crashes inside its deps comparison with
+ * "Cannot read properties of undefined (reading 'length')".
  */

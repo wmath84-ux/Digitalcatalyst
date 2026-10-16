@@ -1058,8 +1058,15 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   //
   // Settings can overrule all of that: "Visible footer navigation always"
   // (src/utils/footerNavigationVisibility.ts) keeps the footer on every page.
+  //
+  // The Settings hook is called UNCONDITIONALLY: a hook inside the `&&` would
+  // be skipped whenever `pageRuleHidesFooter` is false, and the first tab
+  // switch onto a hidden page (Brain deck, search page, editor…) would shift
+  // every later hook's slot — React then crashes reading the misaligned deps
+  // ("Cannot read properties of undefined (reading 'length')").
   const pageRuleHidesFooter = useFooterHiddenPage(tab);
-  const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways();
+  const footerNavigationAlways = useFooterNavigationAlways();
+  const immersivePage = pageRuleHidesFooter && !footerNavigationAlways;
 
   // Read entries reuse the exact module-unlock resolver already used by the
   // Modules tab, plus the current paid-update ownership set for resource-level

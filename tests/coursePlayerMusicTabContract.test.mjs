@@ -235,9 +235,11 @@ test('the footer navigation hides on a player and returns on the library page', 
   // half of a results page (see footerNavigationVisibilityContract), and
   // Settings can overrule the lot with "Visible footer navigation always".
   assert.match(session, /case "music":[\s\S]{0,400}?state\.musicView === "player"/);
-  assert.match(overlay, /const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways\(\);/);
+  assert.match(overlay, /const footerNavigationAlways = useFooterNavigationAlways\(\);/);
+  assert.match(overlay, /const immersivePage = pageRuleHidesFooter && !footerNavigationAlways;/);
   assert.match(overlay, /\$\{keyboardVisible \|\| immersivePage \? "hidden" : ""\}/);
-  assert.match(strip, /const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways\(\)/);
+  assert.match(strip, /const footerNavigationAlways = useFooterNavigationAlways\(\)/);
+  assert.match(strip, /const immersivePage = pageRuleHidesFooter && !footerNavigationAlways/);
   assert.match(strip, /if \(keyboardVisible \|\| immersivePage\) return null/);
 });
 

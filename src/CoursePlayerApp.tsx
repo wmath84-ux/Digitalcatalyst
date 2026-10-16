@@ -1,6 +1,7 @@
 import CourseBookLoader from "./course/CourseBookLoader";
 import "./course/courseBrandColors.css";
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazyWithChunkRecovery } from "./utils/lazyChunk";
 import useLocalCourseProgress from "./course/useLocalCourseProgress";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import ResourceViewer, { type CourseFileActions } from "./course/ResourceViewer";
@@ -43,13 +44,16 @@ import SnowOverlay from "./course/SnowOverlay";
 // keeps that chunk off the wire for every learner who opens a lesson and
 // never touches the mind map — while the element below stays byte-identical
 // and the panel, once opened, stays mounted exactly as before.
-const MindMapPanel = lazy(() => import("./course/MindMapPanel"));
+// `lazyWithChunkRecovery` = plain lazy + retry + one-shot reload when a
+// redeploy replaced the hashed chunk under an open tab ("Failed to fetch
+// dynamically imported module: …/MindMapPanel-<hash>.js").
+const MindMapPanel = lazyWithChunkRecovery(() => import("./course/MindMapPanel"));
 /* The Excalidraw editor is a heavy chunk (the whole drawing engine + its UI),
    so it is downloaded on the FIRST activation of the Sketch tab and never for
    a learner who does not draw — the same lazy contract the mind map uses. */
-const SketchPanel = lazy(() => import("./course/SketchPanel"));
-const AddOfficialResourceDialog = lazy(() => import("./personal-library/AddOfficialResourceDialog"));
-const LumenChat = lazy(() => import("./lumen/App"));
+const SketchPanel = lazyWithChunkRecovery(() => import("./course/SketchPanel"));
+const AddOfficialResourceDialog = lazyWithChunkRecovery(() => import("./personal-library/AddOfficialResourceDialog"));
+const LumenChat = lazyWithChunkRecovery(() => import("./lumen/App"));
 import PlayerPanel from "./course/PlayerPanel";
 import CoursePeekDock from "./course/CoursePeekDock";
 // ONE keyboard-visible state for the whole player: the footer navigation (peek
