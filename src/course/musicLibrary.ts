@@ -369,6 +369,39 @@ export function addMusicLink(
   return { track, tracks };
 }
 
+/**
+ * Save one ONLINE row exactly as the provider described it. A search result
+ * already carries its REAL title, channel and artwork — re-parsing just the
+ * URL would throw all of that away and leave a generic "YouTube video" row
+ * with no name and no photo in the saved list (the owner's 2026-10-16 bug
+ * report). A row that is already on the shelf is refreshed in place with the
+ * richer metadata instead of being duplicated.
+ */
+export function addMusicTrack(
+  uid: string | null | undefined,
+  raw: MusicTrack,
+): { track: MusicTrack; tracks: MusicTrack[] } | null {
+  const clean = cleanTrack({ ...raw, source: "link", addedAt: Date.now() });
+  if (!clean) return addMusicLink(uid, String(raw?.url || ""));
+  const existing = loadMusicLinks(uid);
+  const match = existing.find((row) => row.url === clean.url || row.id === clean.id);
+  if (match) {
+    const refreshed: MusicTrack = {
+      ...match,
+      title: clean.title,
+      subtitle: clean.subtitle,
+      ...(clean.thumbnailUrl ? { thumbnailUrl: clean.thumbnailUrl } : {}),
+      ...(clean.embedUrl ? { embedUrl: clean.embedUrl } : {}),
+    };
+    const tracks = existing.map((row) => (row === match ? refreshed : row));
+    saveMusicLinks(uid, tracks);
+    return { track: refreshed, tracks };
+  }
+  const tracks = [clean, ...existing].slice(0, MUSIC_LIBRARY_MAX);
+  saveMusicLinks(uid, tracks);
+  return { track: clean, tracks };
+}
+
 export function removeMusicLink(uid: string | null | undefined, id: string): MusicTrack[] {
   const tracks = loadMusicLinks(uid).filter((track) => track.id !== id);
   saveMusicLinks(uid, tracks);

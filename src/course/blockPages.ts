@@ -62,6 +62,10 @@ export interface BlockPageRecord {
   /** One quiet line under the label. */
   hint: string;
   icon: ComponentType<{ size?: number; className?: string; style?: CSSProperties }>;
+  /** The page's own vibrant accent — the selection page's card colour. */
+  accent: string;
+  /** A second stop for the card tile's gradient. */
+  accentTo: string;
 }
 
 /**
@@ -86,19 +90,19 @@ export const BLOCK_PAGE_ORDER: readonly BlockPageKey[] = [
 ] as const;
 
 export const BLOCK_PAGES: readonly BlockPageRecord[] = [
-  { key: "lesson", label: "Lesson", hint: "Video / lesson viewer", icon: PlayCircle },
-  { key: "modules", label: "Module", hint: "Lessons on a connected path", icon: BookOpen },
-  { key: "notes", label: "Note", hint: "Your private writing pad", icon: NotebookPen },
-  { key: "mindmap", label: "Mind map", hint: "Is module ka apna diagram", icon: Network },
-  { key: "sketch", label: "Sketch", hint: "Lecture ke saath likhein", icon: PenLine },
-  { key: "read", label: "Read", hint: "PDFs and reading links", icon: FileText },
-  { key: "music", label: "Music", hint: "Course music and links", icon: Music },
-  { key: "brain", label: "Brain", hint: "Practice sets — apna Brain test", icon: Brain },
-  { key: "experiment", label: "Experiment", hint: "Interactive 2D experiments", icon: FlaskConical },
-  { key: "ai", label: "AI", hint: "AI study buddy", icon: AiTabIcon },
-  { key: "paid", label: "Paid", hint: "Upgrades still locked", icon: ShoppingBag },
-  { key: "personal", label: "My Modules", hint: "Apna course tree", icon: GraduationCap },
-  { key: "player", label: "Player settings", hint: "Is course ka player page", icon: Settings },
+  { key: "lesson", label: "Lesson", hint: "Video / lesson viewer", icon: PlayCircle, accent: "#6366f1", accentTo: "#8b5cf6" },
+  { key: "modules", label: "Module", hint: "Lessons on a connected path", icon: BookOpen, accent: "#2563eb", accentTo: "#38bdf8" },
+  { key: "notes", label: "Note", hint: "Your private writing pad", icon: NotebookPen, accent: "#f59e0b", accentTo: "#f97316" },
+  { key: "mindmap", label: "Mind map", hint: "Is module ka apna diagram", icon: Network, accent: "#8b5cf6", accentTo: "#d946ef" },
+  { key: "sketch", label: "Sketch", hint: "Lecture ke saath likhein", icon: PenLine, accent: "#ec4899", accentTo: "#f43f5e" },
+  { key: "read", label: "Read", hint: "PDFs and reading links", icon: FileText, accent: "#10b981", accentTo: "#34d399" },
+  { key: "music", label: "Music", hint: "Course music and links", icon: Music, accent: "#06b6d4", accentTo: "#3b82f6" },
+  { key: "brain", label: "Brain", hint: "Practice sets — apna Brain test", icon: Brain, accent: "#f43f5e", accentTo: "#fb7185" },
+  { key: "experiment", label: "Experiment", hint: "Interactive 2D experiments", icon: FlaskConical, accent: "#14b8a6", accentTo: "#22d3ee" },
+  { key: "ai", label: "AI", hint: "AI study buddy", icon: AiTabIcon, accent: "#7c3aed", accentTo: "#6366f1" },
+  { key: "paid", label: "Paid", hint: "Upgrades still locked", icon: ShoppingBag, accent: "#0ea5e9", accentTo: "#6366f1" },
+  { key: "personal", label: "My Modules", hint: "Apna course tree", icon: GraduationCap, accent: "#a855f7", accentTo: "#ec4899" },
+  { key: "player", label: "Player settings", hint: "Is course ka player page", icon: Settings, accent: "#475569", accentTo: "#64748b" },
 ];
 
 export const BLOCK_PAGE_BY_KEY: Readonly<Record<BlockPageKey, BlockPageRecord>> = Object.fromEntries(

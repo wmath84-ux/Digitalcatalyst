@@ -460,7 +460,8 @@ html[data-glass="on"] [data-home-content] .dc-home-category-group > div:last-chi
 }
 
 html[data-glass="on"] [data-home-content] .dc-home-card,
-html[data-glass="on"] [data-home-content] .dc-home-product-card {
+html[data-glass="on"] [data-home-content] .dc-home-product-card,
+html[data-glass="on"] [data-home-content] .dc-home-hero-module > .dc-scene-plate {
   box-shadow: var(--dc-home-card-shadow) !important;
 }
 
@@ -1569,10 +1570,12 @@ html[data-glass="on"] [data-home-content] .dc-home-product-card {
   padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
 }
 
-/* Give the featured panel a clearer surface and a calmer copy/art balance. */
+/* Give the featured panel a clearer surface and a calmer copy/art balance.
+   Its MAIN shadow is exactly the trending product card's shadow (owner,
+   2026-10-16): one depth language for the promotion and the tiles. */
 [data-home-content] .dc-home-hero-module > .dc-scene-plate {
   border-radius: 26px;
-  box-shadow: 0 18px 42px -30px rgba(18, 38, 86, 0.5), 0 2px 8px -5px rgba(18, 38, 86, 0.28);
+  box-shadow: var(--dc-home-card-shadow);
   isolation: isolate;
 }
 

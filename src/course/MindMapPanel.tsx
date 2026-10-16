@@ -135,11 +135,6 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Cloud,
-  CloudAlert,
-  CloudCheck,
-  CloudUpload,
-  HardDrive,
   House,
   Columns3,
   Eye,
@@ -156,7 +151,6 @@ import {
   Rows3,
   Sparkles,
   Trash2,
-  TriangleAlert,
   Type,
   WrapText,
   FileJson,
@@ -378,8 +372,6 @@ const READ_TAP_SLOP_PX = 10;
  * name while a 360px one hands the space back to the tools.
  */
 const MIN_FULL_TOOLBAR_WIDTH_PX = 360;
-/** How long a finished save keeps blinking before it settles. */
-const SAVED_BLINK_MS = 2400;
 /** The editor's own minimum height — exactly one line of the 17px label leading. */
 const EDITOR_MIN_HEIGHT_PX = 17;
 /** The editor stops growing here (~7 lines) and scrolls internally instead. */
@@ -1413,10 +1405,8 @@ function MindMapCanvas(props: MindMapPanelProps) {
   // Which tool drop-down is open. Only one at a time, and both are portalled
   // to the body so the clipped status strip cannot cut them in half.
   const [alignMenuOpen, setAlignMenuOpen] = useState(false);
-  const [saveMenuOpen, setSaveMenuOpen] = useState(false);
   useEffect(() => {
     if (!readOnlyCanvas && !libraryOpen) return;
-    setSaveMenuOpen(false);
     setAlignMenuOpen(false);
     setStyleMenuOpen(false);
     setJsonImportOpen(false);
@@ -1445,7 +1435,6 @@ function MindMapCanvas(props: MindMapPanelProps) {
     if (footerInset > 0) shell.style.setProperty(COURSE_FOOTER_INSET_PROPERTY, `${footerInset}px`);
     else shell.style.removeProperty(COURSE_FOOTER_INSET_PROPERTY);
   }, [footerInset]);
-  const saveAnchorRef = useRef<HTMLButtonElement>(null);
   const alignAnchorRef = useRef<HTMLButtonElement>(null);
 
   // Set while a real node drag is in progress, so the click that follows a
@@ -1534,8 +1523,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
       }
       // Opening the sheet must never inherit a stale tool drop-down…
       setAlignMenuOpen(false);
-      setSaveMenuOpen(false);
-      // …nor a stale horizontal offset on the status strip. The strip no
+        // …nor a stale horizontal offset on the status strip. The strip no
       // longer scrolls, but a keyboard / orientation change can still hand
       // one to a `overflow: hidden` box (it scrolls programmatically), and a
       // scrolled strip is exactly the "toolbar slid to the left" report:
@@ -1546,8 +1534,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
     // A closed sheet must not leave a drop-down floating over the lesson.
     if (!open) {
       setAlignMenuOpen(false);
-      setSaveMenuOpen(false);
-    }
+      }
     prevOpenRef.current = open;
   }, [open, storageOnly]);
 
@@ -1573,26 +1560,9 @@ function MindMapCanvas(props: MindMapPanelProps) {
     return () => observer.disconnect();
   }, [libraryOpen, readOnlyCanvas]);
 
-  // ── The save beacon ───────────────────────────────────────────────────
-  // The cloud tile replaced a text label, so the message lives in a tooltip +
-  // a drop-down — and while there IS a message the tile wears a blinking dot
-  // on its top-right corner, so "saving…" / "saved" / "retrying" is visible
-  // without reading a word. A completed save blinks for a beat and settles;
-  // an in-flight or failed one blinks until the state moves on.
-  const [saveBlink, setSaveBlink] = useState(false);
-  useEffect(() => {
-    if (status === "saving" || status === "error") {
-      setSaveBlink(true);
-      return undefined;
-    }
-    if (status === "saved") {
-      setSaveBlink(true);
-      const timer = window.setTimeout(() => setSaveBlink(false), SAVED_BLINK_MS);
-      return () => window.clearTimeout(timer);
-    }
-    setSaveBlink(false);
-    return undefined;
-  }, [status]);
+  // The save beacon is GONE with the cloud button (owner, 2026-10-16+):
+  // saving runs silently in the background; only an error still surfaces,
+  // through the panel's own notice.
 
   // A different alignment (or a different text rule) moves every box, so the
   // canvas re-frames itself — otherwise the learner flips to "one line" and
@@ -1845,7 +1815,6 @@ function MindMapCanvas(props: MindMapPanelProps) {
     onFlush?.();
     setEditingId(null);
     setSelectedId(null);
-    setSaveMenuOpen(false);
     setAlignMenuOpen(false);
     setStyleMenuOpen(false);
     setEditMode(false);
@@ -2539,36 +2508,17 @@ function MindMapCanvas(props: MindMapPanelProps) {
               note editor's read control). */}
           <button type="button" className="mm-tool" aria-label="Read mode" title="Read mode" data-mindmap-edit-read
             onClick={handleDone}><Eye size={16} aria-hidden="true" /></button>
-          {/* ── Left cluster: cloud save + which map is open ─────────────── */}
+          {/* ── Left cluster: which map is open ──────────────────────────
+              The cloud/save status BUTTON is gone (owner, 2026-10-16+):
+              "upar ek syncing synced ka button dikhta hai usko remove karo,
+              function background mein chalti rahana chahie." Saving and
+              cloud sync keep running exactly as before — the invisible live
+              region below still announces the state for screen readers, and
+              a real failure still raises the panel's error notice. */}
           <div className="flex min-w-max flex-1 items-center" style={{ gap: "var(--mm-tool-gap)" }}>
-            {/* ── Cloud save ──────────────────────────────────────────────
-                The old "Cloud par saved" TEXT was the widest thing on the
-                bar, so it is an icon now: the cloud itself is tinted by the
-                state (amber saving / emerald saved / rose retrying) and a
-                blinking beacon rides its top-right corner while there is a
-                message. The words moved into the tooltip and this drop-down. */}
-            <button
-              type="button"
-              ref={saveAnchorRef}
-              onClick={() => {
-                setAlignMenuOpen(false);
-                setStyleMenuOpen(false);
-                setSaveMenuOpen((open) => !open);
-              }}
-              aria-expanded={saveMenuOpen}
-              aria-haspopup="menu"
-              aria-label={save.label}
-              title={save.label}
-              className={`mm-tool ${saveMenuOpen ? "mm-tool-violet" : ""}`}
-              data-course-mindmap-save
-              data-save-status={status}
-              data-blink={saveBlink ? "true" : "false"}
-            >
-              {storageOnly
-                ? <HardDrive />
-                : status === "saving" ? <CloudUpload /> : status === "saved" ? <CloudCheck /> : status === "error" ? <CloudAlert /> : <Cloud />}
-              {saveBlink ? <span className="mm-blink" data-course-mindmap-save-blink aria-hidden="true" /> : null}
-            </button>
+            <span className="sr-only" role="status" aria-live="polite" data-course-mindmap-save data-save-status={status}>
+              {save.label}
+            </span>
             {/* AI / JSON import — opens the same prompt + validator the admin
                 Mind Map editor uses. Nothing changes until a valid map is confirmed. */}
             <button
@@ -2581,42 +2531,6 @@ function MindMapCanvas(props: MindMapPanelProps) {
             >
               <FileJson size={16} />
             </button>
-            <ToolbarMenu
-              open={saveMenuOpen}
-              anchorRef={saveAnchorRef}
-              onClose={() => setSaveMenuOpen(false)}
-              theme={mindTheme}
-              label={storageOnly ? "Device-only save" : "Cloud save"}
-            >
-              <p className="mm-menu-head">{storageOnly ? "Device-only save" : "Cloud save"}</p>
-              <p
-                className={`mm-menu-note flex items-center gap-1.5 ${save.tone}`}
-                data-course-mindmap-save-label
-              >
-                {status === "error" ? <TriangleAlert size={11} /> : null}
-                {save.label}
-              </p>
-              {/* The full warning text lives HERE — the persistent error bar at
-                  the bottom is gone, so tapping the blinking beacon is the way
-                  to read the message. */}
-              {errorMessage ? (
-                <p className="mm-menu-note" data-course-mindmap-save-message>
-                  {errorMessage}
-                </p>
-              ) : null}
-              <button
-                type="button"
-                className="mm-menu-item"
-                onClick={() => {
-                  onFlush?.();
-                  setSaveMenuOpen(false);
-                }}
-                data-course-mindmap-save-now
-              >
-                {storageOnly ? <HardDrive /> : <CloudUpload />}
-                <span>{storageOnly ? "Save on this device now" : "Abhi cloud par save karein"}</span>
-              </button>
-            </ToolbarMenu>
 
             {/* ── Map switcher ────────────────────────────────────────────
                 Notes are a LIST, and so are mind maps: this opens the
@@ -2628,8 +2542,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
               type="button"
               onClick={() => {
                 setAlignMenuOpen(false);
-                setSaveMenuOpen(false);
-                setStyleMenuOpen(false);
+                            setStyleMenuOpen(false);
                 setLibraryOpen((open) => !open);
               }}
               aria-expanded={libraryOpen}
@@ -2683,8 +2596,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
               type="button"
               ref={alignAnchorRef}
               onClick={() => {
-                setSaveMenuOpen(false);
-                setStyleMenuOpen(false);
+                            setStyleMenuOpen(false);
                 setAlignMenuOpen((open) => !open);
               }}
               aria-expanded={alignMenuOpen}
@@ -2821,8 +2733,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
                 ref={styleAnchorRef}
                 onClick={() => {
                   setAlignMenuOpen(false);
-                  setSaveMenuOpen(false);
-                  setStyleMenuOpen((open) => !open);
+                                setStyleMenuOpen((open) => !open);
                 }}
                 aria-expanded={styleMenuOpen}
                 aria-haspopup="menu"

@@ -1,6 +1,6 @@
 import CourseBookLoader from "./course/CourseBookLoader";
 import "./course/courseBrandColors.css";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { lazyWithChunkRecovery } from "./utils/lazyChunk";
 import useLocalCourseProgress from "./course/useLocalCourseProgress";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
@@ -22,14 +22,7 @@ import {
   type QuadPaneId,
 } from "./course/quadLayout";
 import type { BlockPageKey } from "./course/blockPages";
-import PageBackButton from "./course/PageBackButton";
-import {
-  backPageHistory,
-  canPageHistoryBack,
-  pushPageHistory,
-  resetPageHistory,
-  subscribePageHistory,
-} from "./course/pageHistory";
+import { pushPageHistory, resetPageHistory } from "./course/pageHistory";
 import { useFooterNavigationAlways } from "./utils/footerNavigationVisibility";
 import { useCourseViewSettings } from "./course/courseViewSettings";
 import { useFooterNavigationPlacement } from "./utils/footerNavigationPlacement";
@@ -105,6 +98,7 @@ import { useCourseTheme, usePersistedBooleanPreference, useModuleListingStyle, i
 import CourseGradientWavesBackground from "./course/CourseGradientWavesBackground";
 import type { Product } from "./data/products";
 import type { CourseFile, CourseModule, PaidCourseUpdate } from "./types/course";
+import type { MusicTrack } from "./course/musicLibrary";
 import { useAuth } from "./context/AuthContext";
 import { readStoredExcalidrawLibraryLink } from "../utils/excalidrawLibraryLink.js";
 import { readUploadModuleDraft, type ReadUpload } from "../utils/readUploads.js";
@@ -137,7 +131,7 @@ import CourseResourceLibrary from "./course/CourseResourceLibrary";
 import { courseModuleSegments } from "./course/studyResourceContext";
 import type { MasterCourseNote } from "./types/course";
 import { collectMasterCourseNotes } from "./course/masterNotes";
-import { Settings } from "lucide-react";
+import { LayoutGrid, Settings } from "lucide-react";
 
 /** A MASTER mind map in the library: its module chain plus the file to open (when it is a file). */
 interface MasterMindMapEntry {
@@ -695,6 +689,23 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   );
 
   /**
+   * THE HEADER'S PAGES BUTTON (owner, 2026-10-16+): one vibrant button on the
+   * header's left, shown ONLY on the multi-split tablet/desktop deck, that
+   * opens the page SELECTION page (the blank picker) in the ACTIVE block —
+   * the block the learner interacted with last ("user jis active window per
+   * hoga … usi ke according vah page button kam karega"). It replaces both
+   * the per-page universal Back button and the per-block Pages switch.
+   */
+  const openActiveBlockPicker = useCallback(() => {
+    const current = quadStateRef.current;
+    const target: QuadPaneId = quadPaneVisible(current, current.focus)
+      ? current.focus
+      : (QUAD_PANE_ORDER.find((pane) => quadPaneVisible(current, pane)) ?? "c11");
+    pushPageHistory(`block:${target}`, "blank");
+    commitQuadState(quadSetBlockPage(current, target, null));
+  }, [commitQuadState]);
+
+  /**
    * Every tab change on a big stage opens that page in a block. One effect
    * covers the navigation taps, the ⌘/Ctrl shortcuts and every deep link; the
    * mount tab itself does NOT route, so a course always opens on the owner's
@@ -714,35 +725,15 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     openQuadPage(page);
   }, [dockTab, quadWide, openQuadPage]);
 
-  /* ── Step-by-step Back (the owner's 2026-10-16+ rule) ────────────────────
-   * Every page carries a top-left back button that walks ONE step back
-   * through the previous pages — "yah button directly home page per redirect
-   * na karen … step bye step previous pages per click karne per back kare".
-   * The phone's study pane walks its tabs; the lesson pane walks the files
-   * the learner opened; each plus-deck block walks its own pages (FreeBlock). */
-  const studyCanBack = useSyncExternalStore(
-    subscribePageHistory,
-    () => canPageHistoryBack("study"),
-    () => false,
-  );
-  const lessonCanBack = useSyncExternalStore(
-    subscribePageHistory,
-    () => canPageHistoryBack("lesson"),
-    () => false,
-  );
+  /* ── Page history (background only, 2026-10-16+ revision) ────────────────
+   * The per-page top-left Back button is GONE (the owner: "vah back universal
+   * button remove kar dun kyunki donon ka ek hi function tha") — its job now
+   * belongs to the header's Pages button, which opens the ACTIVE block's
+   * selection page on the plus deck. The history store itself keeps recording
+   * in the background, so nothing else that reads it changes. */
   useEffect(() => {
     pushPageHistory("study", dockTab);
   }, [dockTab]);
-  const backStudyPage = useCallback(() => {
-    const previous = backPageHistory("study");
-    if (previous) setDockTab(previous as typeof dockTab);
-  }, []);
-  const backLessonPage = useCallback(() => {
-    const previous = backPageHistory("lesson");
-    if (!previous) return;
-    const file = visitedFilesRef.current.find((entry) => String(entry.id) === previous) ?? null;
-    if (file) selectFileRef.current(file);
-  }, []);
   const visitedFilesRef = useRef<CourseFile[]>([]);
   const selectFileRef = useRef<(file: CourseFile) => void>(() => undefined);
   /**
@@ -2123,9 +2114,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   //   · Images → zoom + pan are restored from the snapshot.
   const viewerStack = (
     <div className="relative h-full min-h-0 w-full min-w-0" data-course-viewer-stack>
-      {quadWide ? null : (
-        <PageBackButton surface="lesson" enabled={lessonCanBack} onBack={backLessonPage} />
-      )}
       {visitedFiles.length === 0 ? (
         <ResourceViewer file={null} active playback={playbackRef.current} onPlaybackChange={reportPlayback} onFileActions={handleFileActions} desktopView={desktopView} />
       ) : (
@@ -2343,6 +2331,26 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const libraryPersonalEntry = isMine || !personalModulesEntry
     ? null
     : { ...personalModulesEntry, onOpen: openPersonalModules };
+  /**
+   * A YouTube search result picked in the Resource Library plays in the MAIN
+   * content block — exactly where the course's own YouTube embeds play —
+   * instead of bouncing the learner out to YouTube (owner, 2026-10-16+).
+   * The synthetic file is marked `source: "personal"` so course progress and
+   * resume bookkeeping never see it; the viewer stack keeps it mounted like
+   * any other opened file. On the plus deck the lesson block is revealed so
+   * the pick is visibly playing.
+   */
+  const openYouTubeSearchResult = useCallback((track: MusicTrack) => {
+    const file: CourseFile = {
+      id: `yt-search:${track.url}`,
+      name: track.title || "YouTube video",
+      type: "youtube",
+      url: track.url,
+      source: "personal",
+    };
+    selectFileRef.current(file);
+    if (quadWide) openQuadPage("lesson");
+  }, [quadWide, openQuadPage]);
   const resourceLibraryPanel = (
     <CourseResourceLibrary
       modules={modules}
@@ -2357,6 +2365,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onSelectFile={selectFile}
       onOpenMasterNote={handleOpenMasterNoteFromLibrary}
       onOpenMindMapResource={handleOpenMindMapResourceFromLibrary}
+      onOpenYouTube={openYouTubeSearchResult}
       personalEntry={libraryPersonalEntry}
     />
   );
@@ -2698,9 +2707,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
       data-course-study-root
     >
-      {quadWide ? null : (
-        <PageBackButton surface="study" enabled={studyCanBack} onBack={backStudyPage} />
-      )}
       {buildStudyPane(dockTab, handleDockTabChange)}
     </div>
   );
@@ -2837,20 +2843,35 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         : {})}
       style={{ colorScheme: playerThemeCtl.theme }}
     >
-      {/* ── TOP PROGRESS + SETTINGS RAIL — Part 19 ─────────────────────────
-          Combined control: 2W wide (double the original progress bar width).
-          LEFT 50%: Real progress indicator with Runway loader animation
-          RIGHT 50%: Settings trigger button
-          The progress percentage and calculation remain unchanged. The Runway
-          effect is purely visual (continuous animation overlay). Settings
-          trigger opens the existing Player settings surface. */}
+      {/* ── TOP PROGRESS + SETTINGS RAIL — Part 19 (2026-10-16+ revision) ──
+          LEFT: the PAGES button — vibrant, multi-split (tablet/desktop) ONLY.
+          It opens the page selection page in the ACTIVE block — the block the
+          learner touched last. Mobile never sees it. Then the progress bar
+          (its length trimmed to make the room) and the compact Settings
+          trigger. The progress percentage and calculation are unchanged. */}
       <div
         className="relative z-[75] flex shrink-0 items-stretch border-b border-white/10 bg-[#0a0c12]/85 pt-[max(env(safe-area-inset-top),3px)]"
         data-course-progress-summary
         data-course-top-progress
         data-progress-value={progress}
       >
-        {/* LEFT HALF: Progress Bar with Runway Animation */}
+        {/* THE PAGES BUTTON — multi-split screens only (quadWide ⇒ ≥768px). */}
+        {quadWide ? (
+          <div className="flex shrink-0 items-center px-2 pb-[3px]">
+            <button
+              type="button"
+              onClick={openActiveBlockPicker}
+              data-course-pages
+              aria-label="Open the page selection for the active block"
+              title="Pages — active block ke liye selection page kholo"
+              className="group inline-flex h-[22px] items-center gap-1.5 rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 px-3 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-[0_2px_10px_rgba(139,92,246,0.55)] transition-transform duration-150 hover:scale-[1.04] hover:shadow-[0_2px_14px_rgba(139,92,246,0.75)] active:scale-95"
+            >
+              <LayoutGrid className="h-3 w-3 transition-transform duration-200 group-hover:rotate-90" aria-hidden />
+              <span>Pages</span>
+            </button>
+          </div>
+        ) : null}
+        {/* PROGRESS BAR with Runway Animation (trimmed, flexible length) */}
         <button
           type="button"
           onClick={handleTopProgressActivate}
@@ -2861,9 +2882,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
               : `Course progress ${progress}%`
           }
           title={canMarkCompleteTop ? (isDone ? "Tap to mark as not complete" : "Mark this lesson complete") : undefined}
-          className={`relative flex cursor-pointer items-center gap-2 px-3 pb-[3px] outline-none disabled:cursor-default ${
-            headerNavInRail ? "min-w-0 flex-1" : "w-1/2"
-          }`}
+          className="relative flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-3 pb-[3px] outline-none disabled:cursor-default"
           data-course-progress-bar
           data-progress-value={progress}
         >
@@ -2930,9 +2949,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           }}
           aria-label="Open Player settings"
           title="Player settings"
-          className={`flex cursor-pointer items-center justify-center gap-2 px-3 pb-[3px] outline-none transition-colors hover:bg-white/5 ${
-            headerNavInRail ? "shrink-0" : "w-1/2"
-          }`}
+          className="flex shrink-0 cursor-pointer items-center justify-center gap-2 px-3 pb-[3px] outline-none transition-colors hover:bg-white/5"
           data-course-settings-trigger
         >
           <Settings className="h-3.5 w-3.5 text-white/70" />

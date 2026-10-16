@@ -38,7 +38,6 @@ const DECK = read("src/course/QuadDeck.tsx");
 const DECK_CSS = read("src/course/course-quad-deck.css");
 const FLEX = read("src/course/quadFlex.ts");
 const PICKER = read("src/course/BlockPicker.tsx");
-const BACK = read("src/course/PageBackButton.tsx");
 const PAGES = read("src/course/blockPages.ts");
 const HISTORY = read("src/course/pageHistory.ts");
 const NAV = read("src/course/CourseHeaderNav.tsx");
@@ -197,9 +196,11 @@ test("the header carries the progress bar, Settings and the navigation in ONE li
   assert.match(PLAYER, /const headerNavInRail = quadWide && navPlacement === "header" && !quadNavInDeck && !quadFooterOff;/);
   assert.match(PLAYER, /data-course-nav-slot/);
   assert.match(PLAYER, /\{courseNavNode\}\n\s+<\/div>/);
-  // The progress bar takes the free space and Settings keeps its own width.
-  assert.match(PLAYER, /headerNavInRail \? "min-w-0 flex-1" : "w-1\/2"/);
-  assert.match(PLAYER, /headerNavInRail \? "shrink-0" : "w-1\/2"/);
+  // The progress bar is trimmed — it flexes into the free space and the
+  // Settings trigger keeps only its own width, leaving room for the Pages
+  // button on the left ("progress bar … ki length thoda sa kam karo").
+  assert.match(PLAYER, /className="relative flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-3 pb-\[3px\] outline-none disabled:cursor-default"\n\s+data-course-progress-bar/);
+  assert.match(PLAYER, /className="flex shrink-0 cursor-pointer items-center justify-center gap-2 px-3 pb-\[3px\] outline-none transition-colors hover:bg-white\/5"\n\s+data-course-settings-trigger/);
   // Left, right and bottom have their own homes — one navigation, four places.
   assert.match(PLAYER, /const quadRailLeft = quadWide && navPlacement === "left" && !quadNavInDeck && !quadFooterOff;/);
   assert.match(PLAYER, /const quadRailRight = quadWide && navPlacement === "right" && !quadNavInDeck && !quadFooterOff;/);
@@ -473,20 +474,21 @@ test("the dynamic cross: four half-dividers with their OWN drag, meeting at the 
   assert.match(DECK_CSS, /\.dc-quad-flex__joint-handle \{/);
 });
 
-test("every block starts on a WHITE blank picker — solid blue/white rectangular buttons only", () => {
-  // The owner's starter page: "block Keval aur Keval ek blank page se start
-  // hoga … white background, button s blue white, rectangular … sabkuchh
-  // solid color, glass type nahin".
+test("every block starts on the vibrant SELECTION page — one accent card per course player page", () => {
+  // The owner's 2026-10-16+ brief: "selection page ka jo button hai usko
+  // vibrant aur thoda sa badhiya design do, ui ux selection page ka ekadam
+  // badhiya sa design karo."
   assert.match(PICKER, /className="dc-block-picker"/);
   assert.match(PICKER, /data-course-block-picker-page=\{record\.key\}/);
-  const pickerRule = DECK_CSS.slice(DECK_CSS.indexOf(".dc-block-picker {"), DECK_CSS.indexOf(".dc-block-picker__head"));
-  assert.match(pickerRule, /background: #ffffff;/);
-  assert.doesNotMatch(pickerRule, /gradient|backdrop-filter/, "solid colours only — no glass");
+  // Every card carries its page's own accent colours.
+  assert.match(PICKER, /--dc-page-accent/);
+  assert.match(PAGES, /accent: string;/);
+  assert.match(PAGES, /accentTo: string;/);
   const buttonRule = DECK_CSS.slice(DECK_CSS.indexOf(".dc-block-picker__button {"), DECK_CSS.indexOf(".dc-block-picker__button:hover"));
-  assert.match(buttonRule, /background: #2563eb;/);
-  assert.match(buttonRule, /border: 2px solid #2563eb;/);
-  assert.match(buttonRule, /border-radius: 6px;/, "rectangular buttons");
-  assert.match(buttonRule, /color: #ffffff;/);
+  assert.match(buttonRule, /border-radius: 13px;/, "rounded vibrant cards");
+  assert.match(buttonRule, /transition: transform/, "the cards lift on hover");
+  const tileRule = DECK_CSS.slice(DECK_CSS.indexOf(".dc-block-picker__tile {"), DECK_CSS.indexOf(".dc-block-picker__text"));
+  assert.match(tileRule, /linear-gradient\(135deg, var\(--dc-page-accent/, "the icon tile wears the page's accent");
   // The catalog lists every course player page — the lesson, the learner's
   // own tree and the player settings included.
   assert.match(PAGES, /"lesson"/);
@@ -497,26 +499,26 @@ test("every block starts on a WHITE blank picker — solid blue/white rectangula
   assert.match(PAGES, /export function findBlockOwningPage/);
 });
 
-test("the top-left Back button steps through previous pages — never a jump home", () => {
-  // The owner's rule: "yah button directly home page per redirect na karen …
-  // step bye step previous pages per click karne per back kare. Course player
-  // ke sabhi pages per top left mein yah button hoga."
-  assert.match(BACK, /className="dc-page-back"/);
-  assert.match(BACK, /onBack/);
-  assert.doesNotMatch(BACK, /location|hash|href|window\./, "it never navigates on its own");
-  const backRule = DECK_CSS.slice(DECK_CSS.indexOf(".dc-page-back {"), DECK_CSS.indexOf(".dc-page-back:hover"));
-  assert.match(backRule, /background: #ffffff;/);
-  assert.match(backRule, /border: 2px solid #2563eb;/);
-  // Top-left of the surface it sits on.
-  assert.match(backRule, /top: 6px;/);
-  assert.match(backRule, /left: 6px;/);
-  // The walk: one page per click, and quiet at its end.
+test("the universal Back button and the per-block Pages switch are gone — the header's Pages button replaces them", () => {
+  // The owner's 2026-10-16+ revision: "vah back universal button remove kar
+  // dun kyunki donon ka ek hi function tha … header per left side page ka
+  // button add karo jo choice selection page per user ko bhejega."
+  assert.equal(fs.existsSync(path.join(ROOT, "src/course/PageBackButton.tsx")), false, "the back button component is deleted");
+  assert.doesNotMatch(DECK, /PageBackButton|dc-block-switch|data-course-block-switch/);
+  assert.doesNotMatch(PLAYER, /PageBackButton/);
+  // The header's Pages button: multi-split screens only (quadWide), acting on
+  // the ACTIVE block — the one the learner touched last.
+  assert.match(PLAYER, /data-course-pages/);
+  assert.match(PLAYER, /\{quadWide \? \(\s*<div className="flex shrink-0 items-center px-2 pb-\[3px\]">\s*<button\s*type="button"\s*onClick=\{openActiveBlockPicker\}/);
+  assert.match(PLAYER, /const openActiveBlockPicker = useCallback\(\(\) => \{/);
+  assert.match(PLAYER, /quadPaneVisible\(current, current\.focus\)\s*\?\s*current\.focus/);
+  assert.match(PLAYER, /commitQuadState\(quadSetBlockPage\(current, target, null\)\);/);
+  // Every grid shape records the block the learner touched last, so the
+  // header button always acts on the right one.
+  assert.match(DECK, /if \(stateRef\.current\.focus !== pane\) commit\(quadSetFocus\(stateRef\.current, pane\)\);/);
+  // The history store itself stays — it records in the background.
   assert.match(HISTORY, /export function backPageHistory\(scope: string\): string \| null \{/);
   assert.match(HISTORY, /if \(stack\.length <= 1\) return null;/);
-  assert.match(DECK, /<PageBackButton\n\s+surface=\{pane\}\n\s+enabled=\{canBack\}\n\s+onBack=\{\(\) => onBack\(pane\)\}/);
-  // The phone's study pane and the lesson pane carry it too — every page.
-  assert.match(PLAYER, /<PageBackButton surface="lesson" enabled=\{lessonCanBack\} onBack=\{backLessonPage\} \/>/);
-  assert.match(PLAYER, /<PageBackButton surface="study" enabled=\{studyCanBack\} onBack=\{backStudyPage\} \/>/);
 });
 
 test("the footer navigation shows only in single split mode — Keval do block", () => {

@@ -55,8 +55,14 @@ test('the page opens on ONE search bar over ONE pure-white tray, the All button 
   const barAt = panel.indexOf('data-music-searchbar');
   const trayAt = panel.indexOf('data-music-tray');
   assert.ok(barAt > 0 && trayAt > barAt, 'the search bar must sit above the white tray');
-  assert.match(panel, /data-music-tray data-music-tray-theme="white"/);
-  assert.match(panel, /className="shrink-0 bg-white px-2 py-2 sm:px-4"/);
+  assert.match(panel, /data-music-tray\n\s+data-music-tray-theme="white"/);
+  // The tray HIDES on a scroll down and returns at the top (owner,
+  // 2026-10-16+): "scroll slide karne per yah hide ho jana chahie".
+  assert.match(panel, /trayAway \? "max-h-0 -translate-y-2 py-0 opacity-0" : "max-h-24 translate-y-0 py-2 opacity-100"/);
+  assert.match(panel, /data-music-tray-away=\{trayAway \? "true" : "false"\}/);
+  // …but never while it rides INSIDE the video player's scroller — there the
+  // page's own scrolling carries it away.
+  assert.match(panel, /const trayAway = !inFlow && trayScrolledAway;/);
   // ONE filter list — All FIRST — and the tray renders THAT list, never a copy.
   assert.match(filters, /export const MUSIC_FILTERS: readonly MusicFilter\[\] = \["all", "course", "device", "online", "url"\] as const;/);
   assert.match(panel, /\{MUSIC_FILTERS\.map\(\(key\) => \{/);
@@ -205,13 +211,19 @@ test('a video opens COMPACT: official player, draggable divider, library below',
   assert.match(panel, /librarySurface\(\{ mode: "video", onOpenFullPage: openFullLibrary \}\)/);
   // Full screen hides the divider AND the library; coming back brings both.
   assert.match(panel, /data-music-video-fullscreen=\{fullscreen \? "true" : "false"\}/);
-  assert.match(panel, /data-music-fullscreen-toggle/);
+  // The EXTRA full-screen button is gone (owner, 2026-10-16): YouTube's own
+  // player already carries the inbuilt one, so only the browser's native
+  // fullscreen state is observed — never toggled from our chrome.
+  assert.doesNotMatch(panel, /data-music-fullscreen-toggle/);
+  assert.doesNotMatch(panel, /requestFullscreen/);
   assert.match(panel, /\{fullscreen \? \(\n        <div className="relative min-h-0 flex-1" data-music-video-pane>/);
-  assert.match(panel, /const fullscreen = immersive \|\| nativeFull;/);
-  assert.match(panel, /try \{ await stageRef\.current\?\.requestFullscreen\?\.\(\); \}/);
+  assert.match(panel, /const fullscreen = nativeFull;/);
   // The compact search bar is shorter and carries the arrow to the full page.
   assert.match(panel, /data-music-searchbar-layout=\{compact \? "compact" : "full"\}/);
-  assert.match(panel, /searchBar\(\{ compact: mode === "video", onOpenFullPage \}\)/);
+  assert.match(panel, /searchBar\(\{\n\s+compact: mode === "video",\n\s+onOpenFullPage,/);
+  // Only the library PAGE's bar opens the nested search page on focus — the
+  // video pane's compact bar keeps its old behaviour.
+  assert.match(panel, /\.\.\.\(mode === "page" \? \{ onSearchIntent: \(\) => setSearchPageOpen\(true\) \} : \{\}\)/);
   assert.match(panel, /data-music-open-library/);
   assert.match(panel, /const openFullLibrary = useCallback\(\(\) => \{\n    backToLibrary\(\);\n    chooseFilter\("all"\);/);
   // The platform's own official surface, never a rebuilt player.
@@ -278,7 +290,7 @@ test('the search box wears the SHARED study-search experience, not one of its ow
   assert.match(panel, /if \(searchLoading && !urlMode\) \{/);
   assert.match(panel, /<SearchFlashScan rows=\{5\} label="YouTube par search ho raha hai" \/>/);
   // …and while the box is empty with the caret, YouTube's own history shows.
-  assert.match(panel, /const showHistory = !urlMode && searchFocused && !query\.trim\(\) && search\.history\.length > 0;/);
+  assert.match(panel, /const showHistory = !urlMode && \(searchFocused \|\| searchPageOpen\) && !query\.trim\(\) && search\.history\.length > 0;/);
   assert.match(panel, /<SearchHistoryList\n      entries=\{search\.history\}/);
   // The placeholder still follows the FILTER (the sentence is an overlay, not
   // the placeholder itself) — the box keeps saying what this filter searches.

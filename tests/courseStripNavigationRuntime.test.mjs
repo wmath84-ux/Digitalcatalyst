@@ -7,10 +7,36 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 const require = createRequire(import.meta.url);
-const dom = new JSDOM('<div id="root"></div>', { url: 'https://example.test' });
+// pretendToBeVisual gives jsdom a real requestAnimationFrame — the placement
+// dropdown's layout effect measures through it, so the harness must have one.
+const dom = new JSDOM('<div id="root"></div>', { url: 'https://example.test', pretendToBeVisual: true });
 globalThis.window = dom.window;
 globalThis.document = dom.window.document;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+// jsdom has no layout: every box normally reads as 0×0 at the origin, which
+// would let the dropdown's viewport-fit logic believe EVERY side fits and
+// pick the first fallback. Give the placement button a believable box at the
+// edge its rail actually sits on (1024×768 viewport), and the menu its real
+// footprint, so the fit logic chooses the owner's documented side.
+const zeroRect = { x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, toJSON: () => ({}) };
+const PLACEMENT_BUTTON_RECTS = {
+  header: { top: 10, bottom: 40, left: 800, right: 824 },
+  right: { top: 300, bottom: 330, left: 990, right: 1014 },
+  bottom: { top: 720, bottom: 750, left: 500, right: 524 },
+  left: { top: 300, bottom: 330, left: 10, right: 34 },
+};
+dom.window.HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
+  if (this.hasAttribute?.('data-dc-header-nav-menu')) {
+    return { ...zeroRect, width: 180, height: 170, right: 180, bottom: 170 };
+  }
+  if (this.hasAttribute?.('data-dc-header-nav-placement')) {
+    const placement = this.closest('[data-dc-header-nav]')?.getAttribute('data-placement') || 'header';
+    const rect = PLACEMENT_BUTTON_RECTS[placement] || PLACEMENT_BUTTON_RECTS.header;
+    return { ...zeroRect, ...rect, width: rect.right - rect.left, height: rect.bottom - rect.top };
+  }
+  return { ...zeroRect };
+};
 const tabsSource = fs.readFileSync('src/course/CourseOverlay.tsx', 'utf8');
 const tabs = [...tabsSource.matchAll(/\{ key: "(\w+)", label: "([^"]+)", heading: "([^"]+)", hint: "[^"]*", color: "([^"]+)", icon: (\w+) \}/g)].map(([, key, label, heading, color]) => ({ key, label, heading, color, icon: (props) => React.createElement('svg', { 'data-icon-size': props.size }) }));
 let keyboardVisible = false;

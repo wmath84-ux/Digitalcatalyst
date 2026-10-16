@@ -489,7 +489,12 @@ function NoteEditorSession({
   /** A change happened: cheap emptiness now, batched serialisation later. */
   const schedule = useCallback(() => {
     pending.current = true;
-    const empty = editor.isEmpty && !currentTitle();
+    // `editor.isEmpty` converts the WHOLE ProseMirror document to blocks —
+    // on a long note that is real work on EVERY keystroke, and it was THE
+    // typing lag on big notes. A document past a tiny node size can never be
+    // empty, so only a tiny one (where the conversion is a few blocks) is
+    // actually asked; everything bigger is known non-empty for free.
+    const empty = editor.prosemirrorState.doc.nodeSize > 256 ? false : editor.isEmpty && !currentTitle();
     if (empty !== flags.current.empty) { flags.current.empty = empty; callbacks.current.onEmptyChange?.(empty); }
     window.clearTimeout(timers.current.delay);
     timers.current.delay = window.setTimeout(flushNow, EMIT_DELAY_MS);

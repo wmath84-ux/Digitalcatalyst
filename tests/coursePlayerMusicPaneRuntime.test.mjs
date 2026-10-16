@@ -420,10 +420,13 @@ test("the URL filter adds a link with the arrow, and it plays in the official em
   assert.equal(saved.tracks[0].url, "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
 
   // A link we cannot play is refused with a sentence, and stores nothing.
-  await click(q("[data-music-back]"));
+  // The player carries no overlay chrome any more (owner, 2026-10-16) — the
+  // way back to the library is the compact search bar's arrow, which lands
+  // on the full library page.
+  await click(q("[data-music-open-library]"));
   await settle();
   assert.equal(fixture.panelSession().musicView, "library");
-  assert.equal(q("[data-course-music-panel]").getAttribute("data-music-filter"), "url", "the filter is where it was");
+  assert.equal(q("[data-course-music-panel]").getAttribute("data-music-filter"), "all", "the arrow lands on the full library");
   await click(q('[data-music-filter="url"]'));
   await settle();
   typeInto(q("[data-music-url]"), "https://example.test/some/page.html");
@@ -530,18 +533,19 @@ test("a video opens compact: official player, a draggable divider, the library b
   await settle();
   assert.equal(q("[data-music-player-divider]").getAttribute("aria-valuenow"), "50", "…and it is committed");
 
-  // ── Full screen hides the divider AND the library; coming back restores both.
-  await click(q("[data-music-fullscreen-toggle]"));
-  await settle();
-  assert.equal(q('[data-music-player="video"]').getAttribute("data-music-video-fullscreen"), "true");
-  assert.equal(Boolean(q("[data-music-player-divider]")), false, "full screen hides the divider");
-  assert.equal(Boolean(q("[data-music-video-library]")), false, "…and the library");
-  assert.ok(Boolean(q('[data-music-embed="youtube"]')), "the player keeps playing");
-  await click(q("[data-music-fullscreen-toggle]"));
-  await settle();
-  assert.equal(q('[data-music-player="video"]').getAttribute("data-music-video-fullscreen"), "false");
-  assert.ok(Boolean(q("[data-music-player-divider]")), "leaving full screen brings the divider back");
-  assert.ok(Boolean(q("[data-music-video-library]")), "…and the library");
+  // ── The overlay chrome is GONE ENTIRELY (owner, 2026-10-16): no extra
+  //    full-screen button, no title strip, no left-side back button — the
+  //    YouTube player owns its whole surface; the compact search bar's
+  //    arrow is the way back to the library.
+  assert.equal(q("[data-music-fullscreen-toggle]"), null, "no second full-screen button");
+  assert.equal(q("[data-music-player-chrome]"), null, "no overlay chrome at all on the player");
+  assert.ok(Boolean(q('[data-music-embed="youtube"]')), "the official player keeps playing");
+
+  // ── The search box and the filter tray live INSIDE the library's scroller
+  //    under a playing video, so they scroll away with the page itself.
+  assert.ok(Boolean(q('[data-music-video-library] [data-music-body] [data-music-searchbar]')), "the box is in the scroll flow");
+  assert.ok(Boolean(q('[data-music-video-library] [data-music-body] [data-music-tray]')), "…and the tray with it");
+  assert.equal(q('[data-music-video-library] [data-music-tray]').getAttribute("data-music-tray-away"), "false", "in flow it never collapses on its own");
 
   // ── The arrow in the compact search bar jumps to the full library page.
   await click(q("[data-music-open-library]"));
@@ -632,6 +636,28 @@ test("online search keeps what the learner looked at, with clean artwork", async
   const saved = JSON.parse(window.localStorage.getItem("dc.music.library.v1:learner-1"));
   assert.equal(saved.tracks.length, 1);
   assert.equal(saved.tracks[0].url, "https://www.youtube.com/watch?v=9bZkp7q19f0");
+  // …saved AS the provider described it (owner, 2026-10-16): the real name,
+  // the real channel and the artwork — never a generic "YouTube video" row
+  // with no photo in the All list.
+  assert.equal(saved.tracks[0].title, "GANGNAM STYLE");
+  assert.equal(saved.tracks[0].subtitle, "officialpsy");
+  assert.equal(saved.tracks[0].thumbnailUrl, "https://i.ytimg.com/vi/9bZkp7q19f0/hqdefault.jpg");
+
+  // The saved shelf row shows BOTH the name and the picture. The chrome-less
+  // player's way back is the compact bar's arrow to the full library page.
+  await click(q("[data-music-open-library]"));
+  await settle();
+  await click(q('[data-music-filter="all"]'));
+  await settle();
+  const shelfRow = q('[data-music-track][data-music-track-source="link"]');
+  assert.ok(Boolean(shelfRow), "the played result is on the shelf");
+  assert.match(shelfRow.textContent, /GANGNAM STYLE/);
+  const shelfArt = shelfRow.querySelector("[data-music-track-thumbnail]");
+  assert.ok(Boolean(shelfArt), "with its artwork");
+  assert.equal(shelfArt.getAttribute("src"), "https://i.ytimg.com/vi/9bZkp7q19f0/hqdefault.jpg");
+  // The list row's artwork frame is a real block — a zero-size inline span
+  // was exactly the "photo nahin dikhta" bug.
+  assert.match(String(shelfArt.closest("[data-music-artwork]").className), /\bblock\b|\bgrid\b/);
 });
 
 test("with no key the query goes to YouTube itself — and never from the URL box", async () => {

@@ -1473,15 +1473,6 @@
 .course-mindmap-shell[data-mindmap-theme="light"] .mm-tool-danger:hover:not(:disabled) {
   color: #be123c;
 }
-.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-save-status="saving"] {
-  color: #92400e;
-}
-.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-save-status="saved"] {
-  color: #047857;
-}
-.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-save-status="error"] {
-  color: #be123c;
-}
 [data-course-theme-portal][data-menu-theme="light"].mm-menu {
   background: rgba(255, 255, 255, 0.98);
   border: 1px solid rgba(15, 23, 42, 0.14);

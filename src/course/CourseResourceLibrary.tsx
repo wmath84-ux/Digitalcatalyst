@@ -93,6 +93,12 @@ export interface CourseResourceLibraryProps {
   onOpenMasterNote: (note: MasterCourseNote) => void;
   /** Open a mind map resource: the player focuses the owning module's map library. */
   onOpenMindMapResource: (file: CourseFile, modulePath: string[]) => void;
+  /**
+   * Play a YouTube search result in the MAIN content block — the same place
+   * the course's own YouTube embeds play — instead of leaving for YouTube
+   * ("direct vahin play ho jo main area hai content ka block").
+   */
+  onOpenYouTube?: (track: MusicTrack) => void;
   /** The learner's own "My Modules" entry, shown as the last branch of the library. */
   personalEntry?: { subtitle: string; locked?: boolean; onOpen: () => void } | null;
   /** Library state. Defaults to "ready". */
@@ -181,10 +187,44 @@ function LibraryHitCard({ resource, onOpen }: { resource: LibraryResource; onOpe
 /**
  * A YouTube result: the same two formats, and the same artwork rules the Music
  * pane uses (edge-to-edge picture, or a proper audio tile when there is none).
- * It opens on YouTube itself — the official page, never a scraped stream.
+ *
+ * With `onOpen` it PLAYS RIGHT HERE — in the main content block, where every
+ * other YouTube embed of the course plays (the owner: "turant YouTube open ho
+ * jata hai click karte hi … aisa nahin hona chahie, direct vahin play ho jo
+ * main area hai content ka block"). Only without a handler does it fall back
+ * to the official YouTube page.
  */
-function YouTubeHit({ track, format }: { track: MusicTrack; format: LibrarySearchFormat }) {
+function YouTubeHit({
+  track,
+  format,
+  onOpen,
+}: {
+  track: MusicTrack;
+  format: LibrarySearchFormat;
+  onOpen?: ((track: MusicTrack) => void) | undefined;
+}) {
   if (format === "grid") {
+    const face = (
+      <>
+        <TrackArtwork track={track} variant="card" />
+        <span className="library-hitcard__title">{track.title}</span>
+        <span className="library-hitcard__sub">{track.subtitle || "YouTube"}</span>
+      </>
+    );
+    if (onOpen) {
+      return (
+        <button
+          type="button"
+          onClick={() => onOpen(track)}
+          data-library-search-youtube-hit
+          data-library-hit-id={track.url}
+          data-library-hit-format="grid"
+          className="library-hitcard library-hitcard--video"
+        >
+          {face}
+        </button>
+      );
+    }
     return (
       <a
         href={track.url}
@@ -195,10 +235,32 @@ function YouTubeHit({ track, format }: { track: MusicTrack; format: LibrarySearc
         data-library-hit-format="grid"
         className="library-hitcard library-hitcard--video"
       >
-        <TrackArtwork track={track} variant="card" />
-        <span className="library-hitcard__title">{track.title}</span>
-        <span className="library-hitcard__sub">{track.subtitle || "YouTube"}</span>
+        {face}
       </a>
+    );
+  }
+  const row = (
+    <>
+      <TrackArtwork track={track} variant="tile" />
+      <span className="library-hit__text">
+        <span className="library-hit__title">{track.title}</span>
+        <span className="library-hit__sub">{track.subtitle || "YouTube"}</span>
+      </span>
+    </>
+  );
+  if (onOpen) {
+    return (
+      <button
+        type="button"
+        onClick={() => onOpen(track)}
+        data-library-search-youtube-hit
+        data-library-hit-id={track.url}
+        data-library-hit-format="list"
+        className="library-hit"
+      >
+        {row}
+        <PlayCircle size={14} aria-hidden="true" className="library-hit__external" />
+      </button>
     );
   }
   return (
@@ -211,11 +273,7 @@ function YouTubeHit({ track, format }: { track: MusicTrack; format: LibrarySearc
       data-library-hit-format="list"
       className="library-hit"
     >
-      <TrackArtwork track={track} variant="tile" />
-      <span className="library-hit__text">
-        <span className="library-hit__title">{track.title}</span>
-        <span className="library-hit__sub">{track.subtitle || "YouTube"}</span>
-      </span>
+      {row}
       <ExternalLink size={14} aria-hidden="true" className="library-hit__external" />
     </a>
   );
@@ -508,6 +566,7 @@ export default function CourseResourceLibrary({
   onSelectFile,
   onOpenMasterNote,
   onOpenMindMapResource,
+  onOpenYouTube,
   personalEntry,
   status = "ready",
   errorMessage,
@@ -688,10 +747,20 @@ export default function CourseResourceLibrary({
     [],
   );
 
+  /**
+   * Opening a hit NEVER closes the results page any more (the owner:
+   * "search result open hone ke baad close nahin hona chahie jab tak user
+   * khud se na kar de") — the resource opens in the player while the results
+   * stay exactly where they are, until the back arrow is pressed.
+   */
   const openSearchHit = useCallback((resource: LibraryResource) => {
-    setSearchOpen(false);
     handleSelect(resource.id);
   }, [handleSelect]);
+
+  /** A YouTube hit plays in the MAIN content block — and the results stay. */
+  const openYouTubeHit = useCallback((track: MusicTrack) => {
+    onOpenYouTube?.(track);
+  }, [onOpenYouTube]);
 
   const searchResults = search.phase === "results" ? search.results : null;
   const libraryHits = searchResults?.local ?? [];
@@ -760,7 +829,14 @@ export default function CourseResourceLibrary({
               <form
                 className="library-searchbar__box"
                 data-library-search-form
-                onSubmit={(event) => { event.preventDefault(); void search.search(searchText); }}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  // "Jaise hi Enter karein keyboard close ho jaaye" — the box
+                  // yields the caret the moment the search runs (the page
+                  // itself opened WITH the keyboard via openSearch's focus).
+                  searchInputRef.current?.blur();
+                  void search.search(searchText);
+                }}
               >
                 <Search size={16} className="library-searchbar__glyph" aria-hidden="true" />
                 <input
@@ -839,14 +915,19 @@ export default function CourseResourceLibrary({
               <SearchFlashScan rows={5} label="Searching the course library and YouTube" />
             ) : search.phase === "results" ? (
               <>
-                <section className="library-search-section" data-library-search-section="library" data-library-search-count={libraryHits.length}>
-                  <p className="library-search-section__head">
-                    In this library
-                    <span className="library-search-section__count">{libraryHits.length}</span>
-                    {search.query ? <span className="library-search-section__query">“{search.query}”</span> : null}
-                  </p>
-                  {libraryHits.length ? (
-                    searchFormat === "grid" ? (
+                {/* The library's own half shows ONLY when it has something to
+                    say. A zero-count "In this library / Nothing matches yet"
+                    block is noise the owner removed (2026-10-16+): the related
+                    YouTube results below already answer the query, and the
+                    learner can simply search again. */}
+                {libraryHits.length ? (
+                  <section className="library-search-section" data-library-search-section="library" data-library-search-count={libraryHits.length}>
+                    <p className="library-search-section__head">
+                      In this library
+                      <span className="library-search-section__count">{libraryHits.length}</span>
+                      {search.query ? <span className="library-search-section__query">“{search.query}”</span> : null}
+                    </p>
+                    {searchFormat === "grid" ? (
                       <div className="library-search-grid" data-library-search-listing="grid">
                         {libraryHits.map((resource) => (
                           <LibraryHitCard key={resource.id} resource={resource} onOpen={openSearchHit} />
@@ -858,13 +939,9 @@ export default function CourseResourceLibrary({
                           <LibraryHitRow key={resource.id} resource={resource} onOpen={openSearchHit} />
                         ))}
                       </div>
-                    )
-                  ) : (
-                    <p className="library-search-empty" data-library-search-no-library-hits>
-                      Nothing in this course matches “{search.query}” yet.
-                    </p>
-                  )}
-                </section>
+                    )}
+                  </section>
+                ) : null}
 
                 <section className="library-search-section" data-library-search-section="youtube" data-library-search-count={onlineHits.length}>
                   <p className="library-search-section__head">
@@ -875,13 +952,13 @@ export default function CourseResourceLibrary({
                     searchFormat === "grid" ? (
                       <div className="library-search-grid" data-library-search-listing="grid">
                         {onlineHits.map((track) => (
-                          <YouTubeHit key={track.url} track={track} format="grid" />
+                          <YouTubeHit key={track.url} track={track} format="grid" onOpen={onOpenYouTube ? openYouTubeHit : undefined} />
                         ))}
                       </div>
                     ) : (
                       <div className="library-search-list" data-library-search-listing="list">
                         {onlineHits.map((track) => (
-                          <YouTubeHit key={track.url} track={track} format="list" />
+                          <YouTubeHit key={track.url} track={track} format="list" onOpen={onOpenYouTube ? openYouTubeHit : undefined} />
                         ))}
                       </div>
                     )

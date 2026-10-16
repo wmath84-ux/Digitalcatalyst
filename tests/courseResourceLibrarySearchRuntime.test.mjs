@@ -382,7 +382,7 @@ test("the format button converts itself and the whole listing follows it", async
   assert.equal(Boolean(q('[data-library-search-listing="list"]')), true, "one tap each way");
 });
 
-test("a library hit opens the resource; the search page steps aside", async () => {
+test("a library hit opens the resource — and the results STAY until the learner closes them", async () => {
   window.localStorage.clear();
   mount();
   await settle();
@@ -397,6 +397,12 @@ test("a library hit opens the resource; the search page steps aside", async () =
   await click(hits[0]);
   await settle();
   assert.deepEqual(fixture.opened, [["file", "f2"]], "the player opened that very resource");
+  // The owner's 2026-10-16+ rule: "jab tak user search aur search results ko
+  // close nahin karta … open rahe" — the pick must NOT close the results.
+  assert.equal(Boolean(q("[data-library-search-page-body]")), true, "the results stay open after the pick");
+  // Only the learner's own Back press puts the library listing back.
+  await click(q("[data-library-search-back]"));
+  await settle();
   assert.equal(Boolean(q("[data-library-search-page-body]")), false, "and the library listing is back");
 });
 
@@ -465,7 +471,7 @@ test("without a YouTube key the search still answers, and hands the query over",
   assert.equal(link.getAttribute("href"), "https://www.youtube.com/results?search_query=algebra");
 });
 
-test("a query that matches nothing says so in both halves", async () => {
+test("a query that matches nothing stays quiet in the library half — only the online half answers", async () => {
   window.localStorage.clear();
   window.localStorage.setItem("dc.music.youtubeKey", "test-key");
   fetchResponder = () => ({ ok: true, json: () => Promise.resolve({ items: [] }) });
@@ -477,7 +483,9 @@ test("a query that matches nothing says so in both halves", async () => {
   await pressEnter();
   await settle(1200);
   assert.equal(qa("[data-library-search-hit]").length, 0);
-  assert.equal(Boolean(q("[data-library-search-no-library-hits]")), true);
+  // The owner's 2026-10-16+ rule: the "Nothing in this course matches … yet"
+  // notice is GONE — related results show anyway, no scolding empty state.
+  assert.equal(Boolean(q("[data-library-search-no-library-hits]")), false, "no library empty-state message");
   assert.equal(Boolean(q("[data-library-search-no-online-hits]")), true);
   assert.equal(Boolean(q("[data-library-search-external]")), true, "the hand-off is still offered");
 });

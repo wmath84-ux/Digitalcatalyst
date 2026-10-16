@@ -57,7 +57,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
@@ -84,14 +83,7 @@ import {
 } from "./quadFlex";
 import type { BlockPageKey, BlockPageRecord } from "./blockPages";
 import BlockPicker from "./BlockPicker";
-import PageBackButton from "./PageBackButton";
-import {
-  backPageHistory,
-  canPageHistoryBack,
-  pageHistoryOf,
-  pushPageHistory,
-  subscribePageHistory,
-} from "./pageHistory";
+import { pageHistoryOf, pushPageHistory } from "./pageHistory";
 import { quadSetBlockPage, quadSetFocus, quadSwapFlex } from "./quadLayout";
 import {
   QUAD_COL2_MAX,
@@ -293,8 +285,13 @@ function QuadMenuButton({
  * A block's content in FREE-BLOCKS mode. Every block starts on the white
  * picker ("block Keval aur Keval ek blank page se start hoga"); a page the
  * learner opens stays mounted here (hidden behind the current one) so a
- * playing video or song never loses its place to a page switch. The top-left
- * back button walks the block's OWN history, one step a click — never home.
+ * playing video or song never loses its place to a page switch.
+ *
+ * The owner's 2026-10-16+ revision: the per-page top-left Back button and the
+ * per-block top-right "Pages" switch are GONE — their one job (back to the
+ * selection page) now belongs to the header's Pages button, which acts on the
+ * ACTIVE block (the one the learner touched last). The block's own history
+ * store keeps recording in the background.
  */
 function FreeBlock({
   pane,
@@ -303,7 +300,6 @@ function FreeBlock({
   catalog,
   renderPage,
   onOpen,
-  onBack,
 }: {
   pane: QuadPaneId;
   page: BlockPageKey | null;
@@ -311,14 +307,8 @@ function FreeBlock({
   catalog: readonly BlockPageRecord[];
   renderPage: (page: BlockPageKey, pane: QuadPaneId) => ReactNode;
   onOpen: (pane: QuadPaneId, page: BlockPageKey | null) => void;
-  onBack: (pane: QuadPaneId) => void;
 }) {
   const scope = `block:${pane}`;
-  const canBack = useSyncExternalStore(
-    subscribePageHistory,
-    () => canPageHistoryBack(scope),
-    () => false,
-  );
   const [, bump] = useState(0);
   const openedRef = useRef<BlockPageKey[]>([]);
 
@@ -351,30 +341,6 @@ function FreeBlock({
 
   return (
     <div className="dc-quad-free" data-quad-free={pane} data-quad-free-page={page ?? "blank"}>
-      <PageBackButton
-        surface={pane}
-        enabled={canBack}
-        onBack={() => onBack(pane)}
-      />
-      {/* With a page on screen, the switcher is the quiet way back to the
-          blank page's full list — so any block can change its page without
-          the cluster round-trip. */}
-      {page !== null ? (
-        <button
-          type="button"
-          className="dc-block-switch"
-          data-course-block-switch={pane}
-          aria-label={`Change the page in block ${pane}`}
-          title="Change this block's page"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpen(pane, null);
-          }}
-        >
-          Pages
-        </button>
-      ) : null}
       {page === null ? (
         <BlockPicker
           pane={pane}
@@ -746,12 +712,6 @@ export default function QuadDeck({
     commit(quadSetBlockPage(state, pane, page));
   };
 
-  const backBlockPage = (pane: QuadPaneId) => {
-    const previous = backPageHistory(`block:${pane}`);
-    if (previous === null) return;
-    commit(quadSetBlockPage(state, pane, previous === "blank" ? null : (previous as BlockPageKey)));
-  };
-
   /* ── The cluster: outside click closes it ─────────────────────────────── */
   useEffect(() => {
     if (!menu) return undefined;
@@ -824,7 +784,6 @@ export default function QuadDeck({
           catalog={blocks.catalog}
           renderPage={blocks.renderPage}
           onOpen={openBlockPage}
-          onBack={backBlockPage}
         />
       );
     }
@@ -1071,6 +1030,12 @@ export default function QuadDeck({
                   data-quad-pane-label={QUAD_SLOT_LABEL[QUAD_PANE_SLOT[pane]]}
                   data-quad-focused={focusPane === pane ? "true" : "false"}
                   aria-label={QUAD_SLOT_LABEL[QUAD_PANE_SLOT[pane]]}
+                  onPointerDown={() => {
+                    // The header's Pages button acts on the ACTIVE block, so
+                    // every grid shape records the block the learner touched
+                    // last — the same rule the dynamic cross already keeps.
+                    if (stateRef.current.focus !== pane) commit(quadSetFocus(stateRef.current, pane));
+                  }}
                 >
                   {paneContent(pane)}
                 </section>

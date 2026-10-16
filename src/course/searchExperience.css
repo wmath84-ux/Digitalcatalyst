@@ -23,6 +23,10 @@
   letter-spacing: 0.005em;
   color: rgb(15 23 42 / 0.52);
   text-overflow: clip;
+  /* Decorative text: a tap on the box must never select/highlight it. */
+  -webkit-user-select: none;
+  user-select: none;
+  pointer-events: none;
 }
 
 .dc-slide__inner {

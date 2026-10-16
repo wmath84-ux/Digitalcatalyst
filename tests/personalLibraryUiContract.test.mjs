@@ -233,7 +233,7 @@ test("personal resources reuse ResourceViewer and cannot mutate official progres
 
 test("a learner-authored course opens the SAME Course Player, on its own namespaced storage", () => {
   // Same player component — only the product projection differs…
-  assert.match(myPlayer, /lazy\(\(\) => import\("\.\.\/CoursePlayerApp"\)\)/);
+  assert.match(myPlayer, /lazyWithChunkRecovery\(\(\) => import\("\.\.\/CoursePlayerApp"\)\)/);
   assert.match(myPlayer, /<CoursePlayer/);
   assert.match(myAdapter, /export const myCourseToProduct/);
   assert.match(myAdapter, /courseContent: course\.modules\.map\(toCourseModule\)/);

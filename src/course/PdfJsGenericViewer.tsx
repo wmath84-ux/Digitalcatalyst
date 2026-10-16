@@ -35,6 +35,8 @@ interface PdfViewerApp {
 interface PdfjsElement extends HTMLElement {
   initPromise?: Promise<{ viewerApp?: PdfViewerApp }>;
   iframe?: HTMLIFrameElement;
+  /** Queues PDF.js AppOptions the element applies while the viewer boots. */
+  setViewerOptions?: (options: Record<string, unknown>) => Promise<unknown>;
 }
 
 /**
@@ -221,6 +223,22 @@ export default function PdfJsGenericViewer({
         if (initialPage > 1) element.setAttribute("page", String(initialPage));
         element.style.cssText = "display:block;width:100%;height:100%;min-height:0;background:#f8fafc";
         hostRef.current.replaceChildren(element);
+        // ── Highlight WITHOUT the colour box (owner, 2026-10-16) ──────────
+        // In this viewer skin the highlight colour/thickness box is welded to
+        // the highlight MODE: close the box and the mode — and with it the
+        // ability to highlight — switches off. The box is only a picker, so
+        // highlighting must keep working after it is hidden: PDF.js's own
+        // floating highlight button (the one Firefox ships) appears next to
+        // any text selection while NO editor mode is active, and one press
+        // highlights the selection with the last chosen colour. Queued before
+        // the viewer boots; the element applies it with the other AppOptions.
+        try {
+          element.setViewerOptions?.({ enableHighlightFloatingButton: true })?.catch(() => {
+            /* the viewer still works — only the floating button is missing */
+          });
+        } catch {
+          /* an older element build without the API simply keeps today's behaviour */
+        }
 
         const initialized = await element.initPromise;
         if (cancelled) return;
