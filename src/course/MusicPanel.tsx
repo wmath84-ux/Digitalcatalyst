@@ -64,8 +64,8 @@ import {
   type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode,
 } from "react";
 import {
-  ArrowLeft, ArrowRight, AudioLines, ChevronRight, ExternalLink, Globe, LayoutGrid, Link2, LoaderCircle,
-  Maximize2, Minimize2, Music, Plus, Rows3, Search, X,
+  ArrowLeft, ArrowRight, AudioLines, ChevronRight, CornerDownLeft, ExternalLink, Globe, LayoutGrid, Link2,
+  LoaderCircle, Maximize2, Minimize2, Music, Plus, Rows3, Search, X,
 } from "lucide-react";
 import AudioPlayer from "./AudioPlayer";
 import { toast } from "../components/ui/glass-toast";
@@ -77,6 +77,9 @@ import { listLocalSongs, removeLocalSong, songObjectUrl, storeLocalSong } from "
 import {
   resolveMusicTitle, searchYouTube, subscribeYouTubeKey, youTubeSearchAvailable, youTubeSearchUrl,
 } from "./musicSearch";
+import {
+  SearchFlashScan, SearchHistoryList, SlidingSearchText, STUDY_SEARCH_SENTENCE, useStudySearch,
+} from "./searchExperience";
 import {
   MUSIC_EMPTY_HINT, MUSIC_EMPTY_TITLE, MUSIC_FILTERS, MUSIC_FILTER_HINT, MUSIC_FILTER_LABEL, MUSIC_NO_MATCH,
   MUSIC_SEARCH_PLACEHOLDER, MUSIC_SHELF_TITLE, MUSIC_START_OPTIONS, isUrlFilter, musicAddFabVisible,
@@ -131,13 +134,10 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
   const [filter, setFilter] = useState<MusicFilter>("all");
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [results, setResults] = useState<MusicTrack[]>([]);
-  const [searched, setSearched] = useState(false);
-  /** The query that produced the results — kept apart from the box's text, so
-   *  the Online list keeps what the learner has already searched even after
-   *  they switch filters (which clears the box). */
-  const [searchedQuery, setSearchedQuery] = useState("");
+  /** An upload in flight — the search's own spinner lives in the shared kit. */
+  const [uploading, setUploading] = useState(false);
+  /** YouTube shows recent searches when the box has the caret and is empty. */
+  const [searchFocused, setSearchFocused] = useState(false);
   const [playUrl, setPlayUrl] = useState("");
   const [resolving, setResolving] = useState(false);
   /** The library, opened OVER the audio player by the library glyph. */
@@ -333,7 +333,7 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
   const onPickFile = useCallback(async (file: File | null | undefined) => {
     if (!file) return;
     if (!uid) { setNotice("Sign in to save a song from this device."); return; }
-    setBusy(true);
+    setUploading(true);
     try {
       const track = await storeLocalSong(uid, file);
       const rows = await listLocalSongs(uid);
@@ -344,7 +344,7 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
       const message = error instanceof Error ? error.message : `Songs are capped at ${Math.round(MUSIC_UPLOAD_MAX_BYTES / (1024 * 1024))} MB.`;
       setNotice(message);
     } finally {
-      setBusy(false);
+      setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
     }
   }, [uid, select]);
@@ -361,28 +361,47 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
 
   /* ── Searching online (key-gated, never a scraper) ────────────────────── */
 
-  const runSearch = useCallback(async () => {
+  /**
+   * The search itself — the SHARED experience (./searchExperience), the very
+   * same one the Course Library's search page wears: the query is remembered in
+   * this device's recent searches, the flash scan stays up for a full second
+   * however fast the network is (and for as long as it really takes when it is
+   * slow), and the results appear the moment they land. No nested page here:
+   * the owner asked for the same behaviour on the SAME page structure.
+   */
+  const runMusicSearch = useCallback((text: string) => searchYouTube(text), []);
+  const search = useStudySearch<MusicTrack[]>({ namespace: "course-music", run: runMusicSearch });
+
+  const searchLoading = search.phase === "loading";
+  const searched = search.phase === "results";
+  const results = search.results ?? [];
+  /** The query that produced the results — kept apart from the box's text, so
+   *  the Online list keeps what the learner has already searched even after
+   *  they switch filters (which clears the box). */
+  const searchedQuery = search.query;
+
+  // A key can be valid and still return nothing (quota, offline, a filter).
+  // Say so, and hand the query to YouTube itself.
+  useEffect(() => {
+    if (search.phase !== "results") return;
+    setNotice(
+      (search.results ?? []).length
+        ? ""
+        : "YouTube se results nahin mile (quota ya network). Neeche wale link se YouTube par search karo, phir link yahan paste kar do.",
+    );
+  }, [search.phase, search.results]);
+
+  const submitSearch = useCallback(async () => {
+    if (isUrlFilter(filter)) { await addLink(query); return; }
+    if (filter !== "all" && filter !== "online") return;
     const text = query.trim();
     if (!text || !searchKeyReady) return;
-    setBusy(true);
     // A search is an ONLINE act: the results are shown in the Online list, and
     // they stay there for the rest of the visit — "online filter mein vah
     // sabhi dikhenge jo user search karke dekh chuka hai".
     if (filter === "all") setFilter("online");
-    const found = await searchYouTube(text);
-    setResults(found);
-    setSearched(true);
-    setSearchedQuery(text);
-    // A key can be valid and still return nothing (quota, offline, a filter).
-    // Say so, and hand the query to YouTube itself.
-    setNotice(found.length ? "" : "YouTube se results nahin mile (quota ya network). Neeche wale link se YouTube par search karo, phir link yahan paste kar do.");
-    setBusy(false);
-  }, [filter, query, searchKeyReady]);
-
-  const submitSearch = useCallback(async () => {
-    if (isUrlFilter(filter)) { await addLink(query); return; }
-    if (filter === "all" || filter === "online") await runSearch();
-  }, [addLink, filter, query, runSearch]);
+    await search.search(text);
+  }, [addLink, filter, query, search, searchKeyReady]);
 
   const playResult = useCallback((track: MusicTrack) => {
     const added = addMusicLink(uid, track.url);
@@ -482,11 +501,26 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
   const shelves = musicShelvesForFilter(filter);
   const startOptions = musicStartOptionsVisible(filter, counts) && !query.trim();
   const densityMode: "list" | "grid" = density === "auto" ? (layout === "wide" ? "grid" : "list") : density;
+  /**
+   * The format button, self-convertible: ONE button, and its icon is the format
+   * that the very next tap gives you. There is no menu, no second option on
+   * screen — "options nahin dikhne chahiye, same button dobara dabane se dusra
+   * ho jaaye".
+   */
+  const flipDensity = useCallback(
+    () => setDensity(densityMode === "list" ? "grid" : "list"),
+    [densityMode],
+  );
   // The results belong to the ONLINE shelf: they stay listed while the learner
   // is on All or Online, whatever the search box currently says.
   const showResults = (filter === "all" || filter === "online") && searched;
   const noResults = showResults && results.length === 0 && searchKeyReady;
-  const showCardsToggle = shelves.includes("link") || showResults;
+  /** The format control rides with whatever is on screen: saved online songs,
+   *  the search's own results, or a search in flight (the flash scan's rows). */
+  const showCardsToggle = shelves.includes("link") || showResults || (searchLoading && !urlMode);
+  /** YouTube's own habit: the box has the caret, it is empty, and there is
+   *  something to come back to. */
+  const showHistory = !urlMode && searchFocused && !query.trim() && search.history.length > 0;
 
   const visibleSections = shelves
     .map((source) => ({ source, tracks: musicQueryFilter(shelfTracks(source), effectiveQuery) }))
@@ -508,12 +542,24 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
       >
         <span className={`relative flex min-w-0 flex-1 items-center rounded-full border border-slate-300 bg-white ${height} shadow-[0_2px_10px_rgba(15,23,42,0.06)] focus-within:border-slate-950 focus-within:ring-2 focus-within:ring-slate-950/10`}>
           {urlMode
-            ? <Link2 size={16} className="ml-3.5 shrink-0 text-slate-400" />
-            : <Search size={16} className="ml-3.5 shrink-0 text-slate-400" />}
+            ? <Link2 size={16} className="relative z-[1] ml-3.5 shrink-0 text-slate-400" />
+            : <Search size={16} className="relative z-[1] ml-3.5 shrink-0 text-slate-400" />}
+          {/* The same long sentence the Course Library's box carries, sliding
+              left and right while this box is empty and quiet. The moment the
+              learner taps in (or types), it steps aside for the filter's own
+              placeholder — "is filter mein kya search hota hai" — which is why
+              the input keeps its placeholder either way. */}
+          {!urlMode && !query && !searchFocused ? (
+            <span className="pointer-events-none absolute inset-y-0 left-9 right-24 z-0 flex items-center overflow-hidden rounded-full bg-white">
+              <SlidingSearchText text={STUDY_SEARCH_SENTENCE} />
+            </span>
+          ) : null}
           <input
             ref={searchRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
             placeholder={MUSIC_SEARCH_PLACEHOLDER[filter]}
             aria-label={urlMode ? "Paste a song link" : "Search the music library"}
             // Two names for the one URL box: `data-music-url` is this design's,
@@ -526,7 +572,7 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
               type="button"
               onClick={() => setQuery("")}
               aria-label="Clear the search box"
-              className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              className="relative z-[1] grid h-7 w-7 shrink-0 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
             >
               <X size={14} />
             </button>
@@ -540,39 +586,46 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
               data-music-url-add
               data-music-add-link
               aria-label="Add this link"
-              className="mr-1.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-950 text-white hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+              className="relative z-[1] mr-1.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-950 text-white hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
             >
               <ArrowRight size={16} />
             </button>
           ) : null}
+          {/* The Enter button, INSIDE the box on its right — and since it is the
+              form's own submit, the keyboard's Enter runs exactly the same
+              search. While the search is in flight it carries the spinner, and
+              the flash scan below holds the page. */}
+          {!urlMode && canSearchOnline && searchKeyReady ? (
+            <button
+              type="submit"
+              data-music-search-run
+              data-music-search-enter
+              disabled={searchLoading || !query.trim()}
+              aria-label="Search YouTube"
+              title="Search YouTube"
+              className={`relative z-[1] mr-1.5 grid shrink-0 place-items-center rounded-full bg-slate-950 text-white hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-40 ${compact ? "h-8 w-8" : "h-9 w-9"}`}
+            >
+              {searchLoading
+                ? <LoaderCircle size={15} className="animate-spin" />
+                : compact ? <Search size={15} /> : <CornerDownLeft size={16} />}
+            </button>
+          ) : null}
+          {!urlMode && canSearchOnline && !searchKeyReady ? (
+            // No API key: hand the query to YouTube itself. An ANCHOR, so it opens
+            // correctly in a browser, a PWA and the native shell alike.
+            <a
+              href={youTubeSearchUrl(query)}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-music-search-external
+              aria-label="Search this on YouTube"
+              className={`relative z-[1] mr-1.5 inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-slate-300 bg-white text-[11px] font-black text-slate-800 shadow-sm hover:bg-slate-50 ${compact ? "h-8 w-8" : "h-9 px-3"}`}
+            >
+              <ExternalLink size={15} />
+              {compact ? null : <span>YouTube</span>}
+            </a>
+          ) : null}
         </span>
-
-        {!urlMode && canSearchOnline && searchKeyReady ? (
-          <button
-            type="submit"
-            data-music-search-run
-            disabled={busy || !query.trim()}
-            className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-slate-950 text-[11px] font-black text-white shadow-md shadow-slate-200 hover:bg-slate-800 disabled:opacity-40 ${compact ? "h-10 w-10" : "h-11 px-[13px]"}`}
-          >
-            {busy ? <LoaderCircle size={15} className="animate-spin" /> : <Search size={15} />}
-            {compact ? null : <span>YouTube</span>}
-          </button>
-        ) : null}
-        {!urlMode && canSearchOnline && !searchKeyReady ? (
-          // No API key: hand the query to YouTube itself. An ANCHOR, so it opens
-          // correctly in a browser, a PWA and the native shell alike.
-          <a
-            href={youTubeSearchUrl(query)}
-            target="_blank"
-            rel="noopener noreferrer"
-            data-music-search-external
-            aria-label="Search this on YouTube"
-            className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-slate-300 bg-white text-[11px] font-black text-slate-800 shadow-sm hover:bg-slate-50 ${compact ? "h-10 w-10" : "h-11 px-[13px]"}`}
-          >
-            <ExternalLink size={15} />
-            {compact ? null : <span>YouTube</span>}
-          </a>
-        ) : null}
         {onOpenFullPage ? (
           <button
             type="button"
@@ -621,39 +674,54 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
             );
           })}
         </div>
+        {/* ONE button, and it converts itself: the glyph you see is the format
+            the next tap gives you. Nothing else is ever shown (owner brief). */}
         {showCardsToggle ? (
-          <span className="flex shrink-0 rounded-full border border-slate-200 bg-white p-1 shadow-[0_2px_10px_rgba(15,23,42,0.05)]" data-music-search-view>
-            <button
-              type="button"
-              onClick={() => setDensity("list")}
-              data-music-view-option="list"
-              aria-pressed={densityMode === "list"}
-              aria-label="List view"
-              className={`grid h-7 w-7 place-items-center rounded-full ${densityMode === "list" ? "bg-slate-950 text-white" : "text-slate-500 hover:bg-slate-100"}`}
-            >
-              <Rows3 size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setDensity("grid")}
-              data-music-view-option="grid"
-              aria-pressed={densityMode === "grid"}
-              aria-label="Thumbnail view"
-              className={`grid h-7 w-7 place-items-center rounded-full ${densityMode === "grid" ? "bg-slate-950 text-white" : "text-slate-500 hover:bg-slate-100"}`}
-            >
-              <LayoutGrid size={14} />
-            </button>
-          </span>
+          <button
+            type="button"
+            onClick={flipDensity}
+            data-music-search-view
+            data-music-search-format-toggle
+            data-music-search-format-next={densityMode === "list" ? "grid" : "list"}
+            aria-pressed={densityMode === "grid"}
+            aria-label={densityMode === "list" ? "Thumbnail view" : "List view"}
+            title={densityMode === "list" ? "Thumbnail view" : "List view"}
+            className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border shadow-[0_2px_10px_rgba(15,23,42,0.05)] transition ${
+              densityMode === "grid"
+                ? "border-slate-950 bg-slate-950 text-white hover:bg-slate-800"
+                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+            }`}
+          >
+            {densityMode === "list" ? <LayoutGrid size={15} /> : <Rows3 size={15} />}
+          </button>
         ) : null}
       </div>
     </div>
   );
 
+  /* Recent searches, exactly the shape YouTube's own search page uses —
+     * shown while the box has the caret and is still empty. */
+  const historyPanel = showHistory ? (
+    <SearchHistoryList
+      entries={search.history}
+      onPick={(entry) => { setQuery(entry); void search.search(entry); }}
+      onRemove={search.forget}
+      onClear={search.clearHistory}
+    />
+  ) : null;
+
   /** Every song list in the pane comes out of here — sections, empty page, options. */
   const body = () => {
+    if (searchLoading && !urlMode) {
+      // The flash scan: a full second even on the fastest network, and for as
+      // long as it really takes when the network is slow.
+      return <SearchFlashScan rows={5} label="YouTube par search ho raha hai" />;
+    }
+
     if (startOptions) {
       return (
         <div className="grid place-items-center px-3 py-6 text-center" data-music-start-options>
+          {historyPanel}
           <p className="text-lg font-black tracking-tight text-slate-950">{MUSIC_EMPTY_TITLE.all}</p>
           <p className="mt-1 max-w-[36ch] text-[11.5px] font-medium leading-5 text-slate-500">{MUSIC_FILTER_HINT.all}</p>
           <div className="mt-4 grid w-full max-w-sm gap-2.5">
@@ -681,6 +749,7 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
     if (!rowsVisible) {
       return (
         <>
+          {historyPanel}
           {noResults ? (
             <p className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800" data-music-no-results>
               YouTube se kuch nahin mila.{" "}
@@ -702,6 +771,7 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
 
     return (
       <>
+        {historyPanel}
         {noResults ? (
           <p className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800" data-music-no-results>
             YouTube se kuch nahin mila.{" "}
@@ -755,14 +825,14 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
     <button
       type="button"
       onClick={() => fileRef.current?.click()}
-      disabled={busy}
+      disabled={uploading}
       data-music-add-fab
       data-music-upload
       aria-label="Add music from this device"
       title="Add music from this device"
       className="absolute bottom-4 right-4 z-30 grid h-14 w-14 place-items-center rounded-full bg-slate-950 text-white shadow-[0_14px_34px_rgba(15,23,42,0.38)] transition hover:scale-105 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-60"
     >
-      {busy ? <LoaderCircle size={22} className="animate-spin" /> : <Plus size={24} />}
+      {uploading ? <LoaderCircle size={22} className="animate-spin" /> : <Plus size={24} />}
     </button>
   ) : null;
 

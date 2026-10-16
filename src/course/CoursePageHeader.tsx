@@ -15,17 +15,24 @@
 //     have one, inside the header, never floating in the scrolling body.
 //
 // The header paints no background of its own (transparent), so a page keeps
-// its own surface: the Resource Library in particular keeps its existing
-// background and appearance, untouched by this unification.
+// its own surface.
+//
+// A page may also render the strip with NO title of its own (2026-10-16): the
+// Resource Library moved its name, its icon and its count DOWN onto the page —
+// just under this strip, where the page scrolls — and gave this area to its
+// one rounded search box instead. `title` and `icon` are therefore optional:
+// with them the strip is the page's name row, without them it is the page's
+// own top strip (the Resource Library's search box).
 
 import type { CSSProperties, ReactNode } from "react";
 import "./coursePageHeader.css";
 
 export interface CoursePageHeaderProps {
-  /** The page name, shown bold beside its icon. */
-  title: string;
+  /** The page name, shown bold beside its icon. Omit on a page that carries
+   *  its name on the page itself (the Resource Library's search strip). */
+  title?: string;
   /** The page's icon (render at 20px so every header lines up). */
-  icon: ReactNode;
+  icon?: ReactNode;
   /** Optional control before the title, e.g. a back button. */
   leading?: ReactNode;
   /** Right-hand actions, e.g. the MASTER / SELF control. */
@@ -54,10 +61,12 @@ export default function CoursePageHeader({
       style={style}
     >
       {leading}
-      <h2 className={`course-page-header__title ${titleClassName}`.trim()} data-course-page-title>
-        <span className="course-page-header__icon" aria-hidden="true">{icon}</span>
-        <span className="course-page-header__name">{title}</span>
-      </h2>
+      {title ? (
+        <h2 className={`course-page-header__title ${titleClassName}`.trim()} data-course-page-title>
+          <span className="course-page-header__icon" aria-hidden="true">{icon}</span>
+          <span className="course-page-header__name">{title}</span>
+        </h2>
+      ) : null}
       {children ? <div className="course-page-header__actions">{children}</div> : null}
     </header>
   );

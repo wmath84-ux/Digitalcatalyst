@@ -155,8 +155,12 @@ test('artwork is never washed over — a song without a picture gets an audio pl
   assert.match(list, /variant: "list" \| "grid"/);
   assert.match(list, /repeat\(auto-fit, minmax\(min\(215px, 100%\), 1fr\)\)/);
   assert.match(panel, /variant=\{source === "link" && densityMode === "grid" \? "grid" : "list"\}/);
-  assert.match(panel, /data-music-view-option="list"/);
-  assert.match(panel, /data-music-view-option="grid"/);
+  // ONE control, and it converts ITSELF: the glyph on it is the format the
+  // very next tap gives you. No menu, no second option on screen (owner brief).
+  assert.match(panel, /data-music-search-format-toggle/);
+  assert.match(panel, /data-music-search-format-next=\{densityMode === "list" \? "grid" : "list"\}/);
+  assert.match(panel, /const flipDensity = useCallback\(/);
+  assert.doesNotMatch(panel, /data-music-view-option/);
 });
 
 test('a tap opens the lesson player at FULL AREA — no card, back arrow, library glyph', () => {
@@ -250,8 +254,34 @@ test('search is key-gated, and without a key it hands the query to YouTube itsel
   assert.match(search, /endpoint\.searchParams\.set\("type", "video"\)/);
 });
 
+test('the search box wears the SHARED study-search experience, not one of its own', () => {
+  // ONE kit for both libraries — the Course Library's search page and this pane
+  // cannot drift apart: the same sentence, the same one-second floor, the same
+  // YouTube-shaped recent searches.
+  assert.match(panel, /import \{\n  SearchFlashScan, SearchHistoryList, SlidingSearchText, STUDY_SEARCH_SENTENCE, useStudySearch,\n\} from "\.\/searchExperience";/);
+  assert.match(panel, /useStudySearch<MusicTrack\[\]>\(\{ namespace: "course-music", run: runMusicSearch \}\)/);
+  assert.match(panel, /const searchLoading = search\.phase === "loading";/);
+  assert.match(panel, /const searched = search\.phase === "results";/);
+  // The long sentence slides inside the box while it is empty and quiet.
+  assert.match(panel, /<SlidingSearchText text=\{STUDY_SEARCH_SENTENCE\} \/>/);
+  assert.match(panel, /!urlMode && !query && !searchFocused/);
+  // The Enter button is INSIDE the pill, on its right, and it is the form's own
+  // submit — so the keyboard's Enter runs exactly the same search.
+  assert.match(panel, /data-music-search-run\n              data-music-search-enter/);
+  assert.match(panel, /disabled=\{searchLoading \|\| !query\.trim\(\)\}/);
+  // In flight, the flash scan holds the page…
+  assert.match(panel, /if \(searchLoading && !urlMode\) \{/);
+  assert.match(panel, /<SearchFlashScan rows=\{5\} label="YouTube par search ho raha hai" \/>/);
+  // …and while the box is empty with the caret, YouTube's own history shows.
+  assert.match(panel, /const showHistory = !urlMode && searchFocused && !query\.trim\(\) && search\.history\.length > 0;/);
+  assert.match(panel, /<SearchHistoryList\n      entries=\{search\.history\}/);
+  // The placeholder still follows the FILTER (the sentence is an overlay, not
+  // the placeholder itself) — the box keeps saying what this filter searches.
+  assert.match(panel, /placeholder=\{MUSIC_SEARCH_PLACEHOLDER\[filter\]\}/);
+});
+
 test('a key search that finds nothing hands the query back to YouTube', () => {
-  assert.match(panel, /setNotice\(found\.length \? "" : "YouTube se results nahin mile/);
+  assert.match(panel, /setNotice\(\n      \(search\.results \?\? \[\]\)\.length\n        \? ""\n        : "YouTube se results nahin mile/);
   assert.match(panel, /data-music-no-results/);
   assert.match(panel, /<a href=\{youTubeSearchUrl\(query\)\} target="_blank" rel="noopener noreferrer" data-music-search-external/);
 });

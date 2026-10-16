@@ -1,13 +1,15 @@
-// Owner brief (5 points):
-//   1. Resource Library ka search box hatao — and keep the rest of its
-//      design/appearance unchanged.
+// Owner brief (5 points, 2026-10-15 — amended 2026-10-16):
+//   1. The Resource Library's OLD dead search styles were removed, and on
+//      2026-10-16 the owner asked for a REAL one: one box in the header that
+//      reaches the whole library AND YouTube, opening a nested search page.
+//      The rest of its design/appearance stays unchanged.
 //   2. Paid-page listing ka design module resources ki library ke bilkul
 //      same karo.
 //   3. Paid resources mein folder ke naam se pehle lock icon dikhao.
 //   4. Paid resources ka price clearly dikhao.
 //
-// These tests pin exactly that: no search anywhere near the Resource
-// Library (markup, state, or leftover styles), the Paid listing rendered
+// These tests pin exactly that: the library's search is the SHARED experience
+// (no dead, hand-rolled search state anywhere), the Paid listing rendered
 // through the library's own BranchedMenu with the library's own props and
 // row marks, a lock in the folder head's icon slot (before the name), and
 // a clear price mark on every paid folder (and its Unlock leaf).
@@ -21,18 +23,45 @@ const libraryCss = read('src/course/courseResourceLibrary.css');
 const overlay = read('src/course/CourseOverlay.tsx');
 const menu = read('src/components/branched-menu/BranchedMenu.tsx');
 
-/* ── 1 · No search box in the Resource Library ─────────────────────────── */
+/* ── 1 · The library's search is the SHARED one ────────────────────────── */
 
-test('the Resource Library renders no search box and carries no search state', () => {
-  assert.doesNotMatch(library, /LibrarySearchBar|searchQuery|data-library-search|library-search|type="search"|placeholder="Search/);
-  // The header + branched listing that remain are the existing design.
-  assert.match(library, /<CoursePageHeader\n        title="Resource Library"/);
+test('the Resource Library searches through the shared kit, and names itself on the page', () => {
+  // The header no longer carries the name/icon/count: they are the page's own
+  // title row now (owner brief, 2026-10-16), and the strip holds the search box.
+  assert.match(library, /data-library-title-row/);
+  assert.match(library, /data-course-page-title>Resource Library<\/h2>/);
+  assert.match(library, /library-header__count/);
+  assert.match(library, /data-library-search-open-button/);
+  assert.match(library, /<SlidingSearchText text=\{STUDY_SEARCH_SENTENCE\}/);
+  // The nested search page: back arrow, box with Enter inside it, the
+  // self-convertible format button — and the shared loading/history pieces.
+  assert.match(library, /data-library-search-back/);
+  assert.match(library, /data-library-search-enter/);
+  assert.match(library, /data-library-search-format-toggle/);
+  assert.match(library, /<SearchFlashScan rows=\{5\}/);
+  assert.match(library, /<SearchHistoryList/);
+  // ONE search, two answers: the library's own rows and YouTube.
+  assert.match(library, /matchResources\(/);
+  assert.match(library, /await searchYouTube\(text\)/);
+  assert.match(library, /useStudySearch<LibrarySearchResults>\(\{\n    namespace: "course-library",/);
+  // No hand-rolled search state of its own anywhere.
+  assert.doesNotMatch(library, /searchQuery|setSearchQuery/);
+  // The header + branched listing that were already there are untouched.
+  assert.match(library, /<CoursePageHeader/);
   assert.match(library, /<BranchedMenu/);
   assert.match(library, /data-course-library-menu/);
 });
 
-test('no dead search styles remain in the library sheet; the rest is untouched', () => {
-  assert.doesNotMatch(libraryCss, /\.library-search|library-no-results/);
+test('the library sheet owns the search layout, and no dead search styles', () => {
+  // The box's own layout is this sheet's; its shared LOOK is the kit's.
+  assert.match(libraryCss, /\.library-searchbox \{/);
+  assert.match(libraryCss, /\.library-searchbar__enter \{/);
+  assert.match(libraryCss, /\.library-search-page \{/);
+  assert.match(libraryCss, /\.library-title-row \{/);
+  assert.doesNotMatch(libraryCss, /library-no-results|library-search-input|LibrarySearchBar/);
+  // The page is PURE white, header and body included (owner brief).
+  assert.match(libraryCss, /\.course-resource-library \{[\s\S]*?background: #ffffff;/);
+  assert.match(libraryCss, /\.library-body \{[\s\S]*?background: #ffffff;/);
   // The existing layout/appearance rules are all still there.
   for (const kept of ['.course-resource-library {', '.library-body {', '.course-library__menu {', '.library-header__count {', '.course-library__lock {']) {
     assert.ok(libraryCss.includes(kept), `library sheet must keep ${kept}`);

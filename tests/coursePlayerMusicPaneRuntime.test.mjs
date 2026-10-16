@@ -571,9 +571,24 @@ test("online search keeps what the learner looked at, with clean artwork", async
   assert.equal(q("[data-music-searchbar]").getAttribute("data-music-search-mode"), "api");
   assert.ok(Boolean(q("[data-music-search-run]")), "with a key the pane searches inside itself");
 
+  // The Enter control is INSIDE the pill, on its right — and it is the form's
+  // own submit, so the keyboard's Enter runs the very same search.
+  const pill = q("[data-music-searchbar] > span");
+  const enter = q("[data-music-search-run]");
+  assert.equal(Boolean(pill && enter && pill.contains(enter)), true, "the Enter button lives inside the box");
+  assert.equal(enter.getAttribute("type"), "submit");
+
   typeInto(q("[data-music-search]"), "koi bhi gaana");
-  await click(q("[data-music-search-run]"));
-  await settle();
+  const startedAt = Date.now();
+  await click(enter);
+  // A full second of flash scan even though this fetch answers instantly…
+  await settle(60);
+  assert.equal(Boolean(q("[data-dc-flash-scan]")), true, "the flash scan holds the page while the search is in flight");
+  assert.equal(Boolean(q("[data-music-result]")), false, "no result may land before the floor");
+  // …and then the results, with the scan gone.
+  await settle(1100);
+  assert.ok(Date.now() - startedAt >= 1000, "the one-second floor really elapsed");
+  assert.equal(Boolean(q("[data-dc-flash-scan]")), false, "the scan ends when the results do");
 
   // A search IS an online act: the results land in the online list.
   assert.equal(q("[data-course-music-panel]").getAttribute("data-music-filter"), "online");
@@ -647,7 +662,7 @@ test("with no key the query goes to YouTube itself — and never from the URL bo
   fetchResponder = () => ({ ok: false, status: 403, json: () => Promise.resolve({}) });
   typeInto(q("[data-music-search]"), "quota khatam");
   await click(q("[data-music-search-run]"));
-  await settle();
+  await settle(1200);
   assert.ok(Boolean(q("[data-music-no-results]")), "the pane says so");
   assert.match(text("[data-music-notice]"), /quota ya network/);
   assert.equal(q("[data-music-no-results] a").getAttribute("href"), "https://www.youtube.com/results?search_query=quota%20khatam");
@@ -676,4 +691,108 @@ test("the pane's shape follows the PANE, not the viewport", async () => {
   assert.equal(q("[data-course-music-panel]").getAttribute("data-music-layout"), "wide");
   assert.equal(q('[data-music-list="grid"]')?.getAttribute("data-music-list"), "grid", "a wide pane shows thumbnail cards");
   assert.equal(q("[data-music-open-library]"), null, "the full library page needs no shortcut for itself");
+});
+
+test("an empty library search remembers the query, and shows it back YouTube-style", async () => {
+  window.localStorage.clear();
+  mount();
+  await settle();
+  window.localStorage.setItem("dc.music.youtubeKey", "test-key");
+  await act(async () => { window.dispatchEvent(new window.Event("dc:music-youtube-key")); });
+  await settle();
+  fetchResponder = () => ({
+    ok: true,
+    json: () => Promise.resolve({
+      items: [{ id: { videoId: "dQw4w9WgXcQ" }, snippet: { title: "Never Gonna Give You Up", channelTitle: "Rick Astley" } }],
+    }),
+  });
+
+  await click(q('[data-music-filter="online"]'));
+  await settle();
+  typeInto(q("[data-music-search]"), "purane gaane");
+  await click(q("[data-music-search-run]"));
+  await settle(1200);
+  assert.equal(qa("[data-music-result]").length, 1);
+
+  // The query is on this device's own history list…
+  const stored = JSON.parse(window.localStorage.getItem("dc.searchHistory.v1.course-music"));
+  assert.deepEqual(stored, ["purane gaane"]);
+
+  // …and clearing the box with the caret in it brings it back, in YouTube's
+  // own shape: a heading, one row per search, a remove control, and Clear.
+  await click(q('[data-music-searchbar] button[aria-label="Clear the search box"]'));
+  await act(async () => { q("[data-music-search]").focus(); });
+  await settle();
+  assert.equal(Boolean(q("[data-dc-search-history]")), true, "the history list appears");
+  assert.equal(Boolean(q("[data-dc-history-clear]")), true, "…with YouTube's Clear button");
+  const rows = qa("[data-dc-history-entry]");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].getAttribute("data-dc-history-entry"), "purane gaane");
+  assert.equal(Boolean(q("[data-dc-history-pick]")), true);
+
+  // Picking one runs it again — through the very same search.
+  await click(q("[data-dc-history-pick]"));
+  await settle(1200);
+  assert.equal(qa("[data-music-result]").length, 1);
+  assert.equal(q("[data-music-search]").value, "purane gaane");
+});
+
+test("the format button converts ITSELF: one tap, the other listing", async () => {
+  window.localStorage.clear();
+  mount({ courseAudio: [] });
+  await settle();
+  window.localStorage.setItem("dc.music.youtubeKey", "test-key");
+  await act(async () => { window.dispatchEvent(new window.Event("dc:music-youtube-key")); });
+  await settle();
+  fetchResponder = () => ({
+    ok: true,
+    json: () => Promise.resolve({
+      items: [
+        { id: { videoId: "dQw4w9WgXcQ" }, snippet: { title: "Never Gonna Give You Up", channelTitle: "Rick Astley" } },
+        { id: { videoId: "9bZkp7q19f0" }, snippet: { title: "GANGNAM STYLE", channelTitle: "officialpsy" } },
+      ],
+    }),
+  });
+  await click(q('[data-music-filter="online"]'));
+  await settle();
+  typeInto(q("[data-music-search]"), "thoda gaana");
+  await click(q("[data-music-search-run]"));
+  await settle(1200);
+
+  assert.equal(qa("[data-music-result]").length, 2);
+  // The listing wears one of the two formats — the music library's own two…
+  const first = q('[data-music-list="list"]') ? "list" : "grid";
+  const other = first === "list" ? "grid" : "list";
+  // …and the ONE control on the tray promises the OTHER one, with nothing else
+  // on screen: no menu, no second option.
+  const toggle = q("[data-music-search-format-toggle]");
+  assert.ok(Boolean(toggle), "a single self-convertible control");
+  assert.equal(toggle.getAttribute("data-music-search-format-next"), other);
+  assert.equal(Boolean(q("[data-music-view-option]")), false, "no options are ever shown");
+
+  await click(toggle);
+  await settle();
+  assert.equal(Boolean(q(`[data-music-list="${other}"]`)), true, "the listing converted with the button");
+  assert.equal(q("[data-music-search-format-toggle]").getAttribute("data-music-search-format-next"), first);
+  assert.equal(qa("[data-music-result]").length, 2);
+
+  await click(q("[data-music-search-format-toggle]"));
+  await settle();
+  assert.equal(Boolean(q(`[data-music-list="${first}"]`)), true, "and back");
+});
+
+test("the idle box slides the shared sentence, and the filter's placeholder returns on focus", async () => {
+  window.localStorage.clear();
+  mount();
+  await settle();
+  const slide = q("[data-dc-slide]");
+  assert.ok(Boolean(slide), "the long sentence rides in the box");
+  assert.match(slide.textContent, /Search your favourite lecture on YouTube/);
+  // jsdom has no layout engine: width 0 means it never had to slide.
+  assert.equal(q("[data-music-search]").hasAttribute("data-dc-slide-active"), false);
+
+  await act(async () => { q("[data-music-search]").focus(); });
+  await settle();
+  assert.equal(Boolean(q("[data-dc-slide]")), false, "the caret hands the box back to the filter's own placeholder");
+  assert.equal(q("[data-music-search]").getAttribute("placeholder"), "Songs, videos, course — dhoondo…");
 });

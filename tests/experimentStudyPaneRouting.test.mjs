@@ -47,8 +47,11 @@ test('module selection, personal selection, initial/deep-link and resume paths r
   assert.match(player, /!studyExperiment.personal && !completedIds.has/);
   assert.match(player, /Back to experiments/);
 });
-test('module search is removed, not merely hidden; expansion and access guards stay', () => {
-  assert.doesNotMatch(library, /LibrarySearchBar|searchQuery|data-library-search/);
+test('module search is the SHARED box now; expansion and access guards stay', () => {
+  // The old dead filter state never came back — the library searches through
+  // the shared kit (owner brief, 2026-10-16).
+  assert.doesNotMatch(library, /LibrarySearchBar|searchQuery|setSearchQuery/);
+  assert.match(library, /useStudySearch<LibrarySearchResults>/);
   assert.match(library, /const visibleEntries = built.entries/);
   assert.match(library, /useBranchedOpen\(tree\)/);
   assert.match(library, /resource.locked/);
