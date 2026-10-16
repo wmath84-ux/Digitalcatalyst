@@ -221,30 +221,44 @@ test('the placement button is tablet/desktop only and its dropdown opens into fr
   assert.equal(button.getAttribute('data-side'), 'down', 'navigation at the top → the menu opens down');
 
   await act(() => button.click());
-  const menu = host.querySelector('[data-dc-header-nav-menu]');
+  // The placement dropdown is portalled to <body> so a clipped ancestor can
+  // never truncate it — the test queries the document, not the local host.
+  // The layout effect uses requestAnimationFrame for its final measure, so
+  // give it a tick to run before reading the inline coordinates.
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const menu = document.querySelector('[data-dc-header-nav-menu]');
   assert.ok(menu, 'pressing it opens the dropdown');
+  assert.equal(menu.parentElement === document.body, true, 'the menu is portalled straight into <body>');
   assert.equal(menu.getAttribute('data-side'), 'down');
-  const options = [...host.querySelectorAll('[data-dc-header-nav-option]')];
+  // The menu's own style carries the fixed coordinates (top/left in px) that
+  // the React side just measured for the button + the menu itself.
+  assert.equal(menu.style.position, 'fixed', 'the menu is fixed-positioned, anchored to the button');
+  assert.ok(/^\d+(\.\d+)?px$/.test(menu.style.top), 'the menu sits at a measured `top` in px');
+  assert.ok(/^\d+(\.\d+)?px$/.test(menu.style.left), 'the menu sits at a measured `left` in px');
+  const options = [...menu.querySelectorAll('[data-dc-header-nav-option]')];
   assert.deepEqual(
     options.map((option) => option.getAttribute('data-dc-header-nav-option')),
     ['header', 'left', 'right', 'bottom'],
     'all four places',
   );
-  assert.equal(host.querySelector('[data-dc-header-nav-option="header"]').getAttribute('data-active'), 'true');
+  assert.equal(menu.querySelector('[data-dc-header-nav-option="header"]').getAttribute('data-active'), 'true');
 
-  await act(() => host.querySelector('[data-dc-header-nav-option="right"]').click());
+  await act(() => menu.querySelector('[data-dc-header-nav-option="right"]').click());
   assert.equal(Placement.getFooterNavigationPlacement(), 'right', 'the choice is stored');
-  assert.equal(host.querySelector('[data-dc-header-nav-menu]'), null, 'and the dropdown closes itself');
+  assert.equal(document.querySelector('[data-dc-header-nav-menu]'), null, 'and the dropdown closes itself');
 
   // The navigation re-renders at its new home: a right rail, whose dropdown
   // opens toward the LEFT (the free side).
   await act(() => render('right'));
   assert.equal(host.querySelector('[data-dc-header-nav]').getAttribute('data-placement'), 'right');
   await act(() => host.querySelector('[data-dc-header-nav-placement]').click());
-  assert.equal(host.querySelector('[data-dc-header-nav-menu]').getAttribute('data-side'), 'left');
+  assert.equal(document.querySelector('[data-dc-header-nav-menu]').getAttribute('data-side'), 'left');
 
-  await act(() => document.body.dispatchEvent(new dom.window.PointerEvent('pointerdown', { bubbles: true })));
-  assert.equal(host.querySelector('[data-dc-header-nav-menu]'), null, 'an outside click puts it away');
+  // The dropdown closes itself on an outside pointerdown — even when the click
+  // arrives OUTSIDE the navigation's own wrapper, because the menu lives in
+  // <body>, not the navigation.
+  await act(() => host.dispatchEvent(new dom.window.PointerEvent('pointerdown', { bubbles: true })));
+  assert.equal(document.querySelector('[data-dc-header-nav-menu]'), null, 'an outside click puts it away');
 
   // Bottom and left, for the other two directions.
   await act(() => render('bottom'));

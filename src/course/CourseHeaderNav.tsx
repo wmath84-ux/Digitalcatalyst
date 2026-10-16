@@ -35,7 +35,8 @@
 // Mobile never mounts this component: the player only places the navigation
 // this way in the plus-deck layout, which starts at 768px.
 
-import { useEffect, useRef, useState, type ComponentType, type CSSProperties, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ComponentType, type CSSProperties, type KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 import { Move, PanelBottom, PanelLeft, PanelRight, PanelTop } from "lucide-react";
 import { TABS, type DockTab } from "./CourseOverlay";
 import { useCourseKeyboard } from "./useCourseKeyboard";
@@ -241,6 +242,12 @@ export default function CourseHeaderNav({ tab, onTabChange, hiddenTabs = [], pla
  * The owner's placement button: four choices, and a dropdown that always opens
  * toward the space the navigation is NOT using. It travels with the navigation,
  * which is what makes the direction rule true wherever the navigation lives.
+ *
+ * The dropdown is portalled to `document.body` and positioned in FIXED
+ * coordinates against the button, so a clipped container (`overflow: hidden`)
+ * can never truncate it — and the owner's "kabhi screen ke bahar na jaye" rule
+ * now holds even when the navigation is itself parked in a corner with no room
+ * on its preferred side.
  */
 export function FooterNavigationPlacementButton({ placement }: { placement: FooterNavigationPlacement }) {
   const enabled = useFooterNavigationPlacementEnabled();
@@ -248,24 +255,113 @@ export function FooterNavigationPlacementButton({ placement }: { placement: Foot
   const [open, setOpen] = useState(false);
   const [fitSide, setFitSide] = useState<FooterNavigationMenuSide | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  // Live coordinates of the portalled menu (set after layout so the menu can
+  // be nudged away from any viewport edge its preferred side would clip).
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; side: FooterNavigationMenuSide } | null>(null);
 
   useEffect(() => {
     if (!open) return undefined;
     const onPointerDown = (event: Event) => {
       const target = event.target as Element | null;
-      if (target && wrapRef.current?.contains(target)) return;
+      // Inside the wrap (button) or inside the portalled menu → keep open.
+      if (target && (wrapRef.current?.contains(target) || menuRef.current?.contains(target))) return;
       setOpen(false);
     };
     const onKeyDown = (event: KeyboardEvent | globalThis.KeyboardEvent) => {
       if ((event as globalThis.KeyboardEvent).key === "Escape") setOpen(false);
     };
+    // Window resize / scroll can shift the button out from under a fixed
+    // menu, so we close the dropdown whenever the layout moves.
+    const closeOnLayoutMove = () => setOpen(false);
     document.addEventListener("pointerdown", onPointerDown, true);
     document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", closeOnLayoutMove);
+    window.addEventListener("scroll", closeOnLayoutMove, true);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", closeOnLayoutMove);
+      window.removeEventListener("scroll", closeOnLayoutMove, true);
     };
   }, [open]);
+
+  // After `open` flips on, measure the actual menu (its real height depends on
+  // the four buttons + the localized labels) and pin it on screen — the owner's
+  // "kabhi screen ke bahar na jaye" rule, kept honest with the menu's own box.
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuPos(null);
+      return;
+    }
+    const placeMenu = () => {
+      const btn = buttonRef.current;
+      const menu = menuRef.current;
+      if (!btn || !menu) return;
+      const preferred = fitSide ?? footerNavigationMenuSide(placement);
+      const rect = btn.getBoundingClientRect();
+      const menuRect = menu.getBoundingClientRect();
+      const viewportW = window.innerWidth || document.documentElement.clientWidth;
+      const viewportH = window.innerHeight || document.documentElement.clientHeight;
+      const margin = 8; // never let the menu kiss the viewport edge
+      const fits = (side: FooterNavigationMenuSide): boolean => {
+        switch (side) {
+          case "down":
+            return rect.bottom + 6 + menuRect.height <= viewportH - margin;
+          case "up":
+            return rect.top - 6 - menuRect.height >= margin;
+          case "right":
+            return rect.right + 6 + menuRect.width <= viewportW - margin;
+          case "left":
+            return rect.left - 6 - menuRect.width >= margin;
+          default:
+            return false;
+        }
+      };
+      // Order of preference: the owner's rule first, then the matched fit-side
+      // fallback list, then the remaining sides. The first one that actually
+      // fits in the viewport wins.
+      const order: FooterNavigationMenuSide[] = [
+        preferred,
+        ...FOOTER_NAVIGATION_MENU_SIDE_FALLBACKS[preferred].filter((s) => s !== preferred),
+      ];
+      const chosen = order.find(fits) ?? preferred;
+      // Resolve concrete coordinates for the chosen side. The menu sits past
+      // the button on its axis, anchored to the button's far edge (its inner
+      // edge on the side we open toward), and nudged back into the viewport if
+      // the far edge would otherwise overflow.
+      let top = 0;
+      let left = 0;
+      switch (chosen) {
+        case "down": {
+          top = Math.min(Math.max(margin, rect.bottom + 6), viewportH - menuRect.height - margin);
+          left = Math.min(Math.max(margin, rect.right - menuRect.width), viewportW - menuRect.width - margin);
+          break;
+        }
+        case "up": {
+          top = Math.max(margin, rect.top - 6 - menuRect.height);
+          left = Math.min(Math.max(margin, rect.right - menuRect.width), viewportW - menuRect.width - margin);
+          break;
+        }
+        case "right": {
+          top = Math.min(Math.max(margin, rect.bottom - menuRect.height), viewportH - menuRect.height - margin);
+          left = Math.min(margin + viewportW - menuRect.width, rect.right + 6);
+          break;
+        }
+        case "left": {
+          top = Math.min(Math.max(margin, rect.bottom - menuRect.height), viewportH - menuRect.height - margin);
+          left = Math.max(margin, rect.left - 6 - menuRect.width);
+          break;
+        }
+      }
+      setMenuPos({ top, left, side: chosen });
+    };
+    placeMenu();
+    // Re-measure once fonts/styles settle so the values above are real.
+    const raf = window.requestAnimationFrame(placeMenu);
+    return () => window.cancelAnimationFrame(raf);
+  }, [open, fitSide, placement]);
 
   // The device gate: tablet/desktop only, and it closes itself again if the
   // window shrinks back to a phone width.
@@ -274,11 +370,18 @@ export function FooterNavigationPlacementButton({ placement }: { placement: Foot
   const side = footerNavigationMenuSide(placement);
   // Closed: the button always shows the owner's rule for where it sits. Open:
   // the fitted side, so the dropdown itself can never leave the screen.
-  const openingSide = open && fitSide ? fitSide : side;
+  const openingSide = open && menuPos ? menuPos.side : side;
+
+  // Portalled — the menu MUST live outside the navigation wrapper, otherwise a
+  // clipped ancestor (`overflow: hidden`, the desktop shell's frame) would chop
+  // it the moment it overflows the wrap's box. SSR/no-DOM environments get the
+  // same fallback the other portal callers in the codebase use.
+  const portalTarget = typeof document !== "undefined" ? document.body : null;
 
   return (
     <div ref={wrapRef} data-dc-header-nav-placement-wrap className="dc-header-nav__place">
       <button
+        ref={buttonRef}
         type="button"
         data-dc-header-nav-placement
         data-side={openingSide}
@@ -299,42 +402,58 @@ export function FooterNavigationPlacementButton({ placement }: { placement: Foot
         <span className="dc-header-nav__place-text">Place</span>
       </button>
 
-      {open ? (
-        <div
-          data-dc-header-nav-menu
-          data-side={openingSide}
-          role="menu"
-          aria-label="Place the footer navigation"
-          className="dc-header-nav__menu"
-        >
-          <p data-dc-header-nav-menu-title className="dc-header-nav__menu-title">
-            Footer navigation
-          </p>
-          {FOOTER_NAVIGATION_PLACEMENTS.map((option) => {
-            const Icon = PLACEMENT_ICON[option];
-            const isCurrent = current === option;
-            return (
-              <button
-                key={option}
-                type="button"
-                role="menuitemradio"
-                aria-checked={isCurrent ? "true" : "false"}
-                data-dc-header-nav-option={option}
-                data-active={isCurrent ? "true" : "false"}
-                className="dc-header-nav__option"
-                onClick={() => {
-                  setFooterNavigationPlacement(option);
-                  setOpen(false);
-                }}
-              >
-                <Icon size={15} aria-hidden />
-                <span className="dc-header-nav__option-label">{FOOTER_NAVIGATION_PLACEMENT_LABEL[option]}</span>
-                <small className="dc-header-nav__option-hint">{FOOTER_NAVIGATION_PLACEMENT_HINT[option]}</small>
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
+      {open && portalTarget
+        ? createPortal(
+            <div
+              ref={menuRef}
+              data-dc-header-nav-menu
+              data-side={openingSide}
+              data-portal="placement"
+              role="menu"
+              aria-label="Place the footer navigation"
+              className="dc-header-nav__menu"
+              style={
+                menuPos
+                  ? ({
+                      position: "fixed",
+                      top: `${menuPos.top}px`,
+                      left: `${menuPos.left}px`,
+                      right: "auto",
+                      bottom: "auto",
+                    } as CSSProperties)
+                  : { visibility: "hidden" as const }
+              }
+            >
+              <p data-dc-header-nav-menu-title className="dc-header-nav__menu-title">
+                Footer navigation
+              </p>
+              {FOOTER_NAVIGATION_PLACEMENTS.map((option) => {
+                const Icon = PLACEMENT_ICON[option];
+                const isCurrent = current === option;
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={isCurrent ? "true" : "false"}
+                    data-dc-header-nav-option={option}
+                    data-active={isCurrent ? "true" : "false"}
+                    className="dc-header-nav__option"
+                    onClick={() => {
+                      setFooterNavigationPlacement(option);
+                      setOpen(false);
+                    }}
+                  >
+                    <Icon size={15} aria-hidden />
+                    <span className="dc-header-nav__option-label">{FOOTER_NAVIGATION_PLACEMENT_LABEL[option]}</span>
+                    <small className="dc-header-nav__option-hint">{FOOTER_NAVIGATION_PLACEMENT_HINT[option]}</small>
+                  </button>
+                );
+              })}
+            </div>,
+            portalTarget,
+          )
+        : null}
     </div>
   );
 }

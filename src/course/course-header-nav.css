@@ -118,41 +118,51 @@
 }
 
 .dc-header-nav__menu {
-  position: absolute;
-  z-index: 80;
+  /* The placement dropdown is PORTALLED to <body> (see CourseHeaderNav.tsx):
+     a fixed-positioned box, anchored to the button with pixel-precise coords
+     so a clipped parent (`overflow: hidden`, the desktop shell's frame) can
+     never truncate it, and so the owner's "kabhi screen ke bahar na jaye"
+     rule stays honest when the navigation itself is parked in a corner. */
+  position: fixed;
+  z-index: 120;
   display: grid;
   gap: 4px;
   width: 232px;
   max-width: min(86vw, 232px);
   padding: 8px;
   border-radius: 14px;
-  background: var(--dc-chrome-glass, rgba(12, 14, 20, 0.92));
-  backdrop-filter: var(--dc-chrome-glass-blur, blur(18px));
-  -webkit-backdrop-filter: var(--dc-chrome-glass-blur, blur(18px));
+  /* The owner's "background thoda blur karo kyunki text dekhne mein problem ho
+     rahi hai" rule — the placement dropdown now wears a DEDICATED, deeper
+     frost than the rest of the chrome, so its labels stay readable against any
+     gradient or background the navigation sits over (and the four choice rows
+     have their own tinted plate, doubling the contrast for the option text). */
+  background: color-mix(in srgb, var(--dc-chrome-glass, rgba(12, 14, 20, 0.92)) 88%, rgb(8 10 16 / 0.86));
+  backdrop-filter: var(--dc-chrome-glass-blur, blur(18px)) saturate(1.5);
+  -webkit-backdrop-filter: var(--dc-chrome-glass-blur, blur(18px)) saturate(1.5);
   border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
-  box-shadow: var(--dc-chrome-glass-rim), 0 18px 44px rgba(2, 6, 16, 0.42);
+  box-shadow: var(--dc-chrome-glass-rim), 0 18px 44px rgba(2, 6, 16, 0.55);
   color: var(--course-text, #f8fafc);
 }
 
-/* The four directions: top → down, bottom → up, left → right, right → left. */
+/* The four directions are now driven by inline `top`/`left` (the React side
+   measures the button + the menu and pins both inside the viewport), so the
+   only thing the data-side attribute does today is flip a soft accent on the
+   menu's leading edge — a thin coloured stripe that points back at the
+   navigation. */
 .dc-header-nav__menu[data-side="down"] {
-  top: calc(100% + 6px);
-  right: 0;
+  box-shadow: var(--dc-chrome-glass-rim), inset 0 1px 0 0 color-mix(in srgb, #6366f1 30%, transparent), 0 18px 44px rgba(2, 6, 16, 0.55);
 }
 
 .dc-header-nav__menu[data-side="up"] {
-  bottom: calc(100% + 6px);
-  right: 0;
+  box-shadow: var(--dc-chrome-glass-rim), inset 0 -1px 0 0 color-mix(in srgb, #6366f1 30%, transparent), 0 18px 44px rgba(2, 6, 16, 0.55);
 }
 
 .dc-header-nav__menu[data-side="right"] {
-  left: calc(100% + 6px);
-  top: 0;
+  box-shadow: var(--dc-chrome-glass-rim), inset 1px 0 0 0 color-mix(in srgb, #6366f1 30%, transparent), 0 18px 44px rgba(2, 6, 16, 0.55);
 }
 
 .dc-header-nav__menu[data-side="left"] {
-  right: calc(100% + 6px);
-  top: 0;
+  box-shadow: var(--dc-chrome-glass-rim), inset -1px 0 0 0 color-mix(in srgb, #6366f1 30%, transparent), 0 18px 44px rgba(2, 6, 16, 0.55);
 }
 
 .dc-header-nav__menu-title {
@@ -161,7 +171,7 @@
   font-weight: 900;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  opacity: 0.6;
+  opacity: 0.7;
 }
 
 .dc-header-nav__option {
@@ -173,10 +183,13 @@
   padding: 7px 8px;
   border-radius: 10px;
   border: 1px solid transparent;
-  background: color-mix(in srgb, currentColor 6%, transparent);
+  /* Each row wears its own plate, so the label/hint sit on a solid colour even
+     if the menu sits over a bright page — readability is the owner's rule. */
+  background: color-mix(in srgb, rgb(8 10 16 / 0.55) 75%, transparent);
   color: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease;
 }
 
 .dc-header-nav__option > svg {
@@ -185,25 +198,26 @@
 
 .dc-header-nav__option:hover,
 .dc-header-nav__option:focus-visible {
-  background: color-mix(in srgb, currentColor 12%, transparent);
+  background: color-mix(in srgb, currentColor 14%, transparent);
 }
 
 .dc-header-nav__option[data-active="true"] {
   border-color: color-mix(in srgb, #6366f1 65%, transparent);
-  background: color-mix(in srgb, #6366f1 20%, transparent);
+  background: color-mix(in srgb, #6366f1 22%, transparent);
 }
 
 .dc-header-nav__option-label {
   grid-area: label;
   font-size: 11px;
   font-weight: 800;
+  color: #ffffff;
 }
 
 .dc-header-nav__option-hint {
   grid-area: hint;
   font-size: 9px;
   font-weight: 600;
-  opacity: 0.6;
+  opacity: 0.72;
 }
 
 /* ── Rails: left and right ─────────────────────────────────────────────── */

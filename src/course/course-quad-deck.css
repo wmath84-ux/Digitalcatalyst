@@ -219,6 +219,30 @@
   z-index: 34;
 }
 
+/* ── Independence: a drag of one axis MUST NOT resize the other axis ─────
+   While one axis is being dragged, the other axis dividers lose their pointer
+   events — so a finger that crosses the line mid-drag can never reach the
+   other divider (the owner: "agar Main ek Ko drag Karun to Keval usi se
+   related area resize ho"). The dragged axis's divider is the only one that
+   still catches pointer events. */
+.dc-quad-deck[data-quad-dragging="v"] [data-course-quad-divider="h"],
+.dc-quad-deck[data-quad-dragging="v"] [data-course-quad-divider="v2"],
+.dc-quad-deck[data-quad-dragging="v2"] [data-course-quad-divider="v"],
+.dc-quad-deck[data-quad-dragging="v2"] [data-course-quad-divider="h"],
+.dc-quad-deck[data-quad-dragging="h"] [data-course-quad-divider="v"],
+.dc-quad-deck[data-quad-dragging="h"] [data-course-quad-divider="v2"] {
+  pointer-events: none;
+}
+
+/* The non-dragged dividers also dim their line + dots so the learner sees
+   which one they own. */
+.dc-quad-deck[data-quad-dragging]:not([data-quad-dragging="none"]) [data-course-quad-divider]:not([data-dragging="true"]) [data-course-quad-line] {
+  opacity: 0.25;
+}
+.dc-quad-deck[data-quad-dragging]:not([data-quad-dragging="none"]) [data-course-quad-divider]:not([data-dragging="true"]) .dc-quad-dot {
+  opacity: 0.35;
+}
+
 /* The THIN white strip a squeezed gap shows — back on the owner's word
    (2026-10-16): "jo patali white strip banti hai icon ke niche aur donon ke
    bich mein usko bhi add karo wapas, mobile users desktop sabhi jagah." It runs
@@ -335,11 +359,16 @@
   max-width: min(92vw, 348px);
   padding: 10px;
   border-radius: 16px;
-  background: var(--dc-chrome-glass, rgba(12, 14, 20, 0.86));
-  backdrop-filter: var(--dc-chrome-glass-blur, blur(18px));
-  -webkit-backdrop-filter: var(--dc-chrome-glass-blur, blur(18px));
-  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
-  box-shadow: var(--dc-chrome-glass-rim), 0 18px 44px rgba(2, 6, 16, 0.42);
+  /* Owner (2026-10-16): "divider per click karne per pop up open hota hai uska
+     background thoda blur karo kyunki text dekhne mein problem ho rahi hai
+     options". The QuadDeck's divider menu now wears a deeper, saturated frost
+     (3px extra blur + a dense ink tint) and every option row carries its own
+     plate, so the labels stay readable against any page background. */
+  background: color-mix(in srgb, rgb(8 10 16 / 0.78) 80%, var(--dc-chrome-glass, rgba(12, 14, 20, 0.86)));
+  backdrop-filter: blur(22px) saturate(1.6);
+  -webkit-backdrop-filter: blur(22px) saturate(1.6);
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  box-shadow: var(--dc-chrome-glass-rim), 0 18px 44px rgba(2, 6, 16, 0.55);
   color: var(--course-text, #f8fafc);
 }
 
@@ -392,7 +421,9 @@
   padding: 7px 9px;
   border-radius: 11px;
   border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
-  background: color-mix(in srgb, currentColor 6%, transparent);
+  /* Each button carries its own small dark plate so the label sits on a solid
+     surface regardless of the background behind the menu. */
+  background: color-mix(in srgb, rgb(8 10 16 / 0.55) 70%, transparent);
   color: inherit;
   font-size: 11px;
   font-weight: 700;

@@ -355,7 +355,15 @@ export default function QuadDeck({
    * horizontal — drags on its own; one rule: the whole strip drags, always. During the
    * move the live value is written straight to the deck's CSS variables (no
    * React re-render per frame — the panes hold videos and canvases), and the
-   * settled value is committed on release. */
+   * settled value is committed on release.
+   *
+   * Independence rule (owner, 2026-10-16): a drag of one divider MUST NOT
+   * resize the other axis's blocks. While a drag is live:
+   *   1. the OTHER axis's CSS variable is hidden from pointer events so a
+   *      stray finger never picks up the wrong divider;
+   *   2. the deck's `data-dragging` attribute carries the live axis, so the
+   *      CSS can dim the other divider's segment line — the learner sees which
+   *      one they own and which one they don't. */
   const writeLive = (axis: QuadAxisKey, value: number) => {
     const deck = deckRef.current;
     if (!deck) return;
@@ -527,6 +535,7 @@ export default function QuadDeck({
       data-quad-zoom={view.zoom}
       data-quad-cross={cross ? "true" : "false"}
       data-quad-squeezed={squeezedVertical && squeezedRow ? "both" : squeezedVertical ? "v" : squeezedRow ? "h" : "none"}
+      data-quad-dragging={dragging ?? "none"}
       style={
         {
           "--quad-col": `${state.col}%`,

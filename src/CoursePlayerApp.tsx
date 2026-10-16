@@ -2512,7 +2512,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
               uid={user.id}
               productId={storageProductId}
               courseTitle={product.title}
-              courseShort={product.title.length > 18 ? `${product.title.slice(0, 18).trimEnd()}…` : product.title}
+              courseShort={(product.title?.length ?? 0) > 18 ? `${(product.title ?? "").slice(0, 18).trimEnd()}…` : (product.title ?? "")}
               moduleId={selectedOfficialModule ? String(selectedOfficialModule.id) : (selectedFile?.personalModuleId || null)}
               moduleTitle={selectedOfficialModule?.title || (activeFileIsPersonal ? "My Modules" : null)}
               resourceName={selectedFile?.name || null}
