@@ -56,6 +56,7 @@ import { collectMasterCourseNotes } from "./masterNotes";
 import type { PersonalCourseModule } from "../types/personalCourse";
 import NotesPanel from "./NotesPanel";
 import QuadDeck from "./QuadDeck";
+import { blockPagesFor, type BlockPageKey, type BlockPageRecord } from "./blockPages";
 import type { QuadLayoutState, QuadPaneId } from "./quadLayout";
 import type { CourseViewSettings } from "./courseViewSettings";
 import type { FooterNavigationPlacement } from "../utils/footerNavigationPlacement";
@@ -1058,8 +1059,15 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   //
   // Settings can overrule all of that: "Visible footer navigation always"
   // (src/utils/footerNavigationVisibility.ts) keeps the footer on every page.
+  //
+  // The Settings hook is called UNCONDITIONALLY: a hook inside the `&&` would
+  // be skipped whenever `pageRuleHidesFooter` is false, and the first tab
+  // switch onto a hidden page (Brain deck, search page, editor…) would shift
+  // every later hook's slot — React then crashes reading the misaligned deps
+  // ("Cannot read properties of undefined (reading 'length')").
   const pageRuleHidesFooter = useFooterHiddenPage(tab);
-  const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways();
+  const footerNavigationAlways = useFooterNavigationAlways();
+  const immersivePage = pageRuleHidesFooter && !footerNavigationAlways;
 
   // Read entries reuse the exact module-unlock resolver already used by the
   // Modules tab, plus the current paid-update ownership set for resource-level
@@ -1116,6 +1124,21 @@ export default function CourseOverlay(props: CourseOverlayProps) {
         />
   );
 
+  // The Paid listing in the Modules library's design — built once here and
+  // shared by the study body and the plus deck's free blocks, so the page is
+  // one implementation everywhere.
+  const paidLibraryNode = (
+    <PaidLibraryPanel
+      updates={props.updates}
+      modules={props.modules}
+      ownedUpdateIds={props.ownedUpdateIds}
+      onBuyModule={props.onBuyModule}
+      onBuyUpdate={props.onBuyUpdate}
+      onOpenPaid={props.onOpenPaid}
+      empty={emptyMessage}
+    />
+  );
+
   const studyBody = (
     <StudyContent
       tab={tab}
@@ -1134,20 +1157,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       sketchPanel={props.sketchPanel}
       resourceLibraryPanel={props.resourceLibraryPanel}
       musicPanel={props.musicPanel}
-      paidPanel={
-        // The Paid listing in the Modules library's design. Built here —
-        // the overlay owns the purchasable updates, the locked modules and
-        // the buy handlers the folders' Unlock leaves fire.
-        <PaidLibraryPanel
-          updates={props.updates}
-          modules={props.modules}
-          ownedUpdateIds={props.ownedUpdateIds}
-          onBuyModule={props.onBuyModule}
-          onBuyUpdate={props.onBuyUpdate}
-          onOpenPaid={props.onOpenPaid}
-          empty={emptyMessage}
-        />
-      }
+      paidPanel={paidLibraryNode}
     />
   );
 
@@ -1251,6 +1261,52 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // the main block — and the player stays mounted underneath it, so a playing
   // video never loses its place to a tab switch.
   if (props.quad) {
+    // ── FREE BLOCKS (the owner's 2026-10-16+ upgrade) ──────────────────
+    // Every block starts on its white blank picker ("block Keval aur Keval ek
+    // blank page se start hoga … course player ke sabhi pages ke button
+    // honge"), and the learner opens ANY course player page in ANY block.
+    // The panels come straight from the player's props — the same nodes the
+    // phone's study pane mounts — so a page is one implementation everywhere.
+    const blockCatalog: BlockPageRecord[] = blockPagesFor(props.hiddenTabs ?? []);
+    const renderBlockPage = (page: BlockPageKey): ReactNode => {
+      switch (page) {
+        case "lesson":
+          return props.quad?.playerPane ?? null;
+        case "modules":
+          return props.resourceLibraryPanel ?? RESOURCES_FALLBACK;
+        case "notes":
+          return notesPanelNode;
+        case "mindmap":
+          return props.mindMapPanel ?? MINDMAP_FALLBACK;
+        case "sketch":
+          return props.sketchPanel ?? null;
+        case "read":
+          return (
+            <ReadLibraryPanel
+              entries={readEntries}
+              productId={String(props.productId || "")}
+              onAddToModule={props.onAddReadUploadToModule}
+            />
+          );
+        case "music":
+          return props.musicPanel ?? null;
+        case "brain":
+          return props.brainPanel ?? null;
+        case "experiment":
+          return props.experimentPanel ?? null;
+        case "ai":
+          return props.aiPanel ?? null;
+        case "player":
+          return props.playerPanel ?? null;
+        case "paid":
+          return paidLibraryNode;
+        case "personal":
+          return props.personalModulesPanel ?? null;
+        default:
+          return null;
+      }
+    };
+
     const paneOwnedTabs: DockTab[] = ["notes", "mindmap", "modules"];
     const tabHasOwnBlock =
       paneOwnedTabs.includes(props.tab) && !(props.tab === "modules" && props.personalModulesOpen);
@@ -1289,6 +1345,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           studyVisible={!tabHasOwnBlock}
           resourcesFooter={props.quad.nav}
           reveal={props.quad.reveal}
+          blocks={{ catalog: blockCatalog, renderPage: (page) => renderBlockPage(page) }}
         />
       </div>
     );

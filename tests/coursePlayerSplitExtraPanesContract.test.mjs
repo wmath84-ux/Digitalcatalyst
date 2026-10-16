@@ -106,7 +106,7 @@ test("the player hands the deck the pane renderer and the free-tab rule", () => 
   assert.match(PLAYER, /renderExtraPane=\{renderExtraPane\}/);
   assert.match(PLAYER, /extraPaneTab=\{extraPaneTab\}/);
   // The main pane is built by the SAME builder, so both share one tab language.
-  assert.match(PLAYER, /const studyOverlay = buildStudyPane\(dockTab, handleDockTabChange\);/);
+  assert.match(PLAYER, /const studyOverlay = \(\n[\s\S]{0,600}?buildStudyPane\(dockTab, handleDockTabChange\)/);
   assert.match(PLAYER, /const buildStudyPane = \(/);
 });
 

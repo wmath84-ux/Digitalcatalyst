@@ -13,15 +13,18 @@
 //
 // There is no access check: a learner always owns what they authored.
 
-import { Suspense, lazy, useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import { ArrowLeft, Library, LoaderCircle, RefreshCw } from "lucide-react";
 import { useMyCourses } from "../hooks/useMyCourses";
 import { myCourseToProduct } from "../lib/myCourseAdapter";
+import { lazyWithChunkRecovery } from "../utils/lazyChunk";
 import type { PaidCourseUpdate } from "../types/course";
 
 // The player is the heaviest chunk in the app; it is fetched only when a
 // course is actually opened (same reason the official route lazy-loads it).
-const CoursePlayer = lazy(() => import("../CoursePlayerApp"));
+// lazyWithChunkRecovery retries a failed fetch and reloads once when a
+// redeploy replaced the hashed chunk under an open tab.
+const CoursePlayer = lazyWithChunkRecovery(() => import("../CoursePlayerApp"));
 
 interface MyCoursePlayerPageProps {
   courseId: string | null;

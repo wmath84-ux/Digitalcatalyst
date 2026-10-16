@@ -235,9 +235,11 @@ test('the footer navigation hides on a player and returns on the library page', 
   // half of a results page (see footerNavigationVisibilityContract), and
   // Settings can overrule the lot with "Visible footer navigation always".
   assert.match(session, /case "music":[\s\S]{0,400}?state\.musicView === "player"/);
-  assert.match(overlay, /const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways\(\);/);
+  assert.match(overlay, /const footerNavigationAlways = useFooterNavigationAlways\(\);/);
+  assert.match(overlay, /const immersivePage = pageRuleHidesFooter && !footerNavigationAlways;/);
   assert.match(overlay, /\$\{keyboardVisible \|\| immersivePage \? "hidden" : ""\}/);
-  assert.match(strip, /const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways\(\)/);
+  assert.match(strip, /const footerNavigationAlways = useFooterNavigationAlways\(\)/);
+  assert.match(strip, /const immersivePage = pageRuleHidesFooter && !footerNavigationAlways/);
   assert.match(strip, /if \(keyboardVisible \|\| immersivePage\) return null/);
 });
 
@@ -297,7 +299,7 @@ test('the pane pauses a video embed when its tab is left, and keeps a song alive
   assert.match(panel, /\$\{playerShown \? "flex" : "hidden"\}/);
   assert.ok(panel.includes('{showLibrary ? librarySurface({ mode: "page" }) : null}'), 'the library page is its own surface');
   // The player's own tab truth comes from the player, not from a second guess.
-  assert.match(player, /active=\{paneTab === "music"\}/);
+  assert.match(player, /opts\.quad\s*\?\s*Object\.values\(opts\.quad\.state\.pages \?\? \{}\)\.includes\("music"\)\s*:\s*paneTab === "music"/);
   // The pane is a PERSISTENT sibling of the keyed body (the overlay's trick).
   assert.match(overlay, /data-course-music-tab/);
   assert.match(overlay, /const hideKeyedBody = \(Boolean\(props\.aiPanel\) && props\.tab === "ai"\) \|\| props\.tab === "read"\n    \|\| \(Boolean\(props\.musicPanel\) && props\.tab === "music"\);/);
@@ -310,7 +312,7 @@ test('the player hands the pane the course audio and the learner, main pane only
   assert.match(player, /import MusicPanel from "\.\/course\/MusicPanel";/);
   assert.match(player, /import \{ collectCourseAudio \} from "\.\/course\/musicLibrary";/);
   assert.match(player, /const courseAudio = useMemo\(\n    \(\) => collectCourseAudio\(modules, resolution\.accessibleModuleIds\),\n    \[modules, resolution\.accessibleModuleIds\],\n  \);/);
-  assert.match(player, /musicPanel=\{opts\.extra \? undefined : \(\n        <MusicPanel uid=\{user\?\.id \?\? null\} courseAudio=\{courseAudio\} active=\{paneTab === "music"\} \/>\n      \)\}/);
+  assert.match(player, /musicPanel=\{opts\.extra \? undefined : \(\n\s+<MusicPanel\n\s+uid=\{user\?.id \?\? null\}\n\s+courseAudio=\{courseAudio\}/);
   // One speaker per screen: an extra pane never mounts the music tab.
   assert.match(player, /\(\["modules", "notes", "read", "paid"\] as DockTab\[\]\)\.filter\(\(tab\) => !hiddenTabs\.includes\(tab\)\)/);
 });

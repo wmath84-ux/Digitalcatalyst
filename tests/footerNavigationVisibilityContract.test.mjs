@@ -164,7 +164,11 @@ test("6 — the English instruction line names every time the footer is not show
 test("7 — both footer homes take the Settings override", () => {
   for (const home of [PEEK_DOCK, OVERLAY]) {
     assert.match(home, /const pageRuleHidesFooter = useFooterHiddenPage\(tab\)/);
-    assert.match(home, /const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways\(\)/);
+    // The override hook is called UNCONDITIONALLY — a hook inside the `&&`
+    // would be skipped while the page rule is false and crash React the first
+    // time the rule flips ("Cannot read properties of undefined (reading 'length')").
+    assert.match(home, /const footerNavigationAlways = useFooterNavigationAlways\(\)/);
+    assert.match(home, /const immersivePage = pageRuleHidesFooter && !footerNavigationAlways/);
     assert.match(home, /useFooterNavigationAlways/);
   }
   // The keyboard rule is untouched: it is a physical overlap, not a page rule

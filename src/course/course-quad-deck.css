@@ -573,3 +573,436 @@
 .dc-quad-menu-button:focus-visible {
   border-color: color-mix(in srgb, #6366f1 60%, transparent);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * THE DYNAMIC CROSS + FREE BLOCKS (the owner's 2026-10-16+ upgrade):
+ * four half-dividers with their OWN drag positions meeting at a draggable
+ * centre joint, every block starting on its white blank picker page.
+ * Solid colors only — white, blue, rectangular — no glass, no gradients.
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+.dc-quad-flex {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Each corner block hugs its outer corner and stops at ITS two arms; the
+   joint zone covers whatever the arms leave in the middle. */
+.dc-quad-flex__block {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  outline: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+  outline-offset: -0.5px;
+  background: transparent;
+}
+
+.dc-quad-flex__block--c11 {
+  left: 0;
+  top: 0;
+  width: var(--flex-xt);
+  height: var(--flex-yl);
+}
+
+.dc-quad-flex__block--c12 {
+  left: var(--flex-xt);
+  top: 0;
+  width: calc(100% - var(--flex-xt));
+  height: var(--flex-yr);
+}
+
+.dc-quad-flex__block--c21 {
+  left: 0;
+  top: var(--flex-yl);
+  width: var(--flex-xb);
+  height: calc(100% - var(--flex-yl));
+}
+
+.dc-quad-flex__block--c22 {
+  left: var(--flex-xb);
+  top: var(--flex-yr);
+  width: calc(100% - var(--flex-xb));
+  height: calc(100% - var(--flex-yr));
+}
+
+.dc-quad-flex__block[data-quad-focused="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 2px solid #ffbe0b;
+  border-radius: 2px;
+  animation: dc-quad-glow 1.6s ease-out;
+}
+
+/* The four half-dividers: edge → joint strips, one drag each. */
+.dc-quad-flex__arm {
+  position: absolute;
+  z-index: 30;
+  touch-action: none;
+  cursor: grab;
+}
+
+.dc-quad-flex__arm:active {
+  cursor: grabbing;
+}
+
+.dc-quad-flex__arm--top,
+.dc-quad-flex__arm--bottom {
+  width: var(--quad-hit, 10px);
+  transform: translateX(-50%);
+}
+
+.dc-quad-flex__arm--top {
+  left: var(--flex-xt);
+  top: 0;
+  height: min(var(--flex-yl), var(--flex-yr));
+}
+
+.dc-quad-flex__arm--bottom {
+  left: var(--flex-xb);
+  top: max(var(--flex-yl), var(--flex-yr));
+  height: calc(100% - max(var(--flex-yl), var(--flex-yr)));
+}
+
+.dc-quad-flex__arm--left,
+.dc-quad-flex__arm--right {
+  height: var(--quad-hit, 10px);
+  transform: translateY(-50%);
+}
+
+.dc-quad-flex__arm--left {
+  top: var(--flex-yl);
+  left: 0;
+  width: min(var(--flex-xt), var(--flex-xb));
+}
+
+.dc-quad-flex__arm--right {
+  top: var(--flex-yr);
+  left: max(var(--flex-xt), var(--flex-xb));
+  width: calc(100% - max(var(--flex-xt), var(--flex-xb)));
+}
+
+.dc-quad-flex__arm-line {
+  position: absolute;
+  pointer-events: none;
+}
+
+.dc-quad-flex__arm--top .dc-quad-flex__arm-line,
+.dc-quad-flex__arm--bottom .dc-quad-flex__arm-line {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+}
+
+.dc-quad-flex__arm--left .dc-quad-flex__arm-line,
+.dc-quad-flex__arm--right .dc-quad-flex__arm-line {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+/* A hidden segment (Course view page) still drags — it is just not drawn. */
+.dc-quad-flex__arm-line[data-visible="false"] {
+  opacity: 0;
+}
+
+.dc-quad-deck[data-quad-dragging]:not([data-quad-dragging="none"])
+  [data-course-quad-flex-arm]:not([data-dragging="true"])
+  .dc-quad-flex__arm-line {
+  opacity: 0.35;
+}
+
+/* The arm's own dot: the cluster opens from it, at its exact centre. */
+.dc-quad-flex__arm--top .dc-quad-flex__dot,
+.dc-quad-flex__arm--bottom .dc-quad-flex__dot {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.dc-quad-flex__arm--left .dc-quad-flex__dot,
+.dc-quad-flex__arm--right .dc-quad-flex__dot {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.dc-quad-flex__arm[data-squeezed="true"] {
+  --quad-hit: 18px;
+}
+
+/* The centre joint — the owner's "screen ke center mein point". Its zone is
+   exactly what the arms leave between them (a point when all four agree),
+   and dragging it moves all four positions together. */
+.dc-quad-flex__joint {
+  position: absolute;
+  z-index: 40;
+  left: calc((var(--flex-xt) + var(--flex-xb)) / 2);
+  top: calc((var(--flex-yl) + var(--flex-yr)) / 2);
+  width: 0;
+  height: 0;
+}
+
+.dc-quad-flex__joint-zone {
+  position: absolute;
+  left: calc((min(var(--flex-xt), var(--flex-xb)) - (var(--flex-xt) + var(--flex-xb)) / 2));
+  top: calc((min(var(--flex-yl), var(--flex-yr)) - (var(--flex-yl) + var(--flex-yr)) / 2));
+  width: calc(max(var(--flex-xt), var(--flex-xb)) - min(var(--flex-xt), var(--flex-xb)));
+  height: calc(max(var(--flex-yl), var(--flex-yr)) - min(var(--flex-yl), var(--flex-yr)));
+  background: color-mix(in srgb, #ffbe0b 12%, transparent);
+  pointer-events: none;
+}
+
+.dc-quad-flex__joint-handle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 22px;
+  min-height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+}
+
+.dc-quad-flex__joint-handle:active {
+  cursor: grabbing;
+}
+
+.dc-quad-flex__joint-handle:focus-visible {
+  outline: 2px solid #3a86ff;
+  outline-offset: 2px;
+}
+
+.dc-quad-flex__joint-handle[data-dragging="true"] .dc-quad-dot__pip,
+.dc-quad-flex__joint-handle[data-open="true"] .dc-quad-dot__pip {
+  background: #3a86ff;
+  width: 10px;
+  height: 10px;
+}
+
+/* ── One free block: picker + keep-alive layers + back ────────────────── */
+
+.dc-quad-free {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.dc-quad-free__layer {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* The layers the block keeps mounted (a playing video or song never
+   restarts) — `hidden` must really hide them. */
+.dc-quad-free__layer[hidden] {
+  display: none !important;
+}
+
+/* ── THE BLANK PAGE — white, solid blue/white rectangular buttons ─────── */
+
+.dc-block-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  background: #ffffff;
+  padding: 14px;
+  /* Solid colours only — the owner's starter-page design. */
+  color: #0f172a;
+}
+
+.dc-block-picker__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dc-block-picker__mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 2px solid #2563eb;
+  border-radius: 4px;
+  color: #2563eb;
+  background: #ffffff;
+  flex: 0 0 auto;
+}
+
+.dc-block-picker__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+.dc-block-picker__hint {
+  margin: 1px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #475569;
+}
+
+.dc-block-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 8px;
+}
+
+.dc-block-picker__button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 10px;
+  /* Rectangular, solid blue, white text — the owner's button design. */
+  border: 2px solid #2563eb;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dc-block-picker__button:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.dc-block-picker__button:active {
+  background: #1e40af;
+  border-color: #1e40af;
+}
+
+.dc-block-picker__button:focus-visible {
+  outline: 2px solid #0f172a;
+  outline-offset: 2px;
+}
+
+/* A page already open elsewhere: white with a blue edge (it MOVES here). */
+.dc-block-picker__button[data-taken="true"] {
+  background: #ffffff;
+  color: #2563eb;
+}
+
+.dc-block-picker__button[data-taken="true"]:hover {
+  background: #eff6ff;
+}
+
+.dc-block-picker__button-label {
+  flex: 1 1 auto;
+}
+
+.dc-block-picker__move {
+  flex: 0 0 auto;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 5px;
+  border: 1px solid #2563eb;
+  border-radius: 3px;
+  color: #2563eb;
+  background: #ffffff;
+}
+
+/* ── THE TOP-LEFT BACK BUTTON — white chip, blue edge, step-back ──────── */
+
+.dc-page-back {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 55;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
+  border: 2px solid #2563eb;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+}
+
+.dc-page-back:hover {
+  background: #eff6ff;
+}
+
+.dc-page-back:active {
+  background: #dbeafe;
+}
+
+.dc-page-back:focus-visible {
+  outline: 2px solid #0f172a;
+  outline-offset: 2px;
+}
+
+/* No previous page: quiet but present — it never jumps home instead. */
+.dc-page-back[data-enabled="false"] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* The block's page switcher — top-right, the back button's quiet twin. */
+.dc-block-switch {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 55;
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 9px;
+  border: 2px solid #2563eb;
+  border-radius: 5px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+}
+
+.dc-block-switch:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.dc-block-switch:focus-visible {
+  outline: 2px solid #0f172a;
+  outline-offset: 2px;
+}

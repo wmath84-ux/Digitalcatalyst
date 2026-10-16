@@ -125,12 +125,17 @@ test("5 — every page publishes the fact the rule reads", () => {
 test("6 — both footer homes hide, and Settings can overrule them", () => {
   // The parent-rendered Workspace pill unmounts (its keyboard rule's way).
   assert.match(peekDock, /const pageRuleHidesFooter = useFooterHiddenPage\(tab\)/);
-  assert.match(peekDock, /const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways\(\)/);
+  // The Settings hook is called UNCONDITIONALLY (its own statement) — a hook
+  // inside the `&&` shifts every later hook's slot when the rule flips and
+  // crashes React ("Cannot read properties of undefined (reading 'length')").
+  assert.match(peekDock, /const footerNavigationAlways = useFooterNavigationAlways\(\)/);
+  assert.match(peekDock, /const immersivePage = pageRuleHidesFooter && !footerNavigationAlways/);
   assert.match(peekDock, /if \(keyboardVisible \|\| immersivePage\) return null/);
   // The Split Deck's in-flow dock hides (not unmounts), like its keyboard
   // rule, so the pane's restore survives.
   assert.match(overlay, /const pageRuleHidesFooter = useFooterHiddenPage\(tab\);/);
-  assert.match(overlay, /const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways\(\);/);
+  assert.match(overlay, /const footerNavigationAlways = useFooterNavigationAlways\(\);/);
+  assert.match(overlay, /const immersivePage = pageRuleHidesFooter && !footerNavigationAlways;/);
   assert.match(overlay, /\$\{keyboardVisible \|\| immersivePage \? "hidden" : ""\}/);
   assert.match(overlay, /data-course-dock/);
   // "Visible footer navigation always" (Settings → Footer navigation) is the

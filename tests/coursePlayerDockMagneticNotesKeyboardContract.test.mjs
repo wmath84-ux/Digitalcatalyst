@@ -216,7 +216,7 @@ test("The footer dock lives INSIDE the study pane", () => {
   assert.match(studyPanels, /data-course-study-pane=""[\s\S]*?\{study\}/);
   // ONE builder serves the main pane and every extra part (owner's 2026-10-14
   // split brief), so both speak the same tab language.
-  assert.match(coursePlayer, /const studyOverlay = buildStudyPane\(dockTab, handleDockTabChange\);/);
+  assert.match(coursePlayer, /const studyOverlay = \(\n[\s\S]{0,600}?buildStudyPane\(dockTab, handleDockTabChange\)/);
   assert.match(coursePlayer, /const buildStudyPane = \(/);
   assert.match(coursePlayer, /study=\{studyOverlay\}/);
   // The overlay ends with the dock (module panel, footer navigation and
@@ -516,7 +516,7 @@ test("Switching tabs inside the pane crossfades the content", () => {
   // up — the plus deck's borrowed block. `if (props.quad) { … return … }`
   // means the deck's copy is the only one that ever mounts on a big stage.
   assert.equal(overlay.match(/\{studyBody\}/g)?.length, 2);
-  assert.match(overlay, /if \(props\.quad\) \{[\s\S]{0,1200}?\{studyBody\}[\s\S]{0,1200}?return \(/);
+  assert.match(overlay, /if \(props\.quad\) \{[\s\S]{0,3600}?\{studyBody\}[\s\S]{0,3600}?return \(/);
 });
 
 test("A landscape pane never settles narrower than the dock inside it, on any device", () => {

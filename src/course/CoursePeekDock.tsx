@@ -57,7 +57,12 @@ export default function CoursePeekDock({ tab, onTabChange, hiddenTabs = [] }: {
   // Settings can overrule it: "Visible footer navigation always" keeps the
   // footer navigation on every page.
   const pageRuleHidesFooter = useFooterHiddenPage(tab)
-  const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways()
+  // Unconditional hook call — a hook inside the `&&` is skipped whenever the
+  // rule is false, shifting every later hook's slot the first time the rule
+  // flips (Brain deck, search page, editor…) and crashing React with
+  // "Cannot read properties of undefined (reading 'length')".
+  const footerNavigationAlways = useFooterNavigationAlways()
+  const immersivePage = pageRuleHidesFooter && !footerNavigationAlways
   const navRef = useRef<HTMLElement>(null)
   const items = TABS.filter(item => !hiddenTabs.includes(item.key))
   const moveFocus = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {

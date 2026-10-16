@@ -49,6 +49,13 @@
 // layout it has today, untouched.
 
 import { useCallback, useSyncExternalStore } from "react";
+import {
+  clampQuadFlex,
+  mirrorQuadFlex,
+  QUAD_FLEX_DEFAULT,
+  type QuadFlexState,
+} from "./quadFlex";
+import type { BlockPageKey } from "./blockPages";
 
 export type QuadPaneId = "c11" | "c12" | "c21" | "c22";
 
@@ -171,6 +178,21 @@ export interface QuadLayoutState {
   /** The two swap buttons: mirror the columns / the rows. */
   swappedCols: boolean;
   swappedRows: boolean;
+  /**
+   * The DYNAMIC CROSS (the 2×2 shape): four half-dividers — xTop, xBottom,
+   * yLeft, yRight — each with its own drag position, all meeting at the
+   * centre joint (see quadFlex.ts). `col`/`row` live on for the other shapes.
+   */
+  flex: QuadFlexState;
+  /**
+   * The page each block shows — the owner's free blocks ("block Keval aur
+   * Keval ek blank page se start hoga … user koi bhi page kisi bhi block
+   * mein open kar sakta hai"). null = the block's blank picker page. A page
+   * lives in at most one block.
+   */
+  pages: Record<QuadPaneId, BlockPageKey | null>;
+  /** The block the navigation and deep links act on (last block touched). */
+  focus: QuadPaneId;
 }
 
 /** Where the vertical divider may rest (the owner's blocks stay usable). */
@@ -199,6 +221,9 @@ export const QUAD_DEFAULT_STATE: QuadLayoutState = {
   row: 50,
   swappedCols: false,
   swappedRows: false,
+  flex: { ...QUAD_FLEX_DEFAULT },
+  pages: { c11: null, c12: null, c21: null, c22: null },
+  focus: "c11",
 };
 
 const clamp = (value: number, min: number, max: number) => (value < min ? min : value > max ? max : value);
@@ -327,6 +352,88 @@ export function quadSwap(state: QuadLayoutState, axis: "cols" | "rows"): QuadLay
     : { ...state, swappedRows: !state.swappedRows };
 }
 
+/* ── Free blocks: the page each block shows ─────────────────────────────── */
+
+/**
+ * Open `page` in `pane`. A page lives in at most one block, so picking it
+ * somewhere else MOVES it — "user koi bhi page kisi bhi block mein open kar
+ * sakta hai" — and the pane the learner touched becomes the navigation's
+ * focused block. The store keeps `pages` as exactly the four keys.
+ */
+export function quadSetBlockPage(
+  state: QuadLayoutState,
+  pane: QuadPaneId,
+  page: BlockPageKey | null,
+): QuadLayoutState {
+  const pages: Record<QuadPaneId, BlockPageKey | null> = {
+    c11: state.pages?.c11 ?? null,
+    c12: state.pages?.c12 ?? null,
+    c21: state.pages?.c21 ?? null,
+    c22: state.pages?.c22 ?? null,
+  };
+  if (page) {
+    for (const other of QUAD_PANE_ORDER) {
+      if (other !== pane && pages[other] === page) pages[other] = null;
+    }
+  }
+  pages[pane] = page;
+  return { ...state, pages, focus: pane };
+}
+
+/** Put the block back on its blank picker page. */
+export const quadClearBlockPage = (state: QuadLayoutState, pane: QuadPaneId): QuadLayoutState =>
+  quadSetBlockPage(state, pane, null);
+
+/** Remember which block the learner touched last (nav taps act on it). */
+export const quadSetFocus = (state: QuadLayoutState, pane: QuadPaneId): QuadLayoutState =>
+  state.focus === pane ? state : { ...state, focus: pane };
+
+/** Where a page currently lives, or null. */
+export function quadFindPageBlock(state: QuadLayoutState, page: BlockPageKey): QuadPaneId | null {
+  for (const pane of QUAD_PANE_ORDER) {
+    if (state.pages?.[pane] === page) return pane;
+  }
+  return null;
+}
+
+/**
+ * The cluster's swap on the DYNAMIC CROSS: mirror the arms on that axis and
+ * trade the two blocks' pages, so the layout and its content flip together.
+ */
+export function quadSwapFlex(state: QuadLayoutState, axis: "cols" | "rows"): QuadLayoutState {
+  const flex = mirrorQuadFlex(state.flex ?? QUAD_FLEX_DEFAULT, axis);
+  const pages: Record<QuadPaneId, BlockPageKey | null> = {
+    c11: state.pages?.c11 ?? null,
+    c12: state.pages?.c12 ?? null,
+    c21: state.pages?.c21 ?? null,
+    c22: state.pages?.c22 ?? null,
+  };
+  if (axis === "cols") {
+    const { c11, c12, c21, c22 } = pages;
+    return { ...state, flex, pages: { c11: c12, c12: c11, c21: c22, c22: c21 } };
+  }
+  const { c11, c12, c21, c22 } = pages;
+  return { ...state, flex, pages: { c11: c21, c12: c22, c21: c11, c22: c12 } };
+}
+
+/* ── The footer navigation rule ─────────────────────────────────────────── */
+
+/** How many blocks the current shape actually shows. */
+export function quadOpenBlockCount(state: QuadLayoutState): number {
+  return quadRows(state).flat().length;
+}
+
+/**
+ * The owner's footer rule (2026-10-16+): "footer navigations Keval tabhi
+ * dikhe jo bhi user single split mode mein ho, means Keval do block" — the
+ * navigation shows only in the single-split layout, exactly two blocks. The
+ * 2×2 cross and the three-block shapes run without it (the blocks themselves
+ * carry the pages); a phone is never in this system and keeps its footer.
+ */
+export function quadSingleSplit(state: QuadLayoutState): boolean {
+  return quadOpenBlockCount(state) === 2;
+}
+
 /**
  * A shape button. Panes the shape cannot hold stay closed; the ones it can
  * hold come back, so tapping "1 upar · 3 niche" always gives that shape with
@@ -357,6 +464,26 @@ const storageKey = (courseId: string) => `dc.course.quadLayout.v1.${courseId || 
 const isPane = (value: unknown): value is QuadPaneId =>
   value === "c11" || value === "c12" || value === "c21" || value === "c22";
 
+const BLOCK_PAGE_KEYS: readonly string[] = [
+  "lesson",
+  "personal",
+  "modules",
+  "notes",
+  "mindmap",
+  "sketch",
+  "read",
+  "music",
+  "brain",
+  "experiment",
+  "ai",
+  "player",
+  "paid",
+];
+
+/** A stored page id, or null for the block's blank picker page. */
+const isPageKey = (value: unknown): BlockPageKey | null =>
+  typeof value === "string" && BLOCK_PAGE_KEYS.includes(value) ? (value as BlockPageKey) : null;
+
 const isFormat = (value: unknown): value is QuadFormat =>
   typeof value === "string" && Object.prototype.hasOwnProperty.call(QUAD_FORMATS, value);
 
@@ -376,6 +503,16 @@ export function loadQuadLayout(courseId: string): QuadLayoutState {
       row: typeof value.row === "number" ? clampQuadRow(value.row) : 50,
       swappedCols: value.swappedCols === true,
       swappedRows: value.swappedRows === true,
+      // Stored decks from before the dynamic cross carry no `flex`/`pages`:
+      // they migrate to the even cross with every block on its blank page.
+      flex: clampQuadFlex(value.flex),
+      pages: {
+        c11: isPageKey(value.pages?.c11),
+        c12: isPageKey(value.pages?.c12),
+        c21: isPageKey(value.pages?.c21),
+        c22: isPageKey(value.pages?.c22),
+      },
+      focus: isPane(value.focus) ? value.focus : "c11",
     };
   } catch {
     return QUAD_DEFAULT_STATE;

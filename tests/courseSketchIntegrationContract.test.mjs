@@ -131,7 +131,11 @@ test("the Sketch body is mounted by the same StudyContent switch as every other 
 });
 
 test("the editor's chunk is lazy — a learner who never draws never downloads it", () => {
-  assert.match(player, /const SketchPanel = lazy\(\(\) => import\("\.\/course\/SketchPanel"\)\);/);
+  // lazyWithChunkRecovery is React.lazy with chunk-fetch recovery on top
+  // — the lazy contract (nothing downloaded until the Sketch tab activates)
+  // is unchanged, and a stale hashed chunk after a redeploy now self-heals.
+  assert.ok(player.includes('const SketchPanel = lazyWithChunkRecovery(() => import("./course/SketchPanel"));'), 'SketchPanel loads via lazyWithChunkRecovery');
+  assert.ok(!player.includes('const SketchPanel = lazy(() =>'), 'SketchPanel never uses bare React.lazy again');
   // …and the player's own module must not pull the editor in statically.
   assert.doesNotMatch(code(player), /from "@excalidraw\/excalidraw"/);
   assert.doesNotMatch(code(overlay), /@excalidraw\/excalidraw/);
