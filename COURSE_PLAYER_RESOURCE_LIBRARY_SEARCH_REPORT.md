@@ -111,9 +111,8 @@ Repinned (the owner's direction changed, so the old pins had to):
   the ONE self-convertible toggle, the in-box Enter, the sliding sentence, the
   flash scan and the history list are pinned instead.
 
-Green: `tsc --noEmit` clean, the full sweep **4069 pass / 1 flaky perf test**
-(`coursePlayerMindMapDragPerf`, 8/8 in isolation — timing-only, untouched by this
-change), `npm run build:low-heap` ✅ 50.82 s.
+Green: `tsc --noEmit` clean, the full sweep **4264 tests — 4070 pass, 0 fail,
+194 skipped**, and `npm run build:low-heap` ✅ 50.82 s.
 
 ---
 
