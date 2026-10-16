@@ -48,11 +48,12 @@ test("1 — no header on any notes page, and nothing at the top of one", () => {
   // gone: no top-left, no top-right, no PanelLeft / PanelRight glyphs.
   assert.doesNotMatch(notesPanel, /data-note-editor-chrome/);
   assert.doesNotMatch(notesPanel, /PanelLeft|PanelRight|setSidePanel/);
-  // The only thing at the top of the page is the quiet autosave chip, centred,
-  // and it holds no button.
-  assert.match(editorBranch, /data-note-status-chip/);
-  assert.match(editorBranch, /data-note-autosave/);
-  assert.match(editorBranch, /justify-center[^"]*"[\s\S]{0,200}?data-note-status-chip/);
+  // The autosave chip is INVISIBLE now (owner, 2026-10-16+): "upar ek
+  // syncing synced ka button dikhta hai usko remove karo, function
+  // background mein chalti rahana chahie" — an sr-only live region keeps
+  // announcing the state while nothing shows at the top of the page.
+  assert.match(editorBranch, /className="sr-only" data-note-status-chip data-note-autosave/);
+  assert.doesNotMatch(editorBranch, /justify-center[^"]*"[\s\S]{0,200}?data-note-status-chip/, "no visible centred chip row");
 });
 
 test("home — a clean headless page with three centred buttons", () => {

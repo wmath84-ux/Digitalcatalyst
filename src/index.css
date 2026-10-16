@@ -1991,6 +1991,63 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   max-width: 100%;
 }
 
+/* ── The music player's living surface (owner, 2026-10-16) ────────────────
+   "Music player music beat ke according pop hona chahiye, aur progress bar
+   continuously glow aur animate hota rahe — functional vaisa hi ho."
+   Presentation only: the vinyl POPS on the beat while a song plays (a strong
+   accent and a soft echo per bar, 120 BPM), its glow halo breathes with it,
+   and the seek fill carries a constant glow pulse plus a travelling sheen.
+   Seeking, resume, progress reporting — all untouched. */
+@keyframes dc-audio-beat {
+  0%, 100% { transform: scale(1); }
+  10% { transform: scale(1.045); }
+  22% { transform: scale(0.992); }
+  32% { transform: scale(1.022); }
+  46% { transform: scale(1); }
+}
+@keyframes dc-audio-glow-beat {
+  0%, 100% { opacity: 0.16; transform: scale(1.12); }
+  12% { opacity: 0.3; transform: scale(1.24); }
+  34% { opacity: 0.22; transform: scale(1.17); }
+}
+[data-course-audio-disc][data-playing="true"] {
+  animation: dc-audio-beat 1s cubic-bezier(0.32, 0, 0.18, 1) infinite;
+  will-change: transform;
+}
+[data-course-audio-glow][data-playing="true"] {
+  animation: dc-audio-glow-beat 1s cubic-bezier(0.32, 0, 0.18, 1) infinite;
+  will-change: transform, opacity;
+}
+@keyframes dc-audio-seek-glow {
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 3px rgba(255, 255, 255, 0.28)); }
+  50% { filter: brightness(1.4) drop-shadow(0 0 9px rgba(255, 255, 255, 0.55)); }
+}
+@keyframes dc-audio-seek-sheen {
+  0% { transform: translateX(-130%); }
+  100% { transform: translateX(480%); }
+}
+[data-course-audio-seek-fill] {
+  animation: dc-audio-seek-glow 1.6s ease-in-out infinite;
+}
+[data-course-audio-seek-fill]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 34%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  animation: dc-audio-seek-sheen 1.8s linear infinite;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-course-audio-disc][data-playing="true"],
+  [data-course-audio-glow][data-playing="true"],
+  [data-course-audio-seek-fill],
+  [data-course-audio-seek-fill]::after {
+    animation: none;
+  }
+}
+
 /* Strict containment prevents a mobile YouTube iframe's intrinsic size from
    extending below the short landscape viewport or under either side rail. */
 .course-youtube-stage {
@@ -2742,79 +2799,6 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 }
 .mm-tool-danger:hover:not(:disabled) {
   color: #fb7185;
-}
-
-/* The cloud-save tile is tinted by the save state — the text label it
-   replaced is now a tooltip + menu, so the colour is the status. A quiet
-   state (nothing to report) stays in the muted tone; the ones the learner
-   should notice get their own colour AND the blinking beacon. */
-.mm-tool[data-save-status="idle"],
-.mm-tool[data-save-status="loading"],
-.mm-tool[data-save-status="ready"] {
-  color: var(--mm-muted);
-}
-.mm-tool[data-save-status="saving"] {
-  color: #fcd34d;
-}
-.mm-tool[data-save-status="saved"] {
-  color: #6ee7b7;
-}
-.mm-tool[data-save-status="error"] {
-  color: #fda4af;
-}
-
-/* ── The blinking save beacon ───────────────────────────────────────────
-   Sits on the TOP-RIGHT corner of the cloud tile and inherits that tile's
-   status colour through `currentColor`, so an amber "saving…" beacon and a
-   red "retry" beacon need no extra classes. It only exists while there is a
-   message to read (see `data-blink` in the panel). */
-.mm-blink {
-  position: absolute;
-  top: -1px;
-  right: -1px;
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: currentColor;
-  box-shadow: 0 0 0 2px var(--dc-bd-base);
-  pointer-events: none;
-  animation: mm-blink 1.05s ease-in-out infinite;
-}
-.mm-blink::after {
-  content: "";
-  position: absolute;
-  inset: -3px;
-  border-radius: 999px;
-  background: currentColor;
-  animation: mm-halo 1.05s ease-out infinite;
-}
-@keyframes mm-blink {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.3;
-    transform: scale(0.68);
-  }
-}
-@keyframes mm-halo {
-  0% {
-    opacity: 0.5;
-    transform: scale(0.6);
-  }
-  70%,
-  100% {
-    opacity: 0;
-    transform: scale(1.6);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .mm-blink,
-  .mm-blink::after {
-    animation-duration: 2s;
-  }
 }
 
 /* ── The map-name pill (the only non-square control) ────────────────────

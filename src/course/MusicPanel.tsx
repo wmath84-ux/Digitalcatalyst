@@ -65,12 +65,12 @@ import {
 } from "react";
 import {
   ArrowLeft, ArrowRight, AudioLines, ChevronRight, CornerDownLeft, ExternalLink, Globe, LayoutGrid, Link2,
-  LoaderCircle, Maximize2, Minimize2, Music, Plus, Rows3, Search, X,
+  LoaderCircle, Music, Plus, Rows3, Search, X,
 } from "lucide-react";
 import AudioPlayer from "./AudioPlayer";
 import { toast } from "../components/ui/glass-toast";
 import {
-  MUSIC_UPLOAD_MAX_BYTES, addMusicLink, loadLastMusic, loadMusicLinks, removeMusicLink, saveLastMusic,
+  MUSIC_UPLOAD_MAX_BYTES, addMusicLink, addMusicTrack, loadLastMusic, loadMusicLinks, removeMusicLink, saveLastMusic,
   saveMusicLinks, type MusicSource, type MusicTrack,
 } from "./musicLibrary";
 import { listLocalSongs, removeLocalSong, songObjectUrl, storeLocalSong } from "./musicDb";
@@ -139,6 +139,13 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
   const [uploading, setUploading] = useState(false);
   /** YouTube shows recent searches when the box has the caret and is empty. */
   const [searchFocused, setSearchFocused] = useState(false);
+  /**
+   * The music library's OWN nested search page (owner, 2026-10-16+): tapping
+   * the search box on the library page opens a separate search page — the
+   * same shape the Resource Library wears (back arrow · box · format button,
+   * recent searches, the flash scan) — and only its back arrow closes it.
+   */
+  const [searchPageOpen, setSearchPageOpen] = useState(false);
   const [playUrl, setPlayUrl] = useState("");
   const [resolving, setResolving] = useState(false);
   /** The library, opened OVER the audio player by the library glyph. */
@@ -147,9 +154,7 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
   const [layout, setLayout] = useState<"compact" | "wide">("compact");
   const [playerShare, setPlayerShare] = useState(58);
   const [dragging, setDragging] = useState(false);
-  /** Our own full-area mode (the toggle the learner presses). */
-  const [immersive, setImmersive] = useState(false);
-  /** The browser's Fullscreen API — the same element, the platform's button. */
+  /** The browser's Fullscreen API — YouTube's own inbuilt button lands here. */
   const [nativeFull, setNativeFull] = useState(false);
   const [searchKeyReady, setSearchKeyReady] = useState(youTubeSearchAvailable);
 
@@ -164,7 +169,7 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
   const dragRef = useRef<number | null>(null);
   const shareRef = useRef(playerShare);
 
-  const fullscreen = immersive || nativeFull;
+  const fullscreen = nativeFull;
 
   useEffect(() => subscribeYouTubeKey(() => setSearchKeyReady(youTubeSearchAvailable())), []);
 
@@ -253,6 +258,16 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
     return () => window.clearTimeout(id);
   }, [filter, view]);
 
+  /** The nested search page opened from a tap IN the box, so the box keeps
+   *  the caret — and the phone keeps its keyboard up (owner, 2026-10-16:
+   *  "search page khulne ke sath sath keyboard bhi user ka open hoga").
+   *  Without this the remount into the page's own bar would drop both. */
+  useEffect(() => {
+    if (!searchPageOpen) return;
+    const id = window.setTimeout(() => searchRef.current?.focus(), 30);
+    return () => window.clearTimeout(id);
+  }, [searchPageOpen]);
+
   /** The platform's own fullscreen button (and ours) both land here. */
   useEffect(() => {
     const doc = typeof document === "undefined" ? null : document;
@@ -278,7 +293,6 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
   const backToLibrary = useCallback(() => {
     setView("library");
     setSheetOpen(false);
-    setImmersive(false);
     setNativeFull(false);
     exitNativeFullscreen();
   }, [exitNativeFullscreen]);
@@ -288,7 +302,6 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
     saveLastMusic(uid, track);
     setNotice("");
     setSheetOpen(false);
-    setImmersive(false);
     setView("player");
   }, [uid]);
 
@@ -397,6 +410,9 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
     if (filter !== "all" && filter !== "online") return;
     const text = query.trim();
     if (!text || !searchKeyReady) return;
+    // "Jaise hi Enter karein keyboard close ho jaaye" — the box gives the
+    // caret up the moment the search runs, so the results get the screen.
+    searchRef.current?.blur();
     // A search is an ONLINE act: the results are shown in the Online list, and
     // they stay there for the rest of the visit — "online filter mein vah
     // sabhi dikhenge jo user search karke dekh chuka hai".
@@ -405,8 +421,15 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
   }, [addLink, filter, query, search, searchKeyReady]);
 
   const playResult = useCallback((track: MusicTrack) => {
-    const added = addMusicLink(uid, track.url);
-    if (added) setLinks(added.tracks);
+    // Save the result AS the provider described it — real title, channel and
+    // artwork — never a re-parse of the bare URL (which left a nameless,
+    // pictureless "YouTube video" row in the saved list).
+    const added = addMusicTrack(uid, track);
+    if (added) {
+      setLinks(added.tracks);
+      select(added.track);
+      return;
+    }
     select(track);
   }, [uid, select]);
 
@@ -416,17 +439,6 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
   }, [chooseFilter]);
 
   /* ── Full screen + the draggable divider ──────────────────────────────── */
-
-  const toggleFullscreen = useCallback(async () => {
-    if (fullscreen) {
-      setImmersive(false);
-      setNativeFull(false);
-      exitNativeFullscreen();
-      return;
-    }
-    setImmersive(true);
-    try { await stageRef.current?.requestFullscreen?.(); } catch { /* iOS: the in-app full area is the fallback */ }
-  }, [exitNativeFullscreen, fullscreen]);
 
   const shareFromClientY = useCallback((clientY: number) => {
     const stage = stageRef.current;
@@ -520,8 +532,9 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
    *  the search's own results, or a search in flight (the flash scan's rows). */
   const showCardsToggle = shelves.includes("link") || showResults || (searchLoading && !urlMode);
   /** YouTube's own habit: the box has the caret, it is empty, and there is
-   *  something to come back to. */
-  const showHistory = !urlMode && searchFocused && !query.trim() && search.history.length > 0;
+   *  something to come back to. The nested search page keeps the list up
+   *  even after the caret leaves the box (its back arrow is the only exit). */
+  const showHistory = !urlMode && (searchFocused || searchPageOpen) && !query.trim() && search.history.length > 0;
 
   const visibleSections = shelves
     .map((source) => ({ source, tracks: musicQueryFilter(shelfTracks(source), effectiveQuery) }))
@@ -542,7 +555,8 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
    * The open PLAYER is the other half of the rule and is published above (an
    * open audio player or YouTube player always takes the footer away).
    */
-  const musicSearchView = searchLoading || showHistory ? "page" : searched ? "results" : "closed";
+  const musicSearchView =
+    searchLoading || showHistory || (searchPageOpen && !searched) ? "page" : searched ? "results" : "closed";
   useEffect(() => {
     setSearchSurface("music", musicSearchView);
   }, [musicSearchView]);
@@ -556,9 +570,34 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
     setSearchScrolledAway("music", resultsScrolledAway);
   }, [resultsScrolledAway]);
 
+  /**
+   * The filter tray follows the same scroll rule (owner, 2026-10-16+):
+   * "header ke niche jo filter box hai vah slide hone per hide ho jana
+   * chahie" — scrolling down slides it away, scrolling up (or reaching the
+   * top) brings it back. One scroll host feeds both listeners.
+   */
+  const { scrollerRef: trayScrollerRef, hidden: trayScrolledAway } = useScrollAwayHidden(true);
+  const musicBodyRef = useCallback(
+    (node: HTMLElement | null) => {
+      musicScrollerRef(node);
+      trayScrollerRef(node);
+    },
+    [musicScrollerRef, trayScrollerRef],
+  );
+
   /* ── The pieces ───────────────────────────────────────────────────────── */
 
-  const searchBar = ({ compact, onOpenFullPage }: { compact: boolean; onOpenFullPage?: () => void }) => {
+  const searchBar = ({
+    compact,
+    onOpenFullPage,
+    onSearchIntent,
+  }: {
+    compact: boolean;
+    onOpenFullPage?: () => void;
+    /** The library page hands this in: a tap in the box opens the nested
+     *  search page (module library's own shape) instead of searching inline. */
+    onSearchIntent?: () => void;
+  }) => {
     const height = compact ? "h-10" : "h-11";
     const canSearchOnline = filter === "all" || filter === "online";
     return (
@@ -587,7 +626,10 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
             ref={searchRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            onFocus={() => setSearchFocused(true)}
+            onFocus={() => {
+              setSearchFocused(true);
+              if (!urlMode) onSearchIntent?.();
+            }}
             onBlur={() => setSearchFocused(false)}
             placeholder={MUSIC_SEARCH_PLACEHOLDER[filter]}
             aria-label={urlMode ? "Paste a song link" : "Search the music library"}
@@ -671,8 +713,21 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
     );
   };
 
-  const tray = () => (
-    <div className="shrink-0 bg-white px-2 py-2 sm:px-4" data-music-tray data-music-tray-theme="white">
+  /** `inFlow` = the tray sits INSIDE the scroller (the video player's library
+   *  half), so it scrolls away with the page itself — the slide-away collapse
+   *  is only for the library page, where the tray rides above the scroller. */
+  const tray = ({ inFlow = false }: { inFlow?: boolean } = {}) => {
+    const trayAway = !inFlow && trayScrolledAway;
+    return (
+    <div
+      className={`shrink-0 overflow-hidden bg-white transition-[max-height,opacity,transform,padding] duration-300 ease-out ${inFlow ? "" : "px-2 sm:px-4"} ${
+        trayAway ? "max-h-0 -translate-y-2 py-0 opacity-0" : "max-h-24 translate-y-0 py-2 opacity-100"
+      }`}
+      data-music-tray
+      data-music-tray-theme="white"
+      data-music-tray-away={trayAway ? "true" : "false"}
+      aria-hidden={trayAway ? "true" : undefined}
+    >
       <div className="mx-auto flex w-full max-w-3xl items-center gap-2">
         <div
           role="group"
@@ -726,7 +781,8 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
         ) : null}
       </div>
     </div>
-  );
+    );
+  };
 
   /* Recent searches, exactly the shape YouTube's own search page uses —
      * shown while the box has the caret and is still empty. */
@@ -740,11 +796,57 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
   ) : null;
 
   /** Every song list in the pane comes out of here — sections, empty page, options. */
-  const body = () => {
+  const body = (searchPage = false) => {
     if (searchLoading && !urlMode) {
       // The flash scan: a full second even on the fastest network, and for as
-      // long as it really takes when the network is slow.
+      // long as it really takes when the search is slow.
       return <SearchFlashScan rows={5} label="YouTube par search ho raha hai" />;
+    }
+
+    if (searchPage) {
+      // ── The nested search page (module library's own shape) ──────────────
+      // Recent searches until something runs; then ONLY the results, which
+      // stay here until the back arrow closes the page.
+      return (
+        <div data-music-search-page-body>
+          {historyPanel}
+          {searched ? (
+            <>
+              {noResults ? (
+                <p className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800" data-music-no-results>
+                  YouTube se kuch nahin mila.{" "}
+                  <a href={youTubeSearchUrl(query)} target="_blank" rel="noopener noreferrer" data-music-search-external
+                    className="underline decoration-amber-400 underline-offset-2">
+                    YouTube par khud search karo
+                  </a>{" "}
+                  aur link yahan paste kar do — library usi ko chala degi.
+                </p>
+              ) : null}
+              {freshResults.length > 0 ? (
+                <div className="mb-4" data-music-results data-music-results-view={densityMode}>
+                  <p className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                    YouTube results
+                    {searchedQuery ? <span className="truncate normal-case tracking-normal text-slate-500">“{searchedQuery}”</span> : null}
+                    <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] text-slate-500">{freshResults.length}</span>
+                  </p>
+                  <MusicTrackList
+                    asResult
+                    tracks={freshResults}
+                    variant={densityMode}
+                    currentId={current?.id ?? null}
+                    playing={Boolean(current)}
+                    onPlay={playResult}
+                  />
+                </div>
+              ) : null}
+            </>
+          ) : !showHistory ? (
+            <p className="px-3 py-6 text-center text-[11.5px] font-medium leading-5 text-slate-500" data-music-search-page-hint>
+              YouTube ke lectures aur songs — type karo aur Enter dabao.
+            </p>
+          ) : null}
+        </div>
+      );
     }
 
     if (startOptions) {
@@ -878,8 +980,59 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
     mode: SurfaceMode;
     onOpenFullPage?: () => void;
     onClose?: () => void;
-  }) => (
-    <div className="flex h-full min-h-0 w-full flex-col bg-white" data-music-library={mode}>
+  }) => {
+    /** The nested search page lives on the library PAGE surface only. */
+    const searchPageActive = mode === "page" && searchPageOpen && !urlMode;
+    /** The search strip. On the PAGE it rides above the scroller; under a
+     *  playing VIDEO it is rendered INSIDE the scroller instead, so the box
+     *  and the filter tray scroll away with the list (owner, 2026-10-16). */
+    const searchRow = (
+      <div className={`shrink-0 bg-white ${mode === "video" ? "pb-1 pt-2" : "px-3 pt-3 sm:px-5"}`}>
+        <div className={`mx-auto w-full ${mode === "video" ? "" : "max-w-3xl"}`}>
+          {searchPageActive ? (
+            // ── The nested search page's strip: back · the same box · format ──
+            <div className="flex w-full min-w-0 items-center gap-2" data-music-search-page-bar>
+              <button
+                type="button"
+                onClick={() => setSearchPageOpen(false)}
+                data-music-search-back
+                aria-label="Back to the music library"
+                title="Back to the music library"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-100"
+              >
+                <ArrowLeft size={18} aria-hidden="true" />
+              </button>
+              <div className="min-w-0 flex-1">{searchBar({ compact: false })}</div>
+              <button
+                type="button"
+                onClick={flipDensity}
+                data-music-search-view
+                data-music-search-format-toggle
+                data-music-search-format-next={densityMode === "list" ? "grid" : "list"}
+                aria-pressed={densityMode === "grid"}
+                aria-label={densityMode === "list" ? "Thumbnail view" : "List view"}
+                title={densityMode === "list" ? "Thumbnail view" : "List view"}
+                className={`grid h-10 w-10 shrink-0 place-items-center rounded-full border shadow-sm transition ${
+                  densityMode === "grid"
+                    ? "border-slate-950 bg-slate-950 text-white hover:bg-slate-800"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                {densityMode === "list" ? <LayoutGrid size={15} /> : <Rows3 size={15} />}
+              </button>
+            </div>
+          ) : (
+            searchBar({
+              compact: mode === "video",
+              onOpenFullPage,
+              ...(mode === "page" ? { onSearchIntent: () => setSearchPageOpen(true) } : {}),
+            })
+          )}
+        </div>
+      </div>
+    );
+    return (
+    <div className="flex h-full min-h-0 w-full flex-col bg-white" data-music-library={mode} data-music-search-page={searchPageActive ? "open" : "closed"}>
       {mode === "sheet" ? (
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-3 py-2.5">
           <p className="min-w-0 flex-1 truncate text-[13px] font-black tracking-tight text-slate-950">Music library</p>
@@ -909,13 +1062,9 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
         </div>
       ) : null}
 
-      <div className={`shrink-0 bg-white ${mode === "video" ? "px-2 pt-2" : "px-3 pt-3 sm:px-5"}`}>
-        <div className={`mx-auto w-full ${mode === "video" ? "" : "max-w-3xl"}`}>
-          {searchBar({ compact: mode === "video", onOpenFullPage })}
-        </div>
-      </div>
+      {mode === "video" ? null : searchRow}
 
-      {tray()}
+      {mode === "video" || searchPageActive ? null : tray()}
 
       {notice ? (
         <p className="shrink-0 border-y border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800" data-music-notice>
@@ -925,13 +1074,22 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
 
       <div className="relative min-h-0 flex-1">
         <div
-          className={`h-full overflow-y-auto px-2.5 pt-2 ${mode === "video" ? "pb-20" : "pb-24"} sm:px-4`}
+          className={`h-full overflow-y-auto px-2.5 ${mode === "video" ? "pb-20 pt-0" : "pb-24 pt-2"} sm:px-4`}
           data-music-body
-          ref={musicScrollerRef}
+          ref={musicBodyRef}
         >
-          <div className={`mx-auto w-full ${mode === "video" ? "" : "max-w-5xl"}`}>{body()}</div>
+          {mode === "video" ? (
+            // Under a playing video the controls live IN the scroll flow: the
+            // search box and the filter tray slide up with the list, exactly
+            // as the library page scrolls (owner, 2026-10-16).
+            <div data-music-video-controls>
+              {searchRow}
+              {tray({ inFlow: true })}
+            </div>
+          ) : null}
+          <div className={`mx-auto w-full ${mode === "video" ? "" : "max-w-5xl"}`}>{body(searchPageActive)}</div>
         </div>
-        {addFab}
+        {searchPageActive ? null : addFab}
       </div>
 
       <input
@@ -944,7 +1102,8 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
         onChange={(event) => void onPickFile(event.target.files?.[0])}
       />
     </div>
-  );
+    );
+  };
 
   /* ── The player: audio (a page) or video (official embed + library) ────── */
 
@@ -987,7 +1146,6 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
               Ye song abhi load nahi ho paya.
             </p>
           )}
-          {chrome()}
         </div>
       ) : (
         <>
@@ -1014,7 +1172,6 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
                 Ye song abhi load nahi ho paya.
               </p>
             )}
-            {chrome()}
           </div>
 
           {/* The draggable horizontal divider: the app's one divider language —
@@ -1063,36 +1220,12 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
     </div>
   ) : null;
 
-  /** The player's own chrome: back to the library, the title, full screen. */
-  function chrome() {
-    return (
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-gradient-to-b from-slate-950/85 via-slate-950/35 to-transparent p-2"
-        data-music-player-chrome
-      >
-        <button
-          type="button"
-          onClick={backToLibrary}
-          data-music-back
-          aria-label="Back to library"
-          className="pointer-events-auto grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-950/70 text-white backdrop-blur hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-        >
-          <ArrowLeft size={17} />
-        </button>
-        <p className="pointer-events-none min-w-0 flex-1 truncate text-[12px] font-bold text-white drop-shadow">{current?.title}</p>
-        <button
-          type="button"
-          onClick={() => void toggleFullscreen()}
-          data-music-fullscreen-toggle
-          aria-pressed={fullscreen}
-          aria-label={fullscreen ? "Exit full screen" : "Full screen"}
-          className="pointer-events-auto grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-950/70 text-white backdrop-blur hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-        >
-          {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-        </button>
-      </div>
-    );
-  }
+  /* The video player carries NO overlay chrome of its own any more (owner,
+   * 2026-10-16): YouTube's player already shows the title, its own controls
+   * and the inbuilt full-screen button — our back button, the title text and
+   * the full-screen toggle were all duplicates drawn on top of it. The way
+   * out of the player is the compact search bar's arrow below the divider
+   * (openFullLibrary), which also brings the library page back. */
 
   return (
     <section

@@ -622,12 +622,13 @@ test("the toolbar rides at the bottom of the sheet as the note editor's pill", (
   assert.doesNotMatch(panel, /spaceBelow/);
 });
 
-test("the warning text lives in the save drop-down, not in a persistent bar", () => {
-  // Owner (2026-09-29): the long warning line at the bottom is gone — tapping
-  // the blinking beacon opens the message itself.
+test("the warning text lives in the library's error notice, never a persistent bar", () => {
+  // Owner (2026-09-29): the long warning line at the bottom is gone. And with
+  // the save button itself removed (2026-10-16+), a real failure now speaks
+  // through the panel's StudyLibraryNotice — still no persistent bar.
   assert.doesNotMatch(panel, /data-course-mindmap-error/);
-  assert.match(toolbar, /<ToolbarMenu[\s\S]*?label=\{storageOnly \? "Device-only save" : "Cloud save"\}[\s\S]*?data-course-mindmap-save-message/);
-  assert.match(toolbar, /\{errorMessage \? \(\s*<p className="mm-menu-note" data-course-mindmap-save-message>/);
+  assert.match(panel, /\{status === "error" \? \(\s*<StudyLibraryNotice\s*state="error"/);
+  assert.match(panel, /title=\{storageOnly \? "Device save needs attention" : "Mind map sync needs attention"\}/);
 });
 
 test("the empty-map hint is gone — an empty map shows just the root", () => {
@@ -657,26 +658,21 @@ test("the toolbar measures itself, and its tiles are the note pill's 36px everyw
   assert.match(styles, /\.mm-tool > svg \{\s*width: 1rem;/);
 });
 
-test("cloud save is an icon with a blinking beacon, and the words moved to its menu", () => {
-  // The "Cloud par saved" text was the widest thing on the bar; it is a cloud
-  // icon now, tinted by the state, with a blinking dot while there is a
-  // message — and tapping it still shows the message (plus a save-now action).
-  assert.match(toolbar, /data-course-mindmap-save/);
-  assert.match(toolbar, /data-save-status=\{status\}/);
-  assert.match(toolbar, /data-blink=\{saveBlink \? "true" : "false"\}/);
-  assert.match(toolbar, /storageOnly[\s\S]*?status === "saving" \? <CloudUpload \/> : status === "saved" \? <CloudCheck \/> : status === "error" \? <CloudAlert \/> : <Cloud \/>/);
-  assert.match(toolbar, /\{saveBlink \? <span className="mm-blink" data-course-mindmap-save-blink aria-hidden="true" \/> : null\}/);
-  assert.match(toolbar, /<ToolbarMenu[\s\S]*?label=\{storageOnly \? "Device-only save" : "Cloud save"\}[\s\S]*?data-course-mindmap-save-label/);
-  assert.match(toolbar, /data-course-mindmap-save-now/);
-  // The beacon blinks (and only while a message is live): a finished save
-  // blinks for a beat, an in-flight or failed one keeps blinking.
-  assert.match(panel, /const SAVED_BLINK_MS = 2400;/);
-  assert.match(panel, /if \(status === "saving" \|\| status === "error"\) \{\s*setSaveBlink\(true\);/);
-  assert.match(styles, /@keyframes mm-blink \{/);
-  assert.match(styles, /\.mm-blink \{[\s\S]*?animation: mm-blink 1\.05s ease-in-out infinite;/);
-  // It rides the tile's top-right corner and inherits the status colour.
-  assert.match(styles, /\.mm-blink \{[\s\S]*?position: absolute;\s*top: -1px;\s*right: -1px;/);
-  assert.match(styles, /\.mm-blink \{[\s\S]*?background: currentColor;/);
+test("the cloud-save button is gone from the bar — saving runs silently in the background", () => {
+  // The owner's 2026-10-16+ brief: "upar ek syncing synced ka button dikhta
+  // hai usko remove karo, function background mein chalti rahana chahie."
+  // No button, no beacon, no menu — only an invisible live region that still
+  // announces the state to a screen reader.
+  assert.match(toolbar, /<span className="sr-only" role="status" aria-live="polite" data-course-mindmap-save data-save-status=\{status\}>\s*\{save\.label\}/);
+  assert.doesNotMatch(toolbar, /data-course-mindmap-save-now/);
+  assert.doesNotMatch(toolbar, /data-course-mindmap-save-label/);
+  assert.doesNotMatch(panel, /saveBlink|SAVED_BLINK_MS|mm-blink/, "the beacon machinery left with the button");
+  assert.doesNotMatch(panel, /<CloudUpload|<CloudCheck|<CloudAlert/, "no cloud glyphs on the bar");
+  assert.doesNotMatch(styles, /mm-blink/, "the beacon's CSS is gone too");
+  // The state copy itself SURVIVES — it feeds the live region, proving the
+  // background save pipeline still reports as before.
+  assert.match(panel, /const save = \(storageOnly \? DEVICE_SAVE_COPY\[status\] : SAVE_COPY\[status\]\)/);
+  assert.match(panel, /const SAVE_COPY: Record<MindMapSaveStatus/);
 });
 
 test("one align icon opens a small drop-down with the box alignment + text fit", () => {

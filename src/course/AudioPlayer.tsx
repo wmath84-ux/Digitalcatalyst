@@ -158,6 +158,8 @@ function VinylDisc({
       >
         <div
           aria-hidden
+          data-course-audio-glow
+          data-playing={playing ? "true" : "false"}
           className="absolute inset-0 rounded-full"
           style={{ background: color, opacity: 0.18, filter: "blur(28px)", transform: "scale(1.15)" }}
         />
@@ -171,6 +173,7 @@ function VinylDisc({
             boxShadow: `0 0 0 8px rgba(255,255,255,0.03), 0 12px 40px rgba(0,0,0,0.5)`,
           }}
           data-course-audio-disc
+          data-playing={playing ? "true" : "false"}
         >
           <motion.div
             animate={{ rotate: playing ? 360 : 0 }}

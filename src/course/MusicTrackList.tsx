@@ -65,7 +65,7 @@ export function TrackArtwork({
         variant === "card"
           ? "relative block aspect-video w-full overflow-hidden bg-slate-900"
           : variant === "wide"
-            ? "relative aspect-video w-[86px] shrink-0 overflow-hidden rounded-xl bg-slate-900"
+            ? "relative block aspect-video w-[86px] shrink-0 overflow-hidden rounded-xl bg-slate-900"
             : "relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-slate-900"
       }
     >

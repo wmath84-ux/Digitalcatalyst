@@ -305,7 +305,7 @@ test("the stored shape is normalised on read so a bad document can never crash t
 // ---------------------------------------------------------------------------
 
 test("a learner-authored course is projected into the player's own Product shape", () => {
-  assert.match(playerHost, /lazy\(\(\) => import\("\.\.\/CoursePlayerApp"\)\)/);
+  assert.match(playerHost, /lazyWithChunkRecovery\(\(\) => import\("\.\.\/CoursePlayerApp"\)\)/);
   assert.match(playerHost, /<CoursePlayer/);
   assert.match(adapter, /export const myCourseToProduct/);
   assert.match(

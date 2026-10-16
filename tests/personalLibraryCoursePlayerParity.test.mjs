@@ -39,7 +39,10 @@ const OVERLAY = read("src/course/CourseOverlay.tsx");
 const PANEL = read("src/course/PlayerPanel.tsx");
 
 test("the Personal Library opens the SAME player, flagged as the learner's own", () => {
-  assert.match(HOST, /const CoursePlayer = lazy\(\(\) => import\("\.\.\/CoursePlayerApp"\)\);/);
+  // The host still LAZY-loads the one true player — through the app's own
+  // chunk-recovery lazy() wrapper, which retries a failed fetch and survives
+  // a redeploy swapping the hashed chunk under an open tab.
+  assert.match(HOST, /const CoursePlayer = lazyWithChunkRecovery\(\(\) => import\("\.\.\/CoursePlayerApp"\)\);/);
   assert.match(HOST, /<CoursePlayer\n\s+key=\{course\.id\}\n\s+product=\{product\}\n\s+onBack=\{onBack\}/);
   assert.match(HOST, /mine=\{\{ courseId: course\.id \}\}/);
   // One player instance per course: opening another course starts it clean.
@@ -85,23 +88,50 @@ test("the deck's shape round-trips under the learner's own namespace", () => {
   const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "https://example.test" });
   globalThis.window = dom.window;
   globalThis.localStorage = dom.window.localStorage;
-  const code = ts.transpileModule(read("src/course/quadLayout.ts"), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 },
-  }).outputText;
-  const mod = { exports: {} };
-  new Function("require", "module", "exports", code)((id) => require(id), mod, mod.exports);
-  const { loadQuadLayout, saveQuadLayout, QUAD_DEFAULT_STATE } = mod.exports;
+  // quadLayout pulls its free-block geometry from ./quadFlex since the
+  // dynamic-cross work, so the shim transpiles RELATIVE imports from
+  // src/course too instead of letting require() look beside this test file.
+  const moduleCache = new Map();
+  const loadCourseModule = (file) => {
+    if (moduleCache.has(file)) return moduleCache.get(file).exports;
+    const code = ts.transpileModule(read(`src/course/${file}.ts`), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    const mod = { exports: {} };
+    moduleCache.set(file, mod);
+    new Function("require", "module", "exports", code)(
+      (id) => (id.startsWith("./") ? loadCourseModule(id.slice(2)) : require(id)),
+      mod,
+      mod.exports,
+    );
+    return mod.exports;
+  };
+  const { loadQuadLayout, saveQuadLayout, QUAD_DEFAULT_STATE } = loadCourseModule("quadLayout");
 
   const mineKey = "mine-abc";
   const officialKey = "official-9";
   assert.deepEqual(loadQuadLayout(mineKey), QUAD_DEFAULT_STATE, "a fresh own-course starts in the default + shape");
 
-  const mine = { format: "pair", closed: ["c22"], col: 32, col2: 40, row: 71, swappedCols: true, swappedRows: false };
+  // The free-blocks deck added `flex`, `pages` and `focus` to the stored
+  // shape; a save that omits them gets the defaults back on load.
+  const mine = {
+    format: "pair",
+    closed: ["c22"],
+    col: 32,
+    col2: 40,
+    row: 71,
+    swappedCols: true,
+    swappedRows: false,
+    flex: QUAD_DEFAULT_STATE.flex,
+    pages: QUAD_DEFAULT_STATE.pages,
+    focus: QUAD_DEFAULT_STATE.focus,
+  };
   saveQuadLayout(mineKey, mine);
   assert.deepEqual(loadQuadLayout(mineKey), mine, "the own-course shape is remembered");
 
   // A shape saved BEFORE the three-column button existed (no `col2`) still
-  // loads: the second vertical divider falls back to its default.
+  // loads: the second vertical divider falls back to its default — and the
+  // dynamic cross's own fields fall back the same way.
   localStorage.setItem(
     "dc.course.quadLayout.v1.old-shape",
     JSON.stringify({ format: "quad", closed: [], col: 44, row: 55, swappedCols: false, swappedRows: false }),
@@ -114,6 +144,9 @@ test("the deck's shape round-trips under the learner's own namespace", () => {
     row: 55,
     swappedCols: false,
     swappedRows: false,
+    flex: QUAD_DEFAULT_STATE.flex,
+    pages: QUAD_DEFAULT_STATE.pages,
+    focus: QUAD_DEFAULT_STATE.focus,
   });
 
   // The official course is untouched — one learner's own layout never leaks.

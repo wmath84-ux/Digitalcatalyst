@@ -75,12 +75,13 @@ test("3+4 — the editing toolbar: one opaque pill at the exact bottom, Note-Edi
   // The Note Editor pill's exact tile geometry.
   assert.match(strip, /--mm-tool-size: 36px;/);
   assert.match(css, /\.mm-tool \{[^}]*width: var\(--mm-tool-size\);[^}]*height: var\(--mm-tool-size\);/);
-  // …with the mind map's own glyphs preserved (save state, arrange, fit…).
-  assert.match(panel, /data-course-mindmap-save/);
+  // …with the save state surviving as an invisible live region only — the
+  // visible syncing/synced button is gone (owner, 2026-10-16+), the save
+  // itself keeps running in the background.
+  assert.match(panel, /className="sr-only" role="status" aria-live="polite" data-course-mindmap-save/);
   // The eye leads that bar, in the same tile design as every other control.
   assert.match(panel, /className="mm-tool"[\s\S]{0,160}?data-mindmap-edit-read/);
   assert.match(panel, /<Eye size=\{16\} aria-hidden="true" \/>/);
-  assert.match(panel, /storageOnly\s*\? <HardDrive \/>/);
   // …and read mode's tray is the note page's read navigation: the side-panel
   // button, New mind map, the pencil and Home.
   assert.match(panel, /data-mindmap-read-tray/);

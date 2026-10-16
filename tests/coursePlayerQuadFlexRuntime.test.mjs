@@ -35,7 +35,7 @@ import { createRoot } from "react-dom/client";
 import { act } from "react";
 import QuadDeck from ${JSON.stringify(path.join(ROOT, "src/course/QuadDeck.tsx"))};
 import { BLOCK_PAGES } from ${JSON.stringify(path.join(ROOT, "src/course/blockPages.ts"))};
-import { QUAD_DEFAULT_STATE, quadPaneButtons, quadRows, quadSetFormat, quadTogglePane, quadSingleSplit } from ${JSON.stringify(path.join(ROOT, "src/course/quadLayout.ts"))};
+import { QUAD_DEFAULT_STATE, quadPaneButtons, quadRows, quadSetBlockPage, quadSetFormat, quadTogglePane, quadSingleSplit } from ${JSON.stringify(path.join(ROOT, "src/course/quadLayout.ts"))};
 import { resetPageHistory } from ${JSON.stringify(path.join(ROOT, "src/course/pageHistory.ts"))};
 
 export const DEFAULT_VIEW = { zoom: 100, dividers: { vTop: true, vBottom: true, hLeft: true, hRight: true } };
@@ -47,7 +47,7 @@ export const flexState = (over = {}) => ({
   ...over,
 });
 
-export { act, BLOCK_PAGES, quadPaneButtons, quadRows, quadSetFormat, quadTogglePane, quadSingleSplit, resetPageHistory };
+export { act, BLOCK_PAGES, quadPaneButtons, quadRows, quadSetBlockPage, quadSetFormat, quadTogglePane, quadSingleSplit, resetPageHistory };
 
 export function mountDeck(host, options = {}) {
   const root = createRoot(host);
@@ -431,8 +431,11 @@ test("a picker press opens that page in its block — and it stays while the blo
     await click(pickButton("c11", "lesson"), "the Lesson button");
     assert.equal(Boolean(pickerFor("c11")), false, "the blank page steps aside");
     assert.equal(Boolean(query('[data-quad-free="c11"] [data-fake-page="lesson"]')), true);
-    // The switcher takes the block back to its full page list…
-    await click(query('[data-course-block-switch="c11"]'), "the Pages switcher");
+    // The header's Pages button (it lives OUTSIDE the deck) takes the block
+    // back to its full page list by clearing the block's page — the exact
+    // call openActiveBlockPicker makes in CoursePlayerApp.
+    deck.setState(fixture.quadSetBlockPage(deck.state, "c11", null));
+    await settle(20);
     assert.equal(Boolean(pickerFor("c11")), true, "the blank page's list is back");
     await click(pickButton("c11", "music"), "the Music button");
     // …and the first page STAYS MOUNTED behind it (a playing video never
@@ -463,36 +466,30 @@ test("a page picked in another block MOVES there — one page, one block", async
   }
 });
 
-/* ── 4 · the top-left step-back ────────────────────────────────────────── */
+/* ── 4 · the active block (the old Back button and switch are gone) ────── */
 
-test("the top-left Back button walks ONE page back at a time — and never jumps home", async () => {
+test("no block carries the old Back button or Pages switch — a press marks the block ACTIVE instead", async () => {
+  // The owner's 2026-10-16+ revision: "vah back universal button remove kar
+  // dun kyunki donon ka ek hi function tha". The header's Pages button is the
+  // one replacement, and it acts on the block the learner touched LAST.
   const deck = await mount();
   try {
-    const back = backFor("c11");
-    assert.equal(Boolean(back), true, "every block carries the top-left Back button");
-    // Fresh block: nowhere to walk — the button sits disabled (never a jump).
-    assert.equal(back.getAttribute("data-enabled"), "false");
-    // blank → lesson → blank → modules: a real walk with pages behind it.
-    await click(pickButton("c11", "lesson"), "Lesson");
-    await click(query('[data-course-block-switch="c11"]'), "the Pages switcher");
-    await click(pickButton("c11", "modules"), "Module");
-    assert.equal(deck.state.pages.c11, "modules");
-    assert.equal(backFor("c11").getAttribute("data-enabled"), "true", "a previous page exists");
-    // ONE click, ONE step back (to the blank list) — not to the first page,
-    // and certainly not home.
-    await click(backFor("c11"), "Back");
-    await settle(20);
-    assert.equal(deck.state.pages.c11, null, "Back stepped to the blank page");
-    assert.equal(Boolean(pickerFor("c11")), true);
-    // Another click, another single step: the Lesson page returns.
-    await click(backFor("c11"), "Back");
-    await settle(20);
-    assert.equal(deck.state.pages.c11, "lesson", "one more step back reaches the Lesson page");
-    // Walk's end (blank starter left): disabled again — never a redirect.
-    await click(backFor("c11"), "Back");
-    await settle(20);
-    assert.equal(deck.state.pages.c11, null, "still in the deck, never sent home");
-    assert.equal(backFor("c11").getAttribute("data-enabled"), "false");
+    assert.equal(backFor("c11"), null, "the universal Back button is gone");
+    assert.equal(query("[data-course-page-back]"), null, "…from every block");
+    assert.equal(query("[data-course-block-switch]"), null, "and the per-block Pages switch with it");
+    // A press inside a block records it as the active one — the state the
+    // header's Pages button reads to open the right selection page.
+    assert.equal(deck.state.focus, "c11");
+    await act(async () => {
+      blockEl("c12").dispatchEvent(pointerEvent("pointerdown", 600, 100, 44));
+    });
+    await settle(50);
+    assert.equal(deck.state.focus, "c12", "the pressed block becomes the active one");
+    await act(async () => {
+      blockEl("c21").dispatchEvent(pointerEvent("pointerdown", 100, 600, 45));
+    });
+    await settle(50);
+    assert.equal(deck.state.focus, "c21", "every press moves the mark along");
   } finally {
     deck.done();
   }

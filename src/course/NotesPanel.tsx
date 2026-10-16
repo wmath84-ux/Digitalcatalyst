@@ -46,7 +46,7 @@
 //     its draft survive tab switches, and leaving the player resets to home.
 
 import { useDoubleTapToEdit } from "./useDoubleTapToEdit";
-import { Component, Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Component, Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import "./study-light-surfaces.css";
 import "./notesLibrary.css";
 import { BookOpen, ChevronLeft, ChevronRight, Eye, FileText, House, Library, NotebookPen, Pencil, Plus } from "lucide-react";
@@ -145,6 +145,31 @@ const noteCardTitle = (note: CoursePlayerNote) => {
   const { heading } = splitFirstHeading(html);
   const firstBlock = richTextToPlain(firstRichTextBlock(html));
   return (heading || firstBlock || notePreview(note) || `Untitled · ${String(note.id).slice(0, 8)}`).trim().slice(0, 120);
+};
+
+/**
+ * The library card's derived strings — title and word count — parse the
+ * note's FULL HTML through the DOM several times. Doing that for EVERY note
+ * on every draft flush while a long note is being typed was exactly the
+ * "editor lags with lots of text" bug; the functions are pure in the note's
+ * content, so each version of a note is parsed ONCE and then served from
+ * this bounded cache (oldest entries fall out first).
+ */
+const noteCardMetaCache = new Map<string, { title: string; words: number }>();
+const noteCardMeta = (note: CoursePlayerNote): { title: string; words: number } => {
+  const key = `${String(note.id)}\u0000${note.html || ""}\u0000${note.text || ""}`;
+  const cached = noteCardMetaCache.get(key);
+  if (cached) return cached;
+  const meta = {
+    title: noteCardTitle(note),
+    words: notePreview(note).trim().split(/\s+/).filter(Boolean).length,
+  };
+  if (noteCardMetaCache.size >= 400) {
+    const oldest = noteCardMetaCache.keys().next().value;
+    if (oldest !== undefined) noteCardMetaCache.delete(oldest);
+  }
+  noteCardMetaCache.set(key, meta);
+  return meta;
 };
 
 const aiKindLabel = (note: CoursePlayerNote) => {
@@ -715,7 +740,7 @@ export default function NotesPanel({
    * with the same body under the new title so the next autosave cannot write
    * the old title back.
    */
-  const renameNote = (note: CoursePlayerNote, nextTitle: string) => {
+  const renameNote = useCallback((note: CoursePlayerNote, nextTitle: string) => {
     const html = noteHtml(note);
     const split = splitFirstHeading(html);
     const body = split.heading ? split.body : html;
@@ -727,13 +752,18 @@ export default function NotesPanel({
     latestDraftRef.current = { title: nextTitle, bodyHtml: body };
     setSeed({ key: `edit:${note.id}`, title: nextTitle, body });
     editorRef.current?.load({ title: nextTitle, bodyHtml: body });
-  };
+  }, [onEdit]);
 
   // ── Library tree: one Branched Menu per collection ────────────────────
   // MASTER notes group by their real course-module chain; SELF notes group by
   // the learner's own module (under "My Modules") or by the official chain they
   // were captured from. Notes with no module context stay in "Unfiled notes".
-  const masterTree: BranchedMenuItem[] = buildBranchTree(
+  // Both trees are MEMOISED on the notes themselves: the panel re-renders on
+  // every batched draft while a note is being typed, and rebuilding the trees
+  // then — parsing every note's HTML again — was the other half of the
+  // "editor lags with lots of text" bug. A tree rebuild now needs the notes
+  // (or their module chains) to actually change.
+  const masterTree: BranchedMenuItem[] = useMemo(() => buildBranchTree(
     masterNotes.map((note): BranchEntry => {
       const path = courseModuleSegments(modules, note.moduleId);
       const words = (note.bodyHtml || "").trim().split(/\s+/).filter(Boolean).length;
@@ -752,16 +782,15 @@ export default function NotesPanel({
       };
     }),
     { sectionMeta: ({ count }) => <span>{count}</span> },
-  );
+  ), [masterNotes, modules]);
 
-  const selfTree: BranchedMenuItem[] = buildBranchTree(
+  const selfTree: BranchedMenuItem[] = useMemo(() => buildBranchTree(
     notes.map((note): BranchEntry => {
       const isPersonal = Boolean(note.personalModuleId || note.personalResourceId);
       const path = isPersonal
         ? personalModuleSegments(personalModules, note.personalModuleId || note.moduleId)
         : courseModuleSegments(modules, note.moduleId);
-      const title = noteCardTitle(note);
-      const wordCount = notePreview(note).trim().split(/\s+/).filter(Boolean).length;
+      const { title, words: wordCount } = noteCardMeta(note);
       const metadata = [
         wordCount ? `${wordCount} words` : "",
         note.links?.length ? `${note.links.length} linked` : "",
@@ -784,7 +813,7 @@ export default function NotesPanel({
         },
       };
     }),
-  );
+  ), [notes, modules, personalModules, renameNote]);
 
   const masterOpen = useBranchedOpen(masterTree);
   const selfOpen = useBranchedOpen(selfTree);
@@ -1047,22 +1076,14 @@ export default function NotesPanel({
             a still pointer counts; and the chrome itself (the tray, the library
             panel, a dialog) is never a tap on the page. */}
         <div className="flex min-h-0 flex-1 flex-col" data-course-notes-composer>
-          {/* Saving is automatic, so the page has NO Top chrome: no header, no
-              corner buttons — only this quiet status chip, centred, and it
-              never holds a button (owner brief: nothing sits at the top right
-              of a notes page). */}
-          <div
-            className="pointer-events-none absolute inset-x-0 top-[max(0.5rem,env(safe-area-inset-top))] z-20 flex justify-center px-3"
-            data-note-status-chip
-            data-note-autosave
-          >
-            <span
-              className={`inline-flex max-w-[60vw] items-center rounded-full border px-2.5 py-1 backdrop-blur ${
-                darkNote ? "border-slate-800 bg-slate-900/80" : "border-slate-200 bg-white/85"
-              }`}
-            >
-              <NoteStatus editing={editing || composing} dirty={dirty} tooLong={tooLong} sync={syncState} dark={darkNote} storageOnly={storageOnly} />
-            </span>
+          {/* Saving is automatic, so the page has NO Top chrome at all: no
+              header, no corner buttons — and (owner, 2026-10-16+) the
+              "Saving… / Synced" chip is GONE from the page. Autosave and
+              cloud sync keep running in the background exactly as before;
+              the status stays only as an invisible live region for screen
+              readers, and a real ERROR still speaks through the notice. */}
+          <div className="sr-only" data-note-status-chip data-note-autosave>
+            <NoteStatus editing={editing || composing} dirty={dirty} tooLong={tooLong} sync={syncState} dark={darkNote} storageOnly={storageOnly} />
           </div>
           {syncState?.status === "error" ? (
             <StudyLibraryNotice

@@ -525,9 +525,12 @@ test("dragging one divider leaves the other divider independent — both axes dr
   assert.equal(deckEl().getAttribute("data-quad-dragging"), "none");
 
   // And the round-trip: row back to 50%, column back to 50%, again without
-  // the other axis moving — so both drags are independent end to end.
+  // the other axis moving — so both drags are independent end to end. The
+  // drag is DELTA-based (no jump under the finger), so each pull starts from
+  // where the divider really is: the row clamped at 85% = y 680 of 800, not
+  // at the 700 the previous pointer stopped on past the clamp.
   await dragTo(dividerEl("v"), [620, 400], [500, 400]);
-  await dragTo(dividerEl("h"), [500, 700], [500, 400]);
+  await dragTo(dividerEl("h"), [500, 680], [500, 400]);
   assert.equal(deckEl().getAttribute("data-quad-col"), "50", "vertical divider back to centre");
   assert.equal(deckEl().getAttribute("data-quad-row"), "50", "horizontal divider back to centre");
 
