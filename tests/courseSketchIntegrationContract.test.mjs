@@ -146,7 +146,12 @@ test("touch handling is left to Excalidraw and the deck — nothing global is di
   assert.doesNotMatch(code(panel), /touch-action/, "no app-level touch-action override");
   assert.doesNotMatch(code(panel), /preventDefault|stopPropagation/, "the canvas's own gestures are not intercepted");
   // The divider keeps its own pointer capture; the panel never touches it.
-  assert.doesNotMatch(code(panel), /pointerdown|onPointerDown|setPointerCapture/i);
+  // The panel owns exactly ONE pointer listener, and it is read mode's
+  // single-tap hide: it records where a press started and never cancels,
+  // redirects or captures a gesture — the canvas keeps its own.
+  assert.match(code(panel), /onPointerDownCapture=\{\(event\) => \{ readTapStartRef\.current = \{ x: event\.clientX, y: event\.clientY \}; \}\}/);
+  assert.doesNotMatch(code(panel), /setPointerCapture/);
+  assert.match(code(panel), /READ_TAP_SLOP_PX/);
   assert.match(deck, /setPointerCapture/);
 });
 

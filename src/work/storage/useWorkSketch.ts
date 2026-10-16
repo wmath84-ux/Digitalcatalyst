@@ -420,6 +420,26 @@ export default function useWorkSketch() {
     return key;
   }, []);
 
+  /**
+   * Rename one canvas — the panel's long-press Rename, in place. Work's boards
+   * live in a device-local index, so the new title is written there and the
+   * open canvas's title (which is read off that row) follows at once.
+   */
+  const renameBoard = useCallback((key: string, nextTitle: string): boolean => {
+    const sketchKey = sanitizeSketchKey(key);
+    const title = sanitizeSketchTitle(nextTitle);
+    const row = boardsRef.current.find((candidate) => candidate.sketchKey === sketchKey);
+    if (!row || !title || row.title === title) return false;
+    const next = boardsRef.current.map((candidate) =>
+      candidate.sketchKey === sketchKey ? { ...candidate, title } : candidate,
+    );
+    boardsRef.current = next;
+    setBoards(next);
+    persistIndex(next);
+    bump((value) => value + 1);
+    return true;
+  }, []);
+
   const deleteBoard = useCallback((key: string): boolean => {
     const target = sanitizeSketchKey(key);
     const currentRows = boardsRef.current;
@@ -470,9 +490,10 @@ export default function useWorkSketch() {
     boardsLoading: false,
     onSelectBoard: selectBoard,
     onCreateBoard: createBoard,
+    onRenameBoard: renameBoard,
     canCreateBoard: boards.length < MAX_SKETCH_BOARDS,
     onDeleteActive: () => deleteBoard(activeBoardKey),
-    canDeleteActive: activeBoardKey !== SKETCH_DEFAULT_KEY && boards.length > 1,
+    onDeleteBoard: deleteBoard,
     flush,
     retry,
     revision,

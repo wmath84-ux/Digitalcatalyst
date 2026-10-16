@@ -2277,7 +2277,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             onSelectBoard={sketch.selectBoard}
             onCreateBoard={sketch.createBoard}
             onDeleteActive={() => sketch.deleteBoard(sketch.activeBoardKey)}
-            canDeleteActive={sketch.boards.length > 1}
+            // The panel's own row actions: rename edits that row's label in
+            // place, delete asks the same confirmation the old header did.
+            onRenameBoard={sketch.renameBoard}
+            onDeleteBoard={(key) => sketch.deleteBoard(key)}
             canCreateBoard={sketch.canCreateBoard}
             cleanLook={sketchCleanLookCtl.value}
             productId={product.id}

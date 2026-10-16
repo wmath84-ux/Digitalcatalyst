@@ -5,11 +5,11 @@
 // around it, driven here inside the real WorkPageSurface +
 // WorkSketchSurface in jsdom:
 //
-//   1. the Full Editor's clean header (side-panel button · save state ·
-//      New canvas · Edit · mode switch — no canvas dropdown in the header);
-//   2. the horizontal sketch tray directly under the header; selecting a
-//      chip switches canvas, and the header's New canvas creates one;
-//   3. the side panel opens from the header button and hides on any
+//   1. the page is headless — no header at all, just the quiet save chip;
+//   2. the canvases are the panel's rows: a row switches canvas, the panel's
+//      own foot button creates one, and a row's long press renames it in
+//      place (through Work's device-only store);
+//   3. the panel opens from the bottom tray's button and hides on any
 //      outside click (canvas included) or Escape;
 //   4. drawing persists through Work's device-only store: a change the
 //      editor reports lands as "Saved on this device";
@@ -19,7 +19,7 @@
 // Excalidraw itself needs a real canvas, so the `@excalidraw/excalidraw`
 // module is stubbed with a probe that records the props SketchPanel hands
 // it (view-mode, onChange) and renders a host box; every panel behaviour
-// around it — header, tray, side panel, saving — is the real code. The
+// around it — the tray, the panel, saving — is the real code. The
 // real-canvas drawing suites live in the Chromium harness.
 
 import test, { after } from "node:test";
@@ -154,12 +154,17 @@ const probe = (globalThis.__workSketchExcalidraw ??= { renders: 0, props: null }
 export function Excalidraw(props) {
   probe.renders += 1;
   probe.props = props;
-  return React.createElement("div", {
-    "data-excalidraw-stub": "",
-    "data-view-mode": props.viewModeEnabled ? "true" : "false",
-  });
+  // The page's own trays are Excalidraw's CHILDREN (they rest on the canvas's
+  // bottom edge), so the probe renders them the way the editor does.
+  return React.createElement(
+    "div",
+    { "data-excalidraw-stub": "", "data-view-mode": props.viewModeEnabled ? "true" : "false" },
+    props.children,
+  );
 }
 export function useHandleLibrary() {}
+// The tray's Clear is ONE undoable step, exactly like Excalidraw's own action.
+export const CaptureUpdateAction = { IMMEDIATELY: "immediately", NEVER: "never", EVENTUALLY: "eventually" };
 const Null = () => null;
 export function MainMenu({ children }) {
   return React.createElement(React.Fragment, null, children);
@@ -268,9 +273,11 @@ after(() => {
 const $ = (selector) => window.document.querySelector(selector);
 const $$ = (selector) => Array.from(window.document.querySelectorAll(selector));
 const surface = () => $("[data-work-page-surface='sketch']");
-const header = () => $("[data-course-sketch-status]");
-const status = () => header()?.getAttribute("data-course-sketch-status");
-const trayChips = () => $$("[data-course-sketch-page]");
+// The quiet save chip is the page's only top chrome (there is no header).
+const chip = () => $("[data-course-sketch-status]");
+const status = () => chip()?.getAttribute("data-course-sketch-status");
+const rows = () => $$("[data-course-sketch-canvas-row]");
+const rowKey = (row) => row.getAttribute("data-course-sketch-canvas-row");
 const probe = () => globalThis.__workSketchExcalidraw;
 
 const settle = async (ms = 40) => {
@@ -291,6 +298,22 @@ const outsidePress = async (element) => {
   await act(async () => {
     element.dispatchEvent(new window.MouseEvent("mousedown", { bubbles: true, cancelable: true }));
     await sleep(30);
+  });
+};
+
+// BranchedMenu's long press: a touch press held past its threshold opens the
+// row's own actions menu (rename / delete) instead of selecting the row.
+const longPress = async (element) => {
+  assert.ok(element, "expected a row to press");
+  const down = new window.PointerEvent("pointerdown", { bubbles: true, cancelable: true, clientX: 10, clientY: 10 });
+  Object.defineProperty(down, "pointerType", { value: "touch" });
+  await act(async () => {
+    element.dispatchEvent(down);
+    await sleep(520);
+  });
+  await act(async () => {
+    element.dispatchEvent(new window.PointerEvent("pointerup", { bubbles: true, cancelable: true, clientX: 10, clientY: 10 }));
+    await sleep(60);
   });
 };
 
@@ -326,7 +349,7 @@ const RECTANGLE = {
 
 /* ── the flow ─────────────────────────────────────────────────────────────── */
 
-test("Work Sketch Editor: clean header, tray, new canvas, side panel, drawing save, footer hidden", async () => {
+test("Work Sketch Editor: headless page, tray doors, panel canvases, drawing save, footer hidden", async () => {
   const mounted = await fixture.mountWorkSketch();
   await settle(250);
 
@@ -338,77 +361,151 @@ test("Work Sketch Editor: clean header, tray, new canvas, side panel, drawing sa
     "the slot reports immersive — the signal that hides the Work footer navigation",
   );
 
-  /* 1 — the Full Editor's clean header. */
-  assert.ok(header(), "the sketch header is mounted");
-  assert.ok(header().querySelector("[data-course-sketch-side-panel-toggle]"), "side-panel button in the header");
-  assert.ok(header().querySelector("[data-course-sketch-new-canvas]"), "New canvas in the header");
-  assert.ok(header().querySelector("[data-course-sketch-edit-toggle]"), "Edit toggle in the header");
-  assert.ok(header().querySelector("[data-course-sketch-mode]"), "Full Editor / Quick Sketch switch in the header");
+  /* 1 — headless: no page header, no pages tray, one quiet chip. */
+  assert.equal($("[data-course-sketch-status-bar]"), null, "the old header is gone");
+  assert.equal(Boolean(chip()), true, "the quiet save chip is mounted");
+  assert.equal($("[data-course-sketch-pages-tray]"), null, "the pages tray under the header is gone");
+  assert.equal($("[data-course-sketch-side-panel-toggle]"), null);
+  assert.equal($("[data-course-sketch-new-canvas]"), null);
   assert.equal(
-    header().querySelector("[data-course-sketch-boards]"),
-    null,
-    "the canvas switcher dropdown is NOT in the header (tray + side panel own it)",
+    $("[data-course-sketch-panel]")?.getAttribute("data-work-storage-only"),
+    "true",
+    "Work's device-only scope",
   );
-  assert.equal($("[data-course-sketch-panel]")?.getAttribute("data-work-storage-only"), "true", "Work's device-only scope");
 
-  /* 2 — the horizontal tray under the header, and canvas selection. */
-  const tray = $("[data-course-sketch-pages-tray]");
-  assert.ok(tray, "the sketch pages tray sits under the header");
-  assert.equal(trayChips().length, 1, "one canvas to start");
-  assert.equal(trayChips()[0].getAttribute("data-active"), "true");
+  /* 2 — READ FIRST: the canvas takes no marks, and the tray carries the doors. */
+  assert.equal(probe().props.viewModeEnabled, true, "the canvas opens view-only");
+  assert.equal($("[data-course-sketch-panel]")?.getAttribute("data-sketch-editing"), "false");
+  const readTray = $("[data-course-sketch-read-tray]");
+  assert.equal(Boolean(readTray), true, "read mode's tray is mounted");
+  assert.equal(Boolean(readTray.querySelector("[data-course-sketch-read-panel]")), true, "the tray's panel button");
+  assert.equal(Boolean(readTray.querySelector("[data-course-sketch-read-edit]")), true, "the tray's pencil");
+  assert.equal($("[data-course-sketch-edit-tray]"), null, "the editing tray is not mounted while reading");
 
-  /* 3 — side panel: header button opens it; outside click hides it. */
-  await click($("[data-course-sketch-side-panel-toggle]"), "the side-panel button");
+  /* 3 — the panel opens from that tray button and hides on an outside click. */
+  await click($("[data-course-sketch-read-panel]"), "the tray's panel button");
   await settle(40);
   const sidePanel = $("[data-course-sketch-side-panel]");
-  assert.ok(sidePanel, "the side panel opens from the header button");
-  assert.ok(sidePanel.querySelector("[data-course-sketch-boards]"), "the canvas list lives in the side panel");
+  assert.equal(Boolean(sidePanel), true, "the ONE side panel opens from the tray button");
+  assert.equal(rows().length, 1, "one canvas to start");
+  assert.equal(sidePanel.querySelector("[data-course-sketch-canvas-row]").getAttribute("data-active"), "", "it is the open canvas");
   await outsidePress($("[data-course-sketch-host]"));
-  assert.equal($("[data-course-sketch-side-panel]"), null, "an outside click on the canvas hides the side panel");
-  await click($("[data-course-sketch-side-panel-toggle]"), "the side-panel button again");
+  assert.equal(Boolean($("[data-course-sketch-side-panel]")), false, "an outside click on the canvas hides the side panel");
+  await click($("[data-course-sketch-read-panel]"), "the tray's panel button again");
   await settle(40);
-  assert.ok($("[data-course-sketch-side-panel]"), "the side panel reopens");
+  assert.equal(Boolean($("[data-course-sketch-side-panel]")), true, "the side panel reopens");
   await act(async () => {
     window.document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     await sleep(30);
   });
-  assert.equal($("[data-course-sketch-side-panel]"), null, "Escape hides the side panel too");
+  assert.equal(Boolean($("[data-course-sketch-side-panel]")), false, "Escape hides the side panel too");
 
-  /* 2b — New canvas from the header, then tray selection back. */
-  const firstKey = trayChips()[0].getAttribute("data-course-sketch-page");
-  await click($("[data-course-sketch-new-canvas]"), "New canvas in the header");
-  await settle(120);
-  assert.equal(trayChips().length, 2, "the new canvas joins the tray");
-  const second = trayChips().find((chip) => chip.getAttribute("data-course-sketch-page") !== firstKey);
-  assert.ok(second, "the new canvas chip");
-  assert.equal(second.getAttribute("data-active"), "true", "the new canvas opens, like a normal editor");
-  await click(trayChips().find((chip) => chip.getAttribute("data-course-sketch-page") === firstKey), "the first canvas chip");
-  await settle(120);
-  assert.equal(
-    trayChips().find((chip) => chip.getAttribute("data-course-sketch-page") === firstKey).getAttribute("data-active"),
-    "true",
-    "tray selection switches back to the first canvas",
+  /* 4 — the panel's own foot button creates a canvas. */
+  await click($("[data-course-sketch-read-panel]"), "the tray's panel button");
+  await settle(40);
+  const firstKey = rowKey(rows()[0]);
+  await click($("[data-course-sketch-panel-new]"), "New sketch in the panel");
+  await settle(140);
+  await click($("[data-course-sketch-read-panel]"), "the tray's panel button");
+  await settle(60);
+  assert.equal(rows().length, 2, "the new canvas joins the panel's list");
+  const second = rows().find((row) => rowKey(row) !== firstKey);
+  assert.ok(second, "the new canvas row");
+  assert.equal(second.getAttribute("data-active"), "", "the new canvas opens, like a normal editor");
+
+  /* 4b — a row's long press offers Rename, and rename edits that row in place. */
+  await longPress(second);
+  const popup = $("[data-branched-menu-popup]");
+  assert.equal(Boolean(popup), true, "a long press opens the row's own actions");
+  await click(popup.querySelector("[data-branched-menu-rename]"), "Rename");
+  await settle(40);
+  const renameInput = $("[data-branched-rename-input]");
+  assert.equal(Boolean(renameInput), true, "Rename turns the row's own name into an input");
+  const setValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+  await act(async () => {
+    setValue.call(renameInput, "Renamed work canvas");
+    renameInput.dispatchEvent(new window.Event("input", { bubbles: true }));
+    await sleep(20);
+  });
+  await act(async () => {
+    renameInput.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await sleep(80);
+  });
+  assert.ok(
+    rows().some((row) => row.textContent.includes("Renamed work canvas")),
+    "the renamed canvas shows its new name in the panel",
   );
 
-  /* 4 — drawing + saving: view mode first, Edit unlocks the canvas, and a
-        reported drawing lands in Work's device-only store. */
-  assert.equal(probe().props.viewModeEnabled, true, "the canvas opens in view mode");
-  await click($("[data-course-sketch-edit-toggle]"), "Edit sketch");
+  /* 5 — selecting a row switches canvas; the first is still the default one. */
+  await click(rows().find((row) => rowKey(row) === firstKey), "the first canvas row");
+  await settle(140);
+  await click($("[data-course-sketch-read-panel]"), "the tray's panel button");
   await settle(60);
+  assert.equal(
+    rows().find((row) => rowKey(row) === firstKey).getAttribute("data-active"),
+    "",
+    "the panel's rows switch canvas back",
+  );
+
+  /* 6 — the pencil unlocks the canvas, and the editing tray is the page's bar.
+        (The panel is closed first: while it is open the whole page belongs to
+        it, and a tap on the canvas is deliberately not a tap.) */
+  await click($("[data-course-sketch-read-panel]"), "the tray's panel button — closing it");
+  await settle(40);
+  await click($("[data-course-sketch-read-edit]"), "the tray's pencil");
+  await settle(80);
   assert.equal($("[data-course-sketch-panel]")?.getAttribute("data-sketch-editing"), "true");
-  assert.equal(probe().props.viewModeEnabled, false, "Edit switches the canvas to drawing");
+  assert.equal(probe().props.viewModeEnabled, false, "the pencil switches the canvas to drawing");
+  const editTray = $("[data-course-sketch-edit-tray]");
+  assert.equal(Boolean(editTray), true, "the editing tray replaces the read tray");
+  assert.equal(Boolean($("[data-course-sketch-read-tray]")), false);
+  for (const hook of [
+    "data-course-sketch-edit-panel",
+    "data-course-sketch-edit-read",
+    "data-course-sketch-edit-draw",
+    "data-course-sketch-edit-erase",
+    "data-course-sketch-edit-undo",
+    "data-course-sketch-edit-redo",
+    "data-course-sketch-edit-clear",
+    "data-course-sketch-edit-colour",
+  ]) {
+    assert.equal(Boolean(editTray.querySelector(`[${hook}]`)), true, `the editing tray carries ${hook}`);
+  }
+  assert.equal(Boolean(editTray.querySelector("[data-course-sketch-mode]")), true, "…and the Full Editor / Quick Sketch switch");
+
+  /* 7 — drawing + saving: a reported drawing lands in Work's device-only store. */
   await act(async () => {
     probe().props.onChange([RECTANGLE], { viewBackgroundColor: "#ffffff" }, {});
     await sleep(30);
   });
   await settle(1100);
   assert.equal(status(), "saved", "the drawing reached the saved state");
-  assert.ok(header().textContent.includes("Saved on this device"), "the save line says where it saved — this device only");
+  assert.ok(
+    chip().textContent.includes("Saved on this device"),
+    "the chip says where it saved — this device only",
+  );
 
-  /* The drawn element is still there after switching canvas away and back. */
-  await click(second, "the second canvas chip");
-  await settle(150);
-  await click(trayChips().find((chip) => chip.getAttribute("data-course-sketch-page") === firstKey), "back to the drawn canvas");
+  /* 8 — the eye returns to reading, and ONE tap on the canvas hides the whole
+        tray (the panel button included); the next tap brings it back. */
+  await click($("[data-course-sketch-edit-read]"), "the tray's eye");
+  await settle(80);
+  assert.equal(probe().props.viewModeEnabled, true, "the eye takes the canvas back to view-only");
+  assert.equal(Boolean($("[data-course-sketch-read-tray]")), true, "…with its read tray");
+  await click($("[data-course-sketch-canvas]"), "the canvas");
+  await settle(40);
+  assert.equal(Boolean($("[data-course-sketch-read-tray]")), false, "one tap hides the whole tray");
+  await click($("[data-course-sketch-canvas]"), "the canvas again");
+  await settle(40);
+  assert.equal(Boolean($("[data-course-sketch-read-tray]")), true, "the next tap restores it");
+
+  /* 9 — the drawing survives a canvas round-trip (it was saved, not just shown). */
+  await click($("[data-course-sketch-read-panel]"), "the tray's panel button");
+  await settle(60);
+  await click(rows().find((row) => rowKey(row) !== firstKey), "the other canvas row");
+  await settle(160);
+  await click($("[data-course-sketch-read-panel]"), "the tray's panel button");
+  await settle(60);
+  await click(rows().find((row) => rowKey(row) === firstKey), "back to the drawn canvas");
   await settle(200);
   const elements = probe().props.initialData?.elements ?? [];
   assert.ok(

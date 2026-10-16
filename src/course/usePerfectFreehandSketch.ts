@@ -105,6 +105,8 @@ export interface UsePerfectFreehandSketchResult {
   boardsLoading: boolean;
   selectBoard: (sketchKey: string) => void;
   createBoard: () => string | null;
+  /** Rename one canvas (the panel's long-press Rename). */
+  renameBoard: (sketchKey: string, nextTitle: string) => boolean;
   canCreateBoard: boolean;
   deleteBoard: (sketchKey: string) => boolean;
 }
@@ -139,6 +141,7 @@ type Action =
   | { type: "SET_LAST_SAVED"; at: number }
   | { type: "SET_LOADING"; loading: boolean }
   | { type: "SET_BOARDS"; boards: QuickSketchBoardSummary[] }
+  | { type: "RENAME_BOARD"; sketchKey: string; title: string }
   | { type: "SET_ACTIVE_BOARD"; key: string; title: string }
   | { type: "SET_BOARDS_LOADING"; loading: boolean }
   | { type: "SET_BOARD_STATS"; key: string; strokeCount: number; updatedAt: number };
@@ -161,6 +164,13 @@ const reducer = (state: State, action: Action): State => {
       return { ...state, boards: action.boards };
     case "SET_ACTIVE_BOARD":
       return { ...state, activeBoardKey: action.key, activeBoardTitle: action.title };
+    case "RENAME_BOARD": {
+      const boards = state.boards.map((board) =>
+        board.sketchKey === action.sketchKey ? { ...board, title: action.title } : board,
+      );
+      const active = state.activeBoardKey === action.sketchKey;
+      return { ...state, boards, activeBoardTitle: active ? action.title : state.activeBoardTitle };
+    }
     case "SET_BOARDS_LOADING":
       return { ...state, boardsLoading: action.loading };
     case "SET_BOARD_STATS": {
@@ -724,6 +734,35 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
     return key;
   }, [localOnly, moduleId, productId, saveToFirestore, scoped, state.boards, uid]);
 
+  /**
+   * Rename ONE canvas — the sketch panel's long-press Rename, in place. The
+   * name lives in the canvas's own index row (device list + cloud index), and
+   * the live board's title follows when it is the canvas on screen.
+   */
+  const renameBoard = useCallback(
+    (sketchKey: string, nextTitle: string) => {
+      if (!scoped) return false;
+      const title = String(nextTitle ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
+      if (!title) return false;
+      const board = state.boards.find((row) => row.sketchKey === sketchKey);
+      if (!board || board.title === title) return false;
+      const boards = state.boards.map((row) => (row.sketchKey === sketchKey ? { ...row, title } : row));
+      dispatch({ type: "RENAME_BOARD", sketchKey, title });
+      try {
+        localStorage.setItem(
+          quickSketchIndexKey(uid!, String(productId), String(moduleId)),
+          JSON.stringify(boards),
+        );
+      } catch {
+        // Private mode: the cloud index below is the durable copy.
+      }
+      if (boardRef.current.key === sketchKey) boardRef.current = { ...boardRef.current, title };
+      void saveToFirestore();
+      return true;
+    },
+    [moduleId, productId, saveToFirestore, scoped, state.boards, uid],
+  );
+
   const deleteBoard = useCallback(
     (sketchKey: string) => {
       if (!scoped || sketchKey === QUICK_SKETCH_DEFAULT_KEY || state.boards.length <= 1) return false;
@@ -808,6 +847,7 @@ export function usePerfectFreehandSketch(input: UsePerfectFreehandSketchInput): 
     boardsLoading: state.boardsLoading,
     selectBoard,
     createBoard,
+    renameBoard,
     canCreateBoard: scoped && state.boards.length < MAX_QUICK_SKETCH_BOARDS,
     deleteBoard,
   };

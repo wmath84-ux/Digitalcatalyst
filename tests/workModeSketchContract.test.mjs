@@ -38,35 +38,48 @@ test("Work mounts the shared SketchPanel on its Dexie device store — no Work f
   assert.match(page, /page === "sketch" \|\|/);
 });
 
-test("1+3+4 — clean header: side-panel button, New canvas, edit/mode switches; no canvas dropdown", () => {
-  assert.match(panel, /<SketchStatus[\s\S]{0,400}?leading=\{sidePanelToggle\}/);
-  assert.match(panel, /data-course-sketch-side-panel-toggle/);
+test("1+3+4 — headless: the panel button, create and the switches live in the tray and the panel", () => {
+  // No header, so nothing "rides in" one: the tray carries the panel toggle
+  // (read mode's and the editor's) and the mode switch, and the panel body
+  // carries the canvases plus the create button at its foot.
+  assert.doesNotMatch(panel, /<SketchStatus\b/);
+  assert.match(panel, /data-course-sketch-panel-toggle/);
+  assert.match(panel, /data-course-sketch-read-panel/);
+  assert.match(panel, /data-course-sketch-edit-panel/);
   assert.match(panel, /aria-expanded=\{sidePanelOpen\}/);
-  assert.match(panel, /data-course-sketch-new-canvas/);
+  assert.match(panel, /data-course-sketch-panel-new/);
   assert.match(panel, /onClick=\{\(\) => onCreateBoard\?\.\(\)\}/);
-  assert.match(panel, /data-course-sketch-edit-toggle/);
   assert.match(panel, /data-course-sketch-mode=\{mode\}/);
-  // The canvas switcher lives in the side panel / tray, not the header.
-  const statusStart = panel.indexOf("<SketchStatus");
-  const statusEnd = panel.indexOf("</SketchStatus>");
-  assert.ok(statusStart >= 0 && statusEnd > statusStart);
-  assert.doesNotMatch(panel.slice(statusStart, statusEnd), /data-course-sketch-boards|SketchBoards/);
+  // The canvases are the panel's own list — never a dropdown in chrome.
+  assert.match(panel, /<SketchCanvasList/);
+  assert.doesNotMatch(panel, /SketchBoards/);
+  assert.doesNotMatch(panel, /data-course-sketch-boards/);
 });
 
-test("2 — the horizontal tray under the header; New canvas guards double taps and blank boards", () => {
-  assert.match(panel, /\{!quickMode && !cleanLook && scoped && boards\.length > 0 \? \(\s+<SketchPagesTray/);
-  assert.match(panel, /data-course-sketch-pages-tray=\{boards\.length\}/);
-  assert.match(panel, /data-course-sketch-page=\{board\.sketchKey\}/);
-  assert.match(panel, /if \(!active\) onSelectBoard\?\.\(board\.sketchKey\)/);
+test("2 — the tray under the header is gone; the panel's rows are the canvases, and create is guarded", () => {
+  // The pages tray that used to sit under the header is gone, and so is the
+  // string it was built from.
+  assert.doesNotMatch(panel, /SketchPagesTray/);
+  assert.doesNotMatch(panel, /data-course-sketch-pages-tray/);
+  assert.doesNotMatch(panel, /data-course-sketch-page=\{/);
+  // The canvases are the panel's BranchedMenu rows, one per canvas, and the
+  // panel's foot is the one create button.
+  assert.match(panel, /data-course-sketch-canvas-row/);
+  assert.match(panel, /data-course-sketch-board-option/);
+  assert.match(panel, /if \(key && key !== activeBoardKey\) onSelectBoard\?\.\(key\);/);
+  assert.match(panel, /data-course-sketch-panel-new/);
   assert.match(workSketch, /CREATE_GUARD_MS/);
   assert.match(workSketch, /createSketchScene\(\)/);
 });
 
-test("5 — the side panel hides on any outside click (and Escape), with no scrim", () => {
+test("5 — the side panel hides on any outside click (and Escape)", () => {
   assert.match(panel, /data-course-sketch-side-panel/);
   assert.match(panel, /document\.addEventListener\("mousedown", onDocumentClick\);/);
-  assert.match(panel, /if \(sidePanelRef\.current\?\.contains\(target\)\) return;\s+if \(sideToggleRef\.current\?\.contains\(target\)\) return;\s+setSidePanelOpen\(false\);/);
-  assert.match(panel, /event\.key === "Escape"\) setSidePanelOpen\(false\)/);
+  // Inside clicks (and a click on the tray toggle that opened it) never close
+  // it; everything else does.
+  assert.match(panel, /if \(sidePanelRef\.current\?\.contains\(target\)\) return;/);
+  assert.match(panel, /\?\.closest\?\.\("\[data-course-sketch-panel-toggle\]"\)\) return;\s+setSidePanelOpen\(false\);/);
+  assert.match(panel, /event\.key === "Escape"\) \{ setSidePanelOpen\(false\); setPendingDeleteKey\(null\); \}/);
   // A different canvas never inherits an open panel.
   assert.match(panel, /useEffect\(\(\) => \{ setSidePanelOpen\(false\); \}, \[sceneKey, activeBoardKey\]\);/);
 });
@@ -75,7 +88,7 @@ test("6 — sketch keeps Work's footer (and header) hidden; drawing saves stay o
   assert.match(app, /\{\(page === "myday" && myDayView === "editor"\) \|\| anyImmersive \? null : \(\s+<WorkFooterNav/);
   assert.match(page, /\{showHeader \? \(\s+<header[\s\S]*?data-work-header-area=\{page\}/);
   // The save line's device-only wording is what Work shows (no cloud copy).
-  assert.match(panel, /status === "saved"\) \{ label = "Saved on this device"/);
+  assert.match(panel, /if \(status === "saved"\) return \{ label: "Saved on this device", tone: "ok" \};/);
   assert.match(workSketch, /writeWorkSketchScene/);
   assert.match(workSketch, /SAVE_DEBOUNCE_MS = 500/);
 });

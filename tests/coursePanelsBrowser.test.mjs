@@ -9,6 +9,10 @@
 // a page reload behaves like a real one: the device copy (localStorage) and
 // the cloud copy both survive, and the hook has to reconcile them.
 //
+// The Sketch tab is the redesigned headless page: read-first, its canvases in
+// the bottom tray's ONE side panel (there is no header and no pages tray), so
+// every test below reaches the page's controls through those two doors.
+//
 // Needs Chromium (PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH or Playwright's own);
 // without it every test SKIPS with that reason.
 
@@ -146,6 +150,40 @@ async function draw(page, tool, from, to) {
   await page.waitForTimeout(50);
 }
 
+/**
+ * The redesigned page opens READ-ONLY (the eye/pencil rule), and its chrome is
+ * the bottom tray plus the ONE side panel — there is no header. These helpers
+ * are the only way the tests below touch the page's own controls.
+ */
+const openSidePanel = async (page) => {
+  if (!(await page.locator("[data-course-sketch-side-panel]").count())) {
+    await page.locator("[data-course-sketch-panel-toggle]").first().click();
+    await page.waitForSelector("[data-course-sketch-side-panel]");
+  }
+};
+
+const closeSidePanel = async (page) => {
+  if (await page.locator("[data-course-sketch-side-panel]").count()) {
+    await page.locator("[data-course-sketch-panel-scrim]").click();
+    await page.waitForSelector("[data-course-sketch-side-panel]", { state: "detached" });
+  }
+};
+
+/** The tray's pencil unlocks the canvas: nothing can be drawn before it. */
+const enterEdit = async (page) => {
+  if (await page.locator("[data-sketch-editing='true']").count()) return;
+  await page.locator("[data-course-sketch-read-edit]").click();
+  await page.waitForSelector("[data-sketch-editing='true']");
+  await page.waitForTimeout(120);
+};
+
+const selectCanvas = async (page, sketchKey) => {
+  await openSidePanel(page);
+  await page.locator(`[data-course-sketch-canvas-row="${sketchKey}"]`).click();
+  await page.waitForTimeout(800);
+  await closeSidePanel(page);
+};
+
 const waitForStatus = (page, status, timeout = 10000) =>
   page.waitForFunction((s) => document.querySelector("[data-course-sketch-status]")?.getAttribute("data-course-sketch-status") === s, status, { timeout });
 
@@ -154,6 +192,7 @@ const waitForStatus = (page, status, timeout = 10000) =>
 browserTest("Sketch: a drawing autosaves (pending → saved), survives a reload, and the reload never blanks the cloud", async () => {
   const { page, context, problems } = await open("panel=sketch&module=m1");
   await waitForEditor(page);
+  await enterEdit(page);
   await draw(page, "r", [200, 200], [380, 320]);
   // Immediately after the stroke the state is honest: not "Saved" yet.
   const early = await sketchState(page);
@@ -178,30 +217,36 @@ browserTest("Sketch: '+' makes a blank, auto-selected canvas; double-click makes
   await page.evaluate(() => { sessionStorage.clear(); localStorage.clear(); });
   await page.reload();
   await waitForEditor(page);
+  await enterEdit(page);
   await draw(page, "r", [150, 150], [300, 260]);
   await waitForStatus(page, "saved");
   const first = await sketchState(page);
 
-  await page.locator("[data-course-sketch-new]").dblclick();
+  // The panel's foot button is the ONE create affordance (and the store's own
+  // double-tap guard still makes a double click create exactly one canvas).
+  await openSidePanel(page);
+  await page.locator("[data-course-sketch-panel-new]").dblclick();
   await page.waitForTimeout(900);
   const created = await sketchState(page);
   assert.equal(created.boards.length, 2, "a double-click creates exactly one new canvas");
   assert.notEqual(created.activeBoardKey, first.activeBoardKey, "the new canvas is selected");
   assert.equal(created.count, 0, "the new canvas starts blank");
-  assert.match(await page.locator("[data-course-sketch-board-switch]").innerText(), /Canvas 2/);
+  await openSidePanel(page);
+  assert.match(
+    await page.locator(`[data-course-sketch-canvas-row="${created.activeBoardKey}"]`).innerText(),
+    /Canvas 2/,
+    "the panel lists the new canvas by its own name",
+  );
+  await closeSidePanel(page);
 
   await draw(page, "o", [250, 250], [420, 360]);
   await waitForStatus(page, "saved");
   assert.deepEqual((await sketchState(page)).types, ["ellipse"]);
 
-  // Switch back through the switcher: each canvas keeps its own drawing.
-  await page.locator("[data-course-sketch-board-switch]").click();
-  await page.locator(`[data-course-sketch-board-option="${first.activeBoardKey}"]`).click();
-  await page.waitForTimeout(800);
+  // Switch back through the panel's rows: each canvas keeps its own drawing.
+  await selectCanvas(page, first.activeBoardKey);
   assert.deepEqual((await sketchState(page)).types, ["rectangle"], "canvas 1 still holds the rectangle");
-  await page.locator("[data-course-sketch-board-switch]").click();
-  await page.locator(`[data-course-sketch-board-option="${created.activeBoardKey}"]`).click();
-  await page.waitForTimeout(800);
+  await selectCanvas(page, created.activeBoardKey);
   assert.deepEqual((await sketchState(page)).types, ["ellipse"], "canvas 2 still holds the ellipse");
 
   // Reopen: the last canvas used comes back selected, with both listed.
@@ -224,6 +269,8 @@ browserTest("Sketch: leaving mid-debounce (module switch / tab unmount) loses no
   await page.locator("[data-harness-module='m2']").click(); // inside the debounce window
   await waitForEditor(page);
   assert.equal((await sketchState(page)).count, 0, "module 2 has its own blank board");
+  // Opening another module opens READ-first again — one pencil tap away.
+  await enterEdit(page);
   await draw(page, "o", [200, 200], [320, 300]);
   await page.locator("[data-harness-toggle]").click(); // unmount the tab immediately
   await page.waitForTimeout(1200);
@@ -232,6 +279,7 @@ browserTest("Sketch: leaving mid-debounce (module switch / tab unmount) loses no
   assert.deepEqual((await sketchState(page)).types, ["ellipse"], "module 2's stroke survived the unmount");
   await page.locator("[data-harness-module='m1']").click();
   await waitForEditor(page);
+  await enterEdit(page);
   assert.deepEqual((await sketchState(page)).types, ["rectangle"], "module 1's stroke survived the module switch");
   assert.deepEqual(problems, []);
   await context.close();
@@ -243,8 +291,12 @@ browserTest("Sketch: a refused cloud write is shown with Retry, the device copy 
   await page.reload();
   await waitForEditor(page);
   await page.evaluate(() => { window.__fs.control.failWrites = "unavailable"; });
+  await enterEdit(page);
   await draw(page, "r", [200, 200], [320, 300]);
   await waitForStatus(page, "error");
+  // Retry is one of the panel's options now (the header that used to hold it is
+  // gone), so the panel is opened to reach it.
+  await openSidePanel(page);
   assert.ok(await page.locator("[data-course-sketch-retry]").isVisible(), "Retry is offered");
   const label = (await sketchState(page)).label;
   assert.doesNotMatch(label, /^Saved$/);
@@ -257,7 +309,7 @@ browserTest("Sketch: a refused cloud write is shown with Retry, the device copy 
 });
 
 for (const [width, height, label] of [[360, 740, "phone"], [768, 1024, "tablet"], [1440, 900, "desktop"]]) {
-  browserTest(`Sketch layout (${label} ${width}×${height}): '+', switcher and status fit; the menu stays on screen`, async () => {
+  browserTest(`Sketch layout (${label} ${width}×${height}): the tray and the panel fit; the chip stays one line`, async () => {
     const { page, context, problems } = await open("panel=sketch&module=m1", { width, height, touch: width < 1024 });
     await waitForEditor(page);
     const fit = await page.evaluate(() => {
@@ -266,21 +318,32 @@ for (const [width, height, label] of [[360, 740, "phone"], [768, 1024, "tablet"]
       return {
         overflowX: document.documentElement.scrollWidth - window.innerWidth,
         row: row && { left: row.left, right: row.right, height: row.height },
-        plus: box("[data-course-sketch-new]"),
-        switcher: box("[data-course-sketch-board-switch]"),
+        tray: box("[data-course-sketch-read-tray]"),
+        toggle: box("[data-course-sketch-panel-toggle]"),
+        canvas: box("[data-course-sketch-canvas]"),
         width: window.innerWidth,
+        height: window.innerHeight,
       };
     });
     assert.ok(fit.overflowX <= 0, `no horizontal overflow (${fit.overflowX}px)`);
-    assert.ok(fit.row.height <= 48, `the status row stays one line (${fit.row.height}px)`);
-    for (const key of ["plus", "switcher"]) {
+    assert.ok(fit.row.height <= 48, `the status chip stays one line (${fit.row.height}px)`);
+    for (const key of ["tray", "toggle", "canvas"]) {
       assert.ok(fit[key] && fit[key].width > 0, `${key} is rendered`);
       assert.ok(fit[key].left >= 0 && fit[key].right <= fit.width, `${key} is fully on screen`);
     }
-    assert.ok(fit.plus.width >= 24 && fit.plus.height >= 24, "the '+' is a real target");
-    await page.locator("[data-course-sketch-board-switch]").click();
-    const menu = await page.evaluate(() => document.querySelector("[data-course-sketch-board-menu]")?.getBoundingClientRect());
-    assert.ok(menu && menu.left >= 0 && menu.right <= width && menu.bottom <= height, "the canvas menu is fully on screen");
+    assert.ok(
+      fit.toggle.width >= 24 && fit.toggle.height >= 24,
+      "the tray's panel button is a real target",
+    );
+    assert.ok(
+      fit.tray.bottom <= fit.height && fit.tray.bottom > fit.canvas.top,
+      "the tray rests on the canvas's own bottom edge",
+    );
+    await openSidePanel(page);
+    const panel = await page.evaluate(() => document.querySelector("[data-course-sketch-side-panel]")?.getBoundingClientRect());
+    assert.ok(panel && panel.left >= 0 && panel.right <= width && panel.bottom <= height, "the panel is fully on screen");
+    assert.ok(panel.right < width, "the panel leaves a strip of page visible (the way out)");
+    assert.ok(await page.locator("[data-course-sketch-panel-new]").isVisible(), "the panel's create button is offered");
     await page.keyboard.press("Escape");
     await page.screenshot({ path: path.join(ROOT, `node_modules/.cache/sketch-${label}.png`) });
     assert.deepEqual(problems, []);
