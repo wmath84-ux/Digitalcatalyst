@@ -1,6 +1,6 @@
 import CourseBookLoader from "./course/CourseBookLoader";
 import "./course/courseBrandColors.css";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { lazyWithChunkRecovery } from "./utils/lazyChunk";
 import useLocalCourseProgress from "./course/useLocalCourseProgress";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
@@ -8,7 +8,29 @@ import ResourceViewer, { type CourseFileActions } from "./course/ResourceViewer"
 import { isExperimentFileType } from "./types/course";
 import CourseOverlay, { STUDY_TAB_ORDER, dockTabRecord, unlockedModuleIds, type CourseOverlayQuadConfig, type DockTab } from "./course/CourseOverlay";
 import CourseHeaderNav from "./course/CourseHeaderNav";
-import { loadQuadLayout, saveQuadLayout, useQuadDeckEnabled, type QuadLayoutState, type QuadPaneId } from "./course/quadLayout";
+import {
+  loadQuadLayout,
+  quadFindPageBlock,
+  quadPaneVisible,
+  quadSetBlockPage,
+  quadSetFocus,
+  quadSingleSplit,
+  saveQuadLayout,
+  useQuadDeckEnabled,
+  QUAD_PANE_ORDER,
+  type QuadLayoutState,
+  type QuadPaneId,
+} from "./course/quadLayout";
+import type { BlockPageKey } from "./course/blockPages";
+import PageBackButton from "./course/PageBackButton";
+import {
+  backPageHistory,
+  canPageHistoryBack,
+  pushPageHistory,
+  resetPageHistory,
+  subscribePageHistory,
+} from "./course/pageHistory";
+import { useFooterNavigationAlways } from "./utils/footerNavigationVisibility";
 import { useCourseViewSettings } from "./course/courseViewSettings";
 import { useFooterNavigationPlacement } from "./utils/footerNavigationPlacement";
 import { buildPaidDeepLink, rememberPdpReturn } from "./utils/paidDeepLink";
@@ -622,11 +644,107 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    * niche footer navigation") draws the navigation under the Resource Library
    * itself, so the placed navigation steps aside — never two of them.
    */
-  const quadNavInDeck = quadWide && quadState.format === "pair";
-  const headerNavInRail = quadWide && navPlacement === "header" && !quadNavInDeck;
-  const quadRailLeft = quadWide && navPlacement === "left" && !quadNavInDeck;
-  const quadRailRight = quadWide && navPlacement === "right" && !quadNavInDeck;
-  const quadNavBottom = quadWide && navPlacement === "bottom" && !quadNavInDeck;
+  /**
+   * The owner's footer rule (2026-10-16+): "footer navigations Keval tabhi
+   * dikhe jo bhi user single split mode mein ho, means Keval do block" — on a
+   * big stage the navigation shows ONLY in the single-split layout (exactly
+   * two blocks); the 2×2 cross and the three-block shapes run without it. The
+   * "Visible footer navigation always" setting is the one override, exactly
+   * as it is for the immersive-page rule. A phone is never in this system and
+   * keeps its footer untouched.
+   */
+  const footerNavigationAlways = useFooterNavigationAlways();
+  const quadFooterOff = quadWide && !quadSingleSplit(quadState) && !footerNavigationAlways;
+  const quadNavInDeck = quadWide && quadState.format === "pair" && !quadFooterOff;
+  const headerNavInRail = quadWide && navPlacement === "header" && !quadNavInDeck && !quadFooterOff;
+  const quadRailLeft = quadWide && navPlacement === "left" && !quadNavInDeck && !quadFooterOff;
+  const quadRailRight = quadWide && navPlacement === "right" && !quadNavInDeck && !quadFooterOff;
+  const quadNavBottom = quadWide && navPlacement === "bottom" && !quadNavInDeck && !quadFooterOff;
+
+  /* ── Free blocks: open any course player page in any block ──────────────
+   * A nav tap, a ⌘/Ctrl shortcut or a deep link (Brain set, master map, an
+   * experiment) all land here: the page already on screen glows in its block;
+   * otherwise it opens in a blank block first — the starter page is an
+   * invitation — else the block the learner touched last. */
+  const quadStateRef = useRef(quadState);
+  quadStateRef.current = quadState;
+  const personalModulesOpenRef = useRef(false);
+
+  const openQuadPage = useCallback(
+    (page: BlockPageKey) => {
+      const current = quadStateRef.current;
+      const existing = quadFindPageBlock(current, page);
+      if (existing && quadPaneVisible(current, existing)) {
+        setQuadReveal((prev) => ({ pane: existing, count: (prev?.count ?? 0) + 1 }));
+        if (current.focus !== existing) commitQuadState(quadSetFocus(current, existing));
+        return;
+      }
+      const focusedOpen = quadPaneVisible(current, current.focus);
+      const focusedBlank = focusedOpen && !(current.pages?.[current.focus] ?? null);
+      const blank =
+        QUAD_PANE_ORDER.find((pane) => quadPaneVisible(current, pane) && !(current.pages?.[pane] ?? null)) ??
+        null;
+      const target: QuadPaneId =
+        (focusedBlank ? current.focus : null) ??
+        blank ??
+        (focusedOpen ? current.focus : (QUAD_PANE_ORDER.find((pane) => quadPaneVisible(current, pane)) ?? "c11"));
+      pushPageHistory(`block:${target}`, page);
+      commitQuadState(quadSetBlockPage(current, target, page));
+    },
+    [commitQuadState],
+  );
+
+  /**
+   * Every tab change on a big stage opens that page in a block. One effect
+   * covers the navigation taps, the ⌘/Ctrl shortcuts and every deep link; the
+   * mount tab itself does NOT route, so a course always opens on the owner's
+   * blank starter pages ("block Keval aur Keval ek blank page se start hoga").
+   */
+  const routedDockTabRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (routedDockTabRef.current === dockTab) return;
+    const first = routedDockTabRef.current === null;
+    routedDockTabRef.current = dockTab;
+    if (first || !quadWide) return;
+    const page: BlockPageKey | null =
+      dockTab === "modules" && personalModulesOpenRef.current
+        ? "personal"
+        : (dockTab as BlockPageKey);
+    if (!page) return;
+    openQuadPage(page);
+  }, [dockTab, quadWide, openQuadPage]);
+
+  /* ── Step-by-step Back (the owner's 2026-10-16+ rule) ────────────────────
+   * Every page carries a top-left back button that walks ONE step back
+   * through the previous pages — "yah button directly home page per redirect
+   * na karen … step bye step previous pages per click karne per back kare".
+   * The phone's study pane walks its tabs; the lesson pane walks the files
+   * the learner opened; each plus-deck block walks its own pages (FreeBlock). */
+  const studyCanBack = useSyncExternalStore(
+    subscribePageHistory,
+    () => canPageHistoryBack("study"),
+    () => false,
+  );
+  const lessonCanBack = useSyncExternalStore(
+    subscribePageHistory,
+    () => canPageHistoryBack("lesson"),
+    () => false,
+  );
+  useEffect(() => {
+    pushPageHistory("study", dockTab);
+  }, [dockTab]);
+  const backStudyPage = useCallback(() => {
+    const previous = backPageHistory("study");
+    if (previous) setDockTab(previous as typeof dockTab);
+  }, []);
+  const backLessonPage = useCallback(() => {
+    const previous = backPageHistory("lesson");
+    if (!previous) return;
+    const file = visitedFilesRef.current.find((entry) => String(entry.id) === previous) ?? null;
+    if (file) selectFileRef.current(file);
+  }, []);
+  const visitedFilesRef = useRef<CourseFile[]>([]);
+  const selectFileRef = useRef<(file: CourseFile) => void>(() => undefined);
   /**
    * Every Brain practice set this learner may open — the course tree's `brain`
    * resources (the sets the admin imported on the Product / Course-content
@@ -1559,6 +1677,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         }
       }
       resetCoursePanelSession();
+      resetPageHistory();
     };
   }, [user, storageProductId]);
 
@@ -1903,13 +2022,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    * had closed it — and every other tab borrows the main content block.
    */
   const handleNavTabChange = (next: DockTab) => {
+    // On a big stage the tab-change effect below opens the page in a block;
+    // here we only handle the phone/peek gestures and the same-tab toggle.
     handleDockTabChange(next);
-    if (!quadWide) return;
-    if (next === "modules" && personalModulesOpen) return;
-    const pane: QuadPaneId | null =
-      next === "notes" ? "c12" : next === "mindmap" ? "c22" : next === "modules" ? "c21" : null;
-    if (!pane) return;
-    setQuadReveal((prev) => ({ pane, count: (prev?.count ?? 0) + 1 }));
   };
 
   // ⌘/Ctrl+1…9 walks the study tabs — a desktop shortcut, so it stays out of
@@ -2008,6 +2123,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   //   · Images → zoom + pan are restored from the snapshot.
   const viewerStack = (
     <div className="relative h-full min-h-0 w-full min-w-0" data-course-viewer-stack>
+      {quadWide ? null : (
+        <PageBackButton surface="lesson" enabled={lessonCanBack} onBack={backLessonPage} />
+      )}
       {visitedFiles.length === 0 ? (
         <ResourceViewer file={null} active playback={playbackRef.current} onPlaybackChange={reportPlayback} onFileActions={handleFileActions} desktopView={desktopView} />
       ) : (
@@ -2037,6 +2155,15 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       )}
     </div>
   );
+
+  // The lesson pane's step-back walk: every file the learner opens becomes
+  // one more page of history (the same rule the blocks use).
+  useEffect(() => {
+    if (selectedFile?.id) pushPageHistory("lesson", String(selectedFile.id));
+  }, [selectedFile?.id]);
+  selectFileRef.current = selectFile;
+  visitedFilesRef.current = visitedFiles;
+  personalModulesOpenRef.current = personalModulesOpen;
 
   // P3-14: CoursePlayer — Gate personal access stays email-only (outside Apps Script via GATE_APPS_SCRIPT_URL), PlayerPanel keeps gateFile prop
   // ── The Player tab's panel ─────────────────────────────────────────────
@@ -2456,7 +2583,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
               html={studyExperiment.file.interactiveHtml || ""}
               url={studyExperiment.file.url || ""}
               title={studyExperiment.file.name}
-              active={dockTab === "experiment"}
+              active={
+                opts.quad
+                  ? Object.values(opts.quad.state.pages ?? {}).includes("experiment")
+                  : dockTab === "experiment"
+              }
               onComplete={() => {
                 // SELF work never changes official course completion.
                 if (!studyExperiment.personal && !completedIds.has(studyExperiment.file.id)
@@ -2500,7 +2631,15 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       // so nothing sings behind a Notes page. Inside the tab, going back to the
       // library page never stops the song — the player stays mounted.
       musicPanel={opts.extra ? undefined : (
-        <MusicPanel uid={user?.id ?? null} courseAudio={courseAudio} active={paneTab === "music"} />
+        <MusicPanel
+          uid={user?.id ?? null}
+          courseAudio={courseAudio}
+          active={
+            opts.quad
+              ? Object.values(opts.quad.state.pages ?? {}).includes("music")
+              : paneTab === "music"
+          }
+        />
       )}
       aiPanel={opts.extra ? undefined : (
         user?.id && aiOpened ? (
@@ -2554,7 +2693,17 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    * navigation, the ⌘/Ctrl+1…9 shortcuts and the keyboard takeover all still
    * speak about one tab.
    */
-  const studyOverlay = buildStudyPane(dockTab, handleDockTabChange);
+  const studyOverlay = (
+    <div
+      className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
+      data-course-study-root
+    >
+      {quadWide ? null : (
+        <PageBackButton surface="study" enabled={studyCanBack} onBack={backStudyPage} />
+      )}
+      {buildStudyPane(dockTab, handleDockTabChange)}
+    </div>
+  );
 
   /**
    * The placeable navigation — ONE component for the header, the left/right

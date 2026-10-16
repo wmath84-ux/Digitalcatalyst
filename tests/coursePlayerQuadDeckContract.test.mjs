@@ -36,6 +36,11 @@ const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
 const MODEL = read("src/course/quadLayout.ts");
 const DECK = read("src/course/QuadDeck.tsx");
 const DECK_CSS = read("src/course/course-quad-deck.css");
+const FLEX = read("src/course/quadFlex.ts");
+const PICKER = read("src/course/BlockPicker.tsx");
+const BACK = read("src/course/PageBackButton.tsx");
+const PAGES = read("src/course/blockPages.ts");
+const HISTORY = read("src/course/pageHistory.ts");
 const NAV = read("src/course/CourseHeaderNav.tsx");
 const NAV_CSS = read("src/course/course-header-nav.css");
 const PLACEMENT = read("src/utils/footerNavigationPlacement.ts");
@@ -124,8 +129,12 @@ test("outside click closes the cluster, and so does every press", () => {
   // A swap, a block and a shape all put it away after the press.
   const presses = DECK.match(/setMenu\(null\);/g) || [];
   assert.ok(presses.length >= 5, "the cluster is dismissed by its own buttons too");
-  assert.match(DECK, /onPress=\{\(\) => \{\n\s+commit\(quadSwap\(state, "cols"\)\);\n\s+setMenu\(null\);/);
-  assert.match(DECK, /commit\(quadTogglePane\(state, button\.pane\)\);\n\s+setMenu\(null\);/);
+  // On the dynamic cross a swap mirrors the four arms AND trades the blocks'
+  // pages; on the grid shapes it keeps the old mirror. Either way the
+  // cluster closes after the press.
+  assert.match(DECK, /onPress=\{\(\) => \{\n\s+commit\(dynamicCross \? quadSwapFlex\(state, "cols"\) : quadSwap\(state, "cols"\)\);\n\s+setMenu\(null\);/);
+  assert.match(DECK, /commit\(dynamicCross \? quadSwapFlex\(state, "rows"\) : quadSwap\(state, "rows"\)\);\n\s+setMenu\(null\);/);
+  assert.match(DECK, /if \(dynamicCross\) \{[\s\S]{0,420}} else \{\n\s+commit\(quadTogglePane\(state, button\.pane\)\);\n\s+}\n\s+setMenu\(null\);/);
   assert.match(DECK, /commit\(quadSetFormat\(state, format\)\);\n\s+setMenu\(null\);/);
   // A drag hides it as well — the learner is resizing, not choosing.
   assert.match(DECK, /\/\/ A drag on the line puts the cluster away — the learner is resizing\.\n\s+setMenu\(null\);/);
@@ -148,8 +157,14 @@ test("the four block buttons carry c11…c22 and read cXX+ while closed", () => 
   assert.match(DECK, /"data-quad-pane-open": button\.visible \? "true" : "false"/);
   // The last block on screen cannot be closed — the deck never empties.
   assert.match(MODEL, /if \(open\.length <= 1\) return state;/);
-  assert.match(DECK, /disabled=\{button\.lastOne\}/);
+  assert.match(DECK, /disabled=\{dynamicCross \? false : button\.lastOne\}/);
   assert.match(MODEL, /lastOne: visible && open\.length === 1,/);
+  // On the dynamic cross (free blocks) the four buttons never close a block:
+  // they put it back on its blank picker page ("block Keval aur Keval ek
+  // blank page se start hoga"). Closing/reopening stays for the grid shapes.
+  assert.match(DECK, /Put block \$\{button\.pane\} back on its blank page/);
+  assert.match(DECK, /openBlockPage\(button\.pane, null\);/);
+  assert.match(MODEL, /export const quadClearBlockPage/);
 });
 
 /* ── 6 · every grid shape the owner named ───────────────────────────────── */
@@ -179,16 +194,21 @@ test("the model carries every grid shape the brief asks for", () => {
 /* ── 7 · the header line ────────────────────────────────────────────────── */
 
 test("the header carries the progress bar, Settings and the navigation in ONE line", () => {
-  assert.match(PLAYER, /const headerNavInRail = quadWide && navPlacement === "header" && !quadNavInDeck;/);
+  assert.match(PLAYER, /const headerNavInRail = quadWide && navPlacement === "header" && !quadNavInDeck && !quadFooterOff;/);
   assert.match(PLAYER, /data-course-nav-slot/);
   assert.match(PLAYER, /\{courseNavNode\}\n\s+<\/div>/);
   // The progress bar takes the free space and Settings keeps its own width.
   assert.match(PLAYER, /headerNavInRail \? "min-w-0 flex-1" : "w-1\/2"/);
   assert.match(PLAYER, /headerNavInRail \? "shrink-0" : "w-1\/2"/);
   // Left, right and bottom have their own homes — one navigation, four places.
-  assert.match(PLAYER, /const quadRailLeft = quadWide && navPlacement === "left" && !quadNavInDeck;/);
-  assert.match(PLAYER, /const quadRailRight = quadWide && navPlacement === "right" && !quadNavInDeck;/);
-  assert.match(PLAYER, /const quadNavBottom = quadWide && navPlacement === "bottom" && !quadNavInDeck;/);
+  assert.match(PLAYER, /const quadRailLeft = quadWide && navPlacement === "left" && !quadNavInDeck && !quadFooterOff;/);
+  assert.match(PLAYER, /const quadRailRight = quadWide && navPlacement === "right" && !quadNavInDeck && !quadFooterOff;/);
+  assert.match(PLAYER, /const quadNavBottom = quadWide && navPlacement === "bottom" && !quadNavInDeck && !quadFooterOff;/);
+  // The owner's footer rule (2026-10-16+): "footer navigations Keval tabhi
+  // dikhe jo bhi user single split mode mein ho, means Keval do block".
+  assert.match(PLAYER, /const footerNavigationAlways = useFooterNavigationAlways\(\);/);
+  assert.match(PLAYER, /const quadFooterOff = quadWide && !quadSingleSplit\(quadState\) && !footerNavigationAlways;/);
+  assert.match(MODEL, /export function quadSingleSplit\(state: QuadLayoutState\): boolean \{\n\s+return quadOpenBlockCount\(state\) === 2;/);
   assert.match(PLAYER, /data-quad-nav-rail="left"/);
   assert.match(PLAYER, /data-quad-nav-rail="right"/);
   assert.match(PLAYER, /data-quad-nav-bottom/);
@@ -332,14 +352,25 @@ test("the overlay hands the deck its four blocks, the state and the navigation",
   assert.match(OVERLAY, /const paneOwnedTabs: DockTab\[\] = \["notes", "mindmap", "modules"\];/);
 });
 
-test("the player brings a closed block back when its navigation button is pressed", () => {
+test("a navigation tap opens that page in a block — the free-blocks route", () => {
   assert.match(PLAYER, /const handleNavTabChange = \(next: DockTab\) => \{/);
-  assert.match(PLAYER, /next === "notes" \? "c12" : next === "mindmap" \? "c22" : next === "modules" \? "c21" : null;/);
-  assert.match(PLAYER, /setQuadReveal\(\(prev\) => \(\{ pane, count: \(prev\?\.count \?\? 0\) \+ 1 \}\)\);/);
+  // One effect routes EVERY tab change (nav taps, shortcuts, deep links) into
+  // a block; the mount tab never routes, so a course opens on blank pages.
+  assert.match(PLAYER, /const routedDockTabRef = useRef<string \| null>\(null\);/);
+  assert.match(PLAYER, /if \(routedDockTabRef\.current === dockTab\) return;/);
+  assert.match(PLAYER, /if \(first \|\| !quadWide\) return;/);
+  assert.match(PLAYER, /openQuadPage\(page\);/);
+  // A page already on screen glows in its block; otherwise a blank block
+  // first, else the block the learner touched last.
+  assert.match(PLAYER, /const openQuadPage = useCallback\(/);
+  assert.match(PLAYER, /const existing = quadFindPageBlock\(current, page\);/);
+  assert.match(PLAYER, /setQuadReveal\(\(prev\) => \(\{ pane: existing, count: \(prev\?\.count \?\? 0\) \+ 1 \}\)\);/);
+  assert.match(PLAYER, /pushPageHistory\(`block:\$\{target\}`, page\);/);
+  assert.match(PLAYER, /commitQuadState\(quadSetBlockPage\(current, target, page\)\);/);
+  // The reveal glow still brings a hidden block back on the grid shapes.
   assert.match(DECK, /if \(!quadPaneVisible\(current, pane\)\) onState\(quadTogglePane\(current, pane\)\);/);
-  // The mind map's block is on screen for the whole visit on a big stage, and
-  // its panel still goes through the open transition that restores the last
-  // view from the panel session.
+  // The mind map's panel still goes through the open transition that restores
+  // the last view from the panel session.
   assert.match(PLAYER, /open=\{quadWide \? quadPaneLive : dockTab === "mindmap"\}/);
 });
 
@@ -408,4 +439,92 @@ test("panel chrome steps out of the navigation's way", () => {
   assert.match(DECK_CSS, /\[data-course-quad-deck\]\[data-quad-nav-side="right"\] \[data-course-notes-add\]/);
   assert.match(DECK_CSS, /\[data-course-quad-deck\]\[data-quad-nav-side="left"\] \[data-course-notes-add\]/);
   assert.match(DECK_CSS, /\/\* A phone never mounts the deck, so the rules above cannot reach it\. \*\//);
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * The 2026-10-16+ upgrade: the DYNAMIC CROSS, the free blocks' blank
+ * starter page and the step-back button.
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+test("the dynamic cross: four half-dividers with their OWN drag, meeting at the centre joint", () => {
+  // Four arm positions — the owner's "charon ka apna alag drag position hoga".
+  assert.match(FLEX, /export interface QuadFlexState \{/);
+  assert.match(FLEX, /xTop: number;/);
+  assert.match(FLEX, /xBottom: number;/);
+  assert.match(FLEX, /yLeft: number;/);
+  assert.match(FLEX, /yRight: number;/);
+  // Each arm runs from its outer edge in to the joint.
+  assert.match(FLEX, /export const quadFlexArms = \(flex: QuadFlexState\): Record<QuadArmKey, QuadFlexArm> => \{/);
+  assert.match(FLEX, /top: \{ value: f\.xTop, from: 0, to: joint\.top \},/);
+  assert.match(FLEX, /left: \{ value: f\.yLeft, from: 0, to: joint\.left \},/);
+  // One arm's drag moves ONE value; the joint's drag moves all four
+  // ("center se directly ham drag karenge to charon ek saath resize honge").
+  assert.match(FLEX, /export const moveQuadFlexArm = \(flex: QuadFlexState, arm: QuadArmKey, delta: number\): QuadFlexState => \{/);
+  assert.match(FLEX, /export const moveQuadFlexJoint = \(flex: QuadFlexState, dx: number, dy: number\): QuadFlexState => \{/);
+  // The deck draws the four arms and the joint; the cross drops the old
+  // grid dividers entirely.
+  assert.match(DECK, /data-course-quad-flex-arm=\{arm\}/);
+  assert.match(DECK, /data-course-quad-flex-joint/);
+  assert.match(DECK, /handleFlexPointerDown = \(kind: QuadArmKey \| "joint"\)/);
+  assert.match(DECK, /const dynamicCross = Boolean\(blocks\) && state\.format === "quad";/);
+  // Live drags write the four CSS variables — no re-render per frame.
+  assert.match(DECK, /deck\.style\.setProperty\("--flex-xt"/);
+  assert.match(DECK_CSS, /\.dc-quad-flex__block--c11 \{[\s\S]{0,160}?width: var\(--flex-xt\);\n  height: var\(--flex-yl\);/);
+  assert.match(DECK_CSS, /\.dc-quad-flex__joint-handle \{/);
+});
+
+test("every block starts on a WHITE blank picker — solid blue/white rectangular buttons only", () => {
+  // The owner's starter page: "block Keval aur Keval ek blank page se start
+  // hoga … white background, button s blue white, rectangular … sabkuchh
+  // solid color, glass type nahin".
+  assert.match(PICKER, /className="dc-block-picker"/);
+  assert.match(PICKER, /data-course-block-picker-page=\{record\.key\}/);
+  const pickerRule = DECK_CSS.slice(DECK_CSS.indexOf(".dc-block-picker {"), DECK_CSS.indexOf(".dc-block-picker__head"));
+  assert.match(pickerRule, /background: #ffffff;/);
+  assert.doesNotMatch(pickerRule, /gradient|backdrop-filter/, "solid colours only — no glass");
+  const buttonRule = DECK_CSS.slice(DECK_CSS.indexOf(".dc-block-picker__button {"), DECK_CSS.indexOf(".dc-block-picker__button:hover"));
+  assert.match(buttonRule, /background: #2563eb;/);
+  assert.match(buttonRule, /border: 2px solid #2563eb;/);
+  assert.match(buttonRule, /border-radius: 6px;/, "rectangular buttons");
+  assert.match(buttonRule, /color: #ffffff;/);
+  // The catalog lists every course player page — the lesson, the learner's
+  // own tree and the player settings included.
+  assert.match(PAGES, /"lesson"/);
+  assert.match(PAGES, /"personal"/);
+  assert.match(PAGES, /"player"/);
+  // A page already open elsewhere MOVES on pick (one page, one block).
+  assert.match(MODEL, /pages\[other\] === page/);
+  assert.match(PAGES, /export function findBlockOwningPage/);
+});
+
+test("the top-left Back button steps through previous pages — never a jump home", () => {
+  // The owner's rule: "yah button directly home page per redirect na karen …
+  // step bye step previous pages per click karne per back kare. Course player
+  // ke sabhi pages per top left mein yah button hoga."
+  assert.match(BACK, /className="dc-page-back"/);
+  assert.match(BACK, /onBack/);
+  assert.doesNotMatch(BACK, /location|hash|href|window\./, "it never navigates on its own");
+  const backRule = DECK_CSS.slice(DECK_CSS.indexOf(".dc-page-back {"), DECK_CSS.indexOf(".dc-page-back:hover"));
+  assert.match(backRule, /background: #ffffff;/);
+  assert.match(backRule, /border: 2px solid #2563eb;/);
+  // Top-left of the surface it sits on.
+  assert.match(backRule, /top: 6px;/);
+  assert.match(backRule, /left: 6px;/);
+  // The walk: one page per click, and quiet at its end.
+  assert.match(HISTORY, /export function backPageHistory\(scope: string\): string \| null \{/);
+  assert.match(HISTORY, /if \(stack\.length <= 1\) return null;/);
+  assert.match(DECK, /<PageBackButton\n\s+surface=\{pane\}\n\s+enabled=\{canBack\}\n\s+onBack=\{\(\) => onBack\(pane\)\}/);
+  // The phone's study pane and the lesson pane carry it too — every page.
+  assert.match(PLAYER, /<PageBackButton surface="lesson" enabled=\{lessonCanBack\} onBack=\{backLessonPage\} \/>/);
+  assert.match(PLAYER, /<PageBackButton surface="study" enabled=\{studyCanBack\} onBack=\{backStudyPage\} \/>/);
+});
+
+test("the footer navigation shows only in single split mode — Keval do block", () => {
+  assert.match(MODEL, /"footer navigations Keval tabhi/);
+  assert.match(MODEL, /dikhe jo bhi user single split mode mein ho, means Keval do block"/);
+  assert.match(MODEL, /return quadOpenBlockCount\(state\) === 2;/);
+  // …and the deck's placement flags all step behind it (with the "always"
+  // setting as the one override).
+  assert.match(PLAYER, /const footerNavigationAlways = useFooterNavigationAlways\(\);/);
+  assert.match(PLAYER, /const quadFooterOff = quadWide && !quadSingleSplit\(quadState\) && !footerNavigationAlways;/);
 });

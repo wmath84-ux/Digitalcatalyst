@@ -57,6 +57,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
@@ -66,6 +67,32 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowLeftRight, ArrowUpDown, Move } from "lucide-react";
 import { DIVIDER_HIT, DIVIDER_LINE, EASE_OUT_MOTION, PEEK_STRIP_PX } from "./splitMotion";
 import type { CourseViewSettings } from "./courseViewSettings";
+import {
+  clampQuadFlex,
+  moveQuadFlexArm,
+  moveQuadFlexJoint,
+  quadFlexArms,
+  quadFlexJoint,
+  quadFlexSignature,
+  setQuadFlexArm,
+  QUAD_FLEX_X_MAX,
+  QUAD_FLEX_X_MIN,
+  QUAD_FLEX_Y_MAX,
+  QUAD_FLEX_Y_MIN,
+  type QuadArmKey,
+  type QuadFlexState,
+} from "./quadFlex";
+import type { BlockPageKey, BlockPageRecord } from "./blockPages";
+import BlockPicker from "./BlockPicker";
+import PageBackButton from "./PageBackButton";
+import {
+  backPageHistory,
+  canPageHistoryBack,
+  pageHistoryOf,
+  pushPageHistory,
+  subscribePageHistory,
+} from "./pageHistory";
+import { quadSetBlockPage, quadSetFocus, quadSwapFlex } from "./quadLayout";
 import {
   QUAD_COL2_MAX,
   QUAD_COL2_MIN,
@@ -168,6 +195,20 @@ export interface QuadDeckProps {
    * takes for master notes).
    */
   reveal?: { pane: QuadPaneId; count: number } | null;
+  /**
+   * FREE BLOCKS (the owner's 2026-10-16+ upgrade): when given, every block
+   * starts on its blank picker page and the learner opens ANY course player
+   * page in it — plus the DYNAMIC CROSS on the 2×2 shape (four half-dividers,
+   * each with its own drag, all meeting at the draggable centre joint). The
+   * four fixed pane props above stay for callers that map pages themselves
+   * (Work mode's deck).
+   */
+  blocks?: {
+    /** The picker's catalog (hidden tabs already filtered out). */
+    catalog: readonly BlockPageRecord[];
+    /** Render one page's panel inside a block. */
+    renderPage: (page: BlockPageKey, pane: QuadPaneId) => ReactNode;
+  };
 }
 
 /* ── The little layout glyphs ───────────────────────────────────────────── */
@@ -246,6 +287,116 @@ function QuadMenuButton({
   );
 }
 
+/* ── One free block: its blank picker, its pages, its back button ───────── */
+
+/**
+ * A block's content in FREE-BLOCKS mode. Every block starts on the white
+ * picker ("block Keval aur Keval ek blank page se start hoga"); a page the
+ * learner opens stays mounted here (hidden behind the current one) so a
+ * playing video or song never loses its place to a page switch. The top-left
+ * back button walks the block's OWN history, one step a click — never home.
+ */
+function FreeBlock({
+  pane,
+  page,
+  pagesRecord,
+  catalog,
+  renderPage,
+  onOpen,
+  onBack,
+}: {
+  pane: QuadPaneId;
+  page: BlockPageKey | null;
+  pagesRecord: Record<QuadPaneId, BlockPageKey | null>;
+  catalog: readonly BlockPageRecord[];
+  renderPage: (page: BlockPageKey, pane: QuadPaneId) => ReactNode;
+  onOpen: (pane: QuadPaneId, page: BlockPageKey | null) => void;
+  onBack: (pane: QuadPaneId) => void;
+}) {
+  const scope = `block:${pane}`;
+  const canBack = useSyncExternalStore(
+    subscribePageHistory,
+    () => canPageHistoryBack(scope),
+    () => false,
+  );
+  const [, bump] = useState(0);
+  const openedRef = useRef<BlockPageKey[]>([]);
+
+  // Keep-alive: the pages this block has opened, minus any page that has
+  // moved to another block ("user koi bhi page kisi bhi block mein open kar
+  // sakta hai" — a pick elsewhere MOVES it).
+  useEffect(() => {
+    const kept = openedRef.current.filter((candidate) => {
+      for (const [otherPane, otherPage] of Object.entries(pagesRecord)) {
+        if (otherPane !== pane && otherPage === candidate) return false;
+      }
+      return true;
+    });
+    if (page && !kept.includes(page)) kept.push(page);
+    const changed =
+      kept.length !== openedRef.current.length ||
+      kept.some((candidate, index) => openedRef.current[index] !== candidate);
+    if (changed) {
+      openedRef.current = kept;
+      bump((n) => n + 1);
+    }
+  }, [page, pagesRecord, pane]);
+
+  // The blank page is a page too: the walk starts on it so Back from a page
+  // opened later always has somewhere to land.
+  useEffect(() => {
+    if (pageHistoryOf(scope).length === 0) pushPageHistory(scope, page ?? "blank");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope]);
+
+  return (
+    <div className="dc-quad-free" data-quad-free={pane} data-quad-free-page={page ?? "blank"}>
+      <PageBackButton
+        surface={pane}
+        enabled={canBack}
+        onBack={() => onBack(pane)}
+      />
+      {/* With a page on screen, the switcher is the quiet way back to the
+          blank page's full list — so any block can change its page without
+          the cluster round-trip. */}
+      {page !== null ? (
+        <button
+          type="button"
+          className="dc-block-switch"
+          data-course-block-switch={pane}
+          aria-label={`Change the page in block ${pane}`}
+          title="Change this block's page"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpen(pane, null);
+          }}
+        >
+          Pages
+        </button>
+      ) : null}
+      {page === null ? (
+        <BlockPicker
+          pane={pane}
+          pages={catalog}
+          taken={pagesRecord}
+          onPick={(picked) => onOpen(pane, picked)}
+        />
+      ) : null}
+      {openedRef.current.map((opened) => (
+        <div
+          key={opened}
+          className="dc-quad-free__layer"
+          data-quad-free-layer={opened}
+          hidden={opened !== page}
+        >
+          {renderPage(opened, pane)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ── The deck ───────────────────────────────────────────────────────────── */
 
 export default function QuadDeck({
@@ -261,14 +412,17 @@ export default function QuadDeck({
   studyVisible,
   resourcesFooter,
   reveal,
+  blocks,
 }: QuadDeckProps) {
   const borrowedVisible = Boolean(study) && (studyVisible ?? true);
   const reducedMotion = useReducedMotion() === true;
 
   const deckRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ axis: QuadAxisKey; start: number; base: number; live: number } | null>(null);
-  const [dragging, setDragging] = useState<QuadAxisKey | null>(null);
-  const [menu, setMenu] = useState<{ divider: QuadAxisKey; segment: QuadSegment } | null>(null);
+  const [dragging, setDragging] = useState<QuadAxisKey | QuadArmKey | "joint" | null>(null);
+  const [menu, setMenu] = useState<
+    { divider: QuadAxisKey | "flex"; segment: QuadSegment | QuadArmKey | "joint" } | null
+  >(null);
   const [focusPane, setFocusPane] = useState<QuadPaneId | null>(null);
 
   const commit = onState;
@@ -441,6 +595,163 @@ export default function QuadDeck({
       if (event.key === "Escape") setMenu(null);
     };
 
+  /* ── The dynamic cross: four half-dividers + the centre joint ───────────
+   * Free-blocks mode's 2×2 shape. Every arm drags on its OWN position —
+   * "charon ka apna alag drag position hoga, sabhi draggable honge" — and
+   * the centre joint drags all four together ("center se directly ham drag
+   * karenge to charon ek saath resize honge"). Live drags write the four CSS
+   * variables (no React re-render per frame); the settled values commit on
+   * release, exactly like the grid dividers. */
+  const flex: QuadFlexState = clampQuadFlex(state.flex);
+  const dynamicCross = Boolean(blocks) && state.format === "quad";
+  const flexDragRef = useRef<{ kind: QuadArmKey | "joint"; start: number; start2: number; base: QuadFlexState; live: QuadFlexState } | null>(null);
+
+  const flexMin = (arm: QuadArmKey) => (arm === "top" || arm === "bottom" ? QUAD_FLEX_X_MIN : QUAD_FLEX_Y_MIN);
+  const flexMax = (arm: QuadArmKey) => (arm === "top" || arm === "bottom" ? QUAD_FLEX_X_MAX : QUAD_FLEX_Y_MAX);
+  const flexValue = (f: QuadFlexState, arm: QuadArmKey) =>
+    arm === "top" ? f.xTop : arm === "bottom" ? f.xBottom : arm === "left" ? f.yLeft : f.yRight;
+  const flexSqueezed = (arm: QuadArmKey) => {
+    const value = flexValue(flex, arm);
+    return value <= flexMin(arm) + QUAD_SQUEEZE_EPS || value >= flexMax(arm) - QUAD_SQUEEZE_EPS;
+  };
+  const lastFlexRef = useRef<QuadFlexState>({ ...flex });
+  useEffect(() => {
+    for (const arm of ["top", "bottom", "left", "right"] as QuadArmKey[]) {
+      if (!flexSqueezed(arm)) {
+        lastFlexRef.current = { ...lastFlexRef.current, [arm === "top" ? "xTop" : arm === "bottom" ? "xBottom" : arm === "left" ? "yLeft" : "yRight"]: flexValue(flex, arm) };
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flex.xTop, flex.xBottom, flex.yLeft, flex.yRight]);
+  const restoreFlexArm = (arm: QuadArmKey) =>
+    commit({ ...state, flex: setQuadFlexArm(flex, arm, flexValue(lastFlexRef.current, arm)) });
+
+  /** One arm's live value on the deck's CSS variables. */
+  const writeLiveFlex = (arm: QuadArmKey, value: number) => {
+    const deck = deckRef.current;
+    if (!deck) return;
+    const name = arm === "top" ? "--flex-xt" : arm === "bottom" ? "--flex-xb" : arm === "left" ? "--flex-yl" : "--flex-yr";
+    deck.style.setProperty(name, `${value}%`);
+  };
+  const writeLiveFlexJoint = (next: QuadFlexState) => {
+    const deck = deckRef.current;
+    if (!deck) return;
+    deck.style.setProperty("--flex-xt", `${next.xTop}%`);
+    deck.style.setProperty("--flex-xb", `${next.xBottom}%`);
+    deck.style.setProperty("--flex-yl", `${next.yLeft}%`);
+    deck.style.setProperty("--flex-yr", `${next.yRight}%`);
+  };
+
+  const suppressClickRef = useRef(false);
+  const handleFlexPointerDown = (kind: QuadArmKey | "joint") => (event: ReactPointerEvent<HTMLDivElement | HTMLButtonElement>) => {
+    if (event.button !== 0 && event.pointerType === "mouse") return;
+    event.stopPropagation();
+    suppressClickRef.current = false;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    flexDragRef.current = { kind, start: event.clientX, start2: event.clientY, base: { ...flex }, live: { ...flex } };
+    setDragging(kind);
+    setMenu(null);
+  };
+
+  const handleFlexPointerMove = (event: ReactPointerEvent<HTMLDivElement | HTMLButtonElement>) => {
+    const drag = flexDragRef.current;
+    if (!drag) return;
+    const deck = deckRef.current;
+    const rect = deck?.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return;
+    const dx = ((event.clientX - drag.start) / rect.width) * 100;
+    const dy = ((event.clientY - drag.start2) / rect.height) * 100;
+    if (drag.kind === "joint") {
+      const next = moveQuadFlexJoint(drag.base, dx, dy);
+      drag.live = next;
+      writeLiveFlexJoint(next);
+      return;
+    }
+    const arm = drag.kind;
+    const delta = arm === "top" || arm === "bottom" ? dx : dy;
+    const next = moveQuadFlexArm(drag.base, arm, delta);
+    drag.live = next;
+    writeLiveFlex(arm, flexValue(next, arm));
+  };
+
+  const handleFlexPointerUp = (event: ReactPointerEvent<HTMLDivElement | HTMLButtonElement>) => {
+    const drag = flexDragRef.current;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    flexDragRef.current = null;
+    setDragging(null);
+    if (!drag) return;
+    const moved =
+      drag.live.xTop !== drag.base.xTop ||
+      drag.live.xBottom !== drag.base.xBottom ||
+      drag.live.yLeft !== drag.base.yLeft ||
+      drag.live.yRight !== drag.base.yRight;
+    suppressClickRef.current = moved;
+    commit({ ...state, flex: clampQuadFlex(drag.live) });
+  };
+
+  const handleFlexPointerCancel = (event: ReactPointerEvent<HTMLDivElement | HTMLButtonElement>) => {
+    const drag = flexDragRef.current;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    flexDragRef.current = null;
+    setDragging(null);
+    if (!drag) return;
+    // Cancelled mid-resize: every arm back where it started.
+    writeLiveFlexJoint(drag.base);
+  };
+
+  const handleFlexKeyDown = (kind: QuadArmKey | "joint") => (event: ReactKeyboardEvent<HTMLDivElement | HTMLButtonElement>) => {
+    const step = (dx: number, dy: number) => {
+      event.preventDefault();
+      commit({ ...state, flex: moveQuadFlexJoint(flex, dx, dy) });
+    };
+    const stepArm = (delta: number) => {
+      event.preventDefault();
+      commit({ ...state, flex: moveQuadFlexArm(flex, kind as QuadArmKey, delta) });
+    };
+    if (kind === "joint") {
+      if (event.key === "ArrowLeft") return step(-QUAD_KEY_STEP, 0);
+      if (event.key === "ArrowRight") return step(QUAD_KEY_STEP, 0);
+      if (event.key === "ArrowUp") return step(0, -QUAD_KEY_STEP);
+      if (event.key === "ArrowDown") return step(0, QUAD_KEY_STEP);
+    } else {
+      const vertical = kind === "top" || kind === "bottom";
+      if (vertical && event.key === "ArrowLeft") return stepArm(-QUAD_KEY_STEP);
+      if (vertical && event.key === "ArrowRight") return stepArm(QUAD_KEY_STEP);
+      if (!vertical && event.key === "ArrowUp") return stepArm(-QUAD_KEY_STEP);
+      if (!vertical && event.key === "ArrowDown") return stepArm(QUAD_KEY_STEP);
+    }
+    if (event.key === "s" || event.key === "S") {
+      event.preventDefault();
+      commit(quadSwapFlex(state, kind === "left" || kind === "right" ? "rows" : "cols"));
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setMenu({ divider: "flex", segment: kind });
+      return;
+    }
+    if (event.key === "Escape") setMenu(null);
+  };
+
+  /* ── Free blocks: open a page, walk back one step ──────────────────────── */
+  const blockPagesRecord = (): Record<QuadPaneId, BlockPageKey | null> => ({
+    c11: state.pages?.c11 ?? null,
+    c12: state.pages?.c12 ?? null,
+    c21: state.pages?.c21 ?? null,
+    c22: state.pages?.c22 ?? null,
+  });
+
+  const openBlockPage = (pane: QuadPaneId, page: BlockPageKey | null) => {
+    pushPageHistory(`block:${pane}`, page ?? "blank");
+    commit(quadSetBlockPage(state, pane, page));
+  };
+
+  const backBlockPage = (pane: QuadPaneId) => {
+    const previous = backPageHistory(`block:${pane}`);
+    if (previous === null) return;
+    commit(quadSetBlockPage(state, pane, previous === "blank" ? null : (previous as BlockPageKey)));
+  };
+
   /* ── The cluster: outside click closes it ─────────────────────────────── */
   useEffect(() => {
     if (!menu) return undefined;
@@ -472,6 +783,19 @@ export default function QuadDeck({
   /** Where the cluster sits: exactly on the dot whose segment was pressed. */
   const menuAnchor = (): CSSProperties => {
     if (!menu) return {};
+    // The dynamic cross: the cluster opens on the pressed arm's centre or on
+    // the joint itself — the owner's "screen ke center mein point".
+    if (menu.divider === "flex") {
+      const joint = quadFlexJoint(flex);
+      const cx = joint.left + joint.width / 2;
+      const cy = joint.top + joint.height / 2;
+      const arms = quadFlexArms(flex);
+      if (menu.segment === "top") return { left: `${flex.xTop}%`, top: `${arms.top.to / 2}%` };
+      if (menu.segment === "bottom") return { left: `${flex.xBottom}%`, top: `${(arms.bottom.from + 100) / 2}%` };
+      if (menu.segment === "left") return { left: `${arms.left.to / 2}%`, top: `${flex.yLeft}%` };
+      if (menu.segment === "right") return { left: `${(arms.right.from + 100) / 2}%`, top: `${flex.yRight}%` };
+      return { left: `${cx}%`, top: `${cy}%` };
+    }
     // With no cross the cluster opens in the middle of the deck (the little
     // door above); with the cross it opens exactly on the pressed dot.
     if (!cross) return { left: "50%", top: "50%" };
@@ -489,6 +813,21 @@ export default function QuadDeck({
   };
 
   const paneContent = (pane: QuadPaneId): ReactNode => {
+    // FREE-BLOCKS mode: every block shows the page the learner opened in it
+    // (or its blank picker), wrapped in its own keep-alive layers + back.
+    if (blocks) {
+      return (
+        <FreeBlock
+          pane={pane}
+          page={state.pages?.[pane] ?? null}
+          pagesRecord={blockPagesRecord()}
+          catalog={blocks.catalog}
+          renderPage={blocks.renderPage}
+          onOpen={openBlockPage}
+          onBack={backBlockPage}
+        />
+      );
+    }
     if (pane === "c11") {
       return (
         <div className="dc-quad-pane__stack">
@@ -542,6 +881,11 @@ export default function QuadDeck({
           "--quad-col2": `${state.col2}%`,
           "--quad-row": `${state.row}%`,
           "--quad-strip": `${PEEK_STRIP_PX}px`,
+          // The dynamic cross's four arm positions (free-blocks mode).
+          "--flex-xt": `${flex.xTop}%`,
+          "--flex-xb": `${flex.xBottom}%`,
+          "--flex-yl": `${flex.yLeft}%`,
+          "--flex-yr": `${flex.yRight}%`,
         } as CSSProperties
       }
     >
@@ -553,6 +897,162 @@ export default function QuadDeck({
           transition: reducedMotion ? "none" : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
         }}
       >
+        {dynamicCross ? (
+          /* ── THE DYNAMIC CROSS ──────────────────────────────────────────
+           * Four corner blocks that each hug their outer corner and end at
+           * their own two arms; the arms run edge → joint and drag one at a
+           * time; the joint (the owner's "screen ke center mein point") drags
+           * all four together. When the four positions agree the joint is a
+           * single point — the default even cross. */
+          <div
+            className="dc-quad-flex"
+            data-course-quad-flex
+            data-quad-flex-signature={quadFlexSignature(flex)}
+          >
+            {QUAD_PANE_ORDER.filter((pane) => quadPaneVisible(state, pane)).map((pane) => (
+              <section
+                key={pane}
+                className={`dc-quad-flex__block dc-quad-flex__block--${pane}`}
+                data-quad-pane={pane}
+                data-quad-pane-label={QUAD_SLOT_LABEL[QUAD_PANE_SLOT[pane]]}
+                data-quad-focused={focusPane === pane ? "true" : "false"}
+                aria-label={`Block ${pane}`}
+                onPointerDown={() => {
+                  if (stateRef.current.focus !== pane) commit(quadSetFocus(stateRef.current, pane));
+                }}
+              >
+                {paneContent(pane)}
+              </section>
+            ))}
+
+            {/* The four half-dividers — each from its outer edge in to the
+                joint. Every one drags on its own position; a hidden segment
+                (Course view page) still drags, it is just not drawn. */}
+            {(
+              [
+                ["top", "vTop"],
+                ["bottom", "vBottom"],
+                ["left", "hLeft"],
+                ["right", "hRight"],
+              ] as const
+            ).map(([arm, segmentKey]) => {
+              const vertical = arm === "top" || arm === "bottom";
+              return (
+                <div
+                  key={arm}
+                  role="separator"
+                  tabIndex={0}
+                  aria-orientation={vertical ? "vertical" : "horizontal"}
+                  aria-label={`${arm} divider — drag to resize its blocks, press Enter for its buttons`}
+                  aria-valuemin={vertical ? QUAD_FLEX_X_MIN : QUAD_FLEX_Y_MIN}
+                  aria-valuemax={vertical ? QUAD_FLEX_X_MAX : QUAD_FLEX_Y_MAX}
+                  aria-valuenow={Math.round(flexValue(flex, arm))}
+                  data-course-quad-flex-arm={arm}
+                  data-axis={arm}
+                  data-dragging={dragging === arm ? "true" : "false"}
+                  data-squeezed={flexSqueezed(arm) ? "true" : "false"}
+                  className={`dc-quad-flex__arm dc-quad-flex__arm--${arm}`}
+                  style={
+                    {
+                      ["--quad-hit" as string]: `${flexSqueezed(arm) ? QUAD_SQUEEZE_GAP : DIVIDER_HIT}px`,
+                    } as CSSProperties
+                  }
+                  onPointerDown={handleFlexPointerDown(arm)}
+                  onPointerMove={handleFlexPointerMove}
+                  onPointerUp={handleFlexPointerUp}
+                  onPointerCancel={handleFlexPointerCancel}
+                  onKeyDown={handleFlexKeyDown(arm)}
+                >
+                  <span
+                    className="dc-quad-flex__arm-line"
+                    data-course-quad-line={vertical ? "v" : "h"}
+                    data-visible={view.dividers[segmentKey] ? "true" : "false"}
+                    aria-hidden
+                    style={{
+                      background: DIVIDER_LINE,
+                      boxShadow:
+                        dragging === arm ? `0 0 16px ${DIVIDER_LINE}` : `0 0 10px ${DIVIDER_LINE}66`,
+                    }}
+                  />
+                  {flexSqueezed(arm) ? (
+                    <>
+                      <span aria-hidden data-course-quad-strip="" className="dc-quad-strip" />
+                      <button
+                        type="button"
+                        className="dc-quad-restore"
+                        data-course-quad-restore={arm}
+                        aria-label={`Expand the squeezed blocks back to their previous size — ${arm}`}
+                        title="Back to the previous size"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          restoreFlexArm(arm);
+                        }}
+                      >
+                        <span aria-hidden data-quad-restore-icon>
+                          {vertical ? <ArrowLeftRight size={14} /> : <ArrowUpDown size={14} />}
+                        </span>
+                      </button>
+                    </>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="dc-quad-dot dc-quad-flex__dot"
+                    data-course-quad-dot
+                    data-quad-dot-segment={arm}
+                    data-open={menu?.divider === "flex" && menu.segment === arm ? "true" : "false"}
+                    aria-label={`Divider buttons — ${arm} divider`}
+                    title="Divider buttons"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onDoubleClick={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setMenu({ divider: "flex", segment: arm });
+                    }}
+                  >
+                    <span className="dc-quad-dot__pip" aria-hidden data-quad-dot-pip />
+                  </button>
+                </div>
+              );
+            })}
+
+            {/* The centre joint: drag it and all four positions travel
+                together. Its zone is exactly what the arms leave between
+                them — a point when all four agree. */}
+            <div
+              className="dc-quad-flex__joint"
+              data-course-quad-flex-joint
+              data-quad-joint-size={
+                quadFlexJoint(flex).width + quadFlexJoint(flex).height > 0 ? "open" : "point"
+              }
+            >
+              <span className="dc-quad-flex__joint-zone" aria-hidden data-quad-joint-zone />
+              <button
+                type="button"
+                className="dc-quad-flex__joint-handle"
+                data-course-quad-dot
+                data-quad-joint-handle
+                data-dragging={dragging === "joint" ? "true" : "false"}
+                data-open={menu?.divider === "flex" && menu.segment === "joint" ? "true" : "false"}
+                aria-label="Centre joint — drag to resize every block together, press Enter for its buttons"
+                title="Drag the centre to resize every block"
+                onPointerDown={handleFlexPointerDown("joint")}
+                onPointerMove={handleFlexPointerMove}
+                onPointerUp={handleFlexPointerUp}
+                onPointerCancel={handleFlexPointerCancel}
+                onKeyDown={handleFlexKeyDown("joint")}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (suppressClickRef.current) return;
+                  setMenu({ divider: "flex", segment: "joint" });
+                }}
+              >
+                <span className="dc-quad-dot__pip" aria-hidden data-quad-dot-pip />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
         <div className="dc-quad-grid" style={{ gridTemplateRows: quadDeckRows(rows.length, state.row) }}>
           {rows.map((row, index) => (
             <div
@@ -587,7 +1087,11 @@ export default function QuadDeck({
             cross={cross}
             dragging={dragging === "v"}
             visible={{ vTop: view.dividers.vTop, vBottom: view.dividers.vBottom }}
-            openSegment={menu?.divider === "v" && menu.segment !== "v2" ? menu.segment : null}
+            openSegment={
+              menu && menu.divider === "v" && (menu.segment === "vTop" || menu.segment === "vBottom")
+                ? menu.segment
+                : null
+            }
             squeezed={squeezedCol}
             onRestore={restoreCol}
             onPointerDown={handlePointerDown("v")}
@@ -612,7 +1116,7 @@ export default function QuadDeck({
             cross={false}
             dragging={dragging === "v2"}
             visible={{ vTop: view.dividers.vTop || view.dividers.vBottom, vBottom: false }}
-            openSegment={menu?.divider === "v" && menu.segment === "v2" ? "v2" : null}
+            openSegment={menu && menu.divider === "v" && menu.segment === "v2" ? "v2" : null}
             squeezed={squeezedCol2}
             onRestore={restoreCol2}
             onPointerDown={handlePointerDown("v2")}
@@ -633,7 +1137,11 @@ export default function QuadDeck({
             cross={cross}
             dragging={dragging === "h"}
             visible={{ vTop: view.dividers.hLeft, vBottom: view.dividers.hRight }}
-            openSegment={menu?.divider === "h" ? menu.segment : null}
+            openSegment={
+              menu && menu.divider === "h" && (menu.segment === "hLeft" || menu.segment === "hRight")
+                ? menu.segment
+                : null
+            }
             squeezed={squeezedRow}
             onRestore={restoreRow}
             onPointerDown={handlePointerDown("h")}
@@ -665,6 +1173,9 @@ export default function QuadDeck({
             <Move size={14} aria-hidden />
           </button>
         ) : null}
+
+          </>
+        )}
 
         {/* ── The ONE cluster a dot opens ─────────────────────────────────── */}
         <AnimatePresence initial={false}>
@@ -699,7 +1210,7 @@ export default function QuadDeck({
                       attrs={{ "data-quad-swap": "cols" }}
                       glyph={<ArrowLeftRight size={15} aria-hidden />}
                       onPress={() => {
-                        commit(quadSwap(state, "cols"));
+                        commit(dynamicCross ? quadSwapFlex(state, "cols") : quadSwap(state, "cols"));
                         setMenu(null);
                       }}
                     />
@@ -709,7 +1220,7 @@ export default function QuadDeck({
                       attrs={{ "data-quad-swap": "rows" }}
                       glyph={<ArrowUpDown size={15} aria-hidden />}
                       onPress={() => {
-                        commit(quadSwap(state, "rows"));
+                        commit(dynamicCross ? quadSwapFlex(state, "rows") : quadSwap(state, "rows"));
                         setMenu(null);
                       }}
                     />
@@ -724,12 +1235,14 @@ export default function QuadDeck({
                       <QuadMenuButton
                         key={button.pane}
                         label={
-                          button.visible
-                            ? `Close the ${button.label.toLowerCase()}`
-                            : `Open the ${button.label.toLowerCase()}`
+                          dynamicCross
+                            ? `Put block ${button.pane} back on its blank page`
+                            : button.visible
+                              ? `Close the ${button.label.toLowerCase()}`
+                              : `Open the ${button.label.toLowerCase()}`
                         }
                         text={button.text}
-                        disabled={button.lastOne}
+                        disabled={dynamicCross ? false : button.lastOne}
                         attrs={{ "data-quad-pane-button": button.pane, "data-quad-pane-open": button.visible ? "true" : "false" }}
                         glyph={
                           <QuadGlyph
@@ -738,7 +1251,14 @@ export default function QuadDeck({
                           />
                         }
                         onPress={() => {
-                          commit(quadTogglePane(state, button.pane));
+                          if (dynamicCross) {
+                            // Free blocks: the button puts the block back on
+                            // its blank picker page (never close — the cross
+                            // always keeps its four corners).
+                            openBlockPage(button.pane, null);
+                          } else {
+                            commit(quadTogglePane(state, button.pane));
+                          }
                           setMenu(null);
                         }}
                       />

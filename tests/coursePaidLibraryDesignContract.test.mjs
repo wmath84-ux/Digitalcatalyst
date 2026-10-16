@@ -85,7 +85,10 @@ test('the Paid page renders through the same BranchedMenu with the same props', 
   assert.match(panel, /className="library-body" data-course-paid-library/);
   // The overlay wires the real data + buy handlers into the panel, and the
   // StudyContent paid branch renders it under the shared page header.
-  assert.match(overlay, /<PaidLibraryPanel\n          updates=\{props\.updates\}/);
+  assert.match(overlay, /<PaidLibraryPanel\s+updates=\{props\.updates\}/);
+  // The same node serves the study body AND the plus deck's free blocks.
+  assert.match(overlay, /const paidLibraryNode = /);
+  assert.match(overlay, /paidPanel=\{paidLibraryNode\}/);
   assert.match(overlay, /onBuyUpdate=\{props\.onBuyUpdate\}/);
   assert.match(overlay, /paidPanel=\{/);
 });
