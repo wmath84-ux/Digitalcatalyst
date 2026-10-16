@@ -99,5 +99,5 @@ test('the Workspace footer itself is untouched', () => {
   // The course pill does not register as the measured site footer.
   assert.doesNotMatch(dock, /data-site-footer-nav=""/);
   // Nor did the pill leak into the in-pane dock or other course surfaces.
-  assert.match(overlay, /const dock = props\.peekDock \? null : \(/);
+  assert.match(overlay, /const dock = props\.peekDock \|\| props\.quad \? null : \(/);
 });

@@ -215,8 +215,11 @@ test("close → restore is derived from the same state, with no second footer", 
   // The state is a plain boolean pair handed down; the footer comes back the
   // instant it flips back to false because nothing was mutated on the way out.
   assert.match(keyboardHook, /export const useCourseKeyboard = \(\): CourseKeyboardState => useContext\(CourseKeyboardContext\);/);
-  // Exactly ONE footer is ever rendered: peek mode OR the legacy in-pane dock.
-  assert.match(overlay, /const dock = props\.peekDock \? null : \(/);
+  // Exactly ONE footer is ever rendered: peek mode OR the legacy in-pane dock —
+  // and neither of them in the plus deck (768px and up), where the placeable
+  // navigation stands in the header, a side rail or the bottom strip instead
+  // (owner's brief, 2026-10-16).
+  assert.match(overlay, /const dock = props\.peekDock \|\| props\.quad \? null : \(/);
   assert.equal((coursePlayer.match(/<CoursePeekDock tab=/g) || []).length, 1);
   assert.equal((overlay.match(/^\s*data-course-dock$/gm) || []).length, 1);
 });

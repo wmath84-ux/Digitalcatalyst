@@ -20,6 +20,12 @@ interface GlassPrefToggleProps {
   divider?: boolean;
   /** Contract hook, e.g. data-course-setting="theme". */
   "data-course-setting"?: string;
+  /**
+   * Extra contract hooks on the row itself (e.g. the Course view page's four
+   * divider switches carry `data-course-view-divider="vTop"`). Additive: a row
+   * without them renders exactly as it always has.
+   */
+  dataAttrs?: Record<string, string>;
 }
 
 export function GlassPrefToggle({
@@ -31,6 +37,7 @@ export function GlassPrefToggle({
   open = true,
   divider = false,
   "data-course-setting": dataSetting,
+  dataAttrs,
 }: GlassPrefToggleProps) {
   // One spring drives everything: track bg, border, thumb x, thumb shadow.
   const progress = useSpring(on ? 1 : 0, { stiffness: 300, damping: 22 });
@@ -60,6 +67,7 @@ export function GlassPrefToggle({
     <motion.div
       className={`flex items-center justify-between gap-4 px-4 py-2.5 ${divider ? `border-t ${dividerClass}` : ""}`}
       data-course-setting={dataSetting}
+      {...(dataAttrs ?? {})}
       initial={false}
       animate={open ? { opacity: 1, x: 0 } : { opacity: 0, x: -16 }}
       transition={{ type: "spring", stiffness: 200, damping: 22, delay: open ? delay : 0 }}

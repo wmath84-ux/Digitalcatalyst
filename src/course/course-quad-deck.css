@@ -1,0 +1,456 @@
+/* src/course/course-quad-deck.css
+ *
+ * THE PLUS DECK's geometry — the owner's 4-block desktop/tablet layout
+ * (2026-10-16). Only ever mounted from 768px up (QuadDeck / useQuadDeckEnabled),
+ * so nothing in here can touch the phone layout.
+ *
+ * What it styles:
+ *   · the deck (a CSS grid whose row/column templates come from quadLayout.ts),
+ *   · the two dividers — each drawn as half segments with a guide dot at every
+ *     half's exact centre, always draggable,
+ *   · the ONE cluster a dot opens: swaps, the four c11/c12/c21/c22 blocks and
+ *     every grid shape, grouped and scrollable (about six rows visible),
+ *   · the "-6px" size rule for the navigation wherever it is docked, and the
+ *     nav-space rule (panel chrome steps away from the side the navigation
+ *     occupies).
+ *
+ * Colours come from the course theme tokens the rest of the player uses; the
+ * divider line itself is the pack's yellow (#FFBE0B, set inline from
+ * splitMotion.DIVIDER_LINE) so the deck reads as the same split system.
+ */
+
+.dc-quad-deck {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  /* Zoom is "scales/pans": past 100% the deck is bigger than its box and this
+     scrolls, so every corner stays reachable. */
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: transparent;
+}
+
+.dc-quad-zoom {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  /* Zoom reads from the top-left corner so panning goes where the learner
+     expects. */
+  transform-origin: top left;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-quad-zoom {
+    transition: none !important;
+  }
+}
+
+.dc-quad-grid {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  gap: 0;
+}
+
+.dc-quad-row {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  gap: 0;
+}
+
+.dc-quad-pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  /* A hairline between blocks: the dividers draw the real boundaries, this
+     only keeps two panes from looking like one surface. */
+  outline: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+  outline-offset: -0.5px;
+}
+
+.dc-quad-pane__stack {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.dc-quad-pane__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* The player face stays mounted behind a borrowed tab (a playing video never
+   restarts) — `hidden` must really hide it. */
+.dc-quad-pane__body[hidden] {
+  display: none !important;
+}
+
+.dc-quad-pane__nav {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+/* The navigation brought this block back: a short, calm glow. */
+.dc-quad-pane[data-quad-focused="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, #6366f1 60%, transparent);
+  animation: dcQuadPaneFocus 1600ms ease-out both;
+}
+
+@keyframes dcQuadPaneFocus {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* ── The dividers ──────────────────────────────────────────────────────── */
+
+.dc-quad-divider {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  touch-action: none;
+  outline: none;
+}
+
+.dc-quad-divider--v {
+  top: 0;
+  bottom: 0;
+  left: var(--quad-col, 50%);
+  width: var(--quad-hit, 10px);
+  transform: translateX(-50%);
+  flex-direction: column;
+  cursor: col-resize;
+}
+
+.dc-quad-divider--h {
+  left: 0;
+  right: 0;
+  top: var(--quad-row, 50%);
+  height: var(--quad-hit, 10px);
+  transform: translateY(-50%);
+  flex-direction: row;
+  cursor: row-resize;
+}
+
+.dc-quad-divider:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, #6366f1 70%, transparent);
+  border-radius: 999px;
+}
+
+/* A finger gets a little more room than the eye sees; the layout cost stays
+   the 10px strip itself. */
+.dc-quad-divider::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+
+.dc-quad-segment {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+}
+
+.dc-quad-divider--v .dc-quad-segment {
+  width: 100%;
+}
+
+.dc-quad-divider--h .dc-quad-segment {
+  height: 100%;
+}
+
+.dc-quad-segment__line {
+  display: block;
+  border-radius: 999px;
+  transition: opacity 160ms ease;
+}
+
+.dc-quad-divider--v .dc-quad-segment__line {
+  width: 2px;
+  height: 100%;
+}
+
+.dc-quad-divider--h .dc-quad-segment__line {
+  height: 2px;
+  width: 100%;
+}
+
+/* Course view → a divider segment switched off: the line goes, the drag and
+   the dot stay. */
+.dc-quad-segment[data-visible="false"] .dc-quad-segment__line {
+  opacity: 0;
+}
+
+.dc-quad-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.dc-quad-dot__pip {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #ffbe0b;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #0b0d12 55%, transparent), 0 0 10px rgba(255, 190, 11, 0.55);
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.dc-quad-dot:hover .dc-quad-dot__pip,
+.dc-quad-dot:focus-visible .dc-quad-dot__pip,
+.dc-quad-dot[data-open="true"] .dc-quad-dot__pip {
+  transform: scale(1.35);
+  box-shadow: 0 0 0 3px color-mix(in srgb, #0b0d12 55%, transparent), 0 0 14px rgba(255, 190, 11, 0.85);
+}
+
+/* ── The cluster ───────────────────────────────────────────────────────── */
+
+.dc-quad-menu {
+  transform: translate(-50%, -50%);
+  display: grid;
+  gap: 8px;
+  width: max-content;
+  max-width: min(92vw, 348px);
+  padding: 10px;
+  border-radius: 16px;
+  background: var(--dc-chrome-glass, rgba(12, 14, 20, 0.86));
+  backdrop-filter: var(--dc-chrome-glass-blur, blur(18px));
+  -webkit-backdrop-filter: var(--dc-chrome-glass-blur, blur(18px));
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  box-shadow: var(--dc-chrome-glass-rim), 0 18px 44px rgba(2, 6, 16, 0.42);
+  color: var(--course-text, #f8fafc);
+}
+
+.dc-quad-menu__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+/* About six rows are visible; everything else scrolls inside the popup. */
+.dc-quad-menu__scroll {
+  display: grid;
+  gap: 8px;
+  max-height: min(52vh, 300px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.dc-quad-group {
+  display: grid;
+  gap: 5px;
+}
+
+.dc-quad-group__label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
+.dc-quad-group__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.dc-quad-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 7px 9px;
+  border-radius: 11px;
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  color: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.dc-quad-btn:hover,
+.dc-quad-btn:focus-visible {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  border-color: color-mix(in srgb, #6366f1 55%, transparent);
+}
+
+.dc-quad-btn:active {
+  transform: scale(0.98);
+}
+
+.dc-quad-btn[data-disabled="true"] {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.dc-quad-btn[data-quad-format-active="true"] {
+  border-color: color-mix(in srgb, #6366f1 70%, transparent);
+  background: color-mix(in srgb, #6366f1 18%, transparent);
+}
+
+.dc-quad-btn__glyph {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 24px;
+}
+
+.dc-quad-btn__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The guide dots: one per button, always there, alight on the live choice. */
+.dc-quad-btn__dot {
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 45%, transparent);
+}
+
+.dc-quad-btn[data-quad-format-active="true"] .dc-quad-btn__dot,
+.dc-quad-btn[data-quad-pane-open="true"] .dc-quad-btn__dot {
+  background: #ffbe0b;
+}
+
+.dc-quad-menu__foot {
+  margin: 0;
+  font-size: 9px;
+  font-weight: 600;
+  opacity: 0.5;
+}
+
+/* ── The layout glyphs: thin bars, one per block ───────────────────────── */
+
+.dc-quad-glyph {
+  display: grid;
+  gap: 2px;
+  width: 22px;
+}
+
+.dc-quad-glyph__row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(3px, 1fr);
+  gap: 2px;
+}
+
+.dc-quad-glyph__bar {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, currentColor 40%, transparent);
+}
+
+.dc-quad-glyph__bar[data-accent="true"] {
+  background: #ffbe0b;
+}
+
+/* ── The "-6px" rule, and the nav-space rule ───────────────────────────── */
+
+/* Wherever the navigation is docked inside the plus deck (bottom strip, left
+   rail, right rail) or standing in the header, its whole box comes down by
+   6px: the plate, the cell and the padding, never the icons' own legibility. */
+[data-quad-nav-shrunk] [data-work-footer-nav] [data-site-footer][data-nav-count] {
+  --work-nav-h: 38px;
+  --work-nav-cell: 40px;
+}
+
+[data-quad-nav-shrunk] [data-work-footer-nav] [data-work-nav-cell] {
+  height: 38px;
+  padding: 6px 11px;
+}
+
+/* The owner's nav-space rule: a panel header's "+" / tick button must never sit
+   in the same area as the navigation on the right — with the navigation on the
+   right, the panels' own add controls step to the LEFT of their rows, and with
+   the navigation on the left they step to the right. */
+[data-course-quad-deck][data-quad-nav-side="right"] [data-course-notes-add],
+[data-course-quad-deck][data-quad-nav-side="right"] [data-note-panel-new] {
+  margin-inline-end: auto;
+  margin-inline-start: 0;
+}
+
+[data-course-quad-deck][data-quad-nav-side="left"] [data-course-notes-add],
+[data-course-quad-deck][data-quad-nav-side="left"] [data-note-panel-new] {
+  margin-inline-start: auto;
+  margin-inline-end: 0;
+}
+
+/* A phone never mounts the deck, so the rules above cannot reach it. */
+
+/* The little door to the cluster when the deck has no cross on screen (one row,
+   one column, or a single block left): the same popup, opened from the middle
+   of the deck. Never rendered while the cross is up. */
+.dc-quad-menu-button {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  background: var(--dc-chrome-glass, rgba(12, 14, 20, 0.86));
+  backdrop-filter: var(--dc-chrome-glass-blur, blur(18px));
+  -webkit-backdrop-filter: var(--dc-chrome-glass-blur, blur(18px));
+  color: inherit;
+  cursor: pointer;
+  box-shadow: var(--dc-chrome-glass-rim), 0 10px 24px rgba(2, 6, 16, 0.32);
+}
+
+.dc-quad-menu-button:hover,
+.dc-quad-menu-button:focus-visible {
+  border-color: color-mix(in srgb, #6366f1 60%, transparent);
+}

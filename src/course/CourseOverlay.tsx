@@ -55,6 +55,10 @@ import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } fro
 import { collectMasterCourseNotes } from "./masterNotes";
 import type { PersonalCourseModule } from "../types/personalCourse";
 import NotesPanel from "./NotesPanel";
+import QuadDeck from "./QuadDeck";
+import type { QuadLayoutState, QuadPaneId } from "./quadLayout";
+import type { CourseViewSettings } from "./courseViewSettings";
+import type { FooterNavigationPlacement } from "../utils/footerNavigationPlacement";
 import GlassDock, { type GlassDockItem } from "../components/glass-dock/GlassDock";
 import { EASE_OUT_MOTION } from "./splitMotion";
 import { useCourseKeyboard } from "./useCourseKeyboard";
@@ -360,6 +364,14 @@ interface CourseOverlayProps {
    */
   resourceLibraryPanel?: ReactNode;
   /**
+   * THE PLUS DECK (tablet/desktop, 768px and up). When the Course Player hands
+   * this in, the study area is no longer one tab body: it is the owner's four
+   * blocks — the main content, the Resource Library, Notes and the Mind map —
+   * inside one `+` cross of two always-draggable dividers. Absent (every other
+   * call site, and every phone) → exactly the layout this overlay has today.
+   */
+  quad?: CourseOverlayQuadConfig;
+  /**
    * Signal from the resource library: when set, the Notes panel opens the
    * specified master note in its read-only viewer. The signal carries both
    * the target note id and a count (so re-tapping the same note re-opens).
@@ -470,6 +482,17 @@ export const MUSIC_FALLBACK = (
 );
 
 /**
+ * Rendered when the plus deck's Resource Library block has no panel to host
+ * (an older call site): a hint, never an empty box — the same discipline as
+ * the mind map and player fallbacks.
+ */
+export const RESOURCES_FALLBACK = (
+  <p className="px-4 py-6 text-center text-[11px] font-semibold text-[var(--course-muted)]">
+    Resource library is course me abhi available nahi hai.
+  </p>
+);
+
+/**
  * The footer navigation's items — the home footer's `GlassDockItem` list, in
  * TABS order, with the course data hooks the contract tests look for. Shared
  * by both variants so the dock is identical wherever it lives.
@@ -489,6 +512,31 @@ export const buildDockItems = (tab: DockTab, hiddenTabs: DockTab[] = []): GlassD
       "data-active": key === tab ? "true" : "false",
     },
   }));
+
+/**
+ * Everything the plus deck needs from the player. The STATE lives in the
+ * player (it persists it per course), so the navigation and the deck always
+ * agree about the current shape — the one thing that decides whether the
+ * footer navigation is drawn under the Resource Library.
+ */
+export interface CourseOverlayQuadConfig {
+  /** The shape + both divider ratios (persisted by the player). */
+  state: QuadLayoutState;
+  onState: (next: QuadLayoutState) => void;
+  /** Course view page: zoom and the four divider-segment switches. */
+  view: CourseViewSettings;
+  /** Where the navigation sits — the panes step their chrome out of its way. */
+  placement: FooterNavigationPlacement;
+  /** The main content (the video / lesson stack) that fills the left-top block. */
+  playerPane: ReactNode;
+  /**
+   * The navigation, handed in for the single-divider shape — the owner's
+   * "right side = resource page aur uske niche footer navigation".
+   */
+  nav: ReactNode;
+  /** A pane tab was tapped: bring that block back and let it glow. */
+  reveal: { pane: QuadPaneId; count: number } | null;
+}
 
 /** The slice of the overlay's props the row builders need. */
 export type StudyRowsArgs = Pick<
@@ -1001,14 +1049,9 @@ export default function CourseOverlay(props: CourseOverlayProps) {
 
   // ── The tab body ───────────────────────────────────────────────────────
   // The pane is always the ACTIVE TAB's content — there is no second body.
-  const studyBody = (
-    <StudyContent
-      tab={tab}
-      rows={listRows}
-      empty={emptyMessage}
-      listModeAttr={listModeAttr}
-      moduleListingStyle={props.moduleListingStyle ?? DEFAULT_MODULE_LISTING_STYLE}
-      notesPanel={
+  // The notes panel is built once, as a node: in the plus deck it is the
+  // right-top block's own content, and below 768px it is the notes tab's body.
+  const notesPanelNode = (
         // The panel owns its own circular "+" (bottom-right of the grid) —
         // the pane carries no header at all, so there is nowhere else for
         // the button to live.
@@ -1026,7 +1069,16 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           openMasterNoteSignal={props.openMasterNoteSignal}
           uid={props.uid ?? null}
         />
-      }
+  );
+
+  const studyBody = (
+    <StudyContent
+      tab={tab}
+      rows={listRows}
+      empty={emptyMessage}
+      listModeAttr={listModeAttr}
+      moduleListingStyle={props.moduleListingStyle ?? DEFAULT_MODULE_LISTING_STYLE}
+      notesPanel={notesPanelNode}
       mindMapPanel={props.mindMapPanel ?? MINDMAP_FALLBACK}
       playerPanel={props.playerPanel ?? PLAYER_FALLBACK}
       personalModulesOpen={props.personalModulesOpen}
@@ -1071,7 +1123,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // with. Otherwise the dock would sit in the strip of study pane the deck
   // keeps above the keyboard, i.e. exactly between the keyboard and the
   // writing surface. Hiding (not unmounting) preserves the pane's restore.
-  const dock = props.peekDock ? null : (
+  const dock = props.peekDock || props.quad ? null : (
     <div
       className={`relative z-50 shrink-0 px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-0 ${keyboardVisible || immersivePage ? "hidden" : ""}`}
       data-course-dock
@@ -1103,18 +1155,14 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   const hideKeyedBody = (Boolean(props.aiPanel) && props.tab === "ai") || props.tab === "read"
     || (Boolean(props.musicPanel) && props.tab === "music");
 
-  return (
+  // ── The surfaces that outlive a tab switch ──────────────────────────────
+  // Music (a song must not stop because the learner glanced at their notes),
+  // the AI chat and the Read library keep their own bodies, mounted for as
+  // long as the study pane is, with only their visibility toggling. Defined
+  // ONCE here so the phone's single pane and the plus deck's borrowed block
+  // are literally the same surfaces.
+  const persistentSurfaces = (
     <>
-      {/* A tab switch inside the pane crossfades (opacity 150 ms + a 6 px rise). */}
-      <motion.div
-        key={props.tab}
-        initial={{ opacity: paneCrossfade ? 0 : 1, y: paneCrossfade ? 6 : 0 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.15, ease: EASE_OUT_MOTION }}
-        className={`flex min-h-0 flex-1 flex-col overflow-hidden ${hideKeyedBody ? "hidden" : ""}`}
-      >
-        {studyBody}
-      </motion.div>
       {props.musicPanel ? (
         <div
           className={`h-full min-h-0 flex-1 flex-col overflow-hidden ${props.tab === "music" ? "flex" : "hidden"}`}
@@ -1147,6 +1195,72 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           onAddToModule={props.onAddReadUploadToModule}
         />
       </div>
+    </>
+  );
+
+  // ── The plus deck (tablet/desktop) ─────────────────────────────────────
+  // The owner's rule: three of the four blocks hold a page of their own
+  // (Notes, the Resource Library, the Mind map), so those three stay where
+  // they are and the navigation does not move them. EVERY other tab borrows
+  // the main block — and the player stays mounted underneath it, so a playing
+  // video never loses its place to a tab switch.
+  if (props.quad) {
+    const paneOwnedTabs: DockTab[] = ["notes", "mindmap", "modules"];
+    const tabHasOwnBlock =
+      paneOwnedTabs.includes(props.tab) && !(props.tab === "modules" && props.personalModulesOpen);
+    // The borrowed block: the active tab's own body (unless that tab has a
+    // block of its own) PLUS the persistent surfaces — which stay mounted even
+    // while a block of their own is on screen, so a song, a chat and a PDF
+    // never restart just because the learner looked at their notes.
+    const borrowed = (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden" data-course-quad-borrowed>
+        {tabHasOwnBlock ? null : (
+          <motion.div
+            key={props.tab}
+            initial={{ opacity: paneCrossfade ? 0 : 1, y: paneCrossfade ? 6 : 0 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.15, ease: EASE_OUT_MOTION }}
+            className={`flex min-h-0 flex-1 flex-col overflow-hidden ${hideKeyedBody ? "hidden" : ""}`}
+          >
+            {studyBody}
+          </motion.div>
+        )}
+        {persistentSurfaces}
+      </div>
+    );
+    return (
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-course-quad-pane-host>
+        <QuadDeck
+          state={props.quad.state}
+          onState={props.quad.onState}
+          view={props.quad.view}
+          navSide={props.quad.placement}
+          player={props.quad.playerPane}
+          notes={notesPanelNode}
+          resources={props.resourceLibraryPanel ?? RESOURCES_FALLBACK}
+          mindmap={props.mindMapPanel ?? MINDMAP_FALLBACK}
+          study={borrowed}
+          studyVisible={!tabHasOwnBlock}
+          resourcesFooter={props.quad.nav}
+          reveal={props.quad.reveal}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* A tab switch inside the pane crossfades (opacity 150 ms + a 6 px rise). */}
+      <motion.div
+        key={props.tab}
+        initial={{ opacity: paneCrossfade ? 0 : 1, y: paneCrossfade ? 6 : 0 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.15, ease: EASE_OUT_MOTION }}
+        className={`flex min-h-0 flex-1 flex-col overflow-hidden ${hideKeyedBody ? "hidden" : ""}`}
+      >
+        {studyBody}
+      </motion.div>
+      {persistentSurfaces}
       {dock}
     </>
   );
