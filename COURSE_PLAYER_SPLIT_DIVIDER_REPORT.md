@@ -1,8 +1,8 @@
 # Split divider — **safed patti khatam**, **gap + chhota icon**, aur **teen screen side by side**
 
 **Owner brief:** 2026-10-16 (aapke us ek message ke teen sawaal)
-**Commits:** `8d0e31c` (ask 1 + 2) · `1bbad28` (ask 3) — isi branch par
-**Verification:** `./node_modules/.bin/tsc --noEmit` **EXIT 0** · full sweep **4353 tests / 4159 pass / 0 fail / 194 skipped** EXIT 0 (`/tmp/sweep21b.log`) · `npm run build:low-heap` **EXIT 0** 50.16 s (`/tmp/build-triple2.log`)
+**Commits:** `8d0e31c` (ask 1 + 2) · `1bbad28` (ask 3) · `e900e1b` (patali white strip wapas) — isi branch par
+**Verification:** `./node_modules/.bin/tsc --noEmit` **EXIT 0** · full sweep **4353 tests / 4159 pass / 0 fail / 194 skipped** EXIT 0 (`/tmp/sweep22.log`) · `npm run build:low-heap` **EXIT 0** 48.32 s (`/tmp/build-strip.log`)
 
 ---
 
@@ -68,3 +68,21 @@ Dev preview (vite, port 5173) naya code serve kar raha hai — check kiya gaya.
   sab kuchh DOM-level runtime tests se pin kiya gaya hai (dividers, tracks, gaps, taps).
 * Ghaas-phoos: build ek baar `computing gzip size` par chup-chaap mar gaya (machine 3.9 GB),
   dobara chalane par wahi command EXIT 0 — code se koi lena-dena nahi, memory ka dabaav tha.
+
+---
+
+## 5 · Aur uske baad aapka doosra sandesh (2026-10-16) — patali white strip **wapas**
+
+> "Jo patali white strip banti hai icon ke niche aur donon ke bich mein usko bhi add karo wapas, mobile users desktop sabhi jagah."
+
+Pehla "white strip hatao" wala faisla yahaan **jaan-boojhkar palat diya gaya** — par is baar strip **patli** hai, wo mota 28px plate nahi.
+
+| Aapki baat | Implement | Proof |
+|---|---|---|
+| "**Patali** white strip" | Ek hi shared number har jagah: **`PEEK_STRIP_PX = 6`** (`src/course/splitMotion.ts`). Strip **6px** hi hai — chahein to badal dun (ek number) | contract `courseDividerEdgeIconContract`: `export const PEEK_STRIP_PX = 6;` + strip ke dono axis ke style pins |
+| "**Icon ke niche**" | Strip gap ki **poori lambai** chalti hai aur **chhota icon uske theek upar centre** me baithta hai — is liye wo icon ke **upar aur niche dono** dikhti hai. Strip icon ke **peeche** hai (z-index 1 vs icon ka 3), aur DOM me icon ke **baad** aata hai | runtime `coursePlayerSplitDividerDragRuntime` #12: strip `width 6px`, `top/bottom 0`, `left 50%`, glass + rim maujood, aur `compareDocumentPosition(icon)` = icon baad me |
+| "**Donon ke bich mein**" | Strip **do blocks ke beech** rehti hai — gap ke axis par, jahan pehle divider baithta tha (rail ki 28px/18px strip ke theek centre me) | split #12 (row axis) · quad runtime #11 (vertical squeeze), #12 (horizontal squeeze), #14 (aapki 3-column wali **doosri vertical**) — har divider par **exactly 1** strip |
+| "**Mobile users desktop sabhi jagah**" | Do hi surfaces hain aur dono cover ho gaye: (a) mobile + desktop split ka **collapsed rail** (`PeekRail` → `data-peek-strip`, dono axis), (b) tablet/desktop ka **plus deck** (`QuadDeck` → `data-course-quad-strip`, vertical + doosri vertical + horizontal) — aur **Work mode** bhi, kyunki wo wahi dono components use karta hai | `grep` se har marker: `studyPanels.tsx` (`data-peek-strip`) + `QuadDeck.tsx` (`data-course-quad-strip`) — koi doosra surface bacha hi nahi |
+| Wo mota plate **wapas na aa jaye** | Rail **element** khud aaj bhi kuchh paint nahi karta (na background, na rim) — glass sirf us ek patle child par hai | split #12: rail ka `style.background === ""` (aur boxShadow/backdropFilter bhi) · quad contract: `.dc-quad-divider` rule me koi `background` nahi |
+
+**Do cheezein aap ek line me badal sakte ho:** (a) strip ki motai (`PEEK_STRIP_PX`, abhi 6px); (b) strip parity/sirf-niche — abhi poori lambai chalti hai (aapke "donon ke bich mein" ke hisaab se). Bataiye, badal dunga.
