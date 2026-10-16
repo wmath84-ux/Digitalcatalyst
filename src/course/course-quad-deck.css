@@ -219,6 +219,32 @@
   z-index: 34;
 }
 
+/* The THIN white strip a squeezed gap shows — back on the owner's word
+   (2026-10-16): "jo patali white strip banti hai icon ke niche aur donon ke
+   bich mein usko bhi add karo wapas, mobile users desktop sabhi jagah." It runs
+   BETWEEN the two pressed-together blocks, the small icon sits centred on it,
+   and it stays THIN (var(--quad-strip) = 6px) — never a plate across the gap. */
+.dc-quad-strip {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: var(--quad-strip, 6px);
+  height: 100%;
+  border-radius: 999px;
+  pointer-events: none;
+  z-index: 1;
+  background: var(--dc-chrome-glass, rgba(255, 255, 255, 0.72));
+  box-shadow: var(--dc-chrome-glass-rim, 0 0 0 1px rgba(15, 23, 42, 0.12));
+  backdrop-filter: var(--dc-chrome-glass-blur, blur(12px));
+  -webkit-backdrop-filter: var(--dc-chrome-glass-blur, blur(12px));
+}
+
+.dc-quad-divider--h .dc-quad-strip {
+  width: 100%;
+  height: var(--quad-strip, 6px);
+}
+
 .dc-quad-restore {
   position: absolute;
   left: 50%;

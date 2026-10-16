@@ -90,6 +90,18 @@ export const DIVIDER_HIT = 10;
 /** The collapsed pane's glass strip, in px. */
 export const PEEK_RAIL_PX = 28;
 /**
+ * The THIN white strip a compressed gap shows, in px.
+ *
+ * Owner (2026-10-16, baad mein): "jo patali white strip banti hai icon ke
+ * niche aur donon ke bich mein usko bhi add karo wapas, mobile users desktop
+ * sabhi jagah." So one thin frosted strip runs the whole length of the gap —
+ * BETWEEN the two blocks, with the small icon centred ON it, so it shows above
+ * and below the icon — in the mobile/desktop split's collapsed edge AND in the
+ * plus deck's squeezed dividers. It stays thin: the gap's own element paints
+ * nothing, the strip is its own 6px rail.
+ */
+export const PEEK_STRIP_PX = 6;
+/**
  * The divider's toolbar — the switch + split controls the divider reveals:
  *
  *   · it is hidden until the learner TAPS the divider line (a tap, never a

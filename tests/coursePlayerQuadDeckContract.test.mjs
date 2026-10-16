@@ -40,6 +40,7 @@ const NAV = read("src/course/CourseHeaderNav.tsx");
 const NAV_CSS = read("src/course/course-header-nav.css");
 const PLACEMENT = read("src/utils/footerNavigationPlacement.ts");
 const VIEW = read("src/course/courseViewSettings.ts");
+const MOTION = read("src/course/splitMotion.ts");
 const PLAYER = read("src/CoursePlayerApp.tsx");
 const OVERLAY = read("src/course/CourseOverlay.tsx");
 const PANEL = read("src/course/PlayerPanel.tsx");
@@ -376,10 +377,23 @@ test("a divider pressed onto its clamp keeps a gap and offers ONE small way back
   assert.match(DECK, /Expand the squeezed blocks back to their previous width/);
   assert.match(DECK, /Expand the squeezed blocks back to their previous height/);
   assert.match(DECK, /data-squeezed=\{squeezed \? "true" : "false"\}/);
-  // The strip itself paints NOTHING (the line is the only chrome): what the
-  // learner sees between two pressed-together blocks is a gap, never a strip.
-  const strip = DECK_CSS.slice(DECK_CSS.indexOf(".dc-quad-divider {"), DECK_CSS.indexOf(".dc-quad-divider--v"));
-  assert.doesNotMatch(strip, /background/, "the divider strip stays transparent — no white strip at any edge");
+  // The divider ELEMENT still paints nothing (a plate across the whole gap is
+  // what the owner rejected) — the chrome is its own thin child: the white
+  // strip he asked back (2026-10-16), 6px, running the gap's whole length with
+  // the small icon centred on top of it.
+  const dividerRule = DECK_CSS.slice(DECK_CSS.indexOf(".dc-quad-divider {"), DECK_CSS.indexOf(".dc-quad-divider--v"));
+  assert.doesNotMatch(dividerRule, /background/, "the divider element itself stays transparent");
+  assert.match(DECK, /<span aria-hidden data-course-quad-strip="" className="dc-quad-strip" \/>/);
+  assert.match(DECK, /"--quad-strip": `\$\{PEEK_STRIP_PX\}px`/);
+  assert.match(DECK, /import \{ DIVIDER_HIT, DIVIDER_LINE, EASE_OUT_MOTION, PEEK_STRIP_PX \} from "\.\/splitMotion";/);
+  assert.match(MOTION, /export const PEEK_STRIP_PX = 6;/);
+  assert.match(DECK_CSS, /\.dc-quad-strip \{/);
+  assert.match(DECK_CSS, /width: var\(--quad-strip, 6px\);/);
+  assert.match(DECK_CSS, /height: var\(--quad-strip, 6px\);/);
+  // Between the two blocks, and BEHIND the icon (which sits at z-index 3).
+  assert.match(DECK_CSS, /\.dc-quad-strip \{[\s\S]{0,420}?z-index: 1;/);
+  assert.match(DECK_CSS, /\.dc-quad-restore \{[\s\S]{0,220}?z-index: 3;/);
+  assert.match(DECK_CSS, /\.dc-quad-divider--h \.dc-quad-strip \{/);
   assert.match(DECK_CSS, /\.dc-quad-divider\[data-squeezed="true"\] \{/);
   assert.match(DECK_CSS, /\.dc-quad-restore \{/);
   assert.match(DECK_CSS, /\.dc-quad-restore:hover \{/);

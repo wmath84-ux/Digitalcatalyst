@@ -565,7 +565,7 @@ const clickEl = async (element) => {
   await settle(420);
 };
 
-test("dragging to an edge leaves a clean gap with one small icon — pressing it restores the previous size", async () => {
+test("dragging to an edge leaves a clean gap, a thin white strip, one small icon — press restores the previous size", async () => {
   window.localStorage.clear();
   stageWidth = 1400;
   const mounted = await mountDeck();
@@ -581,10 +581,24 @@ test("dragging to an edge leaves a clean gap with one small icon — pressing it
   const rail = window.document.querySelector('[data-course-peek-rail][data-peek-side="study"]');
   assert.ok(rail, "the collapsed pane leaves its seam");
 
-  // 1 · The white strip is GONE: no frosted plate, no rim shadow on the seam.
-  assert.equal(rail.style.background, "", "the seam carries no plate — that plate WAS the white strip");
+  // 1 · The rail element itself stays unpainted (a plate across the whole gap
+  // is what the owner rejected) — but the THIN white strip is back, as its own
+  // 6px child running the gap's whole length, between the two panes.
+  assert.equal(rail.style.background, "", "the rail element carries no plate");
   assert.equal(rail.style.boxShadow, "");
   assert.equal(rail.style.backdropFilter, "");
+  const strips = rail.querySelectorAll("[data-peek-strip]");
+  assert.equal(strips.length, 1, "exactly ONE thin strip in the gap");
+  const strip = strips[0];
+  assert.equal(strip.style.width, "6px", "a THIN strip — 6px, never the 28px plate");
+  assert.equal(strip.style.top, "0px");
+  assert.equal(strip.style.bottom, "0px");
+  assert.equal(strip.style.left, "50%");
+  assert.notEqual(strip.style.background, "", "the strip carries the frosted glass");
+  assert.notEqual(strip.style.boxShadow, "", "…and the same rim the rest of the chrome wears");
+  // The small icon sits ON the strip: it comes after it in the DOM and carries
+  // its own z-index, so the strip shows above and below the icon.
+  assert.equal(strip.compareDocumentPosition(rail.querySelector("[data-course-peek-icon]")) & 4, 4, "the icon is drawn after the strip");
   // 2 · The gap shows ONE small icon, centred in it.
   assert.equal(rail.className.includes("items-center"), true, "the icon is centred on the cross axis");
   assert.equal(rail.className.includes("justify-center"), true, "the icon is centred along the seam");

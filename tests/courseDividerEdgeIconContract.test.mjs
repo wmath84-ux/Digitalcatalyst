@@ -16,6 +16,17 @@
 //     previous size par wapas le jaata hai;
 //   · drag / edge fill / snap / keyboard / tap-to-restore — sab unchanged.
 //
+// Aur usi din owner ne strip ko THIN karke WAPAS maanga (yeh doosra badlav hai):
+//
+//   "jo patali white strip banti hai icon ke niche aur donon ke bich mein usko
+//    bhi add karo wapas, mobile users desktop sabhi jagah."
+//
+// Isliye ab gap me EK 6px ki patli white strip (PEEK_STRIP_PX) chalti hai —
+// do panes ke BEECH, gap ki poori lambai — aur chhota icon uske theek upar
+// centre me baithta hai (isliye wo "icon ke niche" bhi dikhti hai). Poora 28px
+// plate aaj bhi nahi hai: rail element khud kuchh paint nahi karta, glass sirf
+// is ek patle child par hai.
+//
 // Breathing animation aur purane icon feeds (PlayCircle / studyIcon) aaj bhi
 // nahi hain — wapas nahi laaye gaye.
 import test from 'node:test';
@@ -29,10 +40,22 @@ const player = read('src/CoursePlayerApp.tsx');
 
 const railBody = panels.slice(panels.indexOf('function PeekRail('), panels.indexOf('// ── The divider ──'));
 
-test('the collapsed edge is a clean gap with ONE small icon — never a white plate', () => {
-  // The frosted plate that used to fill the strip is gone from the rail.
-  assert.doesNotMatch(railBody, /style=\{CHROME_GLASS\}/, 'the gap carries no glass plate (that was the white strip)');
-  assert.doesNotMatch(railBody, /background/, 'the gap paints no background of its own');
+test('the collapsed edge is a clean gap with ONE small icon and the THIN white strip he asked back', () => {
+  // The rail element itself still paints nothing — a plate across the whole
+  // 28px is exactly what the owner rejected.
+  assert.doesNotMatch(railBody, /style=\{CHROME_GLASS\}/, 'the rail element carries no glass plate');
+  assert.doesNotMatch(railBody, /background/, 'the rail element paints no background of its own');
+  // …but the THIN white strip is back (owner, 2026-10-16): one 6px rail running
+  // the gap's whole length, between the two panes, under the icon.
+  assert.match(railBody, /data-peek-strip=""/);
+  assert.match(railBody, /style=\{peekStripStyle\(axis\)\}/);
+  assert.match(panels, /const peekStripStyle = \(axis: SplitAxis\): CSSProperties => \{/);
+  assert.match(panels, /const strip: CSSProperties = \{ position: "absolute", borderRadius: 999, \.\.\.CHROME_GLASS \};/);
+  assert.match(panels, /\{ \.\.\.strip, top: 0, bottom: 0, left: "50%", width: PEEK_STRIP_PX, transform: "translateX\(-50%\)" \}/);
+  assert.match(panels, /\{ \.\.\.strip, left: 0, right: 0, top: "50%", height: PEEK_STRIP_PX, transform: "translateY\(-50%\)" \}/);
+  assert.match(motion, /export const PEEK_STRIP_PX = 6;/);
+  // Between the two panes: a bare 6px rail, never a wash across the gap.
+  assert.doesNotMatch(panels, /PEEK_STRIP_PX \* 2|width: PEEK_RAIL_PX/);
   // The icon is there: one small plate at the centre, drawn by the icon style.
   assert.match(railBody, /data-course-peek-icon=""/);
   assert.match(railBody, /style=\{PEEK_ICON_STYLE\}/);

@@ -507,6 +507,12 @@ test("a squeezed divider keeps a wider gap and ONE small icon — press it and i
   const restore = query('[data-course-quad-restore="v"]');
   assert.ok(restore, "the gap carries the way back");
   assert.equal(dividerEl("v").style.getPropertyValue("--quad-hit"), "18px", "the gap stays visible (18px vs the usual 10px)");
+  // The THIN white strip between the two blocks (owner, 2026-10-16 — asked
+  // back): exactly one, inside THIS divider, and it is the 6px rail.
+  const strips = queryAll('[data-course-quad-strip]', dividerEl("v"));
+  assert.equal(strips.length, 1, "one thin strip on the squeezed vertical divider");
+  assert.equal(strips[0].style.width, "", "the width comes from the stylesheet (var(--quad-strip))");
+  assert.equal(deckEl().style.getPropertyValue("--quad-strip"), "6px", "a THIN 6px strip, never a plate");
   assert.equal(restore.getAttribute("title"), "Back to the previous size");
 
   // ONE press → back to the size these blocks had before the squeeze (62),
@@ -528,6 +534,7 @@ test("the horizontal divider squeezes the same way — and its own icon brings i
   assert.equal(deckEl().getAttribute("data-quad-row"), "85", "clamped at 15–85");
   const restore = query('[data-course-quad-restore="h"]');
   assert.ok(restore, "the horizontal gap carries its own way back");
+  assert.equal(queryAll('[data-course-quad-strip]', dividerEl("h")).length, 1, "the horizontal gap wears the same thin strip");
   await click(restore, "the horizontal squeeze icon");
   assert.equal(deckEl().getAttribute("data-quad-row"), "78");
   deck.done();
@@ -592,6 +599,7 @@ test("the second vertical divider drags on its own, squeezes, and never crosses 
   assert.equal(deckEl().getAttribute("data-quad-squeezed"), "v");
   const restore = query('[data-course-quad-restore="v2"]');
   assert.ok(restore, "the second gap carries its own way back");
+  assert.equal(queryAll('[data-course-quad-strip]', dividerEl("v2")).length, 1, "the second gap wears the thin strip too");
   await click(restore, "the second squeeze icon");
   assert.equal(deckEl().getAttribute("data-quad-col2"), "85", "the last ROOMY value, never a default");
 

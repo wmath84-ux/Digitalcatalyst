@@ -64,7 +64,7 @@ import {
 } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowLeftRight, ArrowUpDown, Move } from "lucide-react";
-import { DIVIDER_HIT, DIVIDER_LINE, EASE_OUT_MOTION } from "./splitMotion";
+import { DIVIDER_HIT, DIVIDER_LINE, EASE_OUT_MOTION, PEEK_STRIP_PX } from "./splitMotion";
 import type { CourseViewSettings } from "./courseViewSettings";
 import {
   QUAD_COL2_MAX,
@@ -532,6 +532,7 @@ export default function QuadDeck({
           "--quad-col": `${state.col}%`,
           "--quad-col2": `${state.col2}%`,
           "--quad-row": `${state.row}%`,
+          "--quad-strip": `${PEEK_STRIP_PX}px`,
         } as CSSProperties
       }
     >
@@ -852,9 +853,14 @@ function QuadDivider({
       {/* Squeezed: ONE small icon at the divider's centre — the way back to
           the size these blocks had before they were pressed together. */}
       {squeezed ? (
-        <button
-          type="button"
-          className="dc-quad-restore"
+        <>
+          {/* The thin white strip BETWEEN the two pressed-together blocks — the
+              owner asked it back (2026-10-16), the same as the collapsed split
+              edge wears, with the small icon centred on top of it. */}
+          <span aria-hidden data-course-quad-strip="" className="dc-quad-strip" />
+          <button
+            type="button"
+            className="dc-quad-restore"
           data-course-quad-restore={axis}
           aria-label={vertical
             ? "Expand the squeezed blocks back to their previous width"
@@ -867,10 +873,11 @@ function QuadDivider({
             onRestore();
           }}
         >
-          <span aria-hidden data-quad-restore-icon>
-            {vertical ? <ArrowLeftRight size={14} /> : <ArrowUpDown size={14} />}
-          </span>
-        </button>
+            <span aria-hidden data-quad-restore-icon>
+              {vertical ? <ArrowLeftRight size={14} /> : <ArrowUpDown size={14} />}
+            </span>
+          </button>
+        </>
       ) : null}
       {segments.map((segment) => {
         const isFirst = segment !== secondSegment;

@@ -64,6 +64,7 @@ import {
   KEY_STEP,
   KEY_STEP_FINE,
   PEEK_RAIL_PX,
+  PEEK_STRIP_PX,
   PARK_THRESHOLD,
   SNAP_TOLERANCE,
   SPLIT_DOCK_MIN_PX,
@@ -172,6 +173,24 @@ const railGlowStyle = (axis: SplitAxis, side: SplitSide, accent: string): CSSPro
 const PEEK_ICON_PX = 16;
 
 /**
+ * The THIN white strip the gap wears, between the two panes.
+ *
+ * Owner (2026-10-16, baad mein — the earlier "remove the white strip" is hereby
+ * reversed): "jo patali white strip banti hai icon ke niche aur donon ke bich
+ * mein usko bhi add karo wapas, mobile users desktop sabhi jagah." So a 6px
+ * frosted strip (PEEK_STRIP_PX) runs the whole length of the gap, centred on
+ * the axis the divider used to sit on — and the small icon sits centred ON it,
+ * which is why it reads as the strip below (and above) the icon. The rail
+ * element itself stays unpainted; only this one thin child carries the glass.
+ */
+const peekStripStyle = (axis: SplitAxis): CSSProperties => {
+  const strip: CSSProperties = { position: "absolute", borderRadius: 999, ...CHROME_GLASS };
+  return axis === "row"
+    ? { ...strip, top: 0, bottom: 0, left: "50%", width: PEEK_STRIP_PX, transform: "translateX(-50%)" }
+    : { ...strip, left: 0, right: 0, top: "50%", height: PEEK_STRIP_PX, transform: "translateY(-50%)" };
+};
+
+/**
  * The compressed pane's way back.
  *
  * Owner (2026-10-16): "agar usko kisi bhi edge per le jaya jaye … to vah ek
@@ -180,9 +199,15 @@ const PEEK_ICON_PX = 16;
  * vah apne previous area mein directly expand ho jata tha."
  *
  * So the frosted glass PLATE that used to fill this 28px strip (CHROME_GLASS —
- * the white strip) is gone: what is left is a clean GAP between the two panes,
- * carrying the accent hairline on the divider-facing edge and ONE small icon in
- * the middle of the gap. The whole strip stays the tap target, and a press puts
+ * the white strip) went away: the gap carries the accent hairline on the
+ * divider-facing edge and ONE small icon in the middle.
+ *
+ * …and then the owner asked the strip BACK, thin (2026-10-16, same day): "jo
+ * patali white strip banti hai icon ke niche aur donon ke bich mein usko bhi
+ * add karo wapas, mobile users desktop sabhi jagah." So the middle of the gap
+ * now wears a 6px frosted strip (PEEK_STRIP_PX, `data-peek-strip`) running its
+ * whole length, with the small icon centred on top of it. The rail itself still
+ * paints nothing — a plate across the whole 28px is what he rejected. The whole strip stays the tap target, and a press puts
  * the pane back exactly where it was (`restore()` → the ratio it had before it
  * collapsed, never a default).
  */
@@ -223,8 +248,10 @@ function PeekRail({
       animate={{ opacity: 1 }}
       transition={{ duration: 0.18, ease: EASE_OUT_MOTION }}
     >
-      {/* The only chrome in the gap: the accent hairline on the edge the
-          divider used to sit on. */}
+      {/* The thin white strip BETWEEN the two panes — back on the owner's word
+          (2026-10-16); the small icon below sits centred on top of it. */}
+      <span aria-hidden data-peek-strip="" style={peekStripStyle(axis)} />
+      {/* The accent hairline on the edge the divider used to sit on. */}
       <span aria-hidden style={railGlowStyle(axis, glowSide, accent)} data-peek-glow="" />
       {/* ONE small icon at the centre of the gap — the way back to the pane's
           previous size. */}
