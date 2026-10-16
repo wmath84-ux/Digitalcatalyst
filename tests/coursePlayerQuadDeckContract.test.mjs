@@ -60,27 +60,41 @@ test("the model defines the four blocks and the owner's mapping", () => {
   assert.match(MODEL, /export const QUAD_PANE_ORDER: QuadPaneId\[\] = \["c11", "c12", "c21", "c22"\];/);
 });
 
-test("the deck draws exactly two dividers, never four", () => {
-  // ONE vertical divider (its two half segments) and ONE horizontal one.
-  assert.equal((DECK.match(/<QuadDivider/g) || []).length, 2);
+test("the deck draws exactly the dividers a shape needs, never four", () => {
+  // ONE vertical divider (its two half segments), the SECOND vertical divider
+  // the three-column shape needs, and ONE horizontal one — never one per block.
+  assert.equal((DECK.match(/<QuadDivider/g) || []).length, 3);
   assert.match(DECK, /\{hasVertical \? \(/);
+  assert.match(DECK, /\{secondVertical \? \(/);
   assert.match(DECK, /\{hasHorizontal \? \(/);
   assert.match(DECK, /data-course-quad-divider=\{axis\}/);
   assert.doesNotMatch(DECK, /DIVIDERS|fourDividers|dividers\.map/);
-  // The two axes are the only ones the deck knows.
-  assert.match(DECK, /axis: "v" \| "h";/);
+  // The three lines the deck knows: the vertical, its SECOND vertical (the row
+  // of three blocks) and the horizontal.
+  assert.match(DECK, /type QuadAxisKey = "v" \| "v2" \| "h";/);
+  // The second divider only exists while a row really holds three blocks.
+  assert.match(DECK, /const secondVertical = rows\.some\(\(row\) => row\.length >= 3\);/);
+  assert.match(DECK, /const secondSpan = secondVertical/);
+  // The owner's shape: three equal columns, the row of three blocks.
+  assert.match(MODEL, /triple: \{\n\s+rows: \[\["c11", "c12", "c22"\]\],/);
+  assert.match(MODEL, /label: "3 · side by side"/);
 });
 
 /* ── 2 · every divider always drags ─────────────────────────────────────── */
 
-test("both dividers are always draggable — no mode, no gate, no unlock", () => {
-  assert.match(DECK, /const handlePointerDown = \(axis: "v" \| "h"\) => \(event: ReactPointerEvent<HTMLDivElement>\) => \{/);
-  assert.match(DECK, /dragRef\.current = \{ axis, start: axis === "v" \? event\.clientX : event\.clientY, base, live: base \};/);
+test("every divider is always draggable — no mode, no gate, no unlock", () => {
+  assert.match(DECK, /const handlePointerDown = \(axis: QuadAxisKey\) => \(event: ReactPointerEvent<HTMLDivElement>\) => \{/);
+  assert.match(DECK, /dragRef\.current = \{ axis, start: axis === "h" \? event\.clientY : event\.clientX, base, live: base \};/);
   assert.match(DECK, /event\.currentTarget\.setPointerCapture\?\.\(event\.pointerId\);/);
   // The live drag writes the CSS variables straight to the DOM (no React
   // re-render per frame) and commits on release.
-  assert.match(DECK, /deck\.style\.setProperty\(axis === "v" \? "--quad-col" : "--quad-row", `\$\{value\}%`\);/);
-  assert.match(DECK, /if \(drag\.axis === "v"\) commit\(\{ \.\.\.state, col: clampQuadCol\(drag\.live\) \}\);/);
+  assert.match(DECK, /deck\.style\.setProperty\(axis === "v" \? "--quad-col" : axis === "v2" \? "--quad-col2" : "--quad-row", `\$\{value\}%`\);/);
+  assert.match(DECK, /if \(drag\.axis === "v"\) commit\(\{ \.\.\.state, col: clampAxis\("v", drag\.live\) \}\);/);
+  assert.match(DECK, /else if \(drag\.axis === "v2"\) commit\(\{ \.\.\.state, col2: clampAxis\("v2", drag\.live\) \}\);/);
+  // The two vertical dividers can never cross: a gap always stays between them.
+  assert.match(MODEL, /export const QUAD_TRIPLE_GAP = 8;/);
+  assert.match(DECK, /return Math\.min\(next, second - QUAD_TRIPLE_GAP\);/);
+  assert.match(DECK, /return Math\.max\(clampQuadCol2\(value\), first \+ QUAD_TRIPLE_GAP\);/);
   // Keyboard parity, and no gate on the drag path at all.
   assert.match(DECK, /const QUAD_KEY_STEP = 2;/);
   assert.match(DECK, /if \(event\.key === "s" \|\| event\.key === "S"\) \{/);
@@ -140,8 +154,12 @@ test("the four block buttons carry c11…c22 and read cXX+ while closed", () => 
 /* ── 6 · every grid shape the owner named ───────────────────────────────── */
 
 test("the model carries every grid shape the brief asks for", () => {
-  assert.match(MODEL, /export type QuadFormat = "quad" \| "top1" \| "bottom1" \| "top2" \| "bottom2" \| "pair";/);
+  assert.match(MODEL, /export type QuadFormat = "quad" \| "top1" \| "bottom1" \| "triple" \| "top2" \| "bottom2" \| "pair";/);
   assert.match(MODEL, /label: "1 upar · 3 niche"/);
+  assert.match(MODEL, /hint: "Three blocks side by side, full height — player, notes, mind map"/);
+  // The owner's own reading of the new shape: three equal columns on arrival.
+  assert.match(MODEL, /const seeded = format === "triple" && state\.format !== "triple"/);
+  assert.match(MODEL, /\{ \.\.\.state, col: 33, col2: 67 \}/);
   assert.match(MODEL, /label: "3 upar · 1 niche"/);
   assert.match(MODEL, /label: "2 upar · 1 niche"/);
   assert.match(MODEL, /label: "1 upar · 2 niche"/);

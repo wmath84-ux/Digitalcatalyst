@@ -96,9 +96,25 @@ test("the deck's shape round-trips under the learner's own namespace", () => {
   const officialKey = "official-9";
   assert.deepEqual(loadQuadLayout(mineKey), QUAD_DEFAULT_STATE, "a fresh own-course starts in the default + shape");
 
-  const mine = { format: "pair", closed: ["c22"], col: 32, row: 71, swappedCols: true, swappedRows: false };
+  const mine = { format: "pair", closed: ["c22"], col: 32, col2: 40, row: 71, swappedCols: true, swappedRows: false };
   saveQuadLayout(mineKey, mine);
   assert.deepEqual(loadQuadLayout(mineKey), mine, "the own-course shape is remembered");
+
+  // A shape saved BEFORE the three-column button existed (no `col2`) still
+  // loads: the second vertical divider falls back to its default.
+  localStorage.setItem(
+    "dc.course.quadLayout.v1.old-shape",
+    JSON.stringify({ format: "quad", closed: [], col: 44, row: 55, swappedCols: false, swappedRows: false }),
+  );
+  assert.deepEqual(loadQuadLayout("old-shape"), {
+    format: "quad",
+    closed: [],
+    col: 44,
+    col2: QUAD_DEFAULT_STATE.col2,
+    row: 55,
+    swappedCols: false,
+    swappedRows: false,
+  });
 
   // The official course is untouched — one learner's own layout never leaks.
   assert.equal(localStorage.getItem("dc.course.quadLayout.v1.mine-abc") !== null, true);

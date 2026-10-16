@@ -361,7 +361,7 @@ test("a dot opens ONE cluster: swaps, the four blocks and every grid shape", asy
   assert.equal(menu.getAttribute("data-quad-menu-segment"), "vTop");
   assert.equal(queryAll("[data-quad-swap]", menu).length, 2, "left↔right and top↔bottom");
   assert.equal(queryAll("[data-quad-pane-button]", menu).length, 4, "c11 · c12 · c21 · c22");
-  assert.equal(queryAll("[data-quad-format]", menu).length, 6, "every grid shape, including the 2-pane one");
+  assert.equal(queryAll("[data-quad-format]", menu).length, 7, "every grid shape, including the 2-pane one and the 3-column one");
   assert.equal(Boolean(query("[data-quad-menu-scroll]", menu)), true, "the cluster scrolls instead of overflowing");
   assert.equal(Boolean(query("[data-quad-dot]", menu)), true, "every button carries its guide dot");
   deck.done();
@@ -533,6 +533,79 @@ test("the horizontal divider squeezes the same way — and its own icon brings i
   deck.done();
 });
 
+/* ── 6 · the owner's third ask: three blocks side by side ─────────────────
+ * "teen screen side by side" — player | notes | mind map in three even
+ * columns, full height, with the fourth block off until the cluster brings it
+ * back. Three blocks in ONE row means TWO vertical dividers, both draggable. */
+
+test("three blocks side by side: three even columns and TWO draggable vertical dividers", async () => {
+  const deck = await mount();
+  await click(dotEl("vTop"));
+  await click(query('[data-quad-format="triple"]', menuEl()), "the 3-column shape button");
+  const last = deck.seen[deck.seen.length - 1];
+  assert.equal(last.format, "triple");
+  // Player | Notes | Mind map — the owner's own reading, and the 4th block off.
+  assert.deepEqual(fixture.quadRows(last), [["c11", "c12", "c22"]]);
+  // Three EQUAL columns on arrival (33 · 34 · 33 — never a default that leans).
+  assert.equal(last.col, 33);
+  assert.equal(last.col2, 67);
+
+  const row = query("[data-quad-row-panes]");
+  assert.equal(row.getAttribute("data-quad-row-panes"), "c11+c12+c22");
+  assert.equal(row.style.gridTemplateColumns, "minmax(0, 33fr) minmax(0, 34fr) minmax(0, 33fr)");
+  assert.equal(deckEl().getAttribute("data-quad-col2"), "67");
+  assert.equal(deckEl().style.getPropertyValue("--quad-col2"), "67%");
+
+  // Exactly two lines, both vertical — never one per block, never four.
+  const dividers = queryAll("[data-course-quad-divider]");
+  assert.equal(dividers.length, 2);
+  assert.equal(Boolean(dividerEl("v")), true, "the first vertical divider");
+  assert.equal(Boolean(dividerEl("v2")), true, "the second vertical divider");
+  assert.equal(dividerEl("h"), null, "one row, so no horizontal divider");
+  assert.equal(queryAll("[data-course-quad-dot]").length, 2, "one dot on the vertical divider, one on the second");
+  assert.equal(Boolean(dotEl("v2")), true, "the second divider carries its own dot");
+
+  // The fourth block is off, and its button in the cluster brings the 2×2 back
+  // (with the block reopened) — the deck never leaves a block unreachable.
+  assert.equal(Boolean(paneEl("c21")), false);
+  assert.equal(paneEl("c11") && paneEl("c11").getAttribute("data-quad-pane-nav"), null);
+  await click(dotEl("v2"));
+  await click(query('[data-quad-pane-button="c21"]', menuEl()), "c21+");
+  const back = deck.seen[deck.seen.length - 1];
+  assert.equal(back.format, "quad");
+  assert.deepEqual(fixture.quadRows(back).flat().sort(), ["c11", "c12", "c21", "c22"]);
+  deck.done();
+});
+
+test("the second vertical divider drags on its own, squeezes, and never crosses the first", async () => {
+  const deck = await mount({ state: { format: "triple", col: 33, col2: 67 } });
+  assert.equal(Boolean(paneEl("c22")), true, "the three-column shape is on screen");
+
+  // Roomy: the second divider lands where it was dragged (67 → 85).
+  await dragTo(dividerEl("v2"), [670, 400], [850, 400]);
+  assert.equal(deckEl().getAttribute("data-quad-col2"), "85");
+  assert.equal(deckEl().getAttribute("data-quad-col"), "33", "the first divider did not move");
+
+  // Pressed onto its clamp: the wider gap and ONE small icon of its own.
+  await dragTo(dividerEl("v2"), [850, 400], [990, 400]);
+  assert.equal(deckEl().getAttribute("data-quad-col2"), "92", "clamped at the second divider's own 26–92 band");
+  assert.equal(deckEl().getAttribute("data-quad-squeezed"), "v");
+  const restore = query('[data-course-quad-restore="v2"]');
+  assert.ok(restore, "the second gap carries its own way back");
+  await click(restore, "the second squeeze icon");
+  assert.equal(deckEl().getAttribute("data-quad-col2"), "85", "the last ROOMY value, never a default");
+
+  // The two verticals can touch the same gap rule but never cross: dragged
+  // left, the second stops 8% right of the first.
+  await dragTo(dividerEl("v2"), [850, 400], [150, 400]);
+  assert.equal(deckEl().getAttribute("data-quad-col2"), "41", "first divider 33 + the owner's 8% gap");
+  // …and the first divider stops 8% LEFT of the second.
+  await dragTo(dividerEl("v"), [330, 400], [900, 400]);
+  assert.equal(deckEl().getAttribute("data-quad-col"), "33");
+  assert.equal(deckEl().getAttribute("data-quad-col2"), "41");
+  deck.done();
+});
+
 test("a hidden divider segment still drags (Course view never locks the layout)", async () => {
   const deck = await mount({
     view: { zoom: 100, dividers: { vTop: false, vBottom: true, hLeft: true, hRight: true } },
@@ -580,7 +653,7 @@ test("the model: the gate is 768px and the ratios stay in their bands", () => {
   assert.equal(fixture.clampQuadCol(95), 80);
   assert.equal(fixture.clampQuadRow(-20), 15);
   assert.equal(fixture.clampQuadRow(200), 85);
-  assert.equal(fixture.QUAD_FORMAT_ORDER.length, 6, "four blocks + four named shapes, deduplicated");
+  assert.equal(fixture.QUAD_FORMAT_ORDER.length, 7, "four blocks + five named shapes, deduplicated");
 });
 
 test("the model: closing keeps the learner's choices, the last block stays", () => {

@@ -142,6 +142,15 @@
   cursor: col-resize;
 }
 
+/* The SECOND vertical divider — the three-column shape's right split. It
+   carries the vertical rules too (same line, same dot, same drag) and only
+   swaps its own position variable; its top/height come from the deck, because
+   it spans just the row of three blocks. */
+.dc-quad-divider--v2 {
+  bottom: auto;
+  left: var(--quad-col2, 66%);
+}
+
 .dc-quad-divider--h {
   left: 0;
   right: 0;

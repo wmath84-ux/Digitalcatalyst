@@ -86,7 +86,7 @@ export const QUAD_PANE_LABEL: Record<QuadPaneId, string> = {
   c22: "Mind map area",
 };
 
-export type QuadFormat = "quad" | "top1" | "bottom1" | "top2" | "bottom2" | "pair";
+export type QuadFormat = "quad" | "top1" | "bottom1" | "triple" | "top2" | "bottom2" | "pair";
 
 export interface QuadFormatSpec {
   /**
@@ -130,6 +130,11 @@ export const QUAD_FORMATS: Record<QuadFormat, QuadFormatSpec> = {
     label: "3 upar · 1 niche",
     hint: "Three blocks across the top, one below",
   },
+  triple: {
+    rows: [["c11", "c12", "c22"]],
+    label: "3 · side by side",
+    hint: "Three blocks side by side, full height — player, notes, mind map",
+  },
   top2: {
     rows: [["c11", "c21"], ["c12"]],
     label: "2 upar · 1 niche",
@@ -148,7 +153,7 @@ export const QUAD_FORMATS: Record<QuadFormat, QuadFormatSpec> = {
 };
 
 /** The order the format buttons appear in the divider menu. */
-export const QUAD_FORMAT_ORDER: QuadFormat[] = ["quad", "top1", "bottom1", "top2", "bottom2", "pair"];
+export const QUAD_FORMAT_ORDER: QuadFormat[] = ["quad", "top1", "bottom1", "triple", "top2", "bottom2", "pair"];
 
 export interface QuadLayoutState {
   format: QuadFormat;
@@ -156,6 +161,11 @@ export interface QuadLayoutState {
   closed: QuadPaneId[];
   /** The vertical divider, in percent of the deck's width. */
   col: number;
+  /**
+   * The SECOND vertical divider — the three-column shape's right split, in
+   * percent of the deck's width. Never crosses `col` (see `quadTripleCols`).
+   */
+  col2: number;
   /** The horizontal divider, in percent of the deck's height. */
   row: number;
   /** The two swap buttons: mirror the columns / the rows. */
@@ -169,6 +179,11 @@ export const QUAD_COL_MAX = 80;
 /** Where the horizontal divider may rest. */
 export const QUAD_ROW_MIN = 15;
 export const QUAD_ROW_MAX = 85;
+/** Where the SECOND vertical divider may rest (the three-column shape). */
+export const QUAD_COL2_MIN = 26;
+export const QUAD_COL2_MAX = 92;
+/** The gap the two vertical dividers always keep between them. */
+export const QUAD_TRIPLE_GAP = 8;
 
 /** The screen width the whole system starts at (the owner's own pick). */
 export const QUAD_MIN_SCREEN_PX = 768;
@@ -180,6 +195,7 @@ export const QUAD_DEFAULT_STATE: QuadLayoutState = {
   format: "quad",
   closed: [],
   col: 50,
+  col2: 67,
   row: 50,
   swappedCols: false,
   swappedRows: false,
@@ -189,7 +205,19 @@ const clamp = (value: number, min: number, max: number) => (value < min ? min : 
 
 /** A divider position the deck can actually render. */
 export const clampQuadCol = (value: number) => clamp(value, QUAD_COL_MIN, QUAD_COL_MAX);
+export const clampQuadCol2 = (value: number) => clamp(value, QUAD_COL2_MIN, QUAD_COL2_MAX);
 export const clampQuadRow = (value: number) => clamp(value, QUAD_ROW_MIN, QUAD_ROW_MAX);
+
+/**
+ * The two vertical splits of a THREE-column row, in order and never crossing:
+ * `first` is the draggable `col`, `second` the draggable `col2`, and they always
+ * keep `QUAD_TRIPLE_GAP` between them so neither block can be dragged away.
+ */
+export function quadTripleCols(state: { col: number; col2: number }): { first: number; second: number } {
+  const first = clamp(state.col, QUAD_COL_MIN, QUAD_COL2_MAX - QUAD_TRIPLE_GAP);
+  const second = clamp(state.col2, first + QUAD_TRIPLE_GAP, QUAD_COL2_MAX);
+  return { first, second };
+}
 
 /** The panes the current shape actually shows, in reading order. */
 export function quadOpenPanes(state: QuadLayoutState): QuadPaneId[] {
@@ -217,13 +245,19 @@ export function quadRows(state: QuadLayoutState): QuadPaneId[][] {
  * `grid-template-columns` for ONE row: an even split, except for a two-pane
  * row, whose split is the draggable vertical divider.
  */
-export function quadRowColumns(count: number, col: number): string {
+export function quadRowColumns(count: number, col: number, col2: number = QUAD_DEFAULT_STATE.col2): string {
   if (count <= 1) return "minmax(0, 1fr)";
   if (count === 2) {
     const split = clampQuadCol(col);
     return `minmax(0, ${split}fr) minmax(0, ${100 - split}fr)`;
   }
-  return Array.from({ length: count }, () => "minmax(0, 1fr)").join(" ");
+  // Three (or more) blocks in a row: the TWO vertical dividers own the splits,
+  // so this shape is as resizable as any other. Extra blocks beyond three keep
+  // an even share of what is left.
+  const { first, second } = quadTripleCols({ col, col2 });
+  const parts = [`minmax(0, ${first}fr)`, `minmax(0, ${second - first}fr)`, `minmax(0, ${100 - second}fr)`];
+  for (let index = 3; index < count; index += 1) parts.push("minmax(0, 1fr)");
+  return parts.join(" ");
 }
 
 /**
@@ -306,9 +340,14 @@ export function quadSetFormat(state: QuadLayoutState, format: QuadFormat): QuadL
   // and a pane this shape cannot hold simply is not shown — its button reads
   // "c22+" either way). Only a shape with nothing left to show reopens its
   // first block, so no shape can ever leave an empty deck.
-  if (visible.length) return { ...state, format };
+  // The three-column shape opens as three EQUAL columns (owner: "teen screen
+  // side by side") — every other shape keeps the learner's own splits.
+  const seeded = format === "triple" && state.format !== "triple"
+    ? { ...state, col: 33, col2: 67 }
+    : state;
+  if (visible.length) return { ...seeded, format };
   const first = spec.rows[0][0];
-  return { ...state, format, closed: state.closed.filter((pane) => pane !== first) };
+  return { ...seeded, format, closed: seeded.closed.filter((pane) => pane !== first) };
 }
 
 /* ── Persistence (per course, per device — the split's own pattern) ─────── */
@@ -333,6 +372,7 @@ export function loadQuadLayout(courseId: string): QuadLayoutState {
       format: isFormat(value.format) ? value.format : "quad",
       closed: Array.isArray(value.closed) ? value.closed.filter(isPane) : [],
       col: typeof value.col === "number" ? clampQuadCol(value.col) : 50,
+      col2: typeof value.col2 === "number" ? clampQuadCol2(value.col2) : QUAD_DEFAULT_STATE.col2,
       row: typeof value.row === "number" ? clampQuadRow(value.row) : 50,
       swappedCols: value.swappedCols === true,
       swappedRows: value.swappedRows === true,

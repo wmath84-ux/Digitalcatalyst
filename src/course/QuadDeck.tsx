@@ -32,9 +32,11 @@
 //     with the panes handed in ready-rendered (the player, the Resource
 //     Library, Notes, the Mind map) so the deck owns arrangement and nothing
 //     else;
-//   · the TWO dividers, each drawn as TWO half segments with a dot at every
-//     half's centre — those dots are the owner's "divider ke segment ke theek
-//     center" click targets, and the dots are the guides the brief asks for;
+//   · every divider the shape needs — ONE vertical, ONE horizontal, and the
+//     SECOND vertical the three-column shape brings (the owner's "teen screen
+//     side by side", 2026-10-16) — each drawn as half segments with a dot at
+//     every half's centre: those dots are the owner's "divider ke segment ke
+//     theek center" click targets, and the guides the brief asks for;
 //   · the ONE control cluster a dot opens: the two swaps, the four quadrant
 //     buttons (a closed block reads `c22+`), and every grid shape — grouped,
 //     scrollable (~6 rows visible, the rest scrolls), never a pile of loose
@@ -42,7 +44,8 @@
 //   · the zoom + divider-visibility the Course view page sets.
 //
 // Rules kept from the brief, in the code below:
-//   · every divider always drags (no mode, no gate, no "unlock" step);
+//   · every divider always drags (no mode, no gate, no "unlock" step), and the
+//     two verticals can never cross — a small gap always stays between them;
 //   · outside click closes the cluster — and so does pressing a swap, a
 //     quadrant or a shape button;
 //   · the cluster opens at the dot that was pressed and never leaves the deck;
@@ -64,6 +67,8 @@ import { ArrowLeftRight, ArrowUpDown, Move } from "lucide-react";
 import { DIVIDER_HIT, DIVIDER_LINE, EASE_OUT_MOTION } from "./splitMotion";
 import type { CourseViewSettings } from "./courseViewSettings";
 import {
+  QUAD_COL2_MAX,
+  QUAD_COL2_MIN,
   QUAD_COL_MAX,
   QUAD_COL_MIN,
   QUAD_FORMAT_ORDER,
@@ -73,8 +78,11 @@ import {
   QUAD_ROW_MAX,
   QUAD_ROW_MIN,
   QUAD_SLOT_LABEL,
+  QUAD_TRIPLE_GAP,
   clampQuadCol,
+  clampQuadCol2,
   clampQuadRow,
+  quadTripleCols,
   quadDeckRows,
   quadPaneButtons,
   quadPaneVisible,
@@ -104,6 +112,19 @@ const QUAD_KEY_STEP = 2;
 const QUAD_SQUEEZE_EPS = 0.6;
 /** The gap the deck keeps around a squeezed divider (vs the usual 10px). */
 const QUAD_SQUEEZE_GAP = 18;
+
+/**
+ * The three draggable lines: the vertical divider, the SECOND vertical divider
+ * (the three-column shape) and the horizontal divider.
+ */
+type QuadAxisKey = "v" | "v2" | "h";
+
+/** One half of a divider — the small dot the cluster opens from. */
+type QuadSegment = "vTop" | "vBottom" | "v2" | "hLeft" | "hRight";
+
+/** The value one line sits at, in percent. */
+const quadAxisValue = (state: QuadLayoutState, axis: QuadAxisKey): number =>
+  axis === "v" ? state.col : axis === "v2" ? state.col2 : state.row;
 
 /** How long a pane glows after the navigation brings it back. */
 const QUAD_FOCUS_MS = 1600;
@@ -245,9 +266,9 @@ export default function QuadDeck({
   const reducedMotion = useReducedMotion() === true;
 
   const deckRef = useRef<HTMLDivElement | null>(null);
-  const dragRef = useRef<{ axis: "v" | "h"; start: number; base: number; live: number } | null>(null);
-  const [dragging, setDragging] = useState<"v" | "h" | null>(null);
-  const [menu, setMenu] = useState<{ divider: "v" | "h"; segment: "vTop" | "vBottom" | "hLeft" | "hRight" } | null>(null);
+  const dragRef = useRef<{ axis: QuadAxisKey; start: number; base: number; live: number } | null>(null);
+  const [dragging, setDragging] = useState<QuadAxisKey | null>(null);
+  const [menu, setMenu] = useState<{ divider: QuadAxisKey; segment: QuadSegment } | null>(null);
   const [focusPane, setFocusPane] = useState<QuadPaneId | null>(null);
 
   const commit = onState;
@@ -277,37 +298,77 @@ export default function QuadDeck({
    * A divider sitting on its clamp has compressed its blocks as far as the
    * deck allows. The last ROOMY value of each axis is remembered, so the small
    * icon in the gap can put that divider straight back where it was. */
+  /* The three-column shape (and the owner's "1 upar · 3 niche" shapes) hold a
+     row of three blocks: that row has TWO vertical dividers, both draggable. */
+  const secondVertical = rows.some((row) => row.length >= 3);
+  const tripleRowIndex = rows.findIndex((row) => row.length >= 3);
+  const rowSplit = clampQuadRow(state.row);
+  const secondSpan = secondVertical
+    ? rows.length === 1
+      ? { top: 0, height: 100 }
+      : tripleRowIndex <= 0
+        ? { top: 0, height: rowSplit }
+        : { top: rowSplit, height: 100 - rowSplit }
+    : null;
+
   const squeezedCol = state.col <= QUAD_COL_MIN + QUAD_SQUEEZE_EPS || state.col >= QUAD_COL_MAX - QUAD_SQUEEZE_EPS;
   const squeezedRow = state.row <= QUAD_ROW_MIN + QUAD_SQUEEZE_EPS || state.row >= QUAD_ROW_MAX - QUAD_SQUEEZE_EPS;
+
+  const squeezedCol2 = state.col2 <= QUAD_COL2_MIN + QUAD_SQUEEZE_EPS || state.col2 >= QUAD_COL2_MAX - QUAD_SQUEEZE_EPS;
+  /** Any vertical line squeezed — the deck's own one-line reading. */
+  const squeezedVertical = squeezedCol || squeezedCol2;
   const lastColRef = useRef(state.col);
+  const lastCol2Ref = useRef(state.col2);
   const lastRowRef = useRef(state.row);
   useEffect(() => {
     if (!squeezedCol) lastColRef.current = state.col;
   }, [state.col, squeezedCol]);
   useEffect(() => {
+    if (!squeezedCol2) lastCol2Ref.current = state.col2;
+  }, [state.col2, squeezedCol2]);
+  useEffect(() => {
     if (!squeezedRow) lastRowRef.current = state.row;
   }, [state.row, squeezedRow]);
   const restoreCol = () => commit({ ...state, col: clampQuadCol(lastColRef.current) });
+  const restoreCol2 = () => commit({ ...state, col2: clampQuadCol2(lastCol2Ref.current) });
   const restoreRow = () => commit({ ...state, row: clampQuadRow(lastRowRef.current) });
 
-  /* ── Drag: the two dividers ─────────────────────────────────────────────
-   * Four half segments, one rule: the whole strip drags, always. During the
+  /**
+   * A drag's value for one line, clamped to its own band AND to the other
+   * vertical divider (the two never cross: `QUAD_TRIPLE_GAP` always stays
+   * between them).
+   */
+  const clampAxis = (axis: QuadAxisKey, value: number): number => {
+    if (axis === "h") return clampQuadRow(value);
+    if (axis === "v2") {
+      const { first } = quadTripleCols(state);
+      return Math.max(clampQuadCol2(value), first + QUAD_TRIPLE_GAP);
+    }
+    const next = clampQuadCol(value);
+    if (!secondVertical) return next;
+    const { second } = quadTripleCols(state);
+    return Math.min(next, second - QUAD_TRIPLE_GAP);
+  };
+
+  /* ── Drag: the lines ────────────────────────────────────────────────────
+   * Every line the shape shows — the vertical, its second vertical, the
+   * horizontal — drags on its own; one rule: the whole strip drags, always. During the
    * move the live value is written straight to the deck's CSS variables (no
    * React re-render per frame — the panes hold videos and canvases), and the
    * settled value is committed on release. */
-  const writeLive = (axis: "v" | "h", value: number) => {
+  const writeLive = (axis: QuadAxisKey, value: number) => {
     const deck = deckRef.current;
     if (!deck) return;
-    deck.style.setProperty(axis === "v" ? "--quad-col" : "--quad-row", `${value}%`);
+    deck.style.setProperty(axis === "v" ? "--quad-col" : axis === "v2" ? "--quad-col2" : "--quad-row", `${value}%`);
     const divider = deck.querySelector(`[data-course-quad-divider="${axis}"]`);
     divider?.setAttribute("aria-valuenow", String(Math.round(value)));
   };
 
-  const handlePointerDown = (axis: "v" | "h") => (event: ReactPointerEvent<HTMLDivElement>) => {
+  const handlePointerDown = (axis: QuadAxisKey) => (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 && event.pointerType === "mouse") return;
-    const base = axis === "v" ? state.col : state.row;
+    const base = axis === "v" ? state.col : axis === "v2" ? state.col2 : state.row;
     event.currentTarget.setPointerCapture?.(event.pointerId);
-    dragRef.current = { axis, start: axis === "v" ? event.clientX : event.clientY, base, live: base };
+    dragRef.current = { axis, start: axis === "h" ? event.clientY : event.clientX, base, live: base };
     setDragging(axis);
     // A drag on the line puts the cluster away — the learner is resizing.
     setMenu(null);
@@ -319,12 +380,9 @@ export default function QuadDeck({
     const deck = deckRef.current;
     const rect = deck?.getBoundingClientRect();
     if (!rect || rect.width <= 0 || rect.height <= 0) return;
-    const delta = (drag.axis === "v" ? event.clientX : event.clientY) - drag.start;
-    const span = drag.axis === "v" ? rect.width : rect.height;
-    const next =
-      drag.axis === "v"
-        ? clampQuadCol(drag.base + (delta / span) * 100)
-        : clampQuadRow(drag.base + (delta / span) * 100);
+    const delta = (drag.axis === "h" ? event.clientY : event.clientX) - drag.start;
+    const span = drag.axis === "h" ? rect.height : rect.width;
+    const next = clampAxis(drag.axis, drag.base + (delta / span) * 100);
     drag.live = next;
     writeLive(drag.axis, next);
   };
@@ -335,8 +393,9 @@ export default function QuadDeck({
     dragRef.current = null;
     setDragging(null);
     if (!drag) return;
-    if (drag.axis === "v") commit({ ...state, col: clampQuadCol(drag.live) });
-    else commit({ ...state, row: clampQuadRow(drag.live) });
+    if (drag.axis === "v") commit({ ...state, col: clampAxis("v", drag.live) });
+    else if (drag.axis === "v2") commit({ ...state, col2: clampAxis("v2", drag.live) });
+    else commit({ ...state, row: clampAxis("h", drag.live) });
   };
 
   const handlePointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -349,23 +408,21 @@ export default function QuadDeck({
     writeLive(drag.axis, drag.base);
   };
 
-  const handleDividerKeyDown = (axis: "v" | "h", segment: "vTop" | "vBottom" | "hLeft" | "hRight") =>
+  const handleDividerKeyDown = (axis: QuadAxisKey, segment: QuadSegment) =>
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
       const step = (delta: number) => {
         event.preventDefault();
-        const next =
-          axis === "v"
-            ? { ...state, col: clampQuadCol(state.col + delta) }
-            : { ...state, row: clampQuadRow(state.row + delta) };
-        commit(next);
+        const base = axis === "v" ? state.col : axis === "v2" ? state.col2 : state.row;
+        const next = clampAxis(axis, base + delta);
+        commit(axis === "v" ? { ...state, col: next } : axis === "v2" ? { ...state, col2: next } : { ...state, row: next });
       };
-      if (axis === "v" && event.key === "ArrowLeft") return step(-QUAD_KEY_STEP);
-      if (axis === "v" && event.key === "ArrowRight") return step(QUAD_KEY_STEP);
+      if (axis !== "h" && event.key === "ArrowLeft") return step(-QUAD_KEY_STEP);
+      if (axis !== "h" && event.key === "ArrowRight") return step(QUAD_KEY_STEP);
       if (axis === "h" && event.key === "ArrowUp") return step(-QUAD_KEY_STEP);
       if (axis === "h" && event.key === "ArrowDown") return step(QUAD_KEY_STEP);
       if (event.key === "s" || event.key === "S") {
         event.preventDefault();
-        commit(quadSwap(state, axis === "v" ? "cols" : "rows"));
+        commit(quadSwap(state, axis === "h" ? "rows" : "cols"));
         return;
       }
       if (event.key === "Enter" || event.key === " ") {
@@ -410,7 +467,12 @@ export default function QuadDeck({
     // With no cross the cluster opens in the middle of the deck (the little
     // door above); with the cross it opens exactly on the pressed dot.
     if (!cross) return { left: "50%", top: "50%" };
-    if (menu.divider === "v") {
+    if (menu.divider !== "h") {
+      // The three-column row's SECOND divider: the cluster opens on its dot,
+      // in the middle of the band that divider spans.
+      if (menu.segment === "v2") {
+        return { left: `${state.col2}%`, top: `${secondSpan ? secondSpan.top + secondSpan.height / 2 : 50}%` };
+      }
       const top = menu.segment === "vBottom" ? (cross ? (state.row + 100) / 2 : 50) : cross ? state.row / 2 : 50;
       return { left: `${state.col}%`, top: `${top}%` };
     }
@@ -459,14 +521,16 @@ export default function QuadDeck({
       data-format={state.format}
       data-quad-rows={rows.map((row) => row.join("+")).join("/")}
       data-quad-col={Math.round(state.col)}
+      data-quad-col2={Math.round(state.col2)}
       data-quad-row={Math.round(state.row)}
       data-quad-nav-side={navSide}
       data-quad-zoom={view.zoom}
       data-quad-cross={cross ? "true" : "false"}
-      data-quad-squeezed={squeezedCol && squeezedRow ? "both" : squeezedCol ? "v" : squeezedRow ? "h" : "none"}
+      data-quad-squeezed={squeezedVertical && squeezedRow ? "both" : squeezedVertical ? "v" : squeezedRow ? "h" : "none"}
       style={
         {
           "--quad-col": `${state.col}%`,
+          "--quad-col2": `${state.col2}%`,
           "--quad-row": `${state.row}%`,
         } as CSSProperties
       }
@@ -486,7 +550,7 @@ export default function QuadDeck({
               className="dc-quad-row"
               data-quad-row-index={index}
               data-quad-row-panes={row.join("+")}
-              style={{ gridTemplateColumns: quadRowColumns(row.length, state.col) }}
+              style={{ gridTemplateColumns: quadRowColumns(row.length, state.col, state.col2) }}
             >
               {row.map((pane) => (
                 <section
@@ -513,7 +577,7 @@ export default function QuadDeck({
             cross={cross}
             dragging={dragging === "v"}
             visible={{ vTop: view.dividers.vTop, vBottom: view.dividers.vBottom }}
-            openSegment={menu?.divider === "v" ? menu.segment : null}
+            openSegment={menu?.divider === "v" && menu.segment !== "v2" ? menu.segment : null}
             squeezed={squeezedCol}
             onRestore={restoreCol}
             onPointerDown={handlePointerDown("v")}
@@ -523,6 +587,31 @@ export default function QuadDeck({
             onKeyDown={handleDividerKeyDown}
             onDot={(segment) => setMenu({ divider: "v", segment })}
             onDoubleClick={() => setMenu({ divider: "v", segment: "vTop" })}
+          />
+        ) : null}
+
+        {/* ── The SECOND vertical divider — the row of three blocks ──────────
+            It is a vertical line, so the Course view page's vertical switches
+            (vTop / vBottom) govern it: either one showing means "show my
+            vertical dividers", and this one belongs to that family. */}
+        {secondVertical ? (
+          <QuadDivider
+            axis="v2"
+            span={secondSpan ?? undefined}
+            state={state}
+            cross={false}
+            dragging={dragging === "v2"}
+            visible={{ vTop: view.dividers.vTop || view.dividers.vBottom, vBottom: false }}
+            openSegment={menu?.divider === "v" && menu.segment === "v2" ? "v2" : null}
+            squeezed={squeezedCol2}
+            onRestore={restoreCol2}
+            onPointerDown={handlePointerDown("v2")}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+            onKeyDown={handleDividerKeyDown}
+            onDot={() => setMenu({ divider: "v", segment: "v2" })}
+            onDoubleClick={() => setMenu({ divider: "v", segment: "v2" })}
           />
         ) : null}
 
@@ -686,6 +775,7 @@ export default function QuadDeck({
 
 function QuadDivider({
   axis,
+  span,
   state,
   cross,
   dragging,
@@ -701,12 +791,14 @@ function QuadDivider({
   onDot,
   onDoubleClick,
 }: {
-  axis: "v" | "h";
+  axis: QuadAxisKey;
+  /** The second vertical divider spans only the row of three blocks. */
+  span?: { top: number; height: number };
   state: QuadLayoutState;
   cross: boolean;
   dragging: boolean;
   visible: { vTop: boolean; vBottom: boolean };
-  openSegment: "vTop" | "vBottom" | "hLeft" | "hRight" | null;
+  openSegment: QuadSegment | null;
   /** The blocks on this axis are pressed together — show the way back. */
   squeezed: boolean;
   onRestore: () => void;
@@ -714,37 +806,42 @@ function QuadDivider({
   onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerCancel: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  onKeyDown: (axis: "v" | "h", segment: "vTop" | "vBottom" | "hLeft" | "hRight") => (event: ReactKeyboardEvent<HTMLDivElement>) => void;
-  onDot: (segment: "vTop" | "vBottom" | "hLeft" | "hRight") => void;
+  onKeyDown: (axis: QuadAxisKey, segment: QuadSegment) => (event: ReactKeyboardEvent<HTMLDivElement>) => void;
+  onDot: (segment: QuadSegment) => void;
   onDoubleClick: () => void;
 }) {
-  const value = axis === "v" ? state.col : state.row;
-  const firstSegment = (axis === "v" ? "vTop" : "hLeft") as "vTop" | "hLeft";
-  const secondSegment = (axis === "v" ? "vBottom" : "hRight") as "vBottom" | "hRight";
-  const segments = cross
-    ? ([firstSegment, secondSegment] as const)
-    : ([firstSegment] as const);
+  const vertical = axis !== "h";
+  const value = quadAxisValue(state, axis);
+  const firstSegment: QuadSegment = vertical ? "vTop" : "hLeft";
+  const secondSegment: QuadSegment = vertical ? "vBottom" : "hRight";
+  const segments: readonly QuadSegment[] =
+    axis === "v2" ? (["v2"] as const) : cross ? ([firstSegment, secondSegment] as const) : ([firstSegment] as const);
 
   return (
     <div
       role="separator"
       tabIndex={0}
-      aria-orientation={axis === "v" ? "vertical" : "horizontal"}
+      aria-orientation={vertical ? "vertical" : "horizontal"}
       aria-label={
-        axis === "v"
-          ? "Vertical divider — drag to resize the left and right blocks, press Enter for its buttons"
-          : "Horizontal divider — drag to resize the top and bottom blocks, press Enter for its buttons"
+        axis === "h"
+          ? "Horizontal divider — drag to resize the top and bottom blocks, press Enter for its buttons"
+          : axis === "v2"
+            ? "Second vertical divider — drag to resize the middle and right blocks, press Enter for its buttons"
+            : "Vertical divider — drag to resize the left and right blocks, press Enter for its buttons"
       }
-      aria-valuemin={axis === "v" ? 20 : 15}
-      aria-valuemax={axis === "v" ? 80 : 85}
+      aria-valuemin={axis === "h" ? QUAD_ROW_MIN : axis === "v2" ? QUAD_COL2_MIN : QUAD_COL_MIN}
+      aria-valuemax={axis === "h" ? QUAD_ROW_MAX : axis === "v2" ? QUAD_COL2_MAX : QUAD_COL_MAX}
       aria-valuenow={Math.round(value)}
       data-course-quad-divider={axis}
       data-axis={axis}
       data-dragging={dragging ? "true" : "false"}
       data-cross={cross ? "true" : "false"}
-      className={`dc-quad-divider dc-quad-divider--${axis}`}
+      className={`dc-quad-divider dc-quad-divider--${vertical ? "v" : "h"} dc-quad-divider--${axis}`}
       data-squeezed={squeezed ? "true" : "false"}
-      style={{ ["--quad-hit" as string]: `${squeezed ? QUAD_SQUEEZE_GAP : DIVIDER_HIT}px` } as CSSProperties}
+      style={{
+        ["--quad-hit" as string]: `${squeezed ? QUAD_SQUEEZE_GAP : DIVIDER_HIT}px`,
+        ...(span ? { top: `${span.top}%`, height: `${span.height}%`, bottom: "auto" } : null),
+      } as CSSProperties}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -759,7 +856,7 @@ function QuadDivider({
           type="button"
           className="dc-quad-restore"
           data-course-quad-restore={axis}
-          aria-label={axis === "v"
+          aria-label={vertical
             ? "Expand the squeezed blocks back to their previous width"
             : "Expand the squeezed blocks back to their previous height"}
           title="Back to the previous size"
@@ -771,13 +868,13 @@ function QuadDivider({
           }}
         >
           <span aria-hidden data-quad-restore-icon>
-            {axis === "v" ? <ArrowLeftRight size={14} /> : <ArrowUpDown size={14} />}
+            {vertical ? <ArrowLeftRight size={14} /> : <ArrowUpDown size={14} />}
           </span>
         </button>
       ) : null}
       {segments.map((segment) => {
-        const isFirst = segment === firstSegment;
-        const share = axis === "v" ? state.row : state.col;
+        const isFirst = segment !== secondSegment;
+        const share = axis === "h" ? state.col : state.row;
         const size = cross ? (isFirst ? `${share}%` : `${100 - share}%`) : "100%";
         const shown = isFirst ? visible.vTop : visible.vBottom;
         return (
@@ -786,12 +883,12 @@ function QuadDivider({
             className="dc-quad-segment"
             data-course-quad-segment={segment}
             data-visible={shown ? "true" : "false"}
-            style={axis === "v" ? { height: size } : { width: size }}
+            style={vertical ? { height: size } : { width: size }}
           >
             {/* The 2px core line — the ONLY visible chrome on the deck. */}
             <span
               className="dc-quad-segment__line"
-              data-course-quad-line={axis}
+              data-course-quad-line={vertical ? "v" : "h"}
               aria-hidden
               style={{ background: DIVIDER_LINE, boxShadow: dragging ? `0 0 16px ${DIVIDER_LINE}` : `0 0 10px ${DIVIDER_LINE}66` }}
             />
@@ -804,9 +901,11 @@ function QuadDivider({
               data-quad-dot-segment={segment}
               data-open={openSegment === segment ? "true" : "false"}
               aria-label={
-                axis === "v"
-                  ? `Divider buttons — vertical divider, ${isFirst ? "top" : "bottom"} half`
-                  : `Divider buttons — horizontal divider, ${isFirst ? "left" : "right"} half`
+                axis === "h"
+                  ? `Divider buttons — horizontal divider, ${isFirst ? "left" : "right"} half`
+                  : axis === "v2"
+                    ? "Divider buttons — second vertical divider"
+                    : `Divider buttons — vertical divider, ${isFirst ? "top" : "bottom"} half`
               }
               title="Divider buttons"
               onPointerDown={(event) => event.stopPropagation()}
