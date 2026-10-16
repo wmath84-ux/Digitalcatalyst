@@ -43,6 +43,9 @@ const VIEW = read("src/course/courseViewSettings.ts");
 const PLAYER = read("src/CoursePlayerApp.tsx");
 const OVERLAY = read("src/course/CourseOverlay.tsx");
 const PANEL = read("src/course/PlayerPanel.tsx");
+// The Course view page itself — lifted out of PlayerPanel so Work mode renders
+// the very same page (one design, one store).
+const VIEW_PANEL = read("src/course/CourseViewPanel.tsx");
 const SPLIT = read("src/course/studyPanels.tsx");
 
 /* ── 1 + 3 · four blocks in a +, in the owner's own mapping ─────────────── */
@@ -209,7 +212,12 @@ test("the navigation is the same component everywhere: icons + labels, every tab
   assert.match(NAV, /const items = TABS\.filter\(\(item\) => !hiddenTabs\.includes\(item\.key\)\);/);
   assert.match(NAV, /data-dc-header-nav-tab=\{item\.key\}/);
   assert.match(NAV, /data-dc-header-nav-label/);
-  assert.match(NAV, /onClick=\{\(\) => onTabChange\(item\.key\)\}/);
+  // ONE drawing (HeaderNavView), reused by Work mode with its own page list,
+  // and one thin course wrapper that owns the course's own rules.
+  assert.match(NAV, /export function HeaderNavView\(\{/);
+  assert.match(NAV, /onClick=\{\(\) => onSelect\(item\.key\)\}/);
+  assert.match(NAV, /onSelect=\{\(key\) => onTabChange\(key as DockTab\)\}/);
+  assert.match(NAV, /items=\{items\}/);
   // The same visibility rule as the footer: keyboard up or an immersive page.
   assert.match(NAV, /const pageRuleHidesFooter = useFooterHiddenPage\(tab\);/);
   assert.match(NAV, /const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways\(\);/);
@@ -246,16 +254,19 @@ test("the gear's Course view page carries the zoom and the four divider switches
   assert.match(VIEW, /export const COURSE_DIVIDER_SEGMENTS: CourseDividerSegment\[\] = \["vTop", "vBottom", "hLeft", "hRight"\];/);
   assert.match(VIEW, /export function setCourseViewZoom\(zoom: number\): void \{/);
   assert.match(VIEW, /export function setCourseDividerVisible\(segment: CourseDividerSegment, visible: boolean\): void \{/);
-  assert.match(PANEL, /data-course-view-page/);
-  assert.match(PANEL, /data-course-view-zoom-out/);
-  assert.match(PANEL, /data-course-view-zoom-in/);
-  assert.match(PANEL, /data-course-view-zoom-value/);
-  assert.match(PANEL, /COURSE_DIVIDER_SEGMENTS\.map\(\(segment\) => \(/);
+  assert.match(VIEW_PANEL, /data-course-view-page/);
+  // The player still OWNS the page — it just renders the shared component now.
+  assert.match(PANEL, /<CourseViewPanel quadWide=\{quadWide\} \/>/);
+  assert.match(VIEW_PANEL, /data-course-view-zoom-out/);
+  assert.match(VIEW_PANEL, /data-course-view-zoom-in/);
+  assert.match(VIEW_PANEL, /data-course-view-zoom-value/);
+  assert.match(VIEW_PANEL, /COURSE_DIVIDER_SEGMENTS\.map\(\(segment\) => \(/);
   // …on the app's own switch, never a native checkbox.
-  assert.match(PANEL, /"data-course-view-divider": segment/);
-  assert.match(PANEL, /data-course-view-divider-row=\{segment\}/);
-  assert.match(PANEL, /on=\{courseView\.dividers\[segment\]\}/);
-  assert.match(PANEL, /onChange=\{\(next\) => setCourseDividerVisible\(segment, next\)\}/);
+  assert.match(VIEW_PANEL, /"data-course-view-divider": segment/);
+  assert.match(VIEW_PANEL, /data-course-view-divider-row=\{segment\}/);
+  assert.match(VIEW_PANEL, /on=\{courseView\.dividers\[segment\]\}/);
+  assert.match(VIEW_PANEL, /onChange=\{\(next\) => setCourseDividerVisible\(segment, next\)\}/);
+  assert.doesNotMatch(VIEW_PANEL, /<input/);
   assert.doesNotMatch(PANEL, /<input/);
   // The Course view page replaces the old split-view note (the owner renamed it).
   assert.doesNotMatch(PANEL, /Split view/);

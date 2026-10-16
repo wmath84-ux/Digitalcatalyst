@@ -108,3 +108,152 @@ test('the page rule hides the real strip — and Settings "always" brings it bac
   await act(() => root.unmount());
   host.remove();
 });
+
+// ---------------------------------------------------------------------------
+// The PLACEABLE navigation (the owner's 2026-10-16 brief) — the same component
+// the course player puts in its header and Work mode places around its deck.
+// Same loader, same stubs; the placement STORE is the real one, so the button,
+// the dropdown and the persisted choice are all exercised for real.
+// ---------------------------------------------------------------------------
+
+let wideViewport = false;
+const mediaListeners = new Set();
+dom.window.matchMedia = (query) => ({
+  // LIVE, like a real MediaQueryList: the listener's own read must see the new
+  // width, not the width at creation time.
+  get matches() {
+    return wideViewport;
+  },
+  media: query,
+  addEventListener: (type, listener) => {
+    if (type === 'change') mediaListeners.add(listener);
+  },
+  removeEventListener: (type, listener) => {
+    if (type === 'change') mediaListeners.delete(listener);
+  },
+  addListener: (listener) => mediaListeners.add(listener),
+  removeListener: (listener) => mediaListeners.delete(listener),
+  dispatchEvent: () => false,
+});
+const setWideViewport = (next) => {
+  wideViewport = next;
+  for (const listener of [...mediaListeners]) listener({ matches: next, media: '(min-width: 768px)' });
+};
+
+const Placement = load('src/utils/footerNavigationPlacement.ts', (id) => require(id));
+const HeaderNav = load('src/course/CourseHeaderNav.tsx', (id) => {
+  if (id === './CourseOverlay') return { TABS: tabs };
+  if (id === './useCourseKeyboard') return { useCourseKeyboard: () => ({ keyboardVisible }) };
+  if (id === './coursePanelSession') return { useFooterHiddenPage: () => pageRuleHidesFooter };
+  if (id === '../utils/footerNavigationVisibility') return { useFooterNavigationAlways: () => footerAlwaysVisible };
+  if (id === '../utils/footerNavigationPlacement') return Placement;
+  if (id.endsWith('.css')) return {};
+  return require(id);
+}).default;
+
+test('the placeable navigation renders every tool with its label, and respects hidden tabs', async () => {
+  keyboardVisible = false;
+  pageRuleHidesFooter = false;
+  footerAlwaysVisible = false;
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const selected = [];
+  const render = () =>
+    root.render(
+      React.createElement(HeaderNav, {
+        tab: 'notes',
+        onTabChange: (key) => selected.push(key),
+        hiddenTabs: ['paid'],
+        placement: 'header',
+      }),
+    );
+  await act(render);
+
+  const items = [...host.querySelectorAll('[data-dc-header-nav-tab]')];
+  assert.equal(items.length, 9, 'every tool except the hidden one');
+  assert.equal(host.querySelector('[data-dc-header-nav-tab="paid"]'), null, 'a learner-authored course hides Paid');
+  assert.ok(
+    items.every((item) => item.querySelector('svg') && item.querySelector('[data-dc-header-nav-label]')?.textContent.trim().length > 0),
+    'icons AND labels, as the brief asks',
+  );
+  const active = host.querySelector('[data-dc-header-nav-tab="notes"]');
+  assert.equal(active.getAttribute('data-active'), 'true');
+  assert.equal(active.getAttribute('aria-current'), 'page');
+  await act(() => host.querySelector('[data-dc-header-nav-tab="mindmap"]').click());
+  assert.deepEqual(selected, ['mindmap'], 'every button works');
+
+  // The footer's own page rule, and the Settings override, both hold here.
+  keyboardVisible = true;
+  await act(render);
+  assert.equal(host.querySelector('[data-dc-header-nav]'), null, 'the soft keyboard hides it');
+  keyboardVisible = false;
+  pageRuleHidesFooter = true;
+  await act(render);
+  assert.equal(host.querySelector('[data-dc-header-nav]'), null, 'an editor page hides it');
+  footerAlwaysVisible = true;
+  await act(render);
+  assert.ok(host.querySelector('[data-dc-header-nav]'), '"Visible footer navigation always" keeps it');
+  footerAlwaysVisible = false;
+  pageRuleHidesFooter = false;
+  await act(() => root.unmount());
+  host.remove();
+});
+
+test('the placement button is tablet/desktop only and its dropdown opens into free space', async () => {
+  keyboardVisible = false;
+  pageRuleHidesFooter = false;
+  footerAlwaysVisible = false;
+  dom.window.localStorage.clear();
+  wideViewport = false;
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const render = (placement) => root.render(React.createElement(HeaderNav, { tab: 'notes', onTabChange: () => {}, placement }));
+
+  await act(() => render('header'));
+  assert.equal(host.querySelector('[data-dc-header-nav-placement]'), null, 'no placement button on a phone');
+
+  await act(() => setWideViewport(true));
+  await act(() => render('header'));
+  const button = host.querySelector('[data-dc-header-nav-placement]');
+  assert.ok(button, 'tablet/desktop gets the button');
+  assert.equal(button.getAttribute('data-side'), 'down', 'navigation at the top → the menu opens down');
+
+  await act(() => button.click());
+  const menu = host.querySelector('[data-dc-header-nav-menu]');
+  assert.ok(menu, 'pressing it opens the dropdown');
+  assert.equal(menu.getAttribute('data-side'), 'down');
+  const options = [...host.querySelectorAll('[data-dc-header-nav-option]')];
+  assert.deepEqual(
+    options.map((option) => option.getAttribute('data-dc-header-nav-option')),
+    ['header', 'left', 'right', 'bottom'],
+    'all four places',
+  );
+  assert.equal(host.querySelector('[data-dc-header-nav-option="header"]').getAttribute('data-active'), 'true');
+
+  await act(() => host.querySelector('[data-dc-header-nav-option="right"]').click());
+  assert.equal(Placement.getFooterNavigationPlacement(), 'right', 'the choice is stored');
+  assert.equal(host.querySelector('[data-dc-header-nav-menu]'), null, 'and the dropdown closes itself');
+
+  // The navigation re-renders at its new home: a right rail, whose dropdown
+  // opens toward the LEFT (the free side).
+  await act(() => render('right'));
+  assert.equal(host.querySelector('[data-dc-header-nav]').getAttribute('data-placement'), 'right');
+  await act(() => host.querySelector('[data-dc-header-nav-placement]').click());
+  assert.equal(host.querySelector('[data-dc-header-nav-menu]').getAttribute('data-side'), 'left');
+
+  await act(() => document.body.dispatchEvent(new dom.window.PointerEvent('pointerdown', { bubbles: true })));
+  assert.equal(host.querySelector('[data-dc-header-nav-menu]'), null, 'an outside click puts it away');
+
+  // Bottom and left, for the other two directions.
+  await act(() => render('bottom'));
+  assert.equal(host.querySelector('[data-dc-header-nav-placement]').getAttribute('data-side'), 'up');
+  await act(() => render('left'));
+  assert.equal(host.querySelector('[data-dc-header-nav-placement]').getAttribute('data-side'), 'right');
+
+  await act(() => root.unmount());
+  host.remove();
+  dom.window.localStorage.clear();
+  wideViewport = false;
+});

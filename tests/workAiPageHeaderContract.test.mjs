@@ -24,7 +24,7 @@ const aiSurface = read("src/work/pages/WorkAiSurface.tsx");
 const app = read("src/work/WorkApp.tsx");
 
 test("the AI page renders without the Work header; the header stays for the other pages", () => {
-  assert.match(surface, /const showHeader = !immersive && page !== "ai";/, "the header is suppressed for the AI page only");
+  assert.match(surface, /const showHeader = !headless && !immersive && page !== "ai";/, "the header is suppressed for the AI page only");
   assert.match(surface, /\{showHeader \? \(\s+<header[\s\S]*?data-work-header-area=\{page\}[\s\S]*?data-work-theme-toggle=""/, "the one shared header (exit + theme toggle) still renders for the other pages");
   const immersiveBlock = surface.slice(surface.indexOf("const immersive ="), surface.indexOf("const showHeader"));
   assert.doesNotMatch(immersiveBlock, /"ai"/, "the AI page is not immersive — WorkApp keeps the shared footer up on it");
