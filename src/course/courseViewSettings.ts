@@ -98,15 +98,47 @@ function normalize(raw: unknown): CourseViewSettings {
   };
 }
 
+/* ── Snapshot identity — the one rule this store MUST keep ────────────────
+ *
+ * This getter is handed straight to `useSyncExternalStore` (see the hook at
+ * the bottom of this file), and React calls it on every render and again right
+ * after — if the two answers are not the SAME object it decides the store
+ * changed and re-renders, forever: "The result of getSnapshot should be cached
+ * to avoid an infinite loop", then "Maximum update depth exceeded" (React
+ * error #185), which the Course Player's error boundary shows as "Course
+ * Player hit a snag" the moment a course is opened.
+ *
+ * `normalize()` builds a fresh object every call, so the RAW STRING is the
+ * cache key: an unchanged stored value returns the very same object, and any
+ * real change (a zoom, a divider switch, another tab) re-parses once. This is
+ * the same rule `src/work/storage/workPrefs.ts` documents for its history
+ * snapshot — the shared default object is the answer whenever nothing is
+ * stored, storage is denied, or the stored JSON cannot be read.
+ */
+let cachedRaw: string | null = null;
+let cachedSettings: CourseViewSettings = COURSE_VIEW_DEFAULT_SETTINGS;
+
 export function getCourseViewSettings(): CourseViewSettings {
   if (typeof window === "undefined") return COURSE_VIEW_DEFAULT_SETTINGS;
+  let raw: string | null;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return COURSE_VIEW_DEFAULT_SETTINGS;
-    return normalize(JSON.parse(raw) as unknown);
+    raw = window.localStorage.getItem(STORAGE_KEY);
   } catch {
     return COURSE_VIEW_DEFAULT_SETTINGS;
   }
+  // Nothing stored (or the value was cleared): the stable shared default.
+  if (!raw) {
+    cachedRaw = null;
+    return COURSE_VIEW_DEFAULT_SETTINGS;
+  }
+  if (raw === cachedRaw) return cachedSettings;
+  try {
+    cachedSettings = normalize(JSON.parse(raw) as unknown);
+  } catch {
+    cachedSettings = COURSE_VIEW_DEFAULT_SETTINGS;
+  }
+  cachedRaw = raw;
+  return cachedSettings;
 }
 
 function write(next: CourseViewSettings): void {
