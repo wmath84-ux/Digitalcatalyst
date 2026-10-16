@@ -101,7 +101,11 @@ test("3 — the scroll half of the brief is a real, direction-aware rule", () =>
 
 test("4 — the editors publish EDIT mode, not merely being open", () => {
   // Notes: writing only — a MASTER note open in its READ view keeps the footer.
-  assert.match(NOTES, /const notesEditMode = editorOpen && !\(Boolean\(editingId\) && selfReadOnly\);/);
+  assert.match(NOTES, /const notesEditMode = editorOpen && !viewingMasterNote && !\(Boolean\(editingId\) && selfReadOnly\);/);
+  // The MASTER viewer is read-only by construction (its own "Read only ·
+  // Master" chip and a readOnly editor inside it): reading the teacher's note
+  // is not edit mode, so it keeps the footer navigation.
+  assert.match(NOTES, /data-course-master-note-viewer[\s\S]{0,2000}?data-master-note-readonly/);
   assert.match(NOTES, /setNotesEditMode\(notesEditMode\);/);
   // Mind map: the canvas must be in edit mode (a read-only MASTER map never is).
   assert.match(MIND_MAP, /setMindMapEditMode\(!libraryOpen && !readOnlyCanvas\);/);

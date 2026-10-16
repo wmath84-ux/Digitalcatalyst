@@ -617,12 +617,14 @@ export default function NotesPanel({
   const editorOpen = composing || Boolean(editingId) || Boolean(viewingMasterNote);
   /**
    * The footer rule, and ONLY this (owner, 2026-10-16: "yah tab nahin dikhega
-   * jab editor mode on hoga, bas"): the page is in WRITE mode when the editor
-   * is open on something the learner can actually write — a MASTER note opened
-   * for reading (`readView`, the same flag the eye button toggles) keeps the
-   * footer navigation exactly like the notes home does.
+   * jab editor mode on hoga, bas"): the page is in WRITE mode when the learner
+   * can actually write — the composer, or their own note out of its read view
+   * (that read view is the flag the eye button toggles, and reading keeps the
+   * footer navigation exactly like the notes home does). A MASTER note is the
+   * teacher's: it opens in the read-only viewer below and can never be written,
+   * so it is never edit mode either.
    */
-  const notesEditMode = editorOpen && !(Boolean(editingId) && selfReadOnly);
+  const notesEditMode = editorOpen && !viewingMasterNote && !(Boolean(editingId) && selfReadOnly);
 
   // Keep the session in sync on every render so the current view + draft are
   // immediately available to the next mount (tab switch) and to the player's

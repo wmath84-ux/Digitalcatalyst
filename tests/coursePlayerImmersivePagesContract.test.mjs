@@ -97,7 +97,7 @@ test("4 — one resolver names every page the footer stays away from", () => {
 
 test("5 — every page publishes the fact the rule reads", () => {
   // Note Editor: WRITE mode only (a MASTER note being READ keeps the footer).
-  assert.match(notesPanel, /const notesEditMode = editorOpen && !\(Boolean\(editingId\) && selfReadOnly\);/);
+  assert.match(notesPanel, /const notesEditMode = editorOpen && !viewingMasterNote && !\(Boolean\(editingId\) && selfReadOnly\);/);
   assert.match(notesPanel, /setNotesEditMode\(notesEditMode\);/);
   // Mind map: the canvas AND edit mode (a read-only MASTER map is never edit).
   assert.match(read("src/course/MindMapPanel.tsx"), /setMindMapEditMode\(!libraryOpen && !readOnlyCanvas\);/);
