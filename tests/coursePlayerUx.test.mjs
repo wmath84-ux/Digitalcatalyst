@@ -399,7 +399,11 @@ test("the Modules library keeps locked content visible but disabled; paid module
   const library = readSource("src/course/CourseResourceLibrary.tsx");
   assert.match(library, /disabled: resource\.locked/);
   assert.match(library, /"data-locked": built\.moduleMeta\.get\(key\)\?\.locked/);
-  assert.match(overlay, /isPaidLocked\(module, ownedUpdateIds\)/);
+  // The paid-module rule itself (paidUpdate access + a paid update + not yet
+  // owned) now lives in the ONE shared model the paid page and the flat paid
+  // list both read, so the two can never list different things.
+  assert.match(readSource("src/course/paidListing.ts"), /module\.accessLevel === "paidUpdate" && Boolean\(moduleUpdateId\)/);
+  assert.match(overlay, /buildPaidEntries\(\{ updates, modules, ownedUpdateIds \}\)/);
   assert.match(overlay, /const listRows = paidRows;/);
 });
 

@@ -67,7 +67,7 @@ import { useFooterNavigationAlways } from "../utils/footerNavigationVisibility";
 import { AiTabIcon } from "./studyTabIcons";
 import CoursePageHeader from "./CoursePageHeader";
 import BranchedMenu, { useBranchedOpen, type BranchedMenuItem } from "../components/branched-menu/BranchedMenu";
-import { isVisibleFile } from "./fileVisibility";
+import { buildPaidEntries, modulePriceLabel, type PaidContentEntry } from "./paidListing";
 // The Paid listing wears the Modules library's own design, so it shares the
 // library sheet's row marks (lock, count — and the price below).
 import "./courseResourceLibrary.css";
@@ -271,6 +271,15 @@ interface CourseOverlayProps {
   onSelectFile: (file: CourseFile) => void;
   onBuyModule: (module: { id: string; paidUpdateId?: string; paidUpdateTitle?: string; paidUpdatePrice?: string }) => void;
   onBuyUpdate: (update: PaidCourseUpdate) => void;
+  /**
+   * The Paid page's rows do not check out here any more: a tap hands back the
+   * product detail page's own row key (`update:<id>` / `module:<id>` /
+   * `resource:<id>`) so the player can send the learner straight to that row
+   * on the product page. Owner: "wah seedhe product detail page ke paid
+   * section me chala jaye … wahi paid module ya paid type highlight ya blink
+   * ho jaye, aur wahin se purchase kar sake."
+   */
+  onOpenPaid?: (paidKey: string) => void;
   // Notes wiring
   notes: CoursePlayerNote[];
   onAddNote: (text: string) => CoursePlayerNote | null | void;
@@ -550,6 +559,7 @@ export type StudyRowsArgs = Pick<
   | "onSelectFile"
   | "onBuyModule"
   | "onBuyUpdate"
+  | "onOpenPaid"
   | "personalModulesEntry"
   | "onOpenPersonalModules"
 >;
@@ -574,43 +584,49 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
     updates,
     onBuyModule,
     onBuyUpdate,
+    onOpenPaid,
   } = args;
 
   // ── Paid rows ──────────────────────────────────────────────────────────
+  // One row per purchasable thing, built by the SAME rule the Paid page's
+  // folders come from (`buildPaidEntries`): an update once, a paid module once,
+  // a module already covered by a listed update never again. Nothing repeats.
   const paidRows = useMemo(() => {
     if (tab !== "paid") return [];
     const rows: SheetRowSpec[] = [];
-    // Paid content is one consistent list: every purchasable update, plus
-    // any locked paid module that does not belong to a listed update.
-    for (const update of updates) {
+    for (const entry of buildPaidEntries({ updates, modules, ownedUpdateIds })) {
+      const priceLabel = entry.kind === "module" ? modulePriceLabel(entry, updates) : entry.priceLabel;
       rows.push({
-        id: `update-${update.id}`,
-        kind: "update",
-        icon: <Sparkles size={20} />,
+        id: `${entry.kind}-${entry.id}`,
+        kind: entry.kind === "update" ? "update" : "buy",
+        icon: entry.kind === "resource" ? <LockKeyhole size={20} /> : entry.kind === "module" ? <ShoppingBag size={20} /> : <Sparkles size={20} />,
         color: "#C9A96E",
-        title: update.title,
-        subtitle: update.contentNames.slice(0, 3).join(" · "),
-        extra: <span className="text-xs font-black text-amber-800">₹{update.price.toLocaleString("en-IN")}</span>,
-        press: () => onBuyUpdate(update),
-        dataAttrs: { "data-course-overlay-buy-update": update.id },
-      });
-    }
-    for (const { module, depth } of flattenModules(modules).filter(({ module }) => module.accessLevel !== "hidden" && isPaidLocked(module, ownedUpdateIds))) {
-      const moduleId = String(module.id);
-      rows.push({
-        id: `buy-${moduleId}`,
-        kind: "buy",
-        icon: <ShoppingBag size={20} />,
-        color: "#C9A96E",
-        title: module.title,
-        subtitle: "Paid module",
-        extra: <span className="max-w-[90px] truncate text-[10px] font-black text-amber-800">{module.paidUpdateTitle || "Unlock"}</span>,
-        press: () => onBuyModule({ id: moduleId, paidUpdateId: module.paidUpdateId, paidUpdateTitle: module.paidUpdateTitle, paidUpdatePrice: module.paidUpdatePrice }),
-        dataAttrs: { "data-course-overlay-buy-module": moduleId, "data-module-depth": depth },
+        title: entry.title,
+        subtitle: entry.kind === "update"
+          ? entry.contents.slice(0, 3).join(" · ")
+          : entry.kind === "resource" ? "Locked resource" : "Paid module",
+        extra: priceLabel
+          ? <span className="text-xs font-black text-amber-800">{priceLabel}</span>
+          : <span className="max-w-[90px] truncate text-[10px] font-black text-amber-800">Unlock</span>,
+        press: () => {
+          if (onOpenPaid) {
+            onOpenPaid(entry.paidKey);
+            return;
+          }
+          const update = updates.find((candidate) => String(candidate.id) === entry.id);
+          if (update) onBuyUpdate(update);
+          else onBuyModule({ id: entry.id });
+        },
+        dataAttrs: {
+          "data-course-overlay-buy-update": entry.kind === "update" ? entry.id : undefined,
+          "data-course-overlay-buy-module": entry.kind === "module" ? entry.id : undefined,
+          "data-paid-key": entry.paidKey,
+          "data-paid-kind": entry.kind,
+        },
       });
     }
     return rows;
-  }, [tab, modules, ownedUpdateIds, updates, onBuyUpdate, onBuyModule]);
+  }, [tab, modules, ownedUpdateIds, updates, onBuyUpdate, onBuyModule, onOpenPaid]);
 
   // The Modules tab is the structured library (see `resourceLibraryPanel`);
   // this builder only supplies the Paid list.
@@ -647,12 +663,18 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
 // only the presentation changed.
 const PAID_GOLD = "#C9A96E";
 
-function PaidLibraryPanel({
+/**
+ * Exported for the runtime suite that drives the rendered page
+ * (`tests/coursePaidPageListingRuntime.test.mjs`): the rows, the locks and the
+ * product-page taps are proven on the real tree, not on a copy.
+ */
+export function PaidLibraryPanel({
   updates,
   modules,
   ownedUpdateIds,
   onBuyModule,
   onBuyUpdate,
+  onOpenPaid,
   empty,
 }: {
   updates: PaidCourseUpdate[];
@@ -660,6 +682,8 @@ function PaidLibraryPanel({
   ownedUpdateIds: Set<string>;
   onBuyModule: (module: { id: string; paidUpdateId?: string; paidUpdateTitle?: string; paidUpdatePrice?: string }) => void;
   onBuyUpdate: (update: PaidCourseUpdate) => void;
+  /** The PDP link — every purchasable row on this page goes through it. */
+  onOpenPaid?: (paidKey: string) => void;
   empty?: ReactNode;
 }) {
   const { items, buyByValue } = useMemo(() => {
@@ -667,99 +691,120 @@ function PaidLibraryPanel({
     const price = (label: string) => (
       <span className="course-library__price" data-paid-price>{label}</span>
     );
-    // Before every folder's name (the section head's icon slot).
+    // THE ONE LOCK: a folder carries it before the folder's name (the section
+    // head's icon slot) and nowhere else — its contents are locked by being in
+    // it. Owner: "agar folder hai to keval folder per ek baar".
     const folderLock = <LockKeyhole size={16} strokeWidth={2.1} aria-hidden="true" className="course-library__lock" />;
-    // The library's trailing lock on its locked leaves, at its own size.
-    const leafLock = <LockKeyhole size={12} aria-label="Locked" className="course-library__lock" />;
+    // A SEPARATE RESOURCE is its own row, so its lock rides that row — one
+    // lock each. Owner: "alag-alag resources hai to sab per individual lock".
+    const rowLock = <LockKeyhole size={12} aria-label="Locked" className="course-library__lock" />;
     const items: BranchedMenuItem[] = [];
+    // ONE entry per purchasable thing (see course/paidListing.ts — the whole
+    // dedupe + lock rule lives there, and the flat list builder reads it too).
+    const entries = buildPaidEntries({ updates, modules, ownedUpdateIds });
 
-    for (const update of updates) {
-      const priceLabel = `₹${update.price.toLocaleString("en-IN")}`;
-      const buyValue = `buy-update:${update.id}`;
-      buyByValue.set(buyValue, () => onBuyUpdate(update));
-      const children: BranchedMenuItem[] = [
-        {
-          value: buyValue,
-          label: "Unlock this update",
-          icon: <ShoppingBag size={16} strokeWidth={2.1} aria-hidden="true" />,
-          color: PAID_GOLD,
-          meta: price(priceLabel),
-          description: `Unlock ${update.title} for ${priceLabel}`,
-          dataAttrs: { "data-course-overlay-buy-update": String(update.id) },
-        },
-        ...update.contentNames.map((name, index): BranchedMenuItem => ({
-          value: `update:${update.id}:content:${index}`,
-          label: name,
+    const moduleById = new Map(flattenModules(modules).map((flat) => [String(flat.module.id), flat.module] as const));
+
+    /** Every paid row's action: open this exact thing on the product page. */
+    const openPaid = (entry: PaidContentEntry) => {
+      if (onOpenPaid) {
+        onOpenPaid(entry.paidKey);
+        return;
+      }
+      // Hosts that do not (yet) hand in the PDP link keep the old behaviour.
+      if (entry.kind === "module") {
+        const module = moduleById.get(entry.id);
+        onBuyModule({
+          id: entry.id,
+          paidUpdateId: module?.paidUpdateId,
+          paidUpdateTitle: module?.paidUpdateTitle,
+          paidUpdatePrice: module?.paidUpdatePrice,
+        });
+        return;
+      }
+      const update = updates.find((candidate) => String(candidate.id) === entry.id);
+      if (update) onBuyUpdate(update);
+    };
+
+    for (const entry of entries) {
+      const priceLabel = entry.kind === "module" ? modulePriceLabel(entry, updates) || "" : entry.priceLabel || "";
+
+      // ── A separate locked resource: one row, its own individual lock ────
+      if (entry.kind === "resource") {
+        const value = `resource:${entry.id}`;
+        buyByValue.set(value, () => openPaid(entry));
+        items.push({
+          value,
+          label: entry.title,
           icon: <File size={16} strokeWidth={2.1} aria-hidden="true" />,
-          disabled: true,
-          meta: leafLock,
-          description: `${name}. Locked`,
-        })),
-      ];
-      items.push({
-        value: `update:${update.id}`,
-        label: update.title,
-        icon: folderLock,
-        meta: (
-          <>
-            {price(priceLabel)}
-            <span className="course-library__count">{update.contentNames.length}</span>
-          </>
-        ),
-        dataAttrs: { "data-course-paid-folder": "", "data-paid-kind": "update", "data-paid-id": String(update.id), "data-locked": "true" },
-        children,
-      });
-    }
+          meta: (
+            <>
+              {rowLock}
+              {priceLabel ? price(priceLabel) : null}
+            </>
+          ),
+          description: `${entry.title}. Locked — open it on the product page`,
+          dataAttrs: {
+            "data-course-paid-row": "resource",
+            "data-paid-kind": "resource",
+            "data-paid-id": entry.id,
+            "data-paid-key": entry.paidKey,
+            "data-locked": "true",
+          },
+        });
+        continue;
+      }
 
-    for (const { module, depth } of flattenModules(modules).filter(({ module }) => module.accessLevel !== "hidden" && isPaidLocked(module, ownedUpdateIds))) {
-      const moduleId = String(module.id);
-      const update = updates.find((candidate) => String(candidate.id) === String(module.paidUpdateId));
-      const priceLabel = module.paidUpdatePrice?.trim()
-        || (update ? `₹${update.price.toLocaleString("en-IN")}` : "");
-      const buyValue = `buy-module:${moduleId}`;
-      buyByValue.set(buyValue, () => onBuyModule({
-        id: moduleId,
-        paidUpdateId: module.paidUpdateId,
-        paidUpdateTitle: module.paidUpdateTitle,
-        paidUpdatePrice: module.paidUpdatePrice,
-      }));
-      const files = (module.files || []).filter(isVisibleFile);
+      // ── A purchasable thing: one folder, one lock, its price on the head ─
+      const buyValue = `${entry.kind === "update" ? "buy-update" : "buy-module"}:${entry.id}`;
+      buyByValue.set(buyValue, () => openPaid(entry));
+      const buyAttrs = entry.kind === "module"
+        ? { "data-course-overlay-buy-module": entry.id }
+        : { "data-course-overlay-buy-update": entry.id };
       const children: BranchedMenuItem[] = [
         {
           value: buyValue,
-          label: "Unlock this module",
+          label: entry.kind === "module" ? "Unlock this module" : "Unlock this update",
           icon: <ShoppingBag size={16} strokeWidth={2.1} aria-hidden="true" />,
           color: PAID_GOLD,
           meta: priceLabel ? price(priceLabel) : undefined,
-          description: priceLabel ? `Unlock ${module.title} for ${priceLabel}` : `Unlock ${module.title}`,
-          dataAttrs: { "data-course-overlay-buy-module": moduleId, "data-module-depth": String(depth) },
+          description: priceLabel ? `Unlock ${entry.title} for ${priceLabel}` : `Unlock ${entry.title}`,
+          dataAttrs: { ...buyAttrs, "data-paid-key": entry.paidKey },
         },
-        ...files.map((file): BranchedMenuItem => ({
-          value: `module:${moduleId}:file:${file.id}`,
-          label: file.name,
+      ];
+      entry.contents.forEach((name, index) => {
+        children.push({
+          value: `${entry.kind}:${entry.id}:content:${index}`,
+          label: name,
           icon: <File size={16} strokeWidth={2.1} aria-hidden="true" />,
           disabled: true,
-          meta: leafLock,
-          description: `${file.name}. Locked`,
-        })),
-      ];
+          description: `${name}. Locked`,
+        });
+      });
       items.push({
-        value: `module:${moduleId}`,
-        label: module.title,
+        value: `${entry.kind}:${entry.id}`,
+        label: entry.title,
         icon: folderLock,
         meta: (
           <>
-            {priceLabel ? price(priceLabel) : price(module.paidUpdateTitle || "Paid")}
-            <span className="course-library__count">{files.length}</span>
+            {priceLabel ? price(priceLabel) : null}
+            <span className="course-library__count">{entry.contents.length}</span>
           </>
         ),
-        dataAttrs: { "data-course-paid-folder": "", "data-paid-kind": "module", "data-paid-id": moduleId, "data-module-depth": String(depth), "data-locked": "true" },
+        description: `${entry.title}. Paid ${entry.kind}`,
+        dataAttrs: {
+          "data-course-paid-folder": entry.kind,
+          "data-paid-kind": entry.kind,
+          "data-paid-id": entry.id,
+          "data-paid-key": entry.paidKey,
+          "data-locked": "true",
+        },
         children,
       });
     }
 
     return { items, buyByValue };
-  }, [updates, modules, ownedUpdateIds, onBuyModule, onBuyUpdate]);
+  }, [updates, modules, ownedUpdateIds, onBuyModule, onBuyUpdate, onOpenPaid]);
 
   const { openValues, toggle } = useBranchedOpen(items);
 
@@ -1099,6 +1144,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           ownedUpdateIds={props.ownedUpdateIds}
           onBuyModule={props.onBuyModule}
           onBuyUpdate={props.onBuyUpdate}
+          onOpenPaid={props.onOpenPaid}
           empty={emptyMessage}
         />
       }

@@ -10,6 +10,7 @@ import CourseHeaderNav from "./course/CourseHeaderNav";
 import { loadQuadLayout, saveQuadLayout, useQuadDeckEnabled, type QuadLayoutState, type QuadPaneId } from "./course/quadLayout";
 import { useCourseViewSettings } from "./course/courseViewSettings";
 import { useFooterNavigationPlacement } from "./utils/footerNavigationPlacement";
+import { buildPaidDeepLink, rememberPdpReturn } from "./utils/paidDeepLink";
 import CourseBrainPanel from "./course/CourseBrainPanel";
 import { collectBrainPracticeSets } from "../utils/practiceSet.js";
 import {
@@ -1845,6 +1846,21 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // A different course resets the stack.
   useEffect(() => { setVisitedFiles([]); userSelectedRef.current = false; }, [storageProductId]);
 
+  /**
+   * The Paid page's rows do not buy anything here any more — they open the
+   * product detail page ON the paid row the learner tapped. Owner: "wah seedhe
+   * product detail page ke paid section me chala jaye … wahi paid module ya
+   * paid type highlight ya blink ho jaye, aur wahin se purchase kar sake."
+   *
+   * The course hash is remembered first, so the product page's back control
+   * brings him straight back to this course.
+   */
+  const handleOpenPaid = useCallback((paidKey: string) => {
+    if (!paidKey) return;
+    rememberPdpReturn(String(product.id), `#/course/${encodeURIComponent(String(product.id))}`);
+    window.location.hash = buildPaidDeepLink(String(product.id), paidKey);
+  }, [product.id]);
+
   const handleBuyModule = (module: { id: string; paidUpdateId?: string; paidUpdateTitle?: string; paidUpdatePrice?: string }) => {
     if (!module.paidUpdateId) return;
     const update = updates.find((u) => u.id === module.paidUpdateId) || { id: module.paidUpdateId, title: module.paidUpdateTitle || "Course update", price: numericPrice(module.paidUpdatePrice), coinPrice: 0, contentNames: [] } as PaidCourseUpdate;
@@ -2249,6 +2265,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onSelectFile={selectFile}
       onBuyModule={handleBuyModule}
       onBuyUpdate={onPurchaseUpdate}
+      onOpenPaid={handleOpenPaid}
       // A learner-authored course has nothing to sell: the Paid ("premium")
       // tab is removed from the footer dock and from the ⌘/Ctrl+1… shortcuts.
       hiddenTabs={hiddenTabs}

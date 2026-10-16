@@ -92,39 +92,58 @@ test('the Paid page renders through the same BranchedMenu with the same props', 
 
 /* ── 3 · Lock icon before the folder name ──────────────────────────────── */
 
-test('section heads render an icon before the name; paid folders use it for the lock', () => {
+test('a folder carries ONE lock — separate resources carry their own', () => {
   // BranchedMenu's head: icon slot ahead of the head-label (library pages
   // pass no section icon, so their heads are visually unchanged).
   const head = menu.slice(menu.indexOf('branched-menu__head-label') - 400, menu.indexOf('branched-menu__head-label'));
   assert.match(head, /branched-menu__icon/);
   assert.ok(menu.indexOf('branched-menu__icon') < menu.indexOf('branched-menu__head-label'));
-  // Every paid folder (update + module) passes the amber lock as that icon.
-  const panel = overlay.slice(overlay.indexOf('function PaidLibraryPanel'));
+  const panel = overlay.slice(overlay.indexOf('function PaidLibraryPanel'), overlay.indexOf('function ComingSoonPanel'));
+  // Owner's rule: "agar folder hai to keval folder per ek baar" — the folder
+  // head is the ONE row that shows a lock, and it shows it once.
   assert.match(panel, /const folderLock = <LockKeyhole size=\{16\}/);
-  assert.equal((panel.match(/icon: folderLock,/g) || []).length, 2);
-  assert.match(panel, /className="course-library__lock"/);
+  assert.equal((panel.match(/icon: folderLock,/g) || []).length, 1);
+  assert.equal((panel.match(/folderLock/g) || []).length, 2); // declaration + that one use
+  // Everything INSIDE a folder is locked by being in it: no second lock, and
+  // no lock mark on the content rows at all.
+  const contents = panel.slice(panel.indexOf('entry.contents.forEach'), panel.indexOf('items.push({\n        value: `${entry.kind}:${entry.id}`'));
+  assert.match(contents, /disabled: true,/);
+  assert.doesNotMatch(contents, /LockKeyhole|folderLock|rowLock/);
+  // "alag-alag resources hai to sab per individual lock" — a separate resource
+  // is a row of its own and carries its own lock (the library's own lock mark).
+  assert.match(panel, /const rowLock = <LockKeyhole size=\{12\}/);
+  const resourceRow = panel.slice(panel.indexOf('if (entry.kind === "resource")'), panel.indexOf('// ── A purchasable thing'));
+  assert.match(resourceRow, /meta: \([\s\S]*?\{rowLock\}/);
+  assert.match(resourceRow, /"data-course-paid-row": "resource"/);
+  assert.match(resourceRow, /"data-locked": "true"/);
   // The library sheet still owns the lock's colour.
   assert.match(libraryCss, /\.course-library__lock \{\n  color: #fbbf24;\n\}/);
 });
 
-/* ── 4 · Price, clearly ────────────────────────────────────────────────── */
+/* ── 4 · One row per thing, price clearly, straight to the product page ── */
 
-test('every paid folder shows its price in the library price mark', () => {
-  const panel = overlay.slice(overlay.indexOf('function PaidLibraryPanel'));
-  // Updates: ₹ price on the folder AND on its Unlock leaf.
-  assert.match(panel, /const priceLabel = `₹\$\{update\.price\.toLocaleString\("en-IN"\)\}`;/);
-  assert.match(panel, /label: "Unlock this update",[\s\S]*?meta: price\(priceLabel\),/);
+test('every paid thing is listed once, priced, and opens the product page', () => {
+  const panel = overlay.slice(overlay.indexOf('function PaidLibraryPanel'), overlay.indexOf('function ComingSoonPanel'));
+  // The dedupe is the shared rule, not a local filter: an update that already
+  // holds a paid module never lists that module a second time.
+  assert.match(panel, /const entries = buildPaidEntries\(\{ updates, modules, ownedUpdateIds \}\);/);
+  assert.match(overlay, /import \{ buildPaidEntries, modulePriceLabel, type PaidContentEntry \} from "\.\/paidListing";/);
+  // Updates: the price comes from the model; the leaf keeps its own mark.
+  assert.match(panel, /label: entry.kind === "module" \? "Unlock this module" : "Unlock this update",/);
+  assert.match(panel, /meta: priceLabel \? price\(priceLabel\) : undefined,/);
   // Modules: their own paidUpdatePrice, or the owning update's ₹ price.
-  assert.match(panel, /module\.paidUpdatePrice\?\.trim\(\)/);
-  assert.match(panel, /label: "Unlock this module",[\s\S]*?meta: priceLabel \? price\(priceLabel\) : undefined,/);
+  assert.match(panel, /modulePriceLabel\(entry, updates\)/);
+  assert.match(panel, /const priceLabel = entry.kind === "module" \? modulePriceLabel\(entry, updates\) \|\| "" : entry.priceLabel \|\| "";/);
   // The price mark itself: full-weight, tabular, never truncated.
   assert.match(panel, /<span className="course-library__price" data-paid-price>/);
   assert.match(libraryCss, /\.course-library__price \{\n  font-size: 12px;\n  font-weight: 800;[\s\S]*?white-space: nowrap;/);
-  // Buy actions keep the overlay's existing hooks + handlers.
-  assert.match(panel, /"data-course-overlay-buy-update": String\(update\.id\)/);
-  assert.match(panel, /"data-course-overlay-buy-module": moduleId/);
-  assert.match(panel, /buyByValue\.set\(buyValue, \(\) => onBuyUpdate\(update\)\)/);
-  assert.match(panel, /buyByValue\.set\(buyValue, \(\) => onBuyModule\(\{/);
-  // Locked contents stay visible-but-unselectable, like the library's.
-  assert.match(panel, /disabled: true,\n          meta: leafLock,/);
+  // Buy actions keep the overlay's existing hooks, and every one of them now
+  // hands the product detail page the row key of the thing that was tapped.
+  assert.match(panel, /"data-course-overlay-buy-update": entry.id/);
+  assert.match(panel, /"data-course-overlay-buy-module": entry.id/);
+  // both the buy leaves and the separate-resource row go through it
+  assert.equal((panel.match(/\(\) => openPaid\(entry\)\)/g) || []).length, 2);
+  assert.match(panel, /"data-paid-key": entry.paidKey,/);
+  assert.match(panel, /onOpenPaid\(entry\.paidKey\);/);
+  assert.match(panel, /"data-course-paid-folder": entry.kind,/);
 });
