@@ -31,12 +31,14 @@ import type { CSSProperties, ComponentType, ReactNode } from "react";
 import CourseDownloadButton from "./CourseDownloadButton";
 import { GlassButton } from "../components/ui/glass-button";
 import { GlassPrefToggle } from "../components/ui/glass-pref-toggle";
+import CourseViewPanel from "./CourseViewPanel";
 import GatePersonalAccess from "./GatePersonalAccess";
 import { toast } from "../components/ui/glass-toast";
 import { resolveImageSrc } from "../components/ui/SafeImage";
 import { useHomeHold } from "../hooks/useHomeHold";
 import type { CourseFileActions } from "./ResourceViewer";
 import CoursePageHeader from "./CoursePageHeader";
+import { useQuadDeckEnabled } from "./quadLayout";
 
 // ── Preference row accents — the same colours the ⚙ popover used ──────────
 const SETTING_ACCENTS: Record<string, { color: string; delay: number; divider: boolean }> = {
@@ -225,6 +227,11 @@ export default function PlayerPanel({
   moduleId = null,
   mine = false,
 }: PlayerPanelProps) {
+  // Course view (the settings page below): from 768px up the player is the
+  // plus deck, and the zoom + divider switches describe it; on a phone they
+  // stay on screen but read as the split-mode note they are.
+  const quadWide = useQuadDeckEnabled();
+
   // Holding the logo opens the main app (Home); a normal tap returns the
   // learner to Purchases — the exact contract the old player header had.
   const logoHold = useHomeHold(() => {
@@ -436,8 +443,20 @@ export default function PlayerPanel({
         {showViewportToggle ? settingsRow("Desktop view", desktopView, (next) => onDesktopViewChange(next), "viewport") : null}
         {canFullscreen ? settingsRow("Hide status bar", courseFullscreen, (next) => onHideStatusBarChange(next), "fullscreen") : null}
         <p className="flex items-center gap-2 px-4 pb-3 pt-3 text-[10px] font-semibold text-[var(--course-muted)]">
-          <MonitorSmartphone size={12} /> Split mode hamesha on hai — lesson aur study pane side by side.
+          <MonitorSmartphone size={12} />
+          {quadWide
+            ? "Course view: char blocks, do divider — tablet aur desktop ka plus deck."
+            : "Split mode hamesha on hai — lesson aur study pane side by side."}
         </p>
+
+        {/* ── COURSE VIEW (owner, 2026-10-16) ────────────────────────────────
+            The gear's own page — extracted to `CourseViewPanel.tsx` so Work
+            mode renders the very same page (owner: "work mode mein bhi same
+            design"). Two things only, both live: the ZOOM that carries across
+            every format, and the four DIVIDER-segment switches. All four on is
+            the old four-divider look; a switch hides that piece of the line
+            (and its dot) but never the drag. */}
+        <CourseViewPanel quadWide={quadWide} />
       </div>
 
       {/* Gate personal access — simple email gate, no learner OAuth.

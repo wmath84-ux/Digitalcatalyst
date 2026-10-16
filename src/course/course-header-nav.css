@@ -1,0 +1,265 @@
+/* src/course/course-header-nav.css
+ *
+ * THE PLACEABLE NAVIGATION's design — the owner's "icons + labels, apni row,
+ * size 6px chhota, chaaron jagah lagane layak" brief (2026-10-16).
+ *
+ * Four placements, one component:
+ *   · header  — a row inside the top bar, beside the progress bar and Settings;
+ *   · bottom  — the familiar strip, across the bottom of the course area;
+ *   · left    — a rail down the left edge;
+ *   · right   — a rail down the right edge.
+ *
+ * Size: `--dc-header-nav-h` / `--work-nav-h` come from
+ * footerNavigationSizeVars() (38px — the strip's 44px minus the owner's 6px),
+ * so every placed instance is the same box.
+ *
+ * The dropdown ALWAYS opens toward the free space — header → down,
+ * bottom → up, left → right, right → left — which is the owner's rule, kept
+ * honest by the `data-side` attribute the component writes.
+ */
+
+.dc-header-nav {
+  --dc-header-nav-accent: #4f46e5;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  color: inherit;
+}
+
+.dc-header-nav__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.dc-header-nav__row::-webkit-scrollbar {
+  display: none;
+}
+
+.dc-header-nav__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  height: var(--dc-header-nav-h, 38px);
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0.72;
+  transition: opacity 140ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+
+.dc-header-nav__item:hover,
+.dc-header-nav__item:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.dc-header-nav__item[data-active="true"] {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--dc-header-nav-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--dc-header-nav-accent) 20%, transparent);
+}
+
+.dc-header-nav__icon {
+  display: grid;
+  place-items: center;
+  color: var(--dc-header-nav-accent);
+}
+
+.dc-header-nav__item[data-active="false"] .dc-header-nav__icon {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.dc-header-nav__label {
+  display: inline-block;
+}
+
+/* ── The placement button + its always-on-screen dropdown ──────────────── */
+
+.dc-header-nav__place {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.dc-header-nav__place-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: var(--dc-header-nav-h, 38px);
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  color: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.dc-header-nav__place-button:hover,
+.dc-header-nav__place-button:focus-visible {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.dc-header-nav__menu {
+  position: absolute;
+  z-index: 80;
+  display: grid;
+  gap: 4px;
+  width: 232px;
+  max-width: min(86vw, 232px);
+  padding: 8px;
+  border-radius: 14px;
+  background: var(--dc-chrome-glass, rgba(12, 14, 20, 0.92));
+  backdrop-filter: var(--dc-chrome-glass-blur, blur(18px));
+  -webkit-backdrop-filter: var(--dc-chrome-glass-blur, blur(18px));
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  box-shadow: var(--dc-chrome-glass-rim), 0 18px 44px rgba(2, 6, 16, 0.42);
+  color: var(--course-text, #f8fafc);
+}
+
+/* The four directions: top → down, bottom → up, left → right, right → left. */
+.dc-header-nav__menu[data-side="down"] {
+  top: calc(100% + 6px);
+  right: 0;
+}
+
+.dc-header-nav__menu[data-side="up"] {
+  bottom: calc(100% + 6px);
+  right: 0;
+}
+
+.dc-header-nav__menu[data-side="right"] {
+  left: calc(100% + 6px);
+  top: 0;
+}
+
+.dc-header-nav__menu[data-side="left"] {
+  right: calc(100% + 6px);
+  top: 0;
+}
+
+.dc-header-nav__menu-title {
+  margin: 0 0 2px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.dc-header-nav__option {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  grid-template-areas: "icon label" "icon hint";
+  align-items: center;
+  gap: 0 8px;
+  padding: 7px 8px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dc-header-nav__option > svg {
+  grid-area: icon;
+}
+
+.dc-header-nav__option:hover,
+.dc-header-nav__option:focus-visible {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.dc-header-nav__option[data-active="true"] {
+  border-color: color-mix(in srgb, #6366f1 65%, transparent);
+  background: color-mix(in srgb, #6366f1 20%, transparent);
+}
+
+.dc-header-nav__option-label {
+  grid-area: label;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.dc-header-nav__option-hint {
+  grid-area: hint;
+  font-size: 9px;
+  font-weight: 600;
+  opacity: 0.6;
+}
+
+/* ── Rails: left and right ─────────────────────────────────────────────── */
+
+.dc-header-nav[data-placement="left"],
+.dc-header-nav[data-placement="right"] {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  height: 100%;
+  padding: 8px 6px;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+.dc-header-nav[data-placement="left"] .dc-header-nav__row,
+.dc-header-nav[data-placement="right"] .dc-header-nav__row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  overflow-x: visible;
+  overflow-y: auto;
+}
+
+.dc-header-nav[data-placement="left"] .dc-header-nav__item,
+.dc-header-nav[data-placement="right"] .dc-header-nav__item {
+  width: 100%;
+  justify-content: flex-start;
+  height: auto;
+  min-height: var(--dc-header-nav-h, 38px);
+  padding: 6px 8px;
+  border-radius: 12px;
+}
+
+.dc-header-nav[data-placement="left"] .dc-header-nav__place,
+.dc-header-nav[data-placement="right"] .dc-header-nav__place {
+  margin-top: auto;
+}
+
+.dc-header-nav[data-placement="left"] .dc-header-nav__place-button,
+.dc-header-nav[data-placement="right"] .dc-header-nav__place-button {
+  width: 100%;
+  justify-content: center;
+}
+
+/* The bottom strip: centred, with the placement button at its right end. */
+.dc-header-nav[data-placement="bottom"] {
+  justify-content: center;
+  width: 100%;
+  padding: 4px 8px;
+}
+
+/* A narrow stage keeps the labels off the row but never the buttons. */
+@media (max-width: 900px) {
+  .dc-header-nav[data-placement="header"] .dc-header-nav__label,
+  .dc-header-nav[data-placement="bottom"] .dc-header-nav__label {
+    display: none;
+  }
+}

@@ -10,7 +10,10 @@
 //   4. Course Player ke main header ki actual current width (strip) mein
 //      50% increase ho.
 //   5. Baaki pages ka background approximately 95% pure white ho.
-//   6. Resource Library ka existing background aur appearance unchanged rahe.
+//   6. Resource Library ka existing background aur appearance unchanged rahe —
+//      with ONE exception the owner asked for on 2026-10-16: that page, its
+//      header strip included, is PURE white, and its name/icon/count live on
+//      the page itself (its header strip carries the page's search box).
 //
 // "Same size" is made testable by ONE shared component + ONE defined height
 // token: every page below renders `CoursePageHeader`, whose box is
@@ -33,8 +36,10 @@ const player = read("src/CoursePlayerApp.tsx");
 
 const PAGES = [
   ["src/course/CourseResourceLibrary.tsx", "Resource Library"],
-  ["src/course/NotesPanel.tsx", "Notes"],
-  ["src/course/MindMapPanel.tsx", "Mind map"],
+  // Notes and the mind map are NOT here on purpose: the owner's brief removed
+  // the page header from every notes page, and the mind map followed the same
+  // design system (see the MASTER / SELF test below).
+
   ["src/course/CourseBrainPanel.tsx", "Brain"],
   ["src/course/ExperimentPanel.tsx", "Live Experiment"],
   ["src/course/ReadLibraryPanel.tsx", "Read library"],
@@ -42,6 +47,8 @@ const PAGES = [
   ["src/course/PlayerPanel.tsx", "Player"],
   ["src/course/CourseOverlay.tsx", "Paid content"],
 ];
+
+const LIBRARY = "src/course/CourseResourceLibrary.tsx";
 
 const headerSlice = (source) => {
   const start = source.indexOf("<CoursePageHeader");
@@ -74,6 +81,20 @@ test("one shared header defines the Resource Library header's area for every pag
 test("every relevant Course Player page renders the shared header with its name and icon", () => {
   for (const [file, title] of PAGES) {
     const source = read(file);
+    if (file === LIBRARY) {
+      // The library keeps the shared header BOX (same area, same size), but the
+      // owner moved its name, icon and count DOWN onto the page itself
+      // (2026-10-16) — the strip carries the page's search box instead.
+      assert.doesNotMatch(headerSlice(source), /title="Resource Library"/);
+      const row = source.indexOf("data-library-title-row");
+      const rowSlice = source.slice(row, source.indexOf("</div>", row));
+      assert.ok(row > 0, "the library's name row sits on the page");
+      assert.match(rowSlice, /data-course-page-title/);
+      assert.match(rowSlice, />Resource Library</);
+      assert.match(rowSlice, /library-header__count/, "…with the resource count beside it");
+      assert.match(rowSlice, /<BookOpen size=\{20\}/, "…and the same 20px icon");
+      continue;
+    }
     const slice = headerSlice(source);
     assert.ok(slice.includes(`title="${title}"`), `${file} names its page "${title}" in the header`);
     assert.match(slice, /icon=\{<[A-Z]\w+ size=\{20\}/, `${file} gives its header a 20px icon`);
@@ -82,32 +103,54 @@ test("every relevant Course Player page renders the shared header with its name 
 
 test("MASTER / SELF controls live inside the header, in the defined area", () => {
   // The shared control, inside the header element (not the scrolling body).
-  for (const file of ["src/course/CourseBrainPanel.tsx", "src/course/ExperimentPanel.tsx", "src/course/MindMapPanel.tsx"]) {
+  for (const file of ["src/course/CourseBrainPanel.tsx", "src/course/ExperimentPanel.tsx"]) {
     assert.match(headerSlice(read(file)), /<MasterSelfControl/, `${file} keeps MASTER / SELF inside its page header`);
   }
-  // Notes keeps its own MASTER / SELF tablist — also inside the header now.
-  const notesHeader = headerSlice(read("src/course/NotesPanel.tsx"));
-  assert.match(notesHeader, /data-course-note-collection="master"/);
-  assert.match(notesHeader, /data-course-note-collection="self"/);
-  // …and the collections hook itself moved onto the header element.
-  assert.match(notesHeader, /data-course-note-collections/);
+  // Notes has NO header at all any more (owner brief 2026-10-15: "koi header
+  // hoga hi nahin kahin bhi, pure note me"). Its MASTER / SELF tablist heads
+  // the ONE library panel instead — same shared control, same hooks.
+  const notes = read("src/course/NotesPanel.tsx");
+  assert.doesNotMatch(notes, /CoursePageHeader|data-course-page-header/);
+  const headAt = notes.indexOf("data-note-library-head");
+  const notesHead = notes.slice(notes.lastIndexOf("<div", headAt), notes.indexOf("data-note-library-foot"));
+  assert.match(notesHead, /<MasterSelfControl/);
+  assert.match(notesHead, /feature="notes"/);
+  // …and the shared control keeps the hooks the tabs have always had.
+  const control = read("src/course/MasterSelfControl.tsx");
+  assert.match(control, /data-course-note-collection="master"/);
+  assert.match(control, /data-course-note-collection="self"/);
+  assert.match(notesHead, /justify-center/, "the filter sits at the panel's top CENTRE");
   assert.match(headerSlice(read("src/course/CourseBrainPanel.tsx")), /data-brain-collection/);
   assert.match(headerSlice(read("src/course/ExperimentPanel.tsx")), /data-experiment-collection/);
-  assert.match(headerSlice(read("src/course/MindMapPanel.tsx")), /data-course-mindmap-collections/);
+  // The mind map is headless too ("use that same complete, exact UI design
+  // system in the mind map"). Its MASTER / SELF control sits at the top centre
+  // of the ONE library panel, beside the notes page's own.
+  const mindMap = read("src/course/MindMapPanel.tsx");
+  assert.doesNotMatch(mindMap, /CoursePageHeader|data-course-page-header/);
+  const mapHeadAt = mindMap.indexOf("data-mindmap-panel-head");
+  const mapHead = mindMap.slice(mindMap.lastIndexOf("<div", mapHeadAt), mindMap.indexOf("data-course-mindmap-map-list"));
+  assert.match(mapHead, /<MasterSelfControl/);
+  assert.match(mapHead, /feature="mindMap"/);
+  assert.match(mapHead, /data-course-mindmap-collections/, "the collection switcher keeps its hook");
+  assert.match(mapHead, /justify-center/, "the filter sits at the panel's top CENTRE");
 });
 
-test("the Resource Library keeps its header hooks and its existing background", () => {
+test("the Resource Library is PURE white — the page, its header and its body", () => {
   const library = read("src/course/CourseResourceLibrary.tsx");
-  const slice = headerSlice(library);
-  assert.match(slice, /data-library-header/);
-  assert.match(slice, /library-header__count/);
-  // No background rule for the library anywhere in the new sheet, and the
-  // library's own sheet still paints no background on its root/header/body.
-  assert.doesNotMatch(headerCssRules, /data-course-resource-library/);
-  assert.doesNotMatch(headerCssRules, /\.library-(header|body)/);
+  assert.match(headerSlice(library), /data-library-header/);
+  assert.match(library, /library-header__count/);
+  // The shared sheet paints this ONE page pure white (owner brief, 2026-10-16);
+  // the ~95% plate below deliberately does not list it.
+  const white = headerCssRules.slice(headerCssRules.indexOf("[data-course-resource-library]"));
+  assert.match(white.slice(0, 400), /background: #ffffff !important;/);
+  assert.match(white.slice(0, 400), /\[data-course-resource-library\] \.library-header/);
+  assert.match(white.slice(0, 400), /\[data-course-resource-library\] \.library-body/);
+  const plate = headerCssRules.slice(headerCssRules.indexOf(":is("), headerCssRules.indexOf(":is(") + 900);
+  assert.doesNotMatch(plate, /data-course-resource-library/);
+  // …and the library's own sheet says the same thing for its root and body.
   const libraryCss = stripComments(read("src/course/courseResourceLibrary.css"));
-  assert.doesNotMatch(libraryCss, /\.course-resource-library \{[^}]*background/);
-  assert.doesNotMatch(libraryCss, /\.library-body \{[^}]*background/);
+  assert.match(libraryCss, /\.course-resource-library \{[^}]*background: #ffffff;/);
+  assert.match(libraryCss, /\.library-body \{[^}]*background: #ffffff;/);
 });
 
 test("the main (top) header grows by an actual 50%: 21px to 31.5px", () => {
@@ -125,7 +168,8 @@ test("the other pages sit on approximately 95% pure white", () => {
     "data-course-music-panel",
     "data-course-personal-modules",
     "data-course-player-panel",
-    "data-course-mindmap-library",
+    // The mind map's pages are headless now, so they wear their own --mm-*
+    // palette (Light / Dark with the map's own theme) instead of the plate.
     'data-course-overlay-tab="paid"',
   ]) {
     assert.ok(headerCssRules.includes(hook), `${hook} gets the ~95% white page background`);

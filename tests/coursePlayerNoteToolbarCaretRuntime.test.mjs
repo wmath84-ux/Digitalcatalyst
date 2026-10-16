@@ -365,3 +365,39 @@ test("no footer navigation at all: the toolbar sits at the very bottom", async (
   assert.equal(published(), "");
   await probe.unmount();
 });
+
+/* ── the owner's "three-line button does nothing" report ─────────────────── */
+
+test("Indent ALWAYS acts: a first line has nothing to nest under, so it becomes a list item", async () => {
+  clearFooters();
+  const probe = await fixture.mount({ autoFocus: true });
+  await focus(body());
+  await sleep(60);
+  const blockType = () => window.document.querySelector('.dc-note-dock [role="combobox"]');
+  const blockTypes = () =>
+    Array.from(window.document.querySelectorAll(".bn-editor [data-content-type]")).map((element) =>
+      element.getAttribute("data-content-type"),
+    );
+
+  assert.match(blockType()?.textContent ?? "", /Paragraph/, "the block control always spells out the caret's type");
+
+  const indent = window.document.querySelector('.dc-note-dock [aria-label="Indent"]');
+  assert.ok(indent, "the Indent tile is on the bar");
+  assert.equal(indent.getAttribute("aria-disabled"), null, "…and it is never hard-disabled");
+  await act(async () => {
+    indent.click();
+    await sleep(60);
+  });
+  assert.deepEqual(blockTypes(), ["bulletListItem"], "Indent turns the line into a list item — a visible change");
+  assert.match(blockType()?.textContent ?? "", /Bullet List/, "…and the block control follows the caret");
+
+  const outdent = window.document.querySelector('.dc-note-dock [aria-label="Outdent"]');
+  assert.ok(outdent, "the Outdent tile is on the bar");
+  await act(async () => {
+    outdent.click();
+    await sleep(60);
+  });
+  assert.deepEqual(blockTypes(), ["paragraph"], "Outdent lifts a top-level list item back out");
+  assert.match(blockType()?.textContent ?? "", /Paragraph/, "…and the block control follows it back");
+  await probe.unmount();
+});

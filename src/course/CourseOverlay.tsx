@@ -55,14 +55,19 @@ import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } fro
 import { collectMasterCourseNotes } from "./masterNotes";
 import type { PersonalCourseModule } from "../types/personalCourse";
 import NotesPanel from "./NotesPanel";
+import QuadDeck from "./QuadDeck";
+import type { QuadLayoutState, QuadPaneId } from "./quadLayout";
+import type { CourseViewSettings } from "./courseViewSettings";
+import type { FooterNavigationPlacement } from "../utils/footerNavigationPlacement";
 import GlassDock, { type GlassDockItem } from "../components/glass-dock/GlassDock";
 import { EASE_OUT_MOTION } from "./splitMotion";
 import { useCourseKeyboard } from "./useCourseKeyboard";
 import { useFooterHiddenPage } from "./coursePanelSession";
+import { useFooterNavigationAlways } from "../utils/footerNavigationVisibility";
 import { AiTabIcon } from "./studyTabIcons";
 import CoursePageHeader from "./CoursePageHeader";
 import BranchedMenu, { useBranchedOpen, type BranchedMenuItem } from "../components/branched-menu/BranchedMenu";
-import { isVisibleFile } from "./fileVisibility";
+import { buildPaidEntries, modulePriceLabel, type PaidContentEntry } from "./paidListing";
 // The Paid listing wears the Modules library's own design, so it shares the
 // library sheet's row marks (lock, count — and the price below).
 import "./courseResourceLibrary.css";
@@ -266,6 +271,15 @@ interface CourseOverlayProps {
   onSelectFile: (file: CourseFile) => void;
   onBuyModule: (module: { id: string; paidUpdateId?: string; paidUpdateTitle?: string; paidUpdatePrice?: string }) => void;
   onBuyUpdate: (update: PaidCourseUpdate) => void;
+  /**
+   * The Paid page's rows do not check out here any more: a tap hands back the
+   * product detail page's own row key (`update:<id>` / `module:<id>` /
+   * `resource:<id>`) so the player can send the learner straight to that row
+   * on the product page. Owner: "wah seedhe product detail page ke paid
+   * section me chala jaye … wahi paid module ya paid type highlight ya blink
+   * ho jaye, aur wahin se purchase kar sake."
+   */
+  onOpenPaid?: (paidKey: string) => void;
   // Notes wiring
   notes: CoursePlayerNote[];
   onAddNote: (text: string) => CoursePlayerNote | null | void;
@@ -358,6 +372,14 @@ interface CourseOverlayProps {
    * course tree and wires open-resource callbacks to the viewer/editor.
    */
   resourceLibraryPanel?: ReactNode;
+  /**
+   * THE PLUS DECK (tablet/desktop, 768px and up). When the Course Player hands
+   * this in, the study area is no longer one tab body: it is the owner's four
+   * blocks — the main content, the Resource Library, Notes and the Mind map —
+   * inside one `+` cross of two always-draggable dividers. Absent (every other
+   * call site, and every phone) → exactly the layout this overlay has today.
+   */
+  quad?: CourseOverlayQuadConfig;
   /**
    * Signal from the resource library: when set, the Notes panel opens the
    * specified master note in its read-only viewer. The signal carries both
@@ -469,6 +491,17 @@ export const MUSIC_FALLBACK = (
 );
 
 /**
+ * Rendered when the plus deck's Resource Library block has no panel to host
+ * (an older call site): a hint, never an empty box — the same discipline as
+ * the mind map and player fallbacks.
+ */
+export const RESOURCES_FALLBACK = (
+  <p className="px-4 py-6 text-center text-[11px] font-semibold text-[var(--course-muted)]">
+    Resource library is course me abhi available nahi hai.
+  </p>
+);
+
+/**
  * The footer navigation's items — the home footer's `GlassDockItem` list, in
  * TABS order, with the course data hooks the contract tests look for. Shared
  * by both variants so the dock is identical wherever it lives.
@@ -489,6 +522,31 @@ export const buildDockItems = (tab: DockTab, hiddenTabs: DockTab[] = []): GlassD
     },
   }));
 
+/**
+ * Everything the plus deck needs from the player. The STATE lives in the
+ * player (it persists it per course), so the navigation and the deck always
+ * agree about the current shape — the one thing that decides whether the
+ * footer navigation is drawn under the Resource Library.
+ */
+export interface CourseOverlayQuadConfig {
+  /** The shape + both divider ratios (persisted by the player). */
+  state: QuadLayoutState;
+  onState: (next: QuadLayoutState) => void;
+  /** Course view page: zoom and the four divider-segment switches. */
+  view: CourseViewSettings;
+  /** Where the navigation sits — the panes step their chrome out of its way. */
+  placement: FooterNavigationPlacement;
+  /** The main content (the video / lesson stack) that fills the left-top block. */
+  playerPane: ReactNode;
+  /**
+   * The navigation, handed in for the single-divider shape — the owner's
+   * "right side = resource page aur uske niche footer navigation".
+   */
+  nav: ReactNode;
+  /** A pane tab was tapped: bring that block back and let it glow. */
+  reveal: { pane: QuadPaneId; count: number } | null;
+}
+
 /** The slice of the overlay's props the row builders need. */
 export type StudyRowsArgs = Pick<
   CourseOverlayProps,
@@ -501,6 +559,7 @@ export type StudyRowsArgs = Pick<
   | "onSelectFile"
   | "onBuyModule"
   | "onBuyUpdate"
+  | "onOpenPaid"
   | "personalModulesEntry"
   | "onOpenPersonalModules"
 >;
@@ -525,43 +584,49 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
     updates,
     onBuyModule,
     onBuyUpdate,
+    onOpenPaid,
   } = args;
 
   // ── Paid rows ──────────────────────────────────────────────────────────
+  // One row per purchasable thing, built by the SAME rule the Paid page's
+  // folders come from (`buildPaidEntries`): an update once, a paid module once,
+  // a module already covered by a listed update never again. Nothing repeats.
   const paidRows = useMemo(() => {
     if (tab !== "paid") return [];
     const rows: SheetRowSpec[] = [];
-    // Paid content is one consistent list: every purchasable update, plus
-    // any locked paid module that does not belong to a listed update.
-    for (const update of updates) {
+    for (const entry of buildPaidEntries({ updates, modules, ownedUpdateIds })) {
+      const priceLabel = entry.kind === "module" ? modulePriceLabel(entry, updates) : entry.priceLabel;
       rows.push({
-        id: `update-${update.id}`,
-        kind: "update",
-        icon: <Sparkles size={20} />,
+        id: `${entry.kind}-${entry.id}`,
+        kind: entry.kind === "update" ? "update" : "buy",
+        icon: entry.kind === "resource" ? <LockKeyhole size={20} /> : entry.kind === "module" ? <ShoppingBag size={20} /> : <Sparkles size={20} />,
         color: "#C9A96E",
-        title: update.title,
-        subtitle: update.contentNames.slice(0, 3).join(" · "),
-        extra: <span className="text-xs font-black text-amber-800">₹{update.price.toLocaleString("en-IN")}</span>,
-        press: () => onBuyUpdate(update),
-        dataAttrs: { "data-course-overlay-buy-update": update.id },
-      });
-    }
-    for (const { module, depth } of flattenModules(modules).filter(({ module }) => module.accessLevel !== "hidden" && isPaidLocked(module, ownedUpdateIds))) {
-      const moduleId = String(module.id);
-      rows.push({
-        id: `buy-${moduleId}`,
-        kind: "buy",
-        icon: <ShoppingBag size={20} />,
-        color: "#C9A96E",
-        title: module.title,
-        subtitle: "Paid module",
-        extra: <span className="max-w-[90px] truncate text-[10px] font-black text-amber-800">{module.paidUpdateTitle || "Unlock"}</span>,
-        press: () => onBuyModule({ id: moduleId, paidUpdateId: module.paidUpdateId, paidUpdateTitle: module.paidUpdateTitle, paidUpdatePrice: module.paidUpdatePrice }),
-        dataAttrs: { "data-course-overlay-buy-module": moduleId, "data-module-depth": depth },
+        title: entry.title,
+        subtitle: entry.kind === "update"
+          ? entry.contents.slice(0, 3).join(" · ")
+          : entry.kind === "resource" ? "Locked resource" : "Paid module",
+        extra: priceLabel
+          ? <span className="text-xs font-black text-amber-800">{priceLabel}</span>
+          : <span className="max-w-[90px] truncate text-[10px] font-black text-amber-800">Unlock</span>,
+        press: () => {
+          if (onOpenPaid) {
+            onOpenPaid(entry.paidKey);
+            return;
+          }
+          const update = updates.find((candidate) => String(candidate.id) === entry.id);
+          if (update) onBuyUpdate(update);
+          else onBuyModule({ id: entry.id });
+        },
+        dataAttrs: {
+          "data-course-overlay-buy-update": entry.kind === "update" ? entry.id : undefined,
+          "data-course-overlay-buy-module": entry.kind === "module" ? entry.id : undefined,
+          "data-paid-key": entry.paidKey,
+          "data-paid-kind": entry.kind,
+        },
       });
     }
     return rows;
-  }, [tab, modules, ownedUpdateIds, updates, onBuyUpdate, onBuyModule]);
+  }, [tab, modules, ownedUpdateIds, updates, onBuyUpdate, onBuyModule, onOpenPaid]);
 
   // The Modules tab is the structured library (see `resourceLibraryPanel`);
   // this builder only supplies the Paid list.
@@ -598,12 +663,18 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
 // only the presentation changed.
 const PAID_GOLD = "#C9A96E";
 
-function PaidLibraryPanel({
+/**
+ * Exported for the runtime suite that drives the rendered page
+ * (`tests/coursePaidPageListingRuntime.test.mjs`): the rows, the locks and the
+ * product-page taps are proven on the real tree, not on a copy.
+ */
+export function PaidLibraryPanel({
   updates,
   modules,
   ownedUpdateIds,
   onBuyModule,
   onBuyUpdate,
+  onOpenPaid,
   empty,
 }: {
   updates: PaidCourseUpdate[];
@@ -611,6 +682,8 @@ function PaidLibraryPanel({
   ownedUpdateIds: Set<string>;
   onBuyModule: (module: { id: string; paidUpdateId?: string; paidUpdateTitle?: string; paidUpdatePrice?: string }) => void;
   onBuyUpdate: (update: PaidCourseUpdate) => void;
+  /** The PDP link — every purchasable row on this page goes through it. */
+  onOpenPaid?: (paidKey: string) => void;
   empty?: ReactNode;
 }) {
   const { items, buyByValue } = useMemo(() => {
@@ -618,99 +691,120 @@ function PaidLibraryPanel({
     const price = (label: string) => (
       <span className="course-library__price" data-paid-price>{label}</span>
     );
-    // Before every folder's name (the section head's icon slot).
+    // THE ONE LOCK: a folder carries it before the folder's name (the section
+    // head's icon slot) and nowhere else — its contents are locked by being in
+    // it. Owner: "agar folder hai to keval folder per ek baar".
     const folderLock = <LockKeyhole size={16} strokeWidth={2.1} aria-hidden="true" className="course-library__lock" />;
-    // The library's trailing lock on its locked leaves, at its own size.
-    const leafLock = <LockKeyhole size={12} aria-label="Locked" className="course-library__lock" />;
+    // A SEPARATE RESOURCE is its own row, so its lock rides that row — one
+    // lock each. Owner: "alag-alag resources hai to sab per individual lock".
+    const rowLock = <LockKeyhole size={12} aria-label="Locked" className="course-library__lock" />;
     const items: BranchedMenuItem[] = [];
+    // ONE entry per purchasable thing (see course/paidListing.ts — the whole
+    // dedupe + lock rule lives there, and the flat list builder reads it too).
+    const entries = buildPaidEntries({ updates, modules, ownedUpdateIds });
 
-    for (const update of updates) {
-      const priceLabel = `₹${update.price.toLocaleString("en-IN")}`;
-      const buyValue = `buy-update:${update.id}`;
-      buyByValue.set(buyValue, () => onBuyUpdate(update));
-      const children: BranchedMenuItem[] = [
-        {
-          value: buyValue,
-          label: "Unlock this update",
-          icon: <ShoppingBag size={16} strokeWidth={2.1} aria-hidden="true" />,
-          color: PAID_GOLD,
-          meta: price(priceLabel),
-          description: `Unlock ${update.title} for ${priceLabel}`,
-          dataAttrs: { "data-course-overlay-buy-update": String(update.id) },
-        },
-        ...update.contentNames.map((name, index): BranchedMenuItem => ({
-          value: `update:${update.id}:content:${index}`,
-          label: name,
+    const moduleById = new Map(flattenModules(modules).map((flat) => [String(flat.module.id), flat.module] as const));
+
+    /** Every paid row's action: open this exact thing on the product page. */
+    const openPaid = (entry: PaidContentEntry) => {
+      if (onOpenPaid) {
+        onOpenPaid(entry.paidKey);
+        return;
+      }
+      // Hosts that do not (yet) hand in the PDP link keep the old behaviour.
+      if (entry.kind === "module") {
+        const module = moduleById.get(entry.id);
+        onBuyModule({
+          id: entry.id,
+          paidUpdateId: module?.paidUpdateId,
+          paidUpdateTitle: module?.paidUpdateTitle,
+          paidUpdatePrice: module?.paidUpdatePrice,
+        });
+        return;
+      }
+      const update = updates.find((candidate) => String(candidate.id) === entry.id);
+      if (update) onBuyUpdate(update);
+    };
+
+    for (const entry of entries) {
+      const priceLabel = entry.kind === "module" ? modulePriceLabel(entry, updates) || "" : entry.priceLabel || "";
+
+      // ── A separate locked resource: one row, its own individual lock ────
+      if (entry.kind === "resource") {
+        const value = `resource:${entry.id}`;
+        buyByValue.set(value, () => openPaid(entry));
+        items.push({
+          value,
+          label: entry.title,
           icon: <File size={16} strokeWidth={2.1} aria-hidden="true" />,
-          disabled: true,
-          meta: leafLock,
-          description: `${name}. Locked`,
-        })),
-      ];
-      items.push({
-        value: `update:${update.id}`,
-        label: update.title,
-        icon: folderLock,
-        meta: (
-          <>
-            {price(priceLabel)}
-            <span className="course-library__count">{update.contentNames.length}</span>
-          </>
-        ),
-        dataAttrs: { "data-course-paid-folder": "", "data-paid-kind": "update", "data-paid-id": String(update.id), "data-locked": "true" },
-        children,
-      });
-    }
+          meta: (
+            <>
+              {rowLock}
+              {priceLabel ? price(priceLabel) : null}
+            </>
+          ),
+          description: `${entry.title}. Locked — open it on the product page`,
+          dataAttrs: {
+            "data-course-paid-row": "resource",
+            "data-paid-kind": "resource",
+            "data-paid-id": entry.id,
+            "data-paid-key": entry.paidKey,
+            "data-locked": "true",
+          },
+        });
+        continue;
+      }
 
-    for (const { module, depth } of flattenModules(modules).filter(({ module }) => module.accessLevel !== "hidden" && isPaidLocked(module, ownedUpdateIds))) {
-      const moduleId = String(module.id);
-      const update = updates.find((candidate) => String(candidate.id) === String(module.paidUpdateId));
-      const priceLabel = module.paidUpdatePrice?.trim()
-        || (update ? `₹${update.price.toLocaleString("en-IN")}` : "");
-      const buyValue = `buy-module:${moduleId}`;
-      buyByValue.set(buyValue, () => onBuyModule({
-        id: moduleId,
-        paidUpdateId: module.paidUpdateId,
-        paidUpdateTitle: module.paidUpdateTitle,
-        paidUpdatePrice: module.paidUpdatePrice,
-      }));
-      const files = (module.files || []).filter(isVisibleFile);
+      // ── A purchasable thing: one folder, one lock, its price on the head ─
+      const buyValue = `${entry.kind === "update" ? "buy-update" : "buy-module"}:${entry.id}`;
+      buyByValue.set(buyValue, () => openPaid(entry));
+      const buyAttrs = entry.kind === "module"
+        ? { "data-course-overlay-buy-module": entry.id }
+        : { "data-course-overlay-buy-update": entry.id };
       const children: BranchedMenuItem[] = [
         {
           value: buyValue,
-          label: "Unlock this module",
+          label: entry.kind === "module" ? "Unlock this module" : "Unlock this update",
           icon: <ShoppingBag size={16} strokeWidth={2.1} aria-hidden="true" />,
           color: PAID_GOLD,
           meta: priceLabel ? price(priceLabel) : undefined,
-          description: priceLabel ? `Unlock ${module.title} for ${priceLabel}` : `Unlock ${module.title}`,
-          dataAttrs: { "data-course-overlay-buy-module": moduleId, "data-module-depth": String(depth) },
+          description: priceLabel ? `Unlock ${entry.title} for ${priceLabel}` : `Unlock ${entry.title}`,
+          dataAttrs: { ...buyAttrs, "data-paid-key": entry.paidKey },
         },
-        ...files.map((file): BranchedMenuItem => ({
-          value: `module:${moduleId}:file:${file.id}`,
-          label: file.name,
+      ];
+      entry.contents.forEach((name, index) => {
+        children.push({
+          value: `${entry.kind}:${entry.id}:content:${index}`,
+          label: name,
           icon: <File size={16} strokeWidth={2.1} aria-hidden="true" />,
           disabled: true,
-          meta: leafLock,
-          description: `${file.name}. Locked`,
-        })),
-      ];
+          description: `${name}. Locked`,
+        });
+      });
       items.push({
-        value: `module:${moduleId}`,
-        label: module.title,
+        value: `${entry.kind}:${entry.id}`,
+        label: entry.title,
         icon: folderLock,
         meta: (
           <>
-            {priceLabel ? price(priceLabel) : price(module.paidUpdateTitle || "Paid")}
-            <span className="course-library__count">{files.length}</span>
+            {priceLabel ? price(priceLabel) : null}
+            <span className="course-library__count">{entry.contents.length}</span>
           </>
         ),
-        dataAttrs: { "data-course-paid-folder": "", "data-paid-kind": "module", "data-paid-id": moduleId, "data-module-depth": String(depth), "data-locked": "true" },
+        description: `${entry.title}. Paid ${entry.kind}`,
+        dataAttrs: {
+          "data-course-paid-folder": entry.kind,
+          "data-paid-kind": entry.kind,
+          "data-paid-id": entry.id,
+          "data-paid-key": entry.paidKey,
+          "data-locked": "true",
+        },
         children,
       });
     }
 
     return { items, buyByValue };
-  }, [updates, modules, ownedUpdateIds, onBuyModule, onBuyUpdate]);
+  }, [updates, modules, ownedUpdateIds, onBuyModule, onBuyUpdate, onOpenPaid]);
 
   const { openValues, toggle } = useBranchedOpen(items);
 
@@ -954,12 +1048,18 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // soft keyboard is open, whichever of its two homes is in use.
   const { keyboardVisible } = useCourseKeyboard();
 
-  // The immersive-page rule (coursePanelSession.ts): while the learner is
-  // inside the Note Editor, the Mind Map Editor, the Brain answer page, the
-  // Live Experiment Viewer, the Sketch Editor or the Read PDF / Annotations
-  // viewers, this footer navigation hides; it returns on the library pages,
-  // and the Music Player's footer behaves exactly as before.
-  const immersivePage = useFooterHiddenPage(tab);
+  // The page rule (coursePanelSession.ts → `isFooterHiddenPage`): the footer
+  // hides while an EDITOR is in edit mode (the notes page writing, the mind
+  // map or the sketch drawing — their read modes keep it), on the Brain answer
+  // deck, in a live experiment, in the Read PDF / annotations viewer, on the
+  // Music player or either search page — and on those two results pages it
+  // steps away by itself while the learner scrolls down. Everything else,
+  // every library and every shelf, keeps it.
+  //
+  // Settings can overrule all of that: "Visible footer navigation always"
+  // (src/utils/footerNavigationVisibility.ts) keeps the footer on every page.
+  const pageRuleHidesFooter = useFooterHiddenPage(tab);
+  const immersivePage = pageRuleHidesFooter && !useFooterNavigationAlways();
 
   // Read entries reuse the exact module-unlock resolver already used by the
   // Modules tab, plus the current paid-update ownership set for resource-level
@@ -994,14 +1094,9 @@ export default function CourseOverlay(props: CourseOverlayProps) {
 
   // ── The tab body ───────────────────────────────────────────────────────
   // The pane is always the ACTIVE TAB's content — there is no second body.
-  const studyBody = (
-    <StudyContent
-      tab={tab}
-      rows={listRows}
-      empty={emptyMessage}
-      listModeAttr={listModeAttr}
-      moduleListingStyle={props.moduleListingStyle ?? DEFAULT_MODULE_LISTING_STYLE}
-      notesPanel={
+  // The notes panel is built once, as a node: in the plus deck it is the
+  // right-top block's own content, and below 768px it is the notes tab's body.
+  const notesPanelNode = (
         // The panel owns its own circular "+" (bottom-right of the grid) —
         // the pane carries no header at all, so there is nowhere else for
         // the button to live.
@@ -1019,7 +1114,16 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           openMasterNoteSignal={props.openMasterNoteSignal}
           uid={props.uid ?? null}
         />
-      }
+  );
+
+  const studyBody = (
+    <StudyContent
+      tab={tab}
+      rows={listRows}
+      empty={emptyMessage}
+      listModeAttr={listModeAttr}
+      moduleListingStyle={props.moduleListingStyle ?? DEFAULT_MODULE_LISTING_STYLE}
+      notesPanel={notesPanelNode}
       mindMapPanel={props.mindMapPanel ?? MINDMAP_FALLBACK}
       playerPanel={props.playerPanel ?? PLAYER_FALLBACK}
       personalModulesOpen={props.personalModulesOpen}
@@ -1040,6 +1144,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           ownedUpdateIds={props.ownedUpdateIds}
           onBuyModule={props.onBuyModule}
           onBuyUpdate={props.onBuyUpdate}
+          onOpenPaid={props.onOpenPaid}
           empty={emptyMessage}
         />
       }
@@ -1064,7 +1169,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // with. Otherwise the dock would sit in the strip of study pane the deck
   // keeps above the keyboard, i.e. exactly between the keyboard and the
   // writing surface. Hiding (not unmounting) preserves the pane's restore.
-  const dock = props.peekDock ? null : (
+  const dock = props.peekDock || props.quad ? null : (
     <div
       className={`relative z-50 shrink-0 px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-0 ${keyboardVisible || immersivePage ? "hidden" : ""}`}
       data-course-dock
@@ -1096,18 +1201,14 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   const hideKeyedBody = (Boolean(props.aiPanel) && props.tab === "ai") || props.tab === "read"
     || (Boolean(props.musicPanel) && props.tab === "music");
 
-  return (
+  // ── The surfaces that outlive a tab switch ──────────────────────────────
+  // Music (a song must not stop because the learner glanced at their notes),
+  // the AI chat and the Read library keep their own bodies, mounted for as
+  // long as the study pane is, with only their visibility toggling. Defined
+  // ONCE here so the phone's single pane and the plus deck's borrowed block
+  // are literally the same surfaces.
+  const persistentSurfaces = (
     <>
-      {/* A tab switch inside the pane crossfades (opacity 150 ms + a 6 px rise). */}
-      <motion.div
-        key={props.tab}
-        initial={{ opacity: paneCrossfade ? 0 : 1, y: paneCrossfade ? 6 : 0 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.15, ease: EASE_OUT_MOTION }}
-        className={`flex min-h-0 flex-1 flex-col overflow-hidden ${hideKeyedBody ? "hidden" : ""}`}
-      >
-        {studyBody}
-      </motion.div>
       {props.musicPanel ? (
         <div
           className={`h-full min-h-0 flex-1 flex-col overflow-hidden ${props.tab === "music" ? "flex" : "hidden"}`}
@@ -1140,6 +1241,72 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           onAddToModule={props.onAddReadUploadToModule}
         />
       </div>
+    </>
+  );
+
+  // ── The plus deck (tablet/desktop) ─────────────────────────────────────
+  // The owner's rule: three of the four blocks hold a page of their own
+  // (Notes, the Resource Library, the Mind map), so those three stay where
+  // they are and the navigation does not move them. EVERY other tab borrows
+  // the main block — and the player stays mounted underneath it, so a playing
+  // video never loses its place to a tab switch.
+  if (props.quad) {
+    const paneOwnedTabs: DockTab[] = ["notes", "mindmap", "modules"];
+    const tabHasOwnBlock =
+      paneOwnedTabs.includes(props.tab) && !(props.tab === "modules" && props.personalModulesOpen);
+    // The borrowed block: the active tab's own body (unless that tab has a
+    // block of its own) PLUS the persistent surfaces — which stay mounted even
+    // while a block of their own is on screen, so a song, a chat and a PDF
+    // never restart just because the learner looked at their notes.
+    const borrowed = (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden" data-course-quad-borrowed>
+        {tabHasOwnBlock ? null : (
+          <motion.div
+            key={props.tab}
+            initial={{ opacity: paneCrossfade ? 0 : 1, y: paneCrossfade ? 6 : 0 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.15, ease: EASE_OUT_MOTION }}
+            className={`flex min-h-0 flex-1 flex-col overflow-hidden ${hideKeyedBody ? "hidden" : ""}`}
+          >
+            {studyBody}
+          </motion.div>
+        )}
+        {persistentSurfaces}
+      </div>
+    );
+    return (
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-course-quad-pane-host>
+        <QuadDeck
+          state={props.quad.state}
+          onState={props.quad.onState}
+          view={props.quad.view}
+          navSide={props.quad.placement}
+          player={props.quad.playerPane}
+          notes={notesPanelNode}
+          resources={props.resourceLibraryPanel ?? RESOURCES_FALLBACK}
+          mindmap={props.mindMapPanel ?? MINDMAP_FALLBACK}
+          study={borrowed}
+          studyVisible={!tabHasOwnBlock}
+          resourcesFooter={props.quad.nav}
+          reveal={props.quad.reveal}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* A tab switch inside the pane crossfades (opacity 150 ms + a 6 px rise). */}
+      <motion.div
+        key={props.tab}
+        initial={{ opacity: paneCrossfade ? 0 : 1, y: paneCrossfade ? 6 : 0 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.15, ease: EASE_OUT_MOTION }}
+        className={`flex min-h-0 flex-1 flex-col overflow-hidden ${hideKeyedBody ? "hidden" : ""}`}
+      >
+        {studyBody}
+      </motion.div>
+      {persistentSurfaces}
       {dock}
     </>
   );

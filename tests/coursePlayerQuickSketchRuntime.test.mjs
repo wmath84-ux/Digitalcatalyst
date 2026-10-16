@@ -446,7 +446,8 @@ test("the panel is the perfect-freehand editor's own panel", async () => {
   assert.ok(el("data-quick-sketch-reset-options"), "Reset Options");
   assert.ok(el("data-quick-sketch-copy-options"), "Copy Options");
   assert.ok(el("data-quick-sketch-copy-svg"), "Copy to SVG");
-  assert.equal(el("data-quick-sketch-tool-button=draw").textContent, "Draw");
+  // The tray's tiles carry their label beside a small icon.
+  assert.match(el("data-quick-sketch-tool-button=draw").textContent, /Draw/);
   assert.equal(el("data-quick-sketch-tool-button=draw").getAttribute("data-active"), "true");
   for (const attr of ["data-quick-sketch-undo", "data-quick-sketch-redo", "data-quick-sketch-clear"]) {
     assert.ok(el(attr), attr);

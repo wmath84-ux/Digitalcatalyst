@@ -201,6 +201,14 @@ export interface UseCourseSketchResult {
   /** False when there is no scope or the module is at `MAX_SKETCH_BOARDS`. */
   canCreateBoard: boolean;
   /**
+   * Rename ONE board (the panel's long-press Rename, in place). Returns true
+   * when the title actually changed. A board's title lives in its summary row,
+   * so the new name is on the device list at once and reaches the board's own
+   * cloud document on its next save — and immediately when it is the board on
+   * screen.
+   */
+  renameBoard: (sketchKey: string, nextTitle: string) => boolean;
+  /**
    * Delete ONE board (never the guaranteed first, never the last). Returns
    * true when a board was removed; the active Canvas is reopened on the first
    * board when it was the one deleted. Part 1 §30.
@@ -1347,6 +1355,39 @@ export default function useCourseSketch({
   }, [persistLocal]);
 
   /**
+   * Rename ONE board — the sketch panel's row popup (long press → Rename turns
+   * the row's own label into the input, exactly like the notes library and the
+   * mind map library). A board's TITLE lives in its summary row, not in the
+   * scene, so the rename lands in the index (device list first, and the board's
+   * own cloud document carries it from the next save on); when the board on
+   * screen is the one renamed, the live session's title follows immediately so
+   * the save line and the switcher never disagree. Returns true when the title
+   * actually changed.
+   */
+  const renameBoard = useCallback((sketchKey: string, nextTitle: string): boolean => {
+    const idx = indexRef.current;
+    const key = sanitizeSketchKey(sketchKey);
+    const title = sanitizeSketchTitle(nextTitle);
+    if (!idx.scoped || !title) return false;
+    if (!idx.boards.some((row) => row.sketchKey === key)) return false;
+    // `patchBoard` returns false when nothing moved, so a rename to the same
+    // title costs no write and no re-render.
+    if (!patchBoard(idx, key, { title })) return false;
+    idx.version += 1;
+    writeIndex(idx);
+    const scope = scopeRef.current;
+    if (scope.scoped && scope.sketchKey === key) {
+      scope.title = title;
+      scope.revision += 1;
+      scope.dirty = true;
+      persistLocal(scope);
+      scheduleSave(scope);
+    }
+    bump();
+    return true;
+  }, [persistLocal, scheduleSave]);
+
+  /**
    * Delete ONE board (Part 1 §30) — the active Canvas — without ever touching
    * the rest of the library. The guaranteed first board (`SKETCH_DEFAULT_KEY`)
    * is never deletable, and a module that would be left with no boards refuses,
@@ -1428,6 +1469,7 @@ export default function useCourseSketch({
         boardsLoading: index.scoped && index.listLoading,
         selectBoard,
         createBoard,
+        renameBoard,
         deleteBoard,
         canCreateBoard: index.scoped && index.boards.length < MAX_SKETCH_BOARDS,
       };
@@ -1435,6 +1477,6 @@ export default function useCourseSketch({
     // `bump()` drives this recompute: every field above is read off the
     // session / index objects, which mutate in place by design.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [session, index, generation, indexVersion, session.status, session.loaded, session.pendingSync, session.errorMessage, session.localOk, updateScene, setCanvasColor, flush, retry, getScene, selectBoard, createBoard, deleteBoard],
+    [session, index, generation, indexVersion, session.status, session.loaded, session.pendingSync, session.errorMessage, session.localOk, updateScene, setCanvasColor, flush, retry, getScene, selectBoard, createBoard, renameBoard, deleteBoard],
   );
 }

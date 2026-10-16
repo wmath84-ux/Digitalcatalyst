@@ -1,7 +1,8 @@
 // Contract for the Mind Map library's shared, responsive listing. Both the
 // SELF and MASTER collections render the one `BranchedMenu` (the same listing
-// the Modules and Notes libraries use), so the tablet/narrow-pane behaviour is
-// the menu's own: rows wrap long titles, never overflow, and never shrink type.
+// the Modules and Notes libraries use) inside the ONE library panel, so the
+// tablet/narrow-pane behaviour is the menu's own: rows keep one clean line,
+// never overflow, and never shrink type.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -12,7 +13,11 @@ const menuCss = fs.readFileSync("src/components/branched-menu/BranchedMenu.css",
 const statesCss = fs.readFileSync("src/course/study-library-states.css", "utf8");
 
 test("both mind-map collections render through the shared branched menu", () => {
-  assert.equal((panel.match(/<BranchedMenu\b/g) || []).length, 4, "library + side-panel drawer share the SELF and MASTER trees");
+  assert.equal(
+    (panel.match(/<BranchedMenu\b/g) || []).length,
+    2,
+    "the ONE library panel carries both the SELF and the MASTER tree",
+  );
   assert.match(panel, /data-course-mindmap-map-grid": "true"|data-course-mindmap-map-grid="true"/);
   assert.match(panel, /data-course-mindmap-master-grid/);
 });

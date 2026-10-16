@@ -4,26 +4,33 @@ import fs from 'node:fs';
 const panel = fs.readFileSync('src/course/SketchPanel.tsx', 'utf8');
 const quick = fs.readFileSync('src/components/PerfectFreehandSketch.tsx', 'utf8');
 const css = fs.readFileSync('src/index.css', 'utf8');
-test('sketch starts in view mode and has an accessible editing action in every layout', () => {
-  assert.match(panel, /\[editing, setEditing\] = useState\(false\)/);
-  assert.match(panel, /data-course-sketch-edit-toggle/);
-  assert.match(panel, /aria-pressed=\{editing\}/);
-  assert.match(panel, /editing \? "Done" : "Edit sketch"/);
+test('sketch starts in read mode and has an accessible editing action in every layout', () => {
+  // READ FIRST (the notes page's rule): the page opens view-only, and the two
+  // doors between the modes are the tray's pencil and the tray's eye.
+  assert.match(panel, /const \[readOnlySketch, setReadOnlySketch\] = useState\(true\);/);
+  assert.match(panel, /const editing = !readOnlySketch;/);
+  assert.match(panel, /const enterEditMode = useCallback\(\(\) => \{/);
+  assert.match(panel, /const enterReadMode = useCallback\(\(\) => \{/);
+  assert.match(panel, /data-course-sketch-read-edit/);
+  assert.match(panel, /data-course-sketch-edit-read/);
   assert.match(panel, /data-course-sketch-edit-access/);
-  assert.match(panel, /setEditing\(false\), \[sceneKey, mode\]/);
+  assert.match(panel, /setReadOnlySketch\(true\);\s+setReadChromeVisible\(true\);\s+setPendingDeleteKey\(null\);\s+\}, \[sceneKey, mode\]\);/);
+  // The old header's Edit / Done pill is gone for good.
+  assert.doesNotMatch(panel, /data-course-sketch-edit-toggle/);
+  assert.doesNotMatch(panel, /"Done" : "Edit sketch"/);
 });
-test('the Sketch header drops the Library count pill and gives all four controls the Edit sketch dimensions', () => {
-  const boards = panel.slice(panel.indexOf('function SketchBoards'), panel.indexOf('function SketchColourCluster'));
-  const mode = panel.slice(panel.indexOf('const modeToggle ='), panel.indexOf('const editToggle ='));
-  const edit = panel.match(/const editToggle = \([\s\S]*?\n  \);/)?.[0] || "";
-  const header = panel.slice(panel.indexOf('<SketchStatus'), panel.indexOf('</SketchStatus>'));
-  assert.doesNotMatch(header, /SketchLibraryPill/);
-  assert.match(panel, /data-course-sketch-library-count=\{library\.itemCount\}/); // retained in the editor sidebar
-  assert.match(boards, /data-course-sketch-delete-active[\s\S]*?h-9 w-\[5\.5rem\]/);
-  assert.match(boards, /data-course-sketch-board-switch[\s\S]*?h-9 w-\[5\.5rem\]/);
-  assert.match(mode, /h-9 w-\[5\.5rem\]/);
-  assert.match(edit, /h-9 w-\[5\.5rem\]/);
-  assert.match(mode, /Full Editor/);
+test('there is no header left to size: the trays are ONE row of identical tiles', () => {
+  // No header at all — the library read-out lives in the panel body now.
+  assert.doesNotMatch(panel, /<SketchStatus\b/);
+  assert.match(panel, /data-course-sketch-library-count=\{library\.itemCount\}/); // in the panel's options
+  // Every tray control is the same class, so nothing on the page is a
+  // different size or weight from its neighbours.
+  assert.match(panel, /const trayButtonClass = "dc-sketch-tray-button";/);
+  assert.match(panel, /className=\{trayButtonClass\}/);
+  assert.match(panel, /className=\{`dc-sketch-tray-text\$\{quickMode \? " dc-sketch-tray-text--lit" : ""\}`\}/);
+  assert.match(panel, /data-course-sketch-read-tray/);
+  assert.match(panel, /data-course-sketch-edit-tray/);
+  assert.match(panel, /Full Editor/);
 });
 test('Excalidraw editing and bottom chrome follow the same state without hiding navigation', () => {
   assert.match(panel, /viewModeEnabled=\{!editing\}/);
@@ -36,7 +43,17 @@ test('Quick Sketch hides tools and guards pointer/keyboard edits in view mode', 
   assert.match(quick, /if \(readOnly\) return;/);
   assert.match(quick, /if \(readOnly \|\| !isActive\(\)\) return;/);
   assert.match(quick, /open=\{panelOpen && !readOnly\}/);
-  assert.match(quick, /!readOnly \? <div className="dc-qsk-corner dc-qsk-corner--bottom-left"/);
-  assert.match(quick, /!readOnly \? <div className="dc-qsk-corner dc-qsk-corner--bottom-right"/);
+  // One bottom tray, not two corners: the editor's own tools on the left of
+  // the row, then the page's doors (Full Editor + the eye / pencil).
+  assert.match(quick, /<nav className="dc-qsk-tray" aria-label="Sketch tools" data-quick-sketch-tray>/);
+  assert.match(quick, /data-quick-sketch-tool-button="draw"/);
+  assert.match(quick, /data-quick-sketch-tool-button="erase"/);
+  assert.match(quick, /data-quick-sketch-full-editor/);
+  assert.match(quick, /data-quick-sketch-read-edit/);
+  assert.match(quick, /data-quick-sketch-edit-read/);
+  assert.match(quick, /onShowFullEditor/);
+  // Read mode's tray follows the page's single-tap rule.
+  assert.match(quick, /const \[trayVisible, setTrayVisible\] = useState\(true\);/);
+  assert.match(quick, /if \(!readOnly\) return;\s+const target = event\.target as HTMLElement \| null;/);
   assert.match(quick, /readOnly = false/); // other existing callers keep editing behaviour
 });

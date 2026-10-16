@@ -30,7 +30,8 @@ export default function WorkSketchSurface({ theme }: { theme: WorkTheme }) {
         onCreateBoard={sketch.onCreateBoard}
         canCreateBoard={sketch.canCreateBoard}
         onDeleteActive={sketch.onDeleteActive}
-        canDeleteActive={sketch.canDeleteActive}
+        onRenameBoard={sketch.onRenameBoard}
+        onDeleteBoard={sketch.onDeleteBoard}
         productId={WORK_PRODUCT_ID}
         moduleId={WORK_MODULE_ID}
         playerTheme={theme}

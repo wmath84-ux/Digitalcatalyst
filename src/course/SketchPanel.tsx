@@ -56,7 +56,7 @@ import { useHandleLibrary } from "@excalidraw/excalidraw";
 // group — GitHub / Follow Us / Discord — per Part 1 §24).
 import { MainMenu, Sidebar } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
-import { BookMarked, Check, ChevronDown, Layers, PanelLeft, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { BookMarked, ChevronLeft, ChevronRight, Eraser, Eye, Layers, Menu, Pencil, PenLine, Plus, Redo2, RotateCcw, Trash2, Undo2 } from "lucide-react";
 import type { SketchBoardSummary, SketchSaveStatus } from "./useCourseSketch";
 import type { CoursePlayerTheme } from "./playerPreferences";
 import type { SketchScene } from "../../utils/sketchScene";
@@ -66,6 +66,24 @@ import { useSketchLibrary, type SketchLibraryDeviceStore } from "./useSketchLibr
 import { isAllowedExcalidrawLibraryUrl } from "../../utils/excalidrawLibraryLink.js";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import PerfectFreehandSketch from "../components/PerfectFreehandSketch";
+// The ONE listing system — the same rows the notes library and the mind map
+// library use: one clean line per item, no pencil / trash on the row, and the
+// row's own actions (Rename in place, Delete) behind a long press.
+import BranchedMenu, { type BranchedMenuItem } from "../components/branched-menu/BranchedMenu";
+// `CaptureUpdateAction` is the editor's own history flag: "Clear canvas" with
+// it is ONE undoable step — the same semantics as the editor's clear action.
+import { CaptureUpdateAction } from "@excalidraw/excalidraw";
+import { useCourseFooterInset } from "./useCourseFooterInset";
+import { COURSE_FOOTER_INSET_PROPERTY } from "./courseFooterInset";
+import { SKETCH_DEFAULT_KEY } from "../../utils/sketchScene";
+import "./sketchLibrary.css";
+import { setSketchEditMode } from "./coursePanelSession";
+
+/** Read mode's tray hides on ONE tap, and the next tap brings it back. */
+const READ_TAP_SLOP_PX = 10;
+/** This library is one flat list of canvases — it has no folding sections. */
+const NO_SECTIONS: ReadonlySet<string> = new Set<string>();
+const noopToggle = () => {};
 
 /**
  * The editor's imperative API, derived from the component's own props type
@@ -276,7 +294,16 @@ export interface SketchPanelProps {
   /** Delete the active canvas (Part 1 §30); returns whether one was removed. */
   onDeleteActive?: () => boolean;
   /** True when the active module holds more than one canvas. */
-  canDeleteActive?: boolean;
+  /**
+   * Rename ONE canvas — the panel's long-press Rename, editing that row's own
+   * label in place (the notes library's gesture, on this page's library).
+   */
+  onRenameBoard?: (sketchKey: string, title: string) => boolean | void;
+  /**
+   * Delete ONE canvas (the panel's long-press Delete → the confirmation
+   * dialog). The guaranteed first canvas is never deletable.
+   */
+  onDeleteBoard?: (sketchKey: string) => boolean | void;
   /** "Clean / Optimised Look" (Part 1 §26): header hidden, toolbar on top,
    *  useful header actions in the left sidebar, canvas maximised. */
   cleanLook?: boolean;
@@ -297,200 +324,71 @@ export interface SketchPanelProps {
 }
 
 /**
- * The canvas switcher + the "+" (new canvas) button — the left end of the
- * save line. The list is a small popover, so the save line keeps its one-row
- * height on a phone; the "+" is always one tap.
+ * The module's canvases, listed the way the notes library lists its notes: ONE
+ * clean line per canvas — no pencil, no trash — and the row's own actions,
+ * Rename (editing that row's label in place) and Delete, behind a long press
+ * (a secondary click and the keyboard menu key work too). `BranchedMenu` is the
+ * shared listing system, so this library reads exactly like the note and mind
+ * map ones.
  */
-function SketchBoards({
+function SketchCanvasList({
   boards,
   activeBoardKey,
-  activeBoardTitle,
   onSelectBoard,
-  onCreateBoard,
-  canCreateBoard,
-  onDeleteActive,
-  canDeleteActive,
+  onRenameBoard,
+  onRequestDelete,
+  canDelete,
 }: {
   boards: SketchBoardSummary[];
   activeBoardKey: string;
-  activeBoardTitle: string;
   onSelectBoard?: (sketchKey: string) => void;
-  onCreateBoard?: () => string | null;
-  canCreateBoard: boolean;
-  /** Delete the CURRENTLY ACTIVE canvas (Part 1 §30). Only when one can be. */
-  onDeleteActive?: () => void;
-  canDeleteActive?: boolean;
+  onRenameBoard?: (sketchKey: string, title: string) => void;
+  /** Ask to delete ONE canvas (the page confirms it first — never the row). */
+  onRequestDelete?: (sketchKey: string) => void;
+  /** False when this module must keep every canvas it has. */
+  canDelete: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onDocumentClick = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDocumentClick);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDocumentClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  const create = () => {
-    // The hook ignores a repeated tap inside its double-tap guard, so a
-    // double-click can never make two boards.
-    const key = onCreateBoard?.();
-    if (key) setOpen(false);
-  };
-
-  return (
-    <div ref={rootRef} className="relative flex shrink-0 items-center gap-1" data-course-sketch-boards={boards.length}>
-      {/* §29: the standalone "+" is GONE — New Canvas lives ONLY inside the
-          Canvas dropdown below. §30: its old spot now hosts the single
-          "delete the active canvas" action, visible only when one exists. */}
-      {canDeleteActive ? (
-        <button
-          type="button"
-          onClick={onDeleteActive}
-          aria-label={`Delete active canvas "${activeBoardTitle}"`}
-          title={`Delete active canvas "${activeBoardTitle}"`}
-          data-course-sketch-delete-active
-          className="flex h-9 w-[5.5rem] shrink-0 items-center justify-center rounded-lg border border-rose-400/40 text-rose-300 transition-colors hover:bg-rose-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-300"
-        >
-          <Trash2 aria-hidden size={14} />
-        </button>
-      ) : null}
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label={`Canvas: ${activeBoardTitle}. ${boards.length} canvas${boards.length === 1 ? "" : "es"} in this module`}
-        title={`Canvas: ${activeBoardTitle}. ${boards.length} canvas${boards.length === 1 ? "" : "es"} in this module`}
-        data-course-sketch-board-switch
-        className={`flex h-9 w-[5.5rem] shrink-0 items-center justify-center gap-0.5 rounded-lg border px-1 text-xs font-semibold transition-colors ${
-          open ? "border-white/30 bg-white/10 text-white" : "border-white/15 text-white/80 hover:bg-white/10 hover:text-white"
-        }`}
-      >
-        <Layers aria-hidden size={12} className="shrink-0 text-white/55" />
-        <span className="min-w-0 flex-1 truncate" data-course-sketch-active-board={activeBoardKey}>{activeBoardTitle}</span>
-        <ChevronDown aria-hidden size={12} className="shrink-0 text-white/55" />
-      </button>
-      {open ? (
-        <div
-          className="absolute left-0 top-full z-30 mt-1.5 w-60 max-w-[17rem] rounded-xl border border-white/10 bg-[#1b1b21]/95 p-1.5 shadow-2xl shadow-black/60 backdrop-blur-md"
-          data-course-sketch-board-menu
-        >
-          <ul role="listbox" aria-label="Canvases in this module" className="max-h-64 overflow-y-auto">
-            {boards.map((board) => {
-              const active = board.sketchKey === activeBoardKey;
-              return (
-                <li key={board.sketchKey}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={active}
-                    onClick={() => {
-                      setOpen(false);
-                      if (!active) onSelectBoard?.(board.sketchKey);
-                    }}
-                    data-course-sketch-board-option={board.sketchKey}
-                    className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] transition-colors ${
-                      active ? "bg-white/10 text-white" : "text-white/75 hover:bg-white/[0.06] hover:text-white"
-                    }`}
-                  >
-                    <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                      {active ? <Check aria-hidden size={13} className="text-orange-400" /> : null}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate font-semibold">{board.title}</span>
-                    <span className="shrink-0 text-[10px] tabular-nums text-white/40">
-                      {board.elementCount > 0 ? `${board.elementCount} item${board.elementCount === 1 ? "" : "s"}` : "Blank"}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          <button
-            type="button"
-            onClick={create}
-            disabled={!canCreateBoard}
-            className="mt-1 flex w-full items-center gap-2 rounded-lg border-t border-white/10 px-2 py-1.5 text-left text-[12px] font-semibold text-orange-300 transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Plus aria-hidden size={13} /> New canvas
-          </button>
-        </div>
-      ) : null}
-    </div>
+  const items = useMemo<BranchedMenuItem[]>(
+    () =>
+      boards.map((board) => ({
+        value: `canvas:${board.sketchKey}`,
+        label: board.title,
+        icon: <Layers size={15} aria-hidden />,
+        description: `${board.title} — ${board.elementCount > 0 ? `${board.elementCount} item${board.elementCount === 1 ? "" : "s"}` : "blank"}`,
+        meta: (
+          <span className="sketch-library-menu__count">
+            {board.elementCount > 0 ? `${board.elementCount} item${board.elementCount === 1 ? "" : "s"}` : "Blank"}
+          </span>
+        ),
+        onRename: onRenameBoard ? (nextLabel: string) => onRenameBoard(board.sketchKey, nextLabel) : undefined,
+        onDelete:
+          canDelete && board.sketchKey !== SKETCH_DEFAULT_KEY && onRequestDelete
+            ? () => onRequestDelete(board.sketchKey)
+            : undefined,
+        dataAttrs: {
+          "data-course-sketch-canvas-row": board.sketchKey,
+          "data-course-sketch-board-option": board.sketchKey,
+        },
+      })),
+    [boards, canDelete, onRenameBoard, onRequestDelete],
   );
-}
 
-/**
- * The sketch pages tray — every canvas (page) of this module as one
- * horizontally scrolling row of chips, directly under the Full Editor's
- * header. Tapping a chip opens that page; the active page reads lit. This
- * is the page switcher the header used to hide inside a dropdown, laid out
- * where a learner can see all pages at once (the switcher dropdown itself
- * still lives in the side panel / Clean sidebar for delete + create).
- */
-function SketchPagesTray({
-  boards,
-  activeBoardKey,
-  onSelectBoard,
-  light = false,
-}: {
-  boards: SketchBoardSummary[];
-  activeBoardKey: string;
-  onSelectBoard?: (sketchKey: string) => void;
-  /** Work's light chrome (storageOnly + light player theme). */
-  light?: boolean;
-}) {
   return (
-    <div
-      className={`flex shrink-0 items-center gap-1.5 overflow-x-auto border-b px-3 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-        light ? "border-slate-200 bg-white" : "border-white/10"
-      }`}
-      data-course-sketch-pages-tray={boards.length}
-      role="tablist"
-      aria-label="Sketch pages"
-    >
-      {boards.map((board) => {
-        const active = board.sketchKey === activeBoardKey;
-        return (
-          <button
-            key={board.sketchKey}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            aria-current={active ? "page" : undefined}
-            onClick={() => {
-              if (!active) onSelectBoard?.(board.sketchKey);
-            }}
-            data-course-sketch-page={board.sketchKey}
-            data-active={active ? "true" : "false"}
-            title={board.title}
-            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${
-              active
-                ? light
-                  ? "border-orange-400 bg-orange-50 text-orange-700"
-                  : "border-orange-400/60 bg-orange-500/15 text-orange-200"
-                : light
-                  ? "border-slate-300 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                  : "border-white/15 text-white/70 hover:bg-white/[0.07] hover:text-white"
-            }`}
-          >
-            <span className="max-w-32 truncate">{board.title}</span>
-            <span className={`shrink-0 text-[9px] tabular-nums ${light ? "text-slate-400" : "text-white/40"}`}>
-              {board.elementCount > 0 ? `${board.elementCount} item${board.elementCount === 1 ? "" : "s"}` : "Blank"}
-            </span>
-          </button>
-        );
-      })}
-    </div>
+    <BranchedMenu
+      items={items}
+      openValues={NO_SECTIONS}
+      onToggle={noopToggle}
+      activeValue={`canvas:${activeBoardKey}`}
+      onSelect={(value) => {
+        const key = value.startsWith("canvas:") ? value.slice("canvas:".length) : "";
+        if (key && key !== activeBoardKey) onSelectBoard?.(key);
+      }}
+      ariaLabel="Your sketch canvases"
+      fullWidth
+      rowHeight={44}
+      leafActionMenu="long-press"
+      className="sketch-library-menu"
+    />
   );
 }
 
@@ -569,7 +467,7 @@ function SketchColourCluster({
   );
 }
 
-/** Library account state stays in the Clean Look sidebar, not in the header. */
+/** Library account state lives in the panel's options (and Clean Look's sidebar). */
 function SketchLibraryPill({ library, storageOnly = false }: { library: ReturnType<typeof useSketchLibrary>; storageOnly?: boolean }) {
   return (
     <span
@@ -604,108 +502,76 @@ function SketchLibraryPill({ library, storageOnly = false }: { library: ReturnTy
   );
 }
 
-/** The slim save line — the only chrome this panel adds. Never a banner. */
-function SketchStatus({
+/**
+ * The page's ONE piece of chrome that is not a tray or the panel: a QUIET
+ * status chip, centred at the top, that holds no button at all — exactly the
+ * notes page's own status chip. Retry lives in the panel's options, and the
+ * chip never blocks the canvas.
+ */
+function sketchStatusText({
+  status,
+  pendingSync,
+  storageOnly,
+  scoped,
+  deviceSaved,
+}: {
+  status: SketchSaveStatus;
+  pendingSync: boolean;
+  storageOnly: boolean;
+  scoped: boolean;
+  deviceSaved: boolean;
+}): { label: string; tone: "muted" | "ok" | "warn" } {
+  if (storageOnly) {
+    if (status === "loading") return { label: "Loading from this device…", tone: "muted" };
+    if (status === "pending" || status === "saving") return { label: "Saving on this device…", tone: "muted" };
+    if (status === "error") return { label: "Device save needs attention", tone: "warn" };
+    if (status === "saved") return { label: "Saved on this device", tone: "ok" };
+    return { label: "Device only · ready", tone: "muted" };
+  }
+  if (!scoped) return { label: "Kept on this device", tone: "muted" };
+  if (status === "loading") return { label: "Loading sketch…", tone: "muted" };
+  if (status === "pending") return { label: "Unsaved changes…", tone: "muted" };
+  if (status === "saving") return { label: "Saving…", tone: "muted" };
+  if (status === "error") {
+    return {
+      label: !deviceSaved ? "Not saved yet — retrying" : pendingSync ? "Offline draft — saved on this device" : "Sync paused",
+      tone: "warn",
+    };
+  }
+  if (status === "saved") return { label: "Saved", tone: "ok" };
+  return { label: "Ready", tone: "muted" };
+}
+
+function SketchStatusChip({
   status,
   pendingSync,
   errorMessage,
-  storageOnly = false,
-  theme = "light",
-  boardName,
-  deviceSaved = true,
+  storageOnly,
   scoped,
-  onRetry,
-  leading,
-  children,
+  deviceSaved,
 }: {
   status: SketchSaveStatus;
   pendingSync: boolean;
   errorMessage: string | null;
-  storageOnly?: boolean;
-  theme?: CoursePlayerTheme;
-  boardName?: string;
-  deviceSaved?: boolean;
-  /** False when no module is open — the scene is a device draft then. */
-  scoped?: boolean;
-  onRetry?: () => void;
-  /** The canvas switcher + "+", left-aligned before the save state. */
-  leading?: React.ReactNode;
-  /** The canvas-colour cluster (swatches + pencil + picker), right-aligned. */
-  children?: React.ReactNode;
+  storageOnly: boolean;
+  scoped: boolean;
+  deviceSaved: boolean;
 }) {
-  let label = "Sketch";
-  let tone: "muted" | "ok" | "warn" = "muted";
-  if (storageOnly) {
-    if (status === "loading") label = "Loading from this device…";
-    else if (status === "pending" || status === "saving") label = "Saving on this device…";
-    else if (status === "error") { label = "Device save needs attention"; tone = "warn"; }
-    else if (status === "saved") { label = "Saved on this device"; tone = "ok"; }
-    else label = "Device only · ready";
-  } else if (scoped === false) {
-    // No module open: there is no cloud board, so "Saved" would be a lie and
-    // "Ready" says nothing. The scene is kept on this device (the draft).
-    label = "Kept on this device";
-  } else if (status === "loading") {
-    label = "Loading sketch…";
-  } else if (status === "pending") {
-    // Edited, not written yet — never "Saved" while it is not.
-    label = "Unsaved changes…";
-  } else if (status === "saving") {
-    label = "Saving…";
-  } else if (status === "error") {
-    label = !deviceSaved
-      ? "Not saved yet — retrying"
-      : pendingSync
-        ? "Offline draft — saved on this device"
-        : "Sync paused";
-    tone = "warn";
-  } else if (status === "saved") {
-    label = "Saved";
-    tone = "ok";
-  } else if (status === "ready") {
-    label = "Ready";
-  }
-  const workLight = storageOnly && theme === "light";
+  const { label, tone } = sketchStatusText({ status, pendingSync, storageOnly, scoped, deviceSaved });
   const dot = tone === "warn" ? "bg-amber-400" : tone === "ok" ? "bg-emerald-400" : "bg-slate-400";
-  const text = workLight
-    ? tone === "warn" ? "text-amber-700" : tone === "ok" ? "text-emerald-700" : "text-slate-600"
-    : tone === "warn" ? "text-amber-300" : tone === "ok" ? "text-emerald-300" : "text-white/55";
+  const text = tone === "warn" ? "text-amber-200" : tone === "ok" ? "text-emerald-200" : "text-white/70";
   return (
-    <div
-      className={`relative flex shrink-0 items-center gap-2 border-b px-3 py-1 ${workLight ? "border-slate-200 bg-white" : "border-white/10"}`}
+    <span
+      role="status"
+      aria-live="polite"
+      title={errorMessage ?? undefined}
       data-course-sketch-status={status}
       data-course-sketch-pending={pendingSync ? "true" : "false"}
+      className={`inline-flex max-w-[60vw] items-center gap-1.5 truncate rounded-full border border-white/10 bg-[#141419]/85 px-2.5 py-1 text-[11px] font-semibold backdrop-blur ${text}`}
     >
-      {leading}
-      <span
-        role="status"
-        aria-live="polite"
-        className={`flex min-w-0 items-center gap-1.5 truncate text-[11px] font-semibold ${text}`}
-        title={errorMessage ?? undefined}
-      >
-        <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
-        <span className="truncate">{label}</span>
-      </span>
-      {status === "error" && onRetry ? (
-        <button
-          type="button"
-          onClick={onRetry}
-          title={errorMessage ?? (storageOnly ? "Retry saving on this device" : "Retry saving to your account")}
-          data-course-sketch-retry
-          className="flex shrink-0 items-center gap-1 rounded-md border border-amber-400/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-200 transition-colors hover:bg-amber-400/10"
-        >
-          <RotateCcw aria-hidden size={10} /> Retry
-        </button>
-      ) : null}
-      <div className="ml-auto flex shrink-0 items-center gap-1.5">
-        {children}
-        {boardName ? (
-          <span className={`hidden min-w-0 max-w-32 truncate text-[10px] font-semibold sm:block ${workLight ? "text-slate-400" : "text-white/35"}`} data-course-sketch-board>
-            {boardName}
-          </span>
-        ) : null}
-      </div>
-    </div>
+      <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
+      <span className="truncate">{label}</span>
+    </span>
   );
 }
 
@@ -731,7 +597,8 @@ export default function SketchPanel({
   onCreateBoard,
   canCreateBoard = false,
   onDeleteActive,
-  canDeleteActive = false,
+  onRenameBoard,
+  onDeleteBoard,
   cleanLook = false,
   productId = null,
   moduleId = null,
@@ -753,24 +620,32 @@ export default function SketchPanel({
   const library = useSketchLibrary({ uid, storageOnly, deviceStore: libraryDeviceStore });
   /** The canvas colour as the learner currently sees it (null = theme). */
   const [canvasColour, setCanvasColour] = useState<string | null>(canvasColor);
-  /** §30 deletion is a two-step act: the trash opens this confirmation, which
-   *  names the actual canvas, and only the red confirm removes it. */
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  /** The Full Editor's side panel (pages & options): opened from the header
-   *  button, dismissed by any click outside it (or Escape). */
+  /**
+   * §30 deletion is a two-step act. The panel's row asks for it; this is the
+   * canvas it names, and only the red confirm removes THAT one.
+   */
+  const [pendingDeleteKey, setPendingDeleteKey] = useState<string | null>(null);
+  const pendingDeleteTitle = boards.find((board) => board.sketchKey === pendingDeleteKey)?.title ?? activeBoardTitle;
+  /**
+   * The page's ONE side panel — the module's canvases plus every option a
+   * header used to hold. It opens from the bottom tray's own panel button
+   * (read mode's, exactly like the notes page, or the editor's), and any click
+   * outside it — the visible strip, the canvas — hides it again.
+   */
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
   const sidePanelRef = useRef<HTMLDivElement | null>(null);
-  const sideToggleRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     if (!sidePanelOpen) return undefined;
     const onDocumentClick = (event: MouseEvent) => {
       const target = event.target as Node;
       if (sidePanelRef.current?.contains(target)) return;
-      if (sideToggleRef.current?.contains(target)) return;
+      // Every tray button that opens this panel is a toggle, never an
+      // "outside click" — the same rule the notes page follows.
+      if ((event.target as HTMLElement | null)?.closest?.("[data-course-sketch-panel-toggle]")) return;
       setSidePanelOpen(false);
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSidePanelOpen(false);
+      if (event.key === "Escape") { setSidePanelOpen(false); setPendingDeleteKey(null); }
     };
     document.addEventListener("mousedown", onDocumentClick);
     document.addEventListener("keydown", onKey);
@@ -794,10 +669,57 @@ export default function SketchPanel({
    * shared chrome readable from both branches.
    */
   const quickMode = mode === "quick-sketch";
-  // Viewing a sketch should not expose editing chrome or accept stray marks.
-  // Keep this session-only: opening a different canvas starts in view mode.
-  const [editing, setEditing] = useState(false);
-  useEffect(() => setEditing(false), [sceneKey, mode]);
+  /**
+   * READ FIRST, always (the notes page's rule, and the owner's brief): a
+   * sketch opens VIEW ONLY — the canvas takes no marks and Excalidraw runs in
+   * its own view mode — and the eye in the editing tray, or the tray's pencil,
+   * is the only door between the two. Opening another canvas, or switching
+   * between the two editors, starts reading again.
+   */
+  const [readOnlySketch, setReadOnlySketch] = useState(true);
+  const editing = !readOnlySketch;
+  const enterEditMode = useCallback(() => {
+    setReadChromeVisible(true);
+    setReadOnlySketch(false);
+  }, []);
+  const enterReadMode = useCallback(() => {
+    setReadOnlySketch(true);
+    setReadChromeVisible(true);
+  }, []);
+  /**
+   * Read mode's chrome — the bottom tray, its side-panel button included. ONE
+   * tap on the canvas hides it and the next tap brings it straight back, so a
+   * drawing can be read whole (the same gesture, and the same rule, as the
+   * notes page and the mind map).
+   */
+  const [readChromeVisible, setReadChromeVisible] = useState(true);
+  const readTapStartRef = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    setReadOnlySketch(true);
+    setReadChromeVisible(true);
+    setPendingDeleteKey(null);
+  }, [sceneKey, mode]);
+
+  /**
+   * The footer rule for the Sketch tab (owner, 2026-10-16: hide only while
+   * EDITOR MODE is on). The tab has NO library page — read mode is where the
+   * footer lives, so reading a sketch keeps it and the first real edit
+   * (the tray's pencil / eye, or the Quick Sketch chip's own) takes it away.
+   * `editing` is the panel's one flag for both surfaces, so the two editors
+   * can never disagree about it.
+   */
+  useEffect(() => {
+    if (!storageOnly) setSketchEditMode(editing);
+  }, [editing, storageOnly]);
+  /** The canvas host: measures the tray's lift over the player's footer nav. */
+  const canvasHostRef = useRef<HTMLDivElement | null>(null);
+  const footerInset = useCourseFooterInset(!quickMode, canvasHostRef);
+  useEffect(() => {
+    const shell = canvasHostRef.current?.closest("[data-course-sketch-panel]") as HTMLElement | null;
+    if (!shell) return;
+    if (footerInset > 0) shell.style.setProperty(COURSE_FOOTER_INSET_PROPERTY, `${footerInset}px`);
+    else shell.style.removeProperty(COURSE_FOOTER_INSET_PROPERTY);
+  }, [footerInset]);
 
 
   /**
@@ -930,22 +852,15 @@ export default function SketchPanel({
   }, [sceneKey, sketchTheme]);
 
   /**
-   * The Quick Sketch / Full Editor switch — the ONE control both chrome bars
-   * share. Quick Sketch is the perfect-freehand canvas (perfectfreehand.com's
-   * own design, with its options panel, its eraser and its undo history);
-   * the full editor is the official Excalidraw component.
+   * The Quick Sketch / Full Editor switch — the ONE control both trays share.
+   * It rides NEXT TO the eye (owner brief): the two controls that change what
+   * the page is showing sit together at the head of the editing tray.
    */
   const modeToggle = (
     <button
       type="button"
       onClick={() => { setSidePanelOpen(false); setMode(quickMode ? "editor" : "quick-sketch"); }}
-      className={`flex h-9 w-[5.5rem] shrink-0 items-center justify-center whitespace-nowrap rounded-lg px-1 text-[11px] font-bold transition-colors ${
-        quickMode
-          ? "bg-orange-500 text-white"
-          : storageOnly && playerTheme === "light"
-            ? "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900"
-            : "border border-white/15 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
-      }`}
+      className={`dc-sketch-tray-text${quickMode ? " dc-sketch-tray-text--lit" : ""}`}
       data-course-sketch-mode={mode}
       title={quickMode ? "Switch to Full Editor (Excalidraw)" : "Switch to Quick Sketch (pressure-sensitive pen)"}
     >
@@ -953,112 +868,257 @@ export default function SketchPanel({
     </button>
   );
 
-  const editToggle = (
-    <button type="button" data-course-sketch-edit-toggle
-      aria-pressed={editing}
-      onClick={() => setEditing(value => !value)}
-      className={`flex h-9 w-[5.5rem] shrink-0 items-center justify-center whitespace-nowrap rounded-lg border px-2 text-xs font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${storageOnly && playerTheme === "dark" ? "border-zinc-700 bg-zinc-900 text-white" : "border-slate-300 bg-white text-black"}`}>
-      {editing ? "Done" : "Edit sketch"}
+  /** One tile of a tray — every control on both trays is the same button. */
+  const trayButtonClass = "dc-sketch-tray-button";
+  /** Work's light chrome (device-only storage on a light player theme). */
+  const workLight = storageOnly && playerTheme === "light";
+
+  const boardIndex = boards.findIndex((board) => board.sketchKey === activeBoardKey);
+  const prevBoard = boardIndex > 0 ? boards[boardIndex - 1] : null;
+  const nextBoard = boardIndex >= 0 && boardIndex < boards.length - 1 ? boards[boardIndex + 1] : null;
+
+  /**
+   * The panel's toggle — the SAME button in whichever tray is on screen, and
+   * the only door into the panel (nothing in a page's chrome opens a side
+   * panel here: there is no header at all). It is marked as a toggle so the
+   * panel's own outside-click rule never treats it as an outside click.
+   */
+  const panelButton = (hook: string) => (
+    <button
+      type="button"
+      className={trayButtonClass}
+      data-course-sketch-panel-toggle
+      {...{ [hook]: "" }}
+      aria-expanded={sidePanelOpen}
+      aria-label={sidePanelOpen ? "Hide the sketch canvases" : "Show the sketch canvases"}
+      title={sidePanelOpen ? "Hide canvases" : "Canvases & options"}
+      onClick={() => setSidePanelOpen((open) => !open)}
+    >
+      <Menu size={16} aria-hidden="true" />
     </button>
   );
 
   /**
-   * "+ New canvas" — the Quick Sketch chip's standalone create button, now
-   * in the Full Editor's header too (it used to live only inside the canvas
-   * dropdown, §29). The hook's double-tap guard makes a repeated tap safe.
+   * Excalidraw's undo / redo are action-manager entries; its public API only
+   * exposes `history.clear()`. Both chips therefore reach the editor's OWN
+   * action by name — the real one, with the editor's real history and its real
+   * enable state — and fall back to the editor's own keyboard command if a
+   * future build renames it, so the tray keeps working either way.
    */
-  const newCanvasButton = scoped ? (
-    <button
-      type="button"
-      onClick={() => onCreateBoard?.()}
-      disabled={!canCreateBoard}
-      className={`flex h-9 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2.5 text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-40 ${
-        storageOnly && playerTheme === "light"
-          ? "border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900"
-          : "border-white/15 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white"
-      }`}
-      data-course-sketch-new-canvas
-      title={canCreateBoard ? "New canvas" : "Canvas limit reached for this module"}
-      aria-label="New canvas"
-    >
-      <Plus aria-hidden size={14} /> New canvas
-    </button>
-  ) : null;
+  const runHistoryAction = (name: "undo" | "redo") => {
+    const internal = excalidrawApi as unknown as {
+      actionManager?: { actions?: Record<string, unknown>; executeAction?: (action: unknown) => void };
+    } | null;
+    const action = internal?.actionManager?.actions?.[name];
+    if (action && typeof internal?.actionManager?.executeAction === "function") {
+      internal.actionManager.executeAction(action);
+      return;
+    }
+    const host = canvasHostRef.current?.querySelector<HTMLElement>(".excalidraw") ?? null;
+    host?.focus?.();
+    (host ?? document).dispatchEvent(new KeyboardEvent("keydown", {
+      key: "z", ctrlKey: true, shiftKey: name === "redo", bubbles: true, cancelable: true,
+    }));
+  };
 
-  /** The header's side-panel button: pages & options live behind it. */
-  const sidePanelToggle = scoped ? (
-    <button
-      type="button"
-      ref={sideToggleRef}
-      onClick={() => setSidePanelOpen((open) => !open)}
-      aria-expanded={sidePanelOpen}
-      aria-label={sidePanelOpen ? "Hide sketch pages and options" : "Show sketch pages and options"}
-      title={sidePanelOpen ? "Hide pages & options" : "Pages & options"}
-      data-course-sketch-side-panel-toggle
-      className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${
-        sidePanelOpen
-          ? "border-orange-400/60 bg-orange-500/15 text-orange-200"
-          : storageOnly && playerTheme === "light"
-            ? "border-slate-300 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            : "border-white/15 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
-      }`}
-    >
-      <PanelLeft aria-hidden size={16} />
-    </button>
-  ) : null;
+  /** Draw / erase: the editor's own tool switch, through its public API. */
+  const runTool = (tool: "freedraw" | "eraser") => {
+    apiRef.current?.setActiveTool({ type: tool } as never);
+  };
 
   /**
-   * The side content shared by the Clean Look's docked Excalidraw sidebar
-   * and the Full Editor's own side panel (below): canvas switcher + delete,
-   * mode switch, library read-out, colour cluster, save state. One
-   * implementation, two homes (Part 1 §26C).
+   * Clear the canvas the way the editor's own action does: ONE undoable step
+   * (`CaptureUpdateAction.IMMEDIATELY` is what puts it in the history), so an
+   * accidental clear is one undo away.
+   */
+  const clearCanvas = () => {
+    apiRef.current?.updateScene({
+      elements: [],
+      appState: { selectedElementIds: {} },
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+    } as never);
+  };
+
+  /**
+   * Read mode's tray: the side-panel button, the previous / next canvas, a new
+   * sketch and the pencil that unlocks the editor — the notes page's read
+   * navigation, control for control. ONE tap on the canvas hides the whole
+   * tray, the side-panel button with it, and the next tap brings it back.
+   */
+  const readTray = (
+    <nav className="dc-sketch-tray" aria-label="Sketch navigation" data-course-sketch-read-tray>
+      {panelButton("data-course-sketch-read-panel")}
+      <button
+        type="button"
+        className={trayButtonClass}
+        data-course-sketch-read-prev
+        aria-label="Previous sketch"
+        title="Previous sketch"
+        disabled={!prevBoard}
+        onClick={() => { if (prevBoard) onSelectBoard?.(prevBoard.sketchKey); }}
+      >
+        <ChevronLeft size={16} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className={trayButtonClass}
+        data-course-sketch-read-next
+        aria-label="Next sketch"
+        title="Next sketch"
+        disabled={!nextBoard}
+        onClick={() => { if (nextBoard) onSelectBoard?.(nextBoard.sketchKey); }}
+      >
+        <ChevronRight size={16} aria-hidden="true" />
+      </button>
+      <span className="dc-sketch-tray-sep" aria-hidden="true" />
+      <button
+        type="button"
+        className={trayButtonClass}
+        data-course-sketch-read-new
+        aria-label="New sketch"
+        title={canCreateBoard ? "New sketch" : "Sketch limit reached for this module"}
+        disabled={!canCreateBoard}
+        onClick={() => onCreateBoard?.()}
+      >
+        <Plus size={16} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className={trayButtonClass}
+        data-course-sketch-read-edit
+        aria-label="Edit this sketch"
+        title="Edit this sketch"
+        onClick={enterEditMode}
+      >
+        <Pencil size={16} aria-hidden="true" />
+      </button>
+    </nav>
+  );
+
+  /**
+   * The editing tray, in the owner's order: the canvases button, the EYE (back
+   * to reading), the Full Editor / Quick Sketch switch beside it, the canvas
+   * colour, and then this page's own tools — draw, erase, undo, redo, clear.
+   * Every control is one tile of the row and the row SLIDES, so a narrow sheet
+   * never shrinks or loses a button.
+   */
+  const editTray = (
+    <nav className="dc-sketch-tray" aria-label="Sketch tools" data-course-sketch-edit-tray>
+      {panelButton("data-course-sketch-edit-panel")}
+      <button
+        type="button"
+        className={trayButtonClass}
+        data-course-sketch-edit-read
+        aria-label="Read mode"
+        title="Read mode — the canvas takes no marks"
+        onClick={enterReadMode}
+      >
+        <Eye size={16} aria-hidden="true" />
+      </button>
+      {modeToggle}
+      <span className="dc-sketch-tray-sep" aria-hidden="true" />
+      <span className="dc-sketch-tray-colour" data-course-sketch-edit-colour>
+        <SketchColourCluster canvasColour={canvasColour} onPick={applyCanvasColour} />
+      </span>
+      <span className="dc-sketch-tray-sep" aria-hidden="true" />
+      <button
+        type="button"
+        className={trayButtonClass}
+        data-course-sketch-edit-draw
+        aria-label="Draw"
+        title="Draw — the freehand pen"
+        onClick={() => runTool("freedraw")}
+      >
+        <PenLine size={16} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className={trayButtonClass}
+        data-course-sketch-edit-erase
+        aria-label="Erase"
+        title="Erase"
+        onClick={() => runTool("eraser")}
+      >
+        <Eraser size={16} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className={trayButtonClass}
+        data-course-sketch-edit-undo
+        aria-label="Undo"
+        title="Undo"
+        onClick={() => runHistoryAction("undo")}
+      >
+        <Undo2 size={16} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className={trayButtonClass}
+        data-course-sketch-edit-redo
+        aria-label="Redo"
+        title="Redo"
+        onClick={() => runHistoryAction("redo")}
+      >
+        <Redo2 size={16} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className={trayButtonClass}
+        data-course-sketch-edit-clear
+        aria-label="Clear the canvas"
+        title="Clear the canvas (undoable)"
+        onClick={clearCanvas}
+      >
+        <Trash2 size={16} aria-hidden="true" />
+      </button>
+    </nav>
+  );
+
+  /**
+   * The panel's content — the module's canvases AND every option a header used
+   * to hold (the two editor switches, the library read-out, the canvas colour,
+   * the save state and its Retry). The Clean Look's docked Excalidraw sidebar
+   * renders this same element, so there is one implementation, two homes.
    */
   const sketchSidebarContent = (
-    <div className="flex flex-col gap-2 p-2 text-white" data-course-sketch-clean-sidebar>
+    <div className="flex flex-col gap-2 p-2" data-course-sketch-clean-sidebar>
       {scoped ? (
-        <SketchBoards
+        <SketchCanvasList
           boards={boards}
           activeBoardKey={activeBoardKey}
-          activeBoardTitle={activeBoardTitle}
           onSelectBoard={onSelectBoard}
-          onCreateBoard={onCreateBoard}
-          canCreateBoard={canCreateBoard}
-          canDeleteActive={canDeleteActive}
-          onDeleteActive={() => setConfirmDeleteOpen(true)}
+          onRenameBoard={onRenameBoard}
+          onRequestDelete={setPendingDeleteKey}
+          canDelete={boards.length > 1}
         />
       ) : null}
 
-      {modeToggle}
-      {quickMode ? null : (
-        <>
-          <SketchLibraryPill library={library} storageOnly={storageOnly} />
-          <SketchColourCluster canvasColour={canvasColour} onPick={applyCanvasColour} />
-        </>
-      )}
-      <span
-        role="status"
-        aria-live="polite"
-        className="text-[11px] font-semibold text-white/60"
-        data-course-sketch-clean-status={status}
-        title={errorMessage ?? undefined}
-      >
-        {storageOnly
-          ? status === "saving" || status === "pending" ? "Saving on this device…" : status === "error" ? "Device save needs attention" : status === "saved" ? "Saved on this device" : "Device only · ready"
-          : !scoped
-            ? "Kept on this device"
-            : status === "saving" ? "Saving…" : status === "pending" ? "Unsaved changes…" : status === "error" ? "Sync paused" : status === "saved" ? "Saved" : "Ready"}
-      </span>
-      {status === "error" && onRetry ? (
-        <button
-          type="button"
-          onClick={onRetry}
-          title={errorMessage ?? (storageOnly ? "Retry saving on this device" : "Retry saving to your account")}
-          data-course-sketch-retry
-          className="flex items-center gap-1 rounded-md border border-amber-400/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-200 transition-colors hover:bg-amber-400/10"
-        >
-          <RotateCcw aria-hidden size={10} /> Retry
-        </button>
-      ) : null}
+      <div className="sketch-library-options" data-course-sketch-panel-options>
+        {modeToggle}
+        <SketchLibraryPill library={library} storageOnly={storageOnly} />
+        <SketchColourCluster canvasColour={canvasColour} onPick={applyCanvasColour} />
+      </div>
+      <div className="sketch-library-options">
+        <SketchStatusChip
+          status={status}
+          pendingSync={pendingSync}
+          errorMessage={errorMessage}
+          storageOnly={storageOnly}
+          scoped={scoped}
+          deviceSaved={deviceSaved}
+        />
+        {status === "error" && onRetry ? (
+          <button
+            type="button"
+            onClick={onRetry}
+            title={errorMessage ?? (storageOnly ? "Retry saving on this device" : "Retry saving to your account")}
+            data-course-sketch-retry
+            className="flex items-center gap-1 rounded-full border border-amber-400/40 px-2 py-0.5 text-[10px] font-bold text-amber-200 transition-colors hover:bg-amber-400/10"
+          >
+            <RotateCcw aria-hidden size={10} /> Retry
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 
@@ -1068,100 +1128,51 @@ export default function SketchPanel({
       data-course-sketch-panel
       data-work-storage-only={storageOnly ? "true" : undefined}
       data-sketch-editing={editing ? "true" : "false"}
+      data-sketch-reading={readOnlySketch ? "true" : "false"}
+      data-sketch-chrome={readChromeVisible ? "true" : "false"}
       data-course-theme={playerTheme}
       data-sketch-scope={scoped ? "module" : "none"}
       data-sketch-clean={cleanLook ? "true" : "false"}
     >
-      {/* §26A: in Clean / Optimised Look the whole header disappears and the
-          canvas reclaims its vertical space; the useful actions move into the
-          editor's left sidebar (rendered below with the Excalidraw host).
-          Quick Sketch keeps this one slim bar even in Clean Look: that sidebar
-          is Excalidraw's, so without the bar the way back to the full editor
-          would have nowhere to live. */}
-      {cleanLook && !quickMode ? null : quickMode ? (
-        /* Quick Sketch owns its own chrome on the canvas (its save state and
-           its canvas switcher live in the chip), so this bar keeps only the
-           way back to the full editor — no Excalidraw state, no library pill,
-           no second canvas list. */
-        <div
-          className={`flex shrink-0 items-center justify-end border-b px-3 py-1 ${storageOnly && playerTheme === "light" ? "border-slate-200 bg-white" : "border-white/10"}`}
-          data-course-sketch-quick-bar
-        >
-          {editToggle}
-          {modeToggle}
+      {/* The page's ONE piece of top chrome — and it holds no button at all:
+          the quiet save chip, exactly like the notes page's. Every option a
+          header used to carry is in the tray or in the panel. */}
+      {loading ? null : (
+        <div className="pointer-events-none absolute inset-x-0 top-[max(0.5rem,env(safe-area-inset-top))] z-20 flex justify-center px-3">
+          <SketchStatusChip
+            status={status}
+            pendingSync={pendingSync}
+            errorMessage={errorMessage}
+            storageOnly={storageOnly}
+            scoped={scoped}
+            deviceSaved={deviceSaved}
+          />
         </div>
-      ) : (
-      <SketchStatus
-        status={status}
-        pendingSync={pendingSync}
-        storageOnly={storageOnly}
-        theme={playerTheme}
-        scoped={scoped}
-        errorMessage={errorMessage}
-        boardName={boardName}
-        deviceSaved={deviceSaved}
-        onRetry={onRetry}
-        leading={sidePanelToggle}
-      >
-        {newCanvasButton}
-        {editToggle}
-        {modeToggle}
-        {quickMode ? null : <SketchColourCluster canvasColour={canvasColour} onPick={applyCanvasColour} />}
-      </SketchStatus>
       )}
-
-      {/* The sketch pages tray: every page of this module in one horizontal
-          row, directly under the Full Editor's header. (Clean Look keeps
-          its docked sidebar list instead; Quick Sketch has its own chip.) */}
-      {!quickMode && !cleanLook && scoped && boards.length > 0 ? (
-        <SketchPagesTray
-          boards={boards}
-          activeBoardKey={activeBoardKey}
-          onSelectBoard={onSelectBoard}
-          light={storageOnly && playerTheme === "light"}
-        />
-      ) : null}
-
-      {/* A saved clean layout must still expose a way out of view mode,
-          even if Excalidraw hides its custom sidebar while viewing. */}
-      {cleanLook && !quickMode ? (
-        <div className="absolute left-3 top-14 z-50" data-course-sketch-edit-access>{editToggle}</div>
-      ) : null}
-
-      {/* The Full Editor's side panel: pages & options behind the header
-          button. Any click outside it (canvas included) hides it — see the
-          document listener above; no scrim, so the canvas stays live. */}
-      {sidePanelOpen && !quickMode && !cleanLook ? (
-        <div
-          ref={sidePanelRef}
-          className="absolute inset-y-0 left-0 z-40 flex w-[280px] max-w-[85%] flex-col border-r border-white/10 bg-[#141419] shadow-2xl"
-          data-course-sketch-side-panel
-          role="complementary"
-          aria-label="Sketch pages and options"
-        >
-          <div className="flex h-11 shrink-0 items-center justify-between border-b border-white/10 px-3">
-            <span className="text-xs font-bold text-white/80">Pages & options</span>
-            <button
-              type="button"
-              onClick={() => setSidePanelOpen(false)}
-              aria-label="Hide sketch pages and options"
-              title="Hide pages & options"
-              data-course-sketch-side-panel-close
-              className="grid h-8 w-8 place-items-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-            >
-              <X aria-hidden size={15} />
-            </button>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {sketchSidebarContent}
-          </div>
-        </div>
-      ) : null}
 
       {/* The canvas host: a positioned, flex-sized box. The editor is its
           absolutely-filled child, so its width and height always resolve from
-          the study pane — whatever the split ratio is doing. */}
-      <div className="relative min-h-0 w-full flex-1" data-course-sketch-canvas>
+          the study pane — whatever the split ratio is doing. It also carries
+          read mode's tap: ONE tap hides the tray (a press that travelled is a
+          pan, never a tap) and the next tap restores it. */}
+      <div
+        ref={canvasHostRef}
+        className="relative min-h-0 w-full flex-1"
+        data-course-sketch-canvas
+        onPointerDownCapture={(event) => { readTapStartRef.current = { x: event.clientX, y: event.clientY }; }}
+        onClickCapture={(event) => {
+          if (!readOnlySketch || quickMode || sidePanelOpen) return;
+          const target = event.target as HTMLElement | null;
+          // The chrome itself is never "a tap on the canvas": the trays, the
+          // panel, its strip, the confirmation dialog and the editor's own
+          // menus all keep their own clicks.
+          if (target?.closest?.("[data-course-sketch-read-tray], [data-course-sketch-edit-tray], [data-quick-sketch-tray], [data-course-sketch-side-panel], [data-course-sketch-panel-scrim], [data-course-confirm-delete], .App-menu_top, .App-bottom-bar")) return;
+          const start = readTapStartRef.current;
+          readTapStartRef.current = null;
+          if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > READ_TAP_SLOP_PX) return;
+          setReadChromeVisible((visible) => !visible);
+        }}
+      >
         {loading ? (
           <div className="absolute inset-0 grid place-items-center">
             <span
@@ -1172,7 +1183,9 @@ export default function SketchPanel({
         ) : quickMode ? (
           /* Quick Sketch: the perfect-freehand canvas (its own design, its own
              canvases, its own save line — see the component). Switching back
-             to the full editor loses nothing: both halves persist separately. */
+             to the full editor loses nothing: both halves persist separately.
+             The chip gets the same two doors as the tray — the pencil / eye and
+             the Full Editor switch. */
           <PerfectFreehandSketch
             readOnly={!editing}
             localOnly={storageOnly}
@@ -1182,6 +1195,9 @@ export default function SketchPanel({
             moduleId={moduleId}
             resourceId={resourceId}
             resourceName={resourceName}
+            onRequestEdit={enterEditMode}
+            onRequestRead={enterReadMode}
+            onShowFullEditor={() => setMode("editor")}
           />
         ) : (
           <div className="absolute inset-0" data-course-sketch-host>
@@ -1226,14 +1242,19 @@ export default function SketchPanel({
               </MainMenu>
               {cleanLook ? (
                 /* §26C: in Clean / Optimised Look the removed header's useful
-                   actions live in the editor's LEFT sidebar (docked): canvas
-                   switcher + delete, daylight toggle, save state + retry, the
-                   library read-out and the colour cluster. No socials, no
-                   duplicate toolbar. */
+                   actions live in the editor's LEFT sidebar (docked): the
+                   canvases and their actions, the daylight toggle, save state +
+                   retry, the library read-out and the colour cluster. No
+                   socials, no duplicate toolbar. */
                 <Sidebar docked name="course-sketch-clean">
                   {sketchSidebarContent}
                 </Sidebar>
               ) : null}
+              {/* The page's OWN bottom trays. They live inside the editor's
+                  tree on purpose: the tray then rests on the canvas's own
+                  bottom edge (whatever the split ratio does), and the editor's
+                  own tool row can be brought down beside it. */}
+              {readOnlySketch ? (readChromeVisible ? readTray : null) : editTray}
             </Excalidraw>
           </div>
         )}
@@ -1247,21 +1268,90 @@ export default function SketchPanel({
         ) : null}
       </div>
 
-      {/* §30 — deleting the ACTIVE canvas is a two-step act that names the
-          actual canvas. Only the red confirm removes it; Cancel / backdrop /
-          Escape never do. The rest of the library is untouched. */}
+      {/* A saved clean layout must still expose a way out of view mode, even
+          if Excalidraw hides its custom sidebar while viewing. */}
+      {cleanLook && !quickMode && readOnlySketch ? (
+        <div className="absolute left-3 top-14 z-50" data-course-sketch-edit-access>
+          <button
+            type="button"
+            className={trayButtonClass}
+            data-course-sketch-edit-access-button
+            aria-label="Edit this sketch"
+            title="Edit this sketch"
+            onClick={enterEditMode}
+          >
+            <Pencil size={16} aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
+
+      {/* ── The ONE side panel ──────────────────────────────────────────────
+          The module's canvases, and every option the page's header used to
+          carry. It opens from the bottom tray's own canvases button (read
+          mode's, exactly like the notes page) and closes on the visible strip,
+          on Escape, or on any click outside it — never on a click inside, and
+          never on the button that opened it. */}
+      {sidePanelOpen ? (
+        <>
+          <button
+            type="button"
+            aria-label="Close the sketch canvases"
+            data-course-sketch-panel-scrim
+            className="absolute inset-0 z-30 bg-slate-950/30"
+            onClick={() => setSidePanelOpen(false)}
+          />
+          <aside
+            ref={sidePanelRef}
+            className={`constant-sketch-panel absolute inset-y-0 left-0 z-40 flex w-[calc(100%-2.5rem)] flex-col border-r shadow-2xl ${
+              workLight ? "border-slate-200 bg-white text-slate-900" : "border-white/10 bg-[#141419] text-white"
+            }`}
+            data-course-sketch-side-panel
+            role="complementary"
+            aria-label="Sketch canvases and options"
+          >
+            <div className="flex h-14 shrink-0 items-center justify-center px-3" data-course-sketch-panel-head>
+              <span className="text-sm font-black tracking-wide" data-course-sketch-panel-title>Sketch canvases</span>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto" data-course-sketch-panel-body>
+              {sketchSidebarContent}
+            </div>
+            {/* The panel's ONE bottom button: a new sketch. (There is nowhere
+                "back to the canvases" to go — this panel IS the list.) */}
+            <div className={`shrink-0 border-t p-3 ${workLight ? "border-slate-200" : "border-white/10"}`} data-course-sketch-panel-foot>
+              <button
+                type="button"
+                data-course-sketch-panel-new
+                disabled={!canCreateBoard}
+                aria-label="New sketch"
+                title={canCreateBoard ? "New sketch" : "Sketch limit reached for this module"}
+                onClick={() => onCreateBoard?.()}
+                className="flex h-11 w-full items-center justify-center gap-1.5 rounded-full bg-slate-900 text-[13px] font-black text-white transition hover:bg-slate-800 active:bg-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Plus size={16} aria-hidden="true" /> New sketch
+              </button>
+            </div>
+          </aside>
+        </>
+      ) : null}
+
+      {/* §30 — deleting a canvas is a two-step act that names the actual
+          canvas. Only the red confirm removes it; Cancel / backdrop / Escape
+          never do. The rest of the library is untouched. */}
       <ConfirmDeleteDialog
         theme={playerTheme}
-        open={confirmDeleteOpen}
+        open={Boolean(pendingDeleteKey)}
         title="Delete this Canvas?"
-        message={`Delete Canvas "${activeBoardTitle}"?`}
+        message={`Delete Canvas "${pendingDeleteTitle}"?`}
         detail="This will permanently delete this Canvas. Your other Canvases are kept."
         confirmLabel="Delete Canvas"
         confirmTitle="Delete Canvas"
-        onCancel={() => setConfirmDeleteOpen(false)}
+        onCancel={() => setPendingDeleteKey(null)}
         onConfirm={() => {
-          setConfirmDeleteOpen(false);
-          onDeleteActive?.();
+          const key = pendingDeleteKey;
+          setPendingDeleteKey(null);
+          if (!key) return;
+          if (onDeleteBoard) onDeleteBoard(key);
+          else onDeleteActive?.();
         }}
       />
     </div>

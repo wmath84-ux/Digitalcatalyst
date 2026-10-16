@@ -53,6 +53,7 @@ import {
   ArrowUp,
   CheckSquare,
   Code2,
+  Eye,
   FileCode2,
   Heading1,
   Heading2,
@@ -214,24 +215,69 @@ function HighlightButton() {
   );
 }
 
-/** Indent / outdent the caret's block one level (list nesting included). */
+/**
+ * Indent / outdent the caret's block one level.
+ *
+ * THE REASON these buttons used to look dead (owner: "the three-line button
+ * does nothing"): BlockNote can only NEST a block that already sits under a
+ * sibling, so on the first line of a note — and under a divider, an image or
+ * any block without children — `canNestBlock()` is false and the control was
+ * hard-disabled (`aria-disabled`, `pointer-events: none`, dimmed). There was
+ * nothing to nest under, so a tap did *literally* nothing.
+ *
+ * They now ALWAYS act on the live document:
+ *   · Indent nests the block when BlockNote allows it and otherwise turns the
+ *     line into a list item — the standard "Tab makes a list" gesture, and a
+ *     visible change on the very first line (the next tap nests it);
+ *   · Outdent lifts the block out of its nesting, and a list item that is
+ *     already at the top level becomes a plain paragraph again.
+ * Neither is ever disabled, so neither can ever be tapped for nothing.
+ */
+const LIST_ITEM_TYPES = ["bulletListItem", "numberedListItem", "checkListItem"];
+/** Blocks whose content survives a swap to a list item (or back to a paragraph). */
+const TEXT_BLOCK_TYPES = ["paragraph", "heading", "quote", ...LIST_ITEM_TYPES];
+
 function IndentButton({ direction }: { direction: "indent" | "outdent" }) {
   const Components = useComponentsContext()!;
   const editor = useBlockNoteEditor() as unknown as NoteEditorInstance;
-  const can = useEditorState({
+  // The caret's block decides what the button can do — and whether it can do
+  // anything at all without a swap.
+  const caret = useEditorState({
     editor,
-    selector: ({ editor: live }) => (direction === "indent" ? live.canNestBlock() : live.canUnnestBlock()),
+    selector: ({ editor: live }) => {
+      const block = live.getTextCursorPosition().block;
+      return { type: String(block.type), canNest: live.canNestBlock(), canUnnest: live.canUnnestBlock() };
+    },
   });
+  const inList = LIST_ITEM_TYPES.includes(caret.type);
+  const swappable = TEXT_BLOCK_TYPES.includes(caret.type);
   const Icon = direction === "indent" ? Indent : Outdent;
   const label = direction === "indent" ? "Indent" : "Outdent";
+  const disabled = direction === "indent" ? !swappable : !caret.canUnnest && !inList;
+  const act = () => {
+    const block = editor.getTextCursorPosition().block;
+    if (direction === "indent") {
+      if (editor.canNestBlock()) editor.nestBlock();
+      // Nothing above to nest under: the line becomes a list item, which is
+      // the one indent BlockNote's document model can express there.
+      else if (TEXT_BLOCK_TYPES.includes(String(block.type))) {
+        editor.updateBlock(block, { type: "bulletListItem" } as never);
+      }
+    } else if (editor.canUnnestBlock()) {
+      editor.unnestBlock();
+    } else if (LIST_ITEM_TYPES.includes(String(block.type))) {
+      // A top-level list item leaves the list: back to a plain paragraph.
+      editor.updateBlock(block, { type: "paragraph" } as never);
+    }
+  };
   return (
     <Components.FormattingToolbar.Button
       className="dc-note-indent"
       label={label}
       mainTooltip={label}
       icon={<Icon size={16} />}
-      isDisabled={!can}
-      onClick={() => (direction === "indent" ? editor.nestBlock() : editor.unnestBlock())}
+      isDisabled={disabled}
+      onClick={act}
     />
   );
 }
@@ -249,8 +295,25 @@ function IndentButton({ direction }: { direction: "indent" | "outdent" }) {
  * block type (Heading) · bold · italic · strikethrough · highlight |
  * code · quote · link | bulleted list · numbered list · checklist ·
  * indent · outdent. Every button acts on the live document.
+ *
+ * Two things sit around those tools:
+ *   · the READ button FIRST: leaving the editor for the read view is the one
+ *     action a learner must always be able to find, so it leads the bar — as
+ *     one more 36px toolbar tile with an EYE glyph, in the exact design of
+ *     every other button on the row (the black "Read" capsule is gone);
+ *   · the tools themselves are a SLIDING tray: the buttons keep their real
+ *     36px size — nothing is ever squeezed to fit — and the tray scrolls
+ *     sideways (with scroll snapping) on a narrow pane, so every tool stays
+ *     reachable by a left/right swipe.
  */
-export function NoteDockedToolbar({ onFocusWithinChange }: { onFocusWithinChange?: (within: boolean) => void }) {
+export function NoteDockedToolbar({
+  onFocusWithinChange,
+  onRead,
+}: {
+  onFocusWithinChange?: (within: boolean) => void;
+  /** Leave the editor and return to the note's read view. */
+  onRead?: () => void;
+}) {
   const editor = useBlockNoteEditor() as unknown as NoteEditorInstance;
   const items = useBlockTypeItems(editor);
   const Components = useComponentsContext()!;
@@ -269,7 +332,23 @@ export function NoteDockedToolbar({ onFocusWithinChange }: { onFocusWithinChange
         }}
       >
         <Components.FormattingToolbar.Root className="bn-toolbar dc-note-dock-bar">
-          <div className="dc-note-dock-tools">
+          {/* Read FIRST — in the SAME design as every tool beside it: one more
+              36px round ghost tile, with an EYE for a glyph. (It is pinned
+              before the sliding tray, so the way back to the read view never
+              scrolls out of reach; the black "Read" capsule it replaced is
+              gone.) */}
+          {onRead ? (
+            <Components.FormattingToolbar.Button
+              key="read"
+              className="dc-note-read-eye"
+              data-note-edit-read=""
+              label="Read mode"
+              mainTooltip="Read mode"
+              icon={<Eye size={16} />}
+              onClick={onRead}
+            />
+          ) : null}
+          <div className="dc-note-dock-tools" data-note-dock-tools>
             <HistoryButton direction="undo" key="undo" />
             <HistoryButton direction="redo" key="redo" />
             <DockSeparator key="sep-history" />

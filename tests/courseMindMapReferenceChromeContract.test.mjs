@@ -1,16 +1,27 @@
 // tests/courseMindMapReferenceChromeContract.test.mjs
 //
-// Pins the mind map editor's chrome changes (owner brief):
+// Pins the mind map page's chrome after the redesign (owner brief 2026-10-16:
+// "use that same complete, exact UI design system in the mind map… it must be
+// headless too… the same eye button… centre the toolbar… the same bottom tray
+// as the note page's read mode"):
 //
-//   1. preview/read mode: a double-tap / double-click NEVER opens editing;
-//   2. preview/read mode: nodes cannot be dragged — movement is edit-only;
-//   3. zoomed/panned content under the toolbar never shows through it;
-//   4. the toolbar sits at the very bottom of the screen;
-//   5+6. the toolbar wears the NOTE EDITOR's toolbar design (one floating
-//      pill, 36px round buttons) while keeping the mind map's own icons;
-//   7. top-left / top-right corner buttons open the side panels;
-//   8. a map can be renamed from the side panel (and the name persists
-//      through the same onRenameMap the library has always used).
+//   1. read mode: a double-tap / double-click NEVER opens editing; editing is
+//      entered explicitly — from read mode's tray, or Enter/F2 on the canvas;
+//   2. read mode: nodes cannot be dragged — movement is edit-only;
+//   3. read mode's bottom tray is the note page's read navigation: the side
+//      panel button, a New mind map button and an eye/pencil, in one design;
+//   4. ONE tap on the canvas hides that tray, and the next tap shows it again;
+//   5. the editing toolbar is ONE CENTRED pill (it used to hug the left edge),
+//      wearing the note editor's tile design while keeping the mind map's own
+//      icons, led by the EYE — the same tile as every other control;
+//   6. the ONE side panel is the map library: nearly a page wide with a thin
+//      strip still visible, MASTER / SELF top centre, a single New mind map
+//      button at the bottom, and rows with NO pencil / trash (rename + delete
+//      live behind a long press);
+//   7. headless: no header, no corner button that opens a panel, and no second
+//      (options) drawer anywhere;
+//   8. a map renames from the panel's row popup, saved through the same
+//      onRenameMap the library has always used.
 //
 // Save / sync / drag-commit behaviour stays pinned by the older suites
 // (coursePlayerMindMapContract, courseMindMapCloudSyncRuntime, …).
@@ -21,16 +32,17 @@ import test from "node:test";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const panel = read("src/course/MindMapPanel.tsx");
+const notes = read("src/course/NotesPanel.tsx");
 const styles = read("src/index.css");
 const noteCss = read("src/course/noteEditor/noteEditor.css");
+const libraryCss = read("src/course/mindMapLibrary.css");
 
 test("1 — no double-tap/double-click unlock: editing is entered explicitly", () => {
   assert.doesNotMatch(panel, /useDoubleTapToEdit/, "the double-tap-to-edit gesture is gone from the mind map");
   assert.doesNotMatch(panel, /editGesture/);
-  // The explicit entries: the Map options panel's Edit button, and Enter/F2
-  // on the focused canvas (keyboard intent, not a stray second tap).
+  // The explicit entries: read mode's tray pencil, and Enter/F2 on the canvas.
   assert.match(panel, /const enterEditMode = useCallback/);
-  assert.match(panel, /data-course-mindmap-edit[\s\S]{0,160}?enterEditMode\(\)/);
+  assert.match(panel, /data-mindmap-read-edit[\s\S]{0,160}?enterEditMode/);
   assert.match(panel, /!editMode && \(event\.key === "Enter" \|\| event\.key === "F2"\)/);
   // The canvas no longer advertises a double-tap unlock.
   assert.doesNotMatch(panel, /Double tap or press Enter to edit/);
@@ -48,30 +60,76 @@ test("2 — nodes are draggable only in edit mode", () => {
   assert.match(panel, /if \(dragMovedRef\.current \|\| readOnlyRef\.current\) return;/);
 });
 
-test("3+4 — the toolbar is an opaque pill at the very bottom", () => {
-  assert.match(styles, /\[data-course-mindmap-status\] \{[^}]*position: absolute;[^}]*left: 0\.5rem;/);
-  assert.match(styles, /\[data-course-mindmap-status\] \{[^}]*bottom: calc\(max\(0\.5rem, env\(safe-area-inset-bottom\)\) \+ var\(--dc-note-footer-inset, 0px\)\);/);
-  assert.match(styles, /\[data-course-mindmap-status\] \{[^}]*background: var\(--mm-pill-bg\);/);
-  // Solid surfaces in both palettes — never the glass tokens.
-  assert.match(styles, /\.course-mindmap-shell \{[^}]*--mm-pill-bg: #0d1424;/);
-  assert.match(styles, /\.course-mindmap-shell\[data-mindmap-theme="light"\] \{[^}]*--mm-pill-bg: #ffffff;/);
-  const statusBlock = styles.slice(styles.indexOf("[data-course-mindmap-status] {"), styles.indexOf("[data-course-mindmap-status][data-compact"));
-  assert.doesNotMatch(statusBlock, /backdrop-filter|chrome-glass/, "nothing translucent about the pill");
-  // The measured footer lift is published on the strip itself.
-  assert.match(panel, /useCourseFooterInset\(!libraryOpen && !readOnlyCanvas, canvasRef\)/);
-  assert.match(panel, /strip\.style\.setProperty\(COURSE_FOOTER_INSET_PROPERTY, `\$\{footerInset\}px`\)/);
+test("3+4 — read mode's tray is the note page's tray, and ONE tap hides it", () => {
+  // Mounted only in the read view, and only while it is visible.
+  assert.match(panel, /\{libraryOpen \|\| !readOnlyCanvas \|\| !readChromeVisible \? null : \(/);
+  assert.match(panel, /<nav className="mm-read-tray" aria-label="Mind map navigation" data-mindmap-read-tray>/);
+  for (const hook of [
+    "data-mindmap-read-library",
+    "data-mindmap-read-new",
+    "data-mindmap-read-edit",
+    "data-mindmap-read-home",
+  ]) {
+    assert.match(panel, new RegExp(hook), hook);
+  }
+  assert.match(panel, /const \[readChromeVisible, setReadChromeVisible\] = useState\(true\)/);
+  // ONE tap on the canvas toggles it — and a press that travelled (a pan) never
+  // counts as a tap.
+  assert.match(panel, /const READ_TAP_SLOP_PX = 10;/);
+  assert.match(panel, /onClick=\{\(event\) => \{[\s\S]{0,500}?setReadChromeVisible\(\(visible\) => !visible\)/);
+  assert.match(panel, /Math\.hypot\(event\.clientX - start\.x, event\.clientY - start\.y\) > READ_TAP_SLOP_PX/);
+  // The tray wears the note page read pill's geometry, in this page's palette.
+  assert.match(styles, /\.mm-read-tray \{[\s\S]{0,400}?--mm-tool-size: 36px;/);
+  assert.match(styles, /\.mm-read-tray \{[\s\S]{0,500}?bottom: calc\(max\(0\.5rem, env\(safe-area-inset-bottom\)\) \+ var\(--dc-note-footer-inset, 0px\)\);/);
+  assert.match(styles, /\.mm-read-tray \{[\s\S]{0,700}?padding: 0\.375rem 0\.5rem;/);
+  assert.match(styles, /\.mm-read-tray \{[\s\S]{0,700}?background: var\(--mm-pill-bg\);/);
+  assert.match(styles, /\.mm-read-tray \{[\s\S]{0,700}?border-radius: 999px;/);
+  assert.match(styles, /\.mm-read-tray-sep \{/);
+  // …and the note page's read tray carries a control for every one of them, so
+  // the two trays stay one design.
+  for (const hook of ["data-note-read-library", "data-note-read-new", "data-note-read-edit", "data-note-read-home"]) {
+    assert.match(notes, new RegExp(hook), hook);
+  }
+  assert.match(notes, /data-note-read-tray/);
 });
 
-test("5+6 — note-editor sizes, mind-map icons", () => {
-  // Same geometry as the note editor's pill (36px buttons, same padding).
-  assert.match(styles, /\[data-course-mindmap-status\] \{[^}]*--mm-tool-size: 36px;/);
-  assert.match(styles, /\[data-course-mindmap-status\] \{[^}]*padding: 0\.375rem 0\.5rem;/);
-  assert.match(noteCss, /\.dc-note \.dc-note-dock \.bn-ak-button \{[^}]*height: 2\.25rem;/, "the note pill's buttons are the same 36px");
-  assert.match(styles, /\.mm-tool \{[^}]*width: var\(--mm-tool-size\);[^}]*border-radius: var\(--mm-tool-radius\);/);
-  assert.match(styles, /\.mm-tool > svg \{[^}]*width: 1rem;/);
+test("5 — the editing toolbar is CENTRED, note-editor sized, and eye-led", () => {
+  // It used to hug the left edge ("thoda sa left side mein hai" — the owner).
+  assert.match(styles, /\[data-course-mindmap-status\] \{[\s\S]{0,400}?left: 50%;/);
+  assert.match(styles, /\[data-course-mindmap-status\] \{[\s\S]{0,400}?transform: translateX\(-50%\);/);
+  assert.match(styles, /\[data-course-mindmap-status\] \{[\s\S]{0,500}?bottom: calc\(max\(0\.5rem, env\(safe-area-inset-bottom\)\) \+ var\(--dc-note-footer-inset, 0px\)\);/);
+  // Solid surfaces in both palettes — never the glass tokens.
+  const statusBlockForFill = styles.slice(
+    styles.indexOf("[data-course-mindmap-status] {"),
+    styles.indexOf("[data-course-mindmap-status][data-compact"),
+  );
+  assert.match(statusBlockForFill, /background: var\(--mm-pill-bg\);/);
+  assert.match(styles, /\.course-mindmap-shell \{[^}]*--mm-pill-bg: #0d1424;/);
+  assert.match(styles, /\.course-mindmap-shell\[data-mindmap-theme="light"\] \{[^}]*--mm-pill-bg: #ffffff;/);
+  const statusBlock = styles.slice(
+    styles.indexOf("[data-course-mindmap-status] {"),
+    styles.indexOf("[data-course-mindmap-status][data-compact"),
+  );
+  assert.doesNotMatch(statusBlock, /backdrop-filter|chrome-glass/, "nothing translucent about the pill");
+  // Same geometry as the note editor's pill (36px tiles, same padding).
+  assert.match(statusBlock, /--mm-tool-size: 36px;/);
+  assert.match(statusBlock, /padding: 0\.375rem 0\.5rem;/);
+  assert.match(noteCss, /\.dc-note \.dc-note-dock \.bn-ak-button \{[\s\S]{0,200}?width: 2\.25rem;/, "the note pill's buttons are the same 36px");
+  assert.match(styles, /\.mm-tool \{[\s\S]{0,200}?width: var\(--mm-tool-size\);/);
+  assert.match(styles, /\.mm-tool > svg \{[\s\S]{0,120}?width: 1rem;/);
+  // The EYE leads it — one more .mm-tool of the row, in the same design as the
+  // note editor's own read control. The violet "Save and read" capsule is gone.
+  assert.match(panel, /className="mm-tool"[\s\S]{0,160}?data-mindmap-edit-read/);
+  assert.match(panel, /<Eye size=\{16\} aria-hidden="true" \/>/);
+  assert.doesNotMatch(panel, /data-course-mindmap-done/);
+  // …and the note editor's own read control is the same tile, built from
+  // BlockNote's toolbar button so it cannot drift from its neighbours.
+  const toolbar = read("src/course/NoteEditorToolbar.tsx");
+  assert.match(toolbar, /className="dc-note-read-eye"[\s\S]{0,200}?data-note-edit-read/);
+  assert.match(toolbar, /icon=\{<Eye size=\{16\} \/>\}/);
+  assert.doesNotMatch(toolbar, /dc-note-dock-read|BookOpen/);
   // The mind map's own controls and glyphs are all still on the bar.
   for (const hook of [
-    "data-course-mindmap-done",
     "data-course-mindmap-save",
     "data-course-mindmap-json-import",
     "data-course-mindmap-maps",
@@ -83,36 +141,69 @@ test("5+6 — note-editor sizes, mind-map icons", () => {
   ]) {
     assert.match(panel, new RegExp(hook), hook);
   }
-  assert.match(panel, /className="mm-tool mm-tool-violet"[^>]*data-course-mindmap-done/);
   assert.match(panel, /<Sparkles \/>/);
   assert.match(panel, /<Maximize \/>/);
   assert.match(panel, /<Trash2 \/>/);
-  // Its menus open upward from the bottom bar now.
+  // Its menus open upward from the bottom bar.
   assert.match(panel, /bottom: window\.innerHeight - anchor\.top \+ 8/);
+  // BOTH bottom bars ride the measured footer lift, published on the shell (the
+  // note editor's arrangement) so either bar clears the player's footer.
+  assert.match(panel, /useCourseFooterInset\(!libraryOpen, canvasRef\)/);
+  assert.match(panel, /shell\.style\.setProperty\(COURSE_FOOTER_INSET_PROPERTY, `\$\{footerInset\}px`\)/);
 });
 
-test("7 — corner buttons open the left and right side panels", () => {
-  assert.match(panel, /data-mindmap-open-left-panel[\s\S]{0,200}?setSidePanel\("left"\)/);
-  assert.match(panel, /<PanelLeft size=\{18\}/);
-  assert.match(panel, /data-mindmap-open-right-panel[\s\S]{0,200}?setSidePanel\("right"\)/);
-  assert.match(panel, /<PanelRight size=\{18\}/);
+test("6 — the ONE panel is the map library, with the notes library's rows", () => {
+  assert.match(panel, /data-course-mindmap-library/);
   assert.match(panel, /data-mindmap-left-panel/);
-  assert.match(panel, /absolute inset-y-0 left-0 z-40 flex w-\[280px\]/);
-  assert.match(panel, /data-mindmap-right-panel/);
-  assert.match(panel, /absolute inset-y-0 right-0 z-40 flex w-\[300px\]/);
+  assert.match(panel, /w-\[calc\(100%-2\.5rem\)\]/, "nearly a whole page, a thin strip still visible");
+  assert.match(libraryCss, /\[data-mindmap-left-panel\] \{[\s\S]{0,200}?border-top-right-radius: 18px;/);
   assert.match(panel, /data-mindmap-panel-scrim/);
-  // Escape shuts a panel before it leaves the canvas.
-  assert.match(panel, /if \(sidePanel\) \{ setSidePanel\(null\); return; \}/);
+  assert.match(panel, /data-mindmap-panel-head/);
+  assert.match(panel, /data-mindmap-panel-foot/);
+  assert.match(panel, /data-mindmap-panel-new/);
+  // ONE button at the bottom — "New mind map" — and nothing "back to library".
+  assert.doesNotMatch(panel, /data-mindmap-panel-library/);
+  assert.doesNotMatch(panel, /Open full library/);
+  // Rows carry no pencil / trash: their actions live behind a long press, in
+  // both collections, exactly like the notes library.
+  assert.equal(
+    (panel.match(/leafActionMenu="long-press"/g) || []).length,
+    2,
+    "the SELF and MASTER collections are both in the panel, with long-press rows",
+  );
+  assert.match(libraryCss, /\[data-mindmap-left-panel\] \.mindmap-library-menu \.branched-menu__label[\s\S]{0,200}?text-overflow: ellipsis;/);
+  assert.match(panel, /onRename: \(nextTitle\) => onRenameMap\?\.\(entry\.mapKey, nextTitle\)/);
+  assert.match(panel, /onDelete: \(\) => requestMapDelete\(entry\.mapKey\)/);
+  // Escape shuts the panel before it leaves the canvas.
+  assert.match(panel, /if \(panelOpen\) \{ closePanel\(\); return; \}/);
 });
 
-test("8 — rename from the side panel, saved through the library's rename path", () => {
-  // Right panel: a rename field for the map on the canvas.
-  assert.match(panel, /data-mindmap-right-panel[\s\S]*?data-mindmap-rename-input/);
-  assert.match(panel, /data-mindmap-rename-save/);
-  assert.match(panel, /onRenameMap\?\.\(activeMapKey, next\)/);
-  // Left panel: the same library trees, whose SELF rows rename in place.
-  assert.match(panel, /data-mindmap-left-panel[\s\S]*?<BranchedMenu\s+items=\{collectionMode === "master" \? masterTree : selfTree\}|data-mindmap-left-panel[\s\S]*?items=\{selfTree\}/);
-  assert.match(panel, /onRename: \(nextTitle\) => onRenameMap\?\.\(entry\.mapKey, nextTitle\)/);
-  // The canvas name the panel seeds from is the library's own name source.
+test("7 — headless: no header, no corner buttons, no second drawer, notes' home", () => {
+  assert.doesNotMatch(panel, /CoursePageHeader|data-course-page-header/);
+  assert.doesNotMatch(panel, /data-mindmap-open-left-panel|data-mindmap-open-right-panel|data-mindmap-editor-chrome/);
+  assert.doesNotMatch(
+    panel,
+    /data-mindmap-right-panel|data-mindmap-rename-input|data-mindmap-rename-save|data-mindmap-panel-read|data-mindmap-panel-save|data-mindmap-panel-stats/,
+  );
+  assert.doesNotMatch(panel, /renameDraft|sidePanel/);
+  // The home page: the notes home's three centred buttons, in the same order.
+  assert.match(panel, /data-course-mindmap-home/);
+  assert.match(panel, /data-mindmap-home-actions/);
+  assert.match(panel, /data-mindmap-home-new[\s\S]{0,400}?New mind map/);
+  assert.match(panel, /data-mindmap-home-mine[\s\S]{0,400}?My Library/);
+  assert.match(panel, /data-mindmap-home-course[\s\S]{0,400}?Course Library/);
+  assert.match(notes, /data-notes-home-new[\s\S]{0,400}?New note/);
+  assert.match(notes, /data-notes-home-library[\s\S]{0,400}?My Library/);
+  assert.match(notes, /data-notes-home-course[\s\S]{0,400}?Course Library/);
+});
+
+test("8 — rename through the panel's rows, saved through the library's own path", () => {
+  // The panel renders the collection the MASTER / SELF control picks, and its
+  // SELF rows carry the rename callback the store has always used.
+  assert.match(panel, /collectionMode === "master" \? \(/);
+  assert.match(panel, /items=\{selfTree\}/);
+  assert.match(panel, /items=\{masterTree\}/);
+  assert.match(panel, /onRenameMap\?\.\(entry\.mapKey, nextTitle\)/);
+  // The canvas name the panel reveals is the library's own name source.
   assert.match(panel, /maps\.find\(\(entry\) => entry\.mapKey === activeMapKey\)\?\.title \|\| mind\.title/);
 });

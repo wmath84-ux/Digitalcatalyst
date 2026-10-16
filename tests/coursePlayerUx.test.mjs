@@ -180,20 +180,22 @@ test("ImageViewer shows a friendly error when the image fails to load", () => {
 // Notes panel — add / edit / delete + multi-device sync
 // ---------------------------------------------------------------------------
 
-test("NotesPanel supports add, edit, and delete via a single + button", () => {
-  // The "+" is a small circular button floating at the panel's own grid
-  // (bottom-right) — the pane carries no header at all, so the button lives
-  // in the panel that owns the composer.
+test("NotesPanel adds, edits and deletes through the ONE library panel", () => {
+  // Owner brief 2026-10-15: the notes library IS the side panel. Its bottom
+  // carries exactly ONE button — New note — and a row opens its note in READ
+  // mode first (double tap, or the read pill's pencil, opens the editor).
   assert.match(notesPanel, /data-course-notes-add/);
   assert.doesNotMatch(overlay, /data-course-notes-add/);
-  assert.match(notesPanel, /data-course-notes-save/);
-  assert.match(notesPanel, /data-course-note-edit/);
-  assert.match(notesPanel, /data-course-note-edit-input/);
-  assert.match(notesPanel, /data-course-note-edit-save/);
-  assert.match(notesPanel, /data-course-note-edit-cancel/);
-  assert.match(resourceCard, /data-branched-delete/);
-  assert.match(notesPanel, /onSelect=\{\(value\) => \{/);
-  assert.match(notesPanel, /startEdit\(note\)/);
+  assert.match(notesPanel, /data-note-panel-new/);
+  assert.match(notesPanel, /data-note-library-panel/);
+  assert.match(notesPanel, /data-course-note-open/);
+  assert.match(notesPanel, /const openNote = \(note: CoursePlayerNote\) => \{/);
+  // Delete is still the two-step dialog the library has always used.
+  assert.match(notesPanel, /setPendingDeleteId\(note\.id\)/);
+  assert.match(notesPanel, /onDelete\(pendingDeleteId\)/);
+  assert.match(notesPanel, /<ConfirmDeleteDialog/);
+  // …and the explicit Save / Cancel surface is gone: a note saves itself.
+  assert.doesNotMatch(notesPanel, /data-course-notes-save|data-course-note-edit-save|data-course-note-edit-cancel/);
 });
 
 test("NotesPanel renders the shared branched menu and matching library states", () => {
@@ -397,7 +399,11 @@ test("the Modules library keeps locked content visible but disabled; paid module
   const library = readSource("src/course/CourseResourceLibrary.tsx");
   assert.match(library, /disabled: resource\.locked/);
   assert.match(library, /"data-locked": built\.moduleMeta\.get\(key\)\?\.locked/);
-  assert.match(overlay, /isPaidLocked\(module, ownedUpdateIds\)/);
+  // The paid-module rule itself (paidUpdate access + a paid update + not yet
+  // owned) now lives in the ONE shared model the paid page and the flat paid
+  // list both read, so the two can never list different things.
+  assert.match(readSource("src/course/paidListing.ts"), /module\.accessLevel === "paidUpdate" && Boolean\(moduleUpdateId\)/);
+  assert.match(overlay, /buildPaidEntries\(\{ updates, modules, ownedUpdateIds \}\)/);
   assert.match(overlay, /const listRows = paidRows;/);
 });
 

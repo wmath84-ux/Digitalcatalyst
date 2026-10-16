@@ -5,7 +5,12 @@ import useLocalCourseProgress from "./course/useLocalCourseProgress";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import ResourceViewer, { type CourseFileActions } from "./course/ResourceViewer";
 import { isExperimentFileType } from "./types/course";
-import CourseOverlay, { STUDY_TAB_ORDER, dockTabRecord, unlockedModuleIds, type DockTab } from "./course/CourseOverlay";
+import CourseOverlay, { STUDY_TAB_ORDER, dockTabRecord, unlockedModuleIds, type CourseOverlayQuadConfig, type DockTab } from "./course/CourseOverlay";
+import CourseHeaderNav from "./course/CourseHeaderNav";
+import { loadQuadLayout, saveQuadLayout, useQuadDeckEnabled, type QuadLayoutState, type QuadPaneId } from "./course/quadLayout";
+import { useCourseViewSettings } from "./course/courseViewSettings";
+import { useFooterNavigationPlacement } from "./utils/footerNavigationPlacement";
+import { buildPaidDeepLink, rememberPdpReturn } from "./utils/paidDeepLink";
 import CourseBrainPanel from "./course/CourseBrainPanel";
 import { collectBrainPracticeSets } from "../utils/practiceSet.js";
 import {
@@ -573,6 +578,51 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // and the study pane (tabs + footer dock) on the other. Tapping the active
   // dock tab peek-collapses the study pane; the divider drags it back.
   const splitDeckRef = useRef<SplitDeckHandle | null>(null);
+
+  // ── The plus deck: tablet (every size) and desktop, 768px and up ────────
+  // The owner's brief (2026-10-16): from 768px the course area is FOUR blocks
+  // in a `+` — the main content left-top, the Resource Library under it, Notes
+  // right-top and the Mind map right-bottom — with two dividers that always
+  // drag. Below 768px nothing here is read: the phone keeps the split deck it
+  // has today. The shape and both ratios persist per course, so the player
+  // never opens on a fresh layout.
+  const quadWide = useQuadDeckEnabled();
+  const navPlacement = useFooterNavigationPlacement();
+  const courseViewSettings = useCourseViewSettings();
+  const [quadState, setQuadState] = useState<QuadLayoutState>(() => loadQuadLayout(storageProductId));
+  const [quadReveal, setQuadReveal] = useState<{ pane: QuadPaneId; count: number } | null>(null);
+  /**
+   * The mind map block is on screen for the whole visit in the plus deck, so
+   * its panel is "open" the moment the deck is up. It still goes through the
+   * panel's own open transition (one frame of `false`, then `true`), because
+   * that transition is what restores the learner's last view from the panel
+   * session — "library stays library, canvas stays canvas", never a fresh
+   * state at open.
+   */
+  const [quadPaneLive, setQuadPaneLive] = useState(false);
+  useEffect(() => {
+    setQuadPaneLive(true);
+  }, [quadWide]);
+  useEffect(() => {
+    setQuadState(loadQuadLayout(storageProductId));
+  }, [storageProductId]);
+  const commitQuadState = useCallback(
+    (next: QuadLayoutState) => {
+      setQuadState(next);
+      saveQuadLayout(storageProductId, next);
+    },
+    [storageProductId],
+  );
+  /**
+   * The owner's single-divider shape ("right side = resource page aur uske
+   * niche footer navigation") draws the navigation under the Resource Library
+   * itself, so the placed navigation steps aside — never two of them.
+   */
+  const quadNavInDeck = quadWide && quadState.format === "pair";
+  const headerNavInRail = quadWide && navPlacement === "header" && !quadNavInDeck;
+  const quadRailLeft = quadWide && navPlacement === "left" && !quadNavInDeck;
+  const quadRailRight = quadWide && navPlacement === "right" && !quadNavInDeck;
+  const quadNavBottom = quadWide && navPlacement === "bottom" && !quadNavInDeck;
   /**
    * Every Brain practice set this learner may open — the course tree's `brain`
    * resources (the sets the admin imported on the Product / Course-content
@@ -1796,6 +1846,21 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // A different course resets the stack.
   useEffect(() => { setVisitedFiles([]); userSelectedRef.current = false; }, [storageProductId]);
 
+  /**
+   * The Paid page's rows do not buy anything here any more — they open the
+   * product detail page ON the paid row the learner tapped. Owner: "wah seedhe
+   * product detail page ke paid section me chala jaye … wahi paid module ya
+   * paid type highlight ya blink ho jaye, aur wahin se purchase kar sake."
+   *
+   * The course hash is remembered first, so the product page's back control
+   * brings him straight back to this course.
+   */
+  const handleOpenPaid = useCallback((paidKey: string) => {
+    if (!paidKey) return;
+    rememberPdpReturn(String(product.id), `#/course/${encodeURIComponent(String(product.id))}`);
+    window.location.hash = buildPaidDeepLink(String(product.id), paidKey);
+  }, [product.id]);
+
   const handleBuyModule = (module: { id: string; paidUpdateId?: string; paidUpdateTitle?: string; paidUpdatePrice?: string }) => {
     if (!module.paidUpdateId) return;
     const update = updates.find((u) => u.id === module.paidUpdateId) || { id: module.paidUpdateId, title: module.paidUpdateTitle || "Course update", price: numericPrice(module.paidUpdatePrice), coinPrice: 0, contentNames: [] } as PaidCourseUpdate;
@@ -1825,6 +1890,22 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     }
     setDockTab(next);
     splitDeckRef.current?.activateStudy();
+  };
+
+  /**
+   * The navigation's own tab handler on top of `handleDockTabChange`: on a big
+   * stage three tabs have a BLOCK of their own (Notes, Mind map, Resource
+   * Library), so pressing their button brings that block back if the learner
+   * had closed it — and every other tab borrows the main content block.
+   */
+  const handleNavTabChange = (next: DockTab) => {
+    handleDockTabChange(next);
+    if (!quadWide) return;
+    if (next === "modules" && personalModulesOpen) return;
+    const pane: QuadPaneId | null =
+      next === "notes" ? "c12" : next === "mindmap" ? "c22" : next === "modules" ? "c21" : null;
+    if (!pane) return;
+    setQuadReveal((prev) => ({ pane, count: (prev?.count ?? 0) + 1 }));
   };
 
   // ⌘/Ctrl+1…9 walks the study tabs — a desktop shortcut, so it stays out of
@@ -2157,9 +2238,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const buildStudyPane = (
     paneTab: DockTab,
     onPaneTabChange: (tab: DockTab) => void,
-    opts: { extra?: boolean } = {},
+    opts: { extra?: boolean; quad?: CourseOverlayQuadConfig } = {},
   ) => (
     <CourseOverlay
+      {...(opts.quad ? { quad: opts.quad } : {})}
       orientation={useLandscapeRails ? "landscape" : "portrait"}
       tab={paneTab}
       onTabChange={onPaneTabChange}
@@ -2183,6 +2265,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onSelectFile={selectFile}
       onBuyModule={handleBuyModule}
       onBuyUpdate={onPurchaseUpdate}
+      onOpenPaid={handleOpenPaid}
       // A learner-authored course has nothing to sell: the Paid ("premium")
       // tab is removed from the footer dock and from the ⌘/Ctrl+1… shortcuts.
       hiddenTabs={hiddenTabs}
@@ -2233,11 +2316,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           masterMap={masterMapView}
           onCloseMasterMap={() => setMasterMapKey(null)}
           landscape={useLandscapeRails}
-          // True only while the mind map tab is the one on screen. Within one
-          // player visit the panel restores the learner's last view (library
-          // or canvas) from the panel session; leaving the player resets it
-          // back to the library home screen.
-          open={dockTab === "mindmap"}
+          // True only while the mind map tab is the one on screen — and, in
+          // the plus deck, for as long as the map's own block is (which is the
+          // whole visit at 768px and up). Within one player visit the panel
+          // restores the learner's last view (library or canvas) from the
+          // panel session; leaving the player resets it back to the library
+          // home screen.
+          open={quadWide ? quadPaneLive : dockTab === "mindmap"}
         />
         </Suspense>
       )}
@@ -2277,7 +2362,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             onSelectBoard={sketch.selectBoard}
             onCreateBoard={sketch.createBoard}
             onDeleteActive={() => sketch.deleteBoard(sketch.activeBoardKey)}
-            canDeleteActive={sketch.boards.length > 1}
+            // The panel's own row actions: rename edits that row's label in
+            // place, delete asks the same confirmation the old header did.
+            onRenameBoard={sketch.renameBoard}
+            onDeleteBoard={(key) => sketch.deleteBoard(key)}
             canCreateBoard={sketch.canCreateBoard}
             cleanLook={sketchCleanLookCtl.value}
             productId={product.id}
@@ -2402,8 +2490,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       // library (course audio, their own files, saved links). Main pane only:
       // a second player in an extra part would fight the first one for the
       // speaker, so an extra part never mounts it.
+      //
+      // `active` is the pane's own tab truth: leaving the Music tab pauses a
+      // song (the glass player banks its position) and unmounts a video embed,
+      // so nothing sings behind a Notes page. Inside the tab, going back to the
+      // library page never stops the song — the player stays mounted.
       musicPanel={opts.extra ? undefined : (
-        <MusicPanel uid={user?.id ?? null} courseAudio={courseAudio} />
+        <MusicPanel uid={user?.id ?? null} courseAudio={courseAudio} active={paneTab === "music"} />
       )}
       aiPanel={opts.extra ? undefined : (
         user?.id && aiOpened ? (
@@ -2458,6 +2551,39 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    * speak about one tab.
    */
   const studyOverlay = buildStudyPane(dockTab, handleDockTabChange);
+
+  /**
+   * The placeable navigation — ONE component for the header, the left/right
+   * rails and the bottom strip (src/course/CourseHeaderNav.tsx). Its placement
+   * and its "-6px" size come from the shared store, so the button that moves it
+   * and the surface that draws it can never disagree.
+   */
+  const courseNavNode = (
+    <CourseHeaderNav
+      tab={dockTab}
+      onTabChange={handleNavTabChange}
+      hiddenTabs={hiddenTabs}
+      placement={navPlacement}
+    />
+  );
+
+  /**
+   * The plus deck's study area: the same overlay, handed the four blocks, the
+   * two ratios and the navigation. Only rendered from 768px up.
+   */
+  const quadOverlay = quadWide
+    ? buildStudyPane(dockTab, handleNavTabChange, {
+        quad: {
+          state: quadState,
+          onState: commitQuadState,
+          view: courseViewSettings,
+          placement: navPlacement,
+          playerPane: viewerStack,
+          nav: courseNavNode,
+          reveal: quadReveal,
+        },
+      })
+    : null;
 
   /**
    * The tabs an EXTRA pane (the third / fourth part the divider adds on a big
@@ -2546,6 +2672,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       data-course-theme={playerThemeCtl.theme}
       data-course-waves={gradientWavesOn ? "on" : "off"}
       data-orientation={useLandscapeRails ? "landscape" : "portrait"}
+      // The owner's "-6px": wherever the navigation is docked in the plus deck
+      // (bottom strip, left/right rail, header) its box comes down by six
+      // pixels. Set only from 768px up, so a phone's footer is untouched.
+      {...(quadWide ? { "data-quad-nav-shrunk": "" } : {})}
       {...(useLandscapeRails
         ? {
             "data-course-landscape-scroll": "vertical",
@@ -2578,7 +2708,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
               : `Course progress ${progress}%`
           }
           title={canMarkCompleteTop ? (isDone ? "Tap to mark as not complete" : "Mark this lesson complete") : undefined}
-          className="relative flex w-1/2 cursor-pointer items-center gap-2 px-3 pb-[3px] outline-none disabled:cursor-default"
+          className={`relative flex cursor-pointer items-center gap-2 px-3 pb-[3px] outline-none disabled:cursor-default ${
+            headerNavInRail ? "min-w-0 flex-1" : "w-1/2"
+          }`}
           data-course-progress-bar
           data-progress-value={progress}
         >
@@ -2645,7 +2777,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           }}
           aria-label="Open Player settings"
           title="Player settings"
-          className="flex w-1/2 cursor-pointer items-center justify-center gap-2 px-3 pb-[3px] outline-none transition-colors hover:bg-white/5"
+          className={`flex cursor-pointer items-center justify-center gap-2 px-3 pb-[3px] outline-none transition-colors hover:bg-white/5 ${
+            headerNavInRail ? "shrink-0" : "w-1/2"
+          }`}
           data-course-settings-trigger
         >
           <Settings className="h-3.5 w-3.5 text-white/70" />
@@ -2653,6 +2787,20 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             Settings
           </span>
         </button>
+
+        {/* The navigation joins the header line: progress bar, Settings and
+            the footer navigation in ONE row (owner, 2026-10-16). It renders
+            only while it is placed in the header — left, right and bottom
+            have their own rails — and never while the single-divider shape
+            draws it under the Resource Library. */}
+        {headerNavInRail ? (
+          <div
+            className="flex min-w-0 flex-[2] items-center justify-end border-l border-white/10 px-1"
+            data-course-nav-slot
+          >
+            {courseNavNode}
+          </div>
+        ) : null}
       </div>
 
       {/* Runway animation keyframes */}
@@ -2666,6 +2814,12 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           = lesson left of the study pane (row) — the split always activates
           from the RIGHT in landscape, never from the bottom. */}
       <div className={`relative flex min-h-0 min-w-0 flex-1 ${useLandscapeRails ? "flex-row" : "flex-col"}`} data-course-stage>
+      {/* Placement LEFT: the navigation as a rail down the left edge. */}
+      {quadRailLeft ? (
+        <div className="relative z-[70] flex w-[88px] shrink-0 flex-col border-r border-white/10 bg-[#0a0c12]/70" data-quad-nav-rail="left">
+          {courseNavNode}
+        </div>
+      ) : null}
       {/* ── Animated background — React Bits Gradient Waves ───────────────
           The landing page's own component, behind the content area only (the
           stage — never the top rail). Click-through, z-index -1 inside the
@@ -2679,6 +2833,12 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         data-course-split="on"
         {...(useLandscapeRails ? { "data-course-landscape-content": "" } : {})}
       >
+        {/* ── THE PLUS DECK — 768px and up ────────────────────────────────
+            Four blocks in a `+`: the main content left-top, the Resource
+            Library under it, Notes right-top, the Mind map right-bottom, with
+            two dividers that always drag. Below 768px the split deck below is
+            untouched — mobile keeps exactly what it has today. */}
+        {quadOverlay ? quadOverlay : (
         <SplitDeck
           axis={useLandscapeRails ? "row" : "column"}
           orientation={useLandscapeRails ? "landscape" : "portrait"}
@@ -2699,8 +2859,25 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           renderExtraPane={renderExtraPane}
           extraPaneTab={extraPaneTab}
         />
+        )}
       </section>
+      {/* Placement RIGHT: the same rail on the right edge. */}
+      {quadRailRight ? (
+        <div className="relative z-[70] flex w-[88px] shrink-0 flex-col border-l border-white/10 bg-[#0a0c12]/70" data-quad-nav-rail="right">
+          {courseNavNode}
+        </div>
+      ) : null}
       </div>
+      {/* Placement BOTTOM: the familiar strip across the bottom of the course
+          area — the same navigation, six pixels shorter. */}
+      {quadNavBottom ? (
+        <div
+          className="relative z-[70] shrink-0 border-t border-white/10 bg-[#0a0c12]/85 pb-[max(env(safe-area-inset-bottom),4px)]"
+          data-quad-nav-bottom
+        >
+          {courseNavNode}
+        </div>
+      ) : null}
       {/* ── CENTER COMPLETION CONTROL ─────────────────────────────────────
           Revealed by the top progress interaction (and kept alive by every
           further tap): the SAME animated ChargingCompleteButton the Player
@@ -2728,8 +2905,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           />
         </div>
       ) : null}
-      {/* Direct study strips disappear when the soft keyboard is open. */}
-      <CoursePeekDock tab={dockTab} onTabChange={handleDockTabChange} hiddenTabs={hiddenTabs} />
+      {/* Direct study strips disappear when the soft keyboard is open — and on
+          a big stage the footer strip is replaced by the placeable navigation
+          (header / left / right / bottom), exactly as the brief asks. */}
+      {quadWide ? null : <CoursePeekDock tab={dockTab} onTabChange={handleDockTabChange} hiddenTabs={hiddenTabs} />}
       {snowMode ? <SnowOverlay /> : null}
     </div>
     )}

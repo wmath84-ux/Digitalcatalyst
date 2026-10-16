@@ -1,0 +1,272 @@
+/* src/course/sketchLibrary.css
+ *
+ * The Sketch page's ONE side panel, its bottom trays, and the Quiet status
+ * chip — the same arrangement the notes page has in ./notesLibrary.css and the
+ * mind map in ./mindMapLibrary.css. Everything here is scoped to the sketch
+ * surfaces, so no other Course Player page is touched.
+ *
+ * ── Why the rows needed this ───────────────────────────────────────────────
+ * The canvas list used to share each line with a trash button (and a dropdown
+ * chevron), so a long canvas name was squeezed and wrapped. The rows are now
+ * exactly one clean line, with NO row buttons: rename and delete live in the
+ * row's long-press popup (BranchedMenu's `leafActionMenu="long-press"`), and a
+ * long name truncates with an ellipsis.
+ *
+ * ── The trays ──────────────────────────────────────────────────────────────
+ * Read mode's tray and the editing tray are the notes page's bottom tray in
+ * this page's palette: one opaque, fully-rounded, side-scrolling pill resting
+ * on the same line as the note dock (`--dc-note-footer-inset` is published by
+ * the panel and lifts them both over the player's footer navigation).
+ */
+
+[data-course-sketch-side-panel] {
+  border-top-right-radius: 18px;
+  border-bottom-right-radius: 18px;
+}
+
+/* One clean line per canvas, like the note and mind map libraries. */
+[data-course-sketch-side-panel] .sketch-library-menu .branched-menu__label,
+[data-course-sketch-side-panel] .sketch-library-menu .branched-menu__head-label {
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-course-sketch-side-panel] .sketch-library-menu .branched-menu__item,
+[data-course-sketch-side-panel] .sketch-library-menu .branched-menu__item--section,
+[data-course-sketch-side-panel] .sketch-library-menu .branched-menu__head {
+  padding-right: 12px;
+}
+
+/* The canvas the page is showing: the same soft ink wash the note library
+   gives the note that is open. */
+[data-course-sketch-side-panel] .sketch-library-menu .branched-menu__item[data-active] {
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bm-accent) 10%, transparent);
+}
+
+/* A row's actions menu (long press / secondary click / keyboard menu key). */
+[data-course-sketch-side-panel] .branched-menu__popup {
+  margin-left: 4px;
+}
+
+.sketch-library-menu__count {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.55;
+}
+
+/* The options block under the list (the switches, the library read-out, the
+   canvas colour, the save state and its Retry). */
+.sketch-library-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.25rem;
+}
+
+/* The strip of page the panel leaves visible is the way out — make it obvious
+   that it is interactive. */
+[data-course-sketch-panel] [data-course-sketch-panel-scrim] {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── The bottom trays ─────────────────────────────────────────────────────── */
+
+[data-course-sketch-panel] .dc-sketch-tray {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(max(0.5rem, env(safe-area-inset-bottom)) + var(--dc-note-footer-inset, 0px));
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100% - 1rem);
+  padding: 0.375rem 0.5rem;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 999px;
+  background: #141419;
+  box-shadow: 0 10px 25px rgb(2 6 23 / 0.28);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: auto;
+  scrollbar-width: none;
+}
+
+[data-course-sketch-panel] .dc-sketch-tray::-webkit-scrollbar {
+  display: none;
+}
+
+/* A light page (Work's device-only light theme) keeps the tray readable. */
+[data-course-sketch-panel][data-work-storage-only="true"][data-course-theme="light"] .dc-sketch-tray {
+  border-color: rgb(15 23 42 / 0.12);
+  background: #ffffff;
+  box-shadow: 0 10px 25px rgb(15 23 42 / 0.18);
+}
+
+/* Every control on the tray is the SAME 36px round tile — nothing on this page
+   is a different shape or weight from its neighbours (the owner's brief). */
+.dc-sketch-tray-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  color: rgb(255 255 255 / 0.86);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.dc-sketch-tray-button:hover {
+  background: rgb(255 255 255 / 0.12);
+  color: #ffffff;
+}
+
+.dc-sketch-tray-button:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.dc-sketch-tray-button[aria-expanded="true"] {
+  background: rgb(249 115 22 / 0.18);
+  color: #fdba74;
+}
+
+[data-course-sketch-panel][data-work-storage-only="true"][data-course-theme="light"] .dc-sketch-tray-button {
+  color: rgb(15 23 42 / 0.72);
+}
+
+[data-course-sketch-panel][data-work-storage-only="true"][data-course-theme="light"] .dc-sketch-tray-button:hover {
+  background: rgb(15 23 42 / 0.08);
+  color: #0f172a;
+}
+
+/* The Full Editor / Quick Sketch switch keeps its words: it is the one control
+   whose label is the whole point, so it is a wider tile in the same row. */
+.dc-sketch-tray-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.15);
+  color: rgb(255 255 255 / 0.8);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.dc-sketch-tray-text:hover {
+  background: rgb(255 255 255 / 0.1);
+  color: #ffffff;
+}
+
+.dc-sketch-tray-text--lit {
+  border-color: rgb(249 115 22 / 0.6);
+  background: rgb(249 115 22 / 0.18);
+  color: #fdba74;
+}
+
+[data-course-sketch-panel][data-work-storage-only="true"][data-course-theme="light"] .dc-sketch-tray-text {
+  border-color: rgb(15 23 42 / 0.15);
+  color: rgb(15 23 42 / 0.75);
+}
+
+[data-course-sketch-panel][data-work-storage-only="true"][data-course-theme="light"] .dc-sketch-tray-text:hover {
+  background: rgb(15 23 42 / 0.06);
+  color: #0f172a;
+}
+
+.dc-sketch-tray-sep {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 1.25rem;
+  margin: 0 0.25rem;
+  background: rgb(255 255 255 / 0.16);
+}
+
+/* The canvas-colour cluster floats its picker; inside the tray it is one more
+   widget of the row. */
+.dc-sketch-tray-colour {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 0 0.25rem;
+}
+
+/* ── The editor's own chrome, brought down to the bottom zone ────────────
+   Excalidraw renders its shape tools in the top menu's middle cell (the
+   "shapes" island) and its zoom / undo / redo island in the footer. On this
+   page the page's OWN bottom tray is the bottom line of chrome, so the
+   editor's pieces stack directly above it — same width, same centred
+   anchor, no overlap and no duplicated row:
+
+       [ zoom · undo · redo ]        row 3, left   (editor utilities)
+       [ shapes · text · arrows ]     row 2, centre (the editor's tool row)
+       [ the page's tray ]             row 1, centre (the page's own controls)
+
+   The bottom zone's coordinates come from the SAME inset the page's tray
+   uses, so the whole stack lifts together over the player's footer
+   navigation. Only the anchor moves: widths, paddings and pointer behaviour
+   stay Excalidraw's, so touch / pen / keyboard interaction is untouched. */
+
+[data-course-sketch-panel][data-sketch-editing="true"] [data-course-sketch-host] .excalidraw .App-menu_top > .shapes-section {
+  position: absolute;
+  left: 50%;
+  bottom: calc(max(0.5rem, env(safe-area-inset-bottom)) + var(--dc-note-footer-inset, 0px) + 3.25rem);
+  transform: translateX(-50%);
+  z-index: 28;
+  max-width: calc(100% - 1rem);
+  pointer-events: none;
+}
+
+/* The island keeps its own look — only its inner row may slide sideways when
+   the pane is narrow. */
+[data-course-sketch-panel] [data-course-sketch-host] .excalidraw .App-menu_top > .shapes-section > * {
+  pointer-events: auto;
+  max-width: 100%;
+}
+
+[data-course-sketch-panel][data-sketch-editing="true"] [data-course-sketch-host] .excalidraw .App-menu_top > .shapes-section .App-toolbar-container,
+[data-course-sketch-panel][data-sketch-editing="true"] [data-course-sketch-host] .excalidraw .App-menu_top > .shapes-section .App-toolbar {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+[data-course-sketch-panel][data-sketch-editing="true"] [data-course-sketch-host] .excalidraw .App-menu_top > .shapes-section .App-toolbar-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* The editor's own utility island (zoom · undo · redo) rides one row higher:
+   the page's tray already owns drawing, undoing and clearing, so this stays
+   out of the tray's line while zoom stays one tap away. */
+[data-course-sketch-panel] [data-course-sketch-host] .excalidraw .layer-ui__wrapper__footer {
+  position: absolute;
+  top: auto;
+  bottom: calc(max(0.5rem, env(safe-area-inset-bottom)) + var(--dc-note-footer-inset, 0px) + 6.75rem);
+  justify-content: flex-start;
+  padding-inline: 0.75rem;
+}
+
+/* The editor's phone toolbar lives in its own bottom bar; it takes the same
+   row as the desktop tool row so only ONE of the two ever shows. */
+[data-course-sketch-panel][data-sketch-editing="true"] [data-course-sketch-host] .excalidraw .App-bottom-bar {
+  top: auto;
+  bottom: calc(max(0.5rem, env(safe-area-inset-bottom)) + var(--dc-note-footer-inset, 0px) + 3.25rem);
+}
+
+/* While reading, none of the editor's drawing chrome shows — only the utility
+   island (zoom), on its own row above the read tray. */
+[data-course-sketch-panel][data-sketch-reading="true"] [data-course-sketch-host] .excalidraw .App-menu_top > .shapes-section {
+  display: none;
+}

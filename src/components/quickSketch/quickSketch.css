@@ -636,3 +636,96 @@
 .dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-number {
   background: #18181b;
 }
+
+/* ── The bottom tray ──────────────────────────────────────────────────────
+   ONE sliding row at the bottom of the chip, in the page's tray design: the
+   editor's own Draw · Erase · Undo · Redo · Clear first, then — beside them —
+   the Full Editor switch and the read / edit control. Every button keeps its
+   size and the row scrolls sideways on a narrow sheet. */
+
+.dc-qsk-tray {
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(max(0.5rem, env(safe-area-inset-bottom)) + var(--dc-note-footer-inset, 0px));
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100% - 1rem);
+  padding: 4px 6px;
+  border: 1px solid rgb(15 23 42 / 0.12);
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 10px 25px rgb(15 23 42 / 0.18);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  user-select: none;
+}
+
+.dc-qsk-tray::-webkit-scrollbar {
+  display: none;
+}
+
+/* Inside the tray a button is one small tile — never the 40px corner size and
+   never the wide padding the editor's standalone corners use. */
+.dc-qsk-tray .dc-qsk-text-button {
+  height: 32px;
+  min-width: 0;
+  padding: 0 10px;
+  gap: 5px;
+  border-radius: 999px;
+  background: transparent;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 600;
+  text-shadow: none;
+}
+
+.dc-qsk-tray .dc-qsk-text-button:hover {
+  background: rgb(15 23 42 / 0.08);
+  color: #0f172a;
+}
+
+.dc-qsk-tray .dc-qsk-text-button[data-active="true"] {
+  background: rgb(15 23 42 / 0.1);
+  color: #0f172a;
+}
+
+.dc-qsk-tray .dc-qsk-text-button--lit {
+  background: rgb(249 115 22 / 0.16);
+  color: #c2410c;
+}
+
+.dc-qsk-tray-sep {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: rgb(15 23 42 / 0.14);
+}
+
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-tray {
+  border-color: rgb(255 255 255 / 0.14);
+  background: #141419;
+  box-shadow: 0 10px 25px rgb(2 6 23 / 0.4);
+}
+
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-tray .dc-qsk-text-button {
+  color: rgb(255 255 255 / 0.85);
+}
+
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-tray .dc-qsk-text-button:hover {
+  background: rgb(255 255 255 / 0.12);
+  color: #ffffff;
+}
+
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-tray .dc-qsk-text-button--lit {
+  background: rgb(249 115 22 / 0.2);
+  color: #fdba74;
+}
+
+.dc-qsk[data-quick-sketch-theme="dark"] .dc-qsk-tray-sep {
+  background: rgb(255 255 255 / 0.16);
+}

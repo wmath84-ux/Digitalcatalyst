@@ -2636,7 +2636,12 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   --mm-tool-gap: 2px;
   --mm-tool-radius: 999px;
   position: absolute;
-  left: 0.5rem;
+  /* CENTRED on the pane (the owner's brief): the bar used to hug the left
+     edge, which read as a mistake next to the note editor's own pill. The
+     menus it opens are portalled to <body>, so the transform below cannot
+     move them. */
+  left: 50%;
+  transform: translateX(-50%);
   bottom: calc(max(0.5rem, env(safe-area-inset-bottom)) + var(--dc-note-footer-inset, 0px));
   z-index: 30;
   max-width: calc(100% - 1rem);
@@ -2655,6 +2660,38 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   gap: 0.2rem;
   padding-left: 0.3rem;
   padding-right: 0.3rem;
+}
+
+/* ── Read mode's bottom tray ──────────────────────────────────────────────
+   The note page's read navigation, control for control and in the same
+   geometry: ONE opaque pill at the bottom of the pane, 36px round ghost tiles
+   inside it. It wears this page's palette (--mm-*, which flips with the mind
+   map's own Light / Dark theme) rather than the note page's, and it is lifted
+   by the same measured footer inset. ONE tap on the canvas hides it. */
+.mm-read-tray {
+  --mm-tool-size: 36px;
+  --mm-tool-radius: 999px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(max(0.5rem, env(safe-area-inset-bottom)) + var(--dc-note-footer-inset, 0px));
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--mm-tool-gap);
+  max-width: calc(100% - 1rem);
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--mm-border);
+  border-radius: 999px;
+  background: var(--mm-pill-bg);
+  box-shadow: 0 10px 25px rgb(2 6 23 / 0.18);
+}
+.mm-read-tray-sep {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 1.25rem;
+  margin: 0 0.25rem;
+  background: var(--mm-border);
 }
 
 /* One icon tile — the note editor pill's button: a 36px circle, ghost

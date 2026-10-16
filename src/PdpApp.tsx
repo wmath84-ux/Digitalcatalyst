@@ -26,6 +26,7 @@ import { buildCheckoutSelection, computeSummary, normalizeModuleSelectionIds } f
 import { PaymentButton } from "./components/ui/PaymentButton";
 import PdpPaidContent from "./components/pdp/PdpPaidContent";
 import { buildPdpPaidContent, type PaidContentRow } from "../utils/pdpPaidContent";
+import { readPaidDeepLink, readPdpReturn, takePdpReturn } from "./utils/paidDeepLink";
 import PdpPurchaseBuilder, { type PdpSelectionRequest } from "./components/pdp/PdpPurchaseBuilder";
 import WriteReviewDialog from "./components/pdp/WriteReviewDialog";
 import PdpSelectionSummary, { type PdpPricingView, type PdpSelectionSnapshot } from "./components/pdp/PdpSelectionSummary";
@@ -296,6 +297,41 @@ function PremiumProductContent({
     return () => window.removeEventListener("hashchange", syncReviewsRoute);
   }, [product.id]);
 
+  /**
+   * The Course Player's Paid page links here — `?tab=Paid&paid=<rowKey>` — so
+   * the learner lands on the paid thing he tapped, with that row blinking, and
+   * buys it from THIS page. Owner (2026-10-16): "wah seedhe product detail page
+   * ke paid section me chala jaye … wahi paid module ya paid type highlight ya
+   * blink ho jaye, aur wahin se purchase kar sake."
+   */
+  const [paidJump, setPaidJump] = useState<{ key: string; at: number } | null>(null);
+  // Where the learner came from, when he came from a course's Paid page.
+  const [courseReturn, setCourseReturn] = useState("");
+
+  useEffect(() => {
+    const syncPaidRoute = () => {
+      const link = readPaidDeepLink(window.location.hash);
+      const back = readPdpReturn(product.id);
+      setCourseReturn(back);
+      if (!link.paidTab) return;
+      setActiveTab("Paid");
+      setPaidJump(link.paidKey ? { key: link.paidKey, at: Date.now() } : null);
+    };
+    syncPaidRoute();
+    window.addEventListener("hashchange", syncPaidRoute);
+    return () => window.removeEventListener("hashchange", syncPaidRoute);
+  }, [product.id]);
+
+  /** The PDP's way back: the course he came from, else its own route. */
+  const handlePdpBack = useCallback(() => {
+    const back = takePdpReturn(product.id);
+    if (back) {
+      window.location.hash = back;
+      return;
+    }
+    onBack();
+  }, [onBack, product.id]);
+
   const gallery = useMemo(() => getProductImageSources(product), [product]);
   const visibleGallery = gallery.filter((image) => !failedImageSources.has(image));
   const selectedImageIndex = Math.min(activeImage, Math.max(0, visibleGallery.length - 1));
@@ -383,6 +419,42 @@ function PremiumProductContent({
     || resolution.hasFullProductAccess;
   const updates = ownedUpdateIds || resolution.ownedUpdateIds;
   const paidContent = useMemo(() => buildPdpPaidContent({ product, isProductOwned, ownedUpdateIds: updates, resolution }), [product, isProductOwned, updates, resolution]);
+
+  // The row itself: find the tapped key among the paid rows (or the owned list,
+  // once it has been bought), scroll it into view and blink it.
+  useEffect(() => {
+    if (!paidJump) return undefined;
+    let frame = 0;
+    let tries = 0;
+    let mark: HTMLElement | null = null;
+    const find = () => {
+      const rows = Array.from(document.querySelectorAll<HTMLElement>("[data-pdp-paid-item], [data-pdp-owned-item]"));
+      const match = rows.find((row) => row.getAttribute("data-pdp-paid-item") === paidJump.key
+        || row.getAttribute("data-pdp-owned-item") === paidJump.key);
+      if (!match) {
+        // The paid rows arrive with the access resolution — keep looking for a
+        // moment instead of blinking nothing.
+        if (tries++ < 90) frame = window.requestAnimationFrame(find);
+        return;
+      }
+      mark = match;
+      match.setAttribute("data-pdp-paid-focus", "true");
+      const reduceMotion = typeof window.matchMedia === "function"
+        && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      match.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center", inline: "nearest" });
+    };
+    frame = window.requestAnimationFrame(find);
+    const clearMark = window.setTimeout(() => {
+      mark?.removeAttribute("data-pdp-paid-focus");
+      setPaidJump(null);
+    }, 6000);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(clearMark);
+      mark?.removeAttribute("data-pdp-paid-focus");
+    };
+  }, [paidJump, activeTab, paidContent]);
+
   const ownedModuleIds = paidContent.ownedModuleIds;
   const ownedResourceIds = paidContent.ownedResourceIds;
   const identity = getProductPresentation(product);
@@ -681,7 +753,7 @@ function PremiumProductContent({
   return (
     <div data-pdp-root className="relative pb-5 text-white">
       <nav aria-label="Breadcrumb" data-pdp-loose className="dc-scene-ink hidden min-w-0 items-center gap-1.5 px-4 pt-4 text-[11px] text-white/60 sm:flex">
-        <button type="button" onClick={onBack} className="min-h-9 shrink-0 px-1 transition hover:text-white">Store</button>
+        <button type="button" onClick={handlePdpBack} className="min-h-9 shrink-0 px-1 transition hover:text-white">{courseReturn ? "Course" : "Store"}</button>
         <ChevronRight aria-hidden="true" className="h-3 w-3 shrink-0 text-white/40" />
         <span className="shrink-0 text-white/65">{identity.typeLabel}</span>
         <ChevronRight aria-hidden="true" className="h-3 w-3 shrink-0 text-white/40" />
@@ -829,6 +901,12 @@ function PremiumProductContent({
         </section>
 
         <div data-pdp-stack className="flex min-w-0 flex-col gap-6">
+          {courseReturn && paidJump ? (
+            <p data-pdp-paid-from-course className="dc-pdp-selection-note">
+              Opened from your course — this is the paid item you tapped. Buy it here, or{" "}
+              <a className="dc-pdp-text-action" href={courseReturn}>go back to the course</a>.
+            </p>
+          ) : null}
           <DetailsCard product={product} modules={modules} curriculumMode={curriculumMode} includedItems={includedItems} highlights={highlights} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule}
             paidContent={<PdpPaidContent available={paidContent.available} owned={paidContent.owned} selection={paidSelection}
               signedIn={Boolean(user)} loading={accessLoading} error={activeTab === "Paid" ? accessError || undefined : undefined} onRetry={retryAccess} unavailable={unavailable}

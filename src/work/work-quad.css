@@ -1,0 +1,67 @@
+/* src/work/work-quad.css
+ *
+ * The little the plus deck needs from WORK itself (owner, 2026-10-16: "work
+ * mode mein bhi same split-screen behaviour … same navigation behaviour").
+ *
+ * The deck, its dividers, its dots, its one control cluster, the zoom and the
+ * divider switches are all the Course Player's own files —
+ * `course-quad-deck.css` and `course-header-nav.css` — so the two environments
+ * cannot drift apart. What lives here is only Work's shell around them:
+ *
+ *   · the single Work header line (768px up) that carries the navigation;
+ *   · the left/right rails and the bottom strip the navigation can move to;
+ *   · the "Work view" popover that holds the shared Course-view page.
+ *
+ * Every colour is a token the Work theme already publishes, so the deck reads
+ * the same in Work's light and dark themes.
+ */
+
+/* ── The one header line (768px up) ─────────────────────────────────────── */
+
+[data-work-quad-header] {
+  position: relative;
+  z-index: 70;
+}
+
+[data-work-quad-header] [data-work-quad-nav-slot] {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+/* ── The rails and the bottom strip ────────────────────────────────────── */
+
+[data-work-quad-nav-rail] {
+  /* 38px boxes + the navigation's own padding, the same width the Course
+     Player's rails use, so the two environments look identical. */
+  width: 88px;
+  overflow: hidden;
+}
+
+[data-work-quad-nav-rail] > nav,
+[data-work-quad-nav-bottom] > nav {
+  width: 100%;
+}
+
+[data-work-quad-nav-bottom] {
+  display: flex;
+  justify-content: center;
+}
+
+/* ── The Work-view popover ─────────────────────────────────────────────── */
+
+[data-work-view-settings] {
+  /* The panel itself is the Course Player's `CourseViewPanel` — this only
+     keeps the popover above the deck and its rails. */
+  z-index: 90;
+}
+
+/* Phones never see any of it: below 768px Work keeps today's deck. */
+@media (max-width: 767px) {
+  [data-work-quad-header],
+  [data-work-quad-nav-rail],
+  [data-work-quad-nav-bottom],
+  [data-work-view-settings] {
+    display: none;
+  }
+}

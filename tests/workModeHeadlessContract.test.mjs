@@ -39,7 +39,7 @@ test("Work page surface drops its outer header for headless states (the Revision
   assert.match(page, /data-work-immersive=\{immersive \? "true" : "false"\}/);
   assert.match(page, /data-work-headless=\{immersive \? "true" : undefined\}/);
   assert.match(page, /\{showHeader \? \(\s+<header[\s\S]*?data-work-header-area=\{page\}/);
-  assert.match(page, /const showHeader = !immersive && page !== "ai";/, "only the AI page drops the header without going immersive (footer stays)");
+  assert.match(page, /const showHeader = !headless && !immersive && page !== "ai";/, "only the AI page drops the header without going immersive (footer stays)");
   // The Work header (Work exit + theme) still exists for library/page states.
   assert.match(page, /data-work-exit=""/);
   assert.match(page, /data-work-theme-toggle=""/);

@@ -57,9 +57,15 @@ test("the replaced listing implementations are gone and nothing imports them", (
   }
 });
 
-test("the Modules page has no filter chips or search box", () => {
+test("the Modules page has no filter chips, and its ONE search box is the shared kit's", () => {
   assert.doesNotMatch(library, /FILTERS|LibraryFilterChips|data-library-filter/);
-  assert.doesNotMatch(library, /LibrarySearchBar|searchQuery|data-library-search/);
+  // No hand-rolled search state ever came back: the box, its sliding sentence,
+  // its flash scan and its history are the SHARED experience (owner brief,
+  // 2026-10-16), and its library half is the pure matcher.
+  assert.doesNotMatch(library, /LibrarySearchBar|searchQuery|setSearchQuery/);
+  assert.match(library, /import \{ matchResources \} from "\.\/resourceSearch";/);
+  assert.match(library, /useStudySearch<LibrarySearchResults>/);
+  assert.match(library, /from "\.\/searchExperience";/);
 });
 
 test("the Modules library shows the real module tree and the My Modules root entry", () => {
@@ -104,7 +110,7 @@ test("MASTER and SELF are subtle tags, shown for notes and maps", () => {
 test("the master and self resources open from the right page", () => {
   // Notes: master opens the read-only viewer, self opens the editor.
   assert.match(notes, /setViewingMasterNoteId\(note\.id\)/);
-  assert.match(notes, /startEdit\(note\)/);
+  assert.match(notes, /openNote\(note\)/);
   // Mind maps: master goes through the player (its module), self opens its map.
   assert.match(maps, /onOpenMasterMap\?\.\(key\)/);
   assert.match(maps, /openMap\(key\)/);

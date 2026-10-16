@@ -10,25 +10,51 @@
 //
 // The library is purely navigational: opening a row delegates to the existing
 // viewer / editor handlers the Course Player already owns. All modules remain
-// visible; this page no longer carries a search box or filtering state.
+// visible.
+//
+// ── The owner's brief (2026-10-16) ──────────────────────────────────────────
+// The page is PURE white, header included, and the name + icon + resource count
+// moved OFF the header and onto the page itself, just under it — where the page
+// scrolls exactly as it always did. The header's area now holds one circular
+// search box carrying the long sentence, sliding left and right inside it.
+// A click on that box opens a NESTED search page (still inside this panel):
+// the box ready to write in, the back arrow beside it on the left, and a format
+// button on its right that shows no options at all — it converts itself, and
+// the listing follows. Enter sits inside the box on the right (the keyboard's
+// own Enter runs the same search), the loading state is the shared flash scan
+// with a full one-second floor, and previous searches come back in YouTube's
+// own search-page design.
+//
+// ONE query, TWO answers: the library's own rows (the pure matcher in
+// ./resourceSearch) and YouTube (the same key-gated, never-scraping search the
+// Music pane owns). The shared experience itself — the sliding sentence, the
+// flash scan, the history — lives in ./searchExperience, so the Music library
+// wears exactly the same behaviour on its own page.
 
-import { useCallback, useEffect, useMemo, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  ArrowLeft,
   BookOpen,
   Brain,
   Check,
+  CornerDownLeft,
   Eye,
+  ExternalLink,
   File,
   FileSpreadsheet,
   FileText,
   FlaskConical,
   FormInput,
   Library,
+  LayoutGrid,
   Link2,
   LockKeyhole,
   Network,
   NotebookPen,
   PlayCircle,
+  Rows3,
+  Search,
+  X,
 } from "lucide-react";
 import type { CourseFile, CourseModule, MasterCourseNote } from "../types/course";
 import { isExperimentFileType, NOTE_RESOURCE_FILE_TYPE, READ_RESOURCE_FILE_TYPE } from "../types/course";
@@ -38,6 +64,15 @@ import { StudyLibraryEmptyState, StudyLibraryNotice } from "./StudyLibraryStates
 import CoursePageHeader from "./CoursePageHeader";
 import "./courseResourceLibrary.css";
 import { isVisibleFile } from "./fileVisibility";
+import { matchResources } from "./resourceSearch";
+import {
+  SearchFlashScan, SearchHistoryList, SlidingSearchText, STUDY_SEARCH_SENTENCE,
+  useScrollAwayHidden, useStudySearch,
+} from "./searchExperience";
+import { setSearchScrolledAway, setSearchSurface } from "./coursePanelSession";
+import { searchYouTube, subscribeYouTubeKey, youTubeSearchAvailable, youTubeSearchUrl } from "./musicSearch";
+import type { MusicTrack } from "./musicLibrary";
+import { TrackArtwork } from "./MusicTrackList";
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -64,6 +99,126 @@ export interface CourseResourceLibraryProps {
   status?: "ready" | "loading" | "error";
   errorMessage?: string | null;
   onRetry?: () => void;
+}
+
+/** The card plate per kind: the same ink language as the music library's tiles. */
+const KIND_GRADIENT: Record<LibraryResourceKind, string> = {
+  note: "linear-gradient(140deg, #b45309 0%, #78350f 55%, #0b1220 100%)",
+  "mind-map": "linear-gradient(140deg, #7c3aed 0%, #4c1d95 55%, #0b1220 100%)",
+  brain: "linear-gradient(140deg, #047857 0%, #065f46 55%, #0b1220 100%)",
+  experiment: "linear-gradient(140deg, #be185d 0%, #831843 55%, #0b1220 100%)",
+  lesson: "linear-gradient(140deg, #0369a1 0%, #0c4a6e 55%, #0b1220 100%)",
+  read: "linear-gradient(140deg, #0369a1 0%, #0c4a6e 55%, #0b1220 100%)",
+};
+
+const resourceGlyph = (resource: LibraryResource) =>
+  resource.file ? fileIconForType(resource.file.type) : resource.kind === "note" ? NotebookPen : File;
+
+/** The row's second line: kind, then the presenter's own words, then the path. */
+const resourceLine = (resource: LibraryResource): string =>
+  [resourceKindLabel(resource.kind), resource.subtitle, resource.modulePath.join(" / ")]
+    .filter(Boolean)
+    .join(" · ");
+
+/**
+ * ONE library hit, in the LIST format — a row: a tinted plate, the title on one
+ * line, the kind/subtitle/path beneath it, and the row's own marks (a source
+ * tag, completion, a lock). Tapping it opens the resource itself.
+ */
+function LibraryHitRow({ resource, onOpen }: { resource: LibraryResource; onOpen: (resource: LibraryResource) => void }) {
+  const Icon = resourceGlyph(resource);
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(resource)}
+      data-library-search-hit
+      data-library-hit-id={resource.id}
+      data-library-hit-kind={resource.kind}
+      data-library-hit-format="list"
+      disabled={resource.locked}
+      className="library-hit"
+    >
+      <span className="library-hit__plate" style={{ color: KIND_COLOR[resource.kind] }} aria-hidden="true">
+        <Icon size={17} strokeWidth={2.1} />
+      </span>
+      <span className="library-hit__text">
+        <span className="library-hit__title">{resource.title}</span>
+        <span className="library-hit__sub">{resourceLine(resource)}</span>
+      </span>
+      {resource.source ? <span className="library-hit__tag" data-library-hit-source={resource.source}>{resource.source}</span> : null}
+      {resource.completed ? <Check size={13} aria-label="Completed" className="course-library__done" /> : null}
+      {resource.locked ? <LockKeyhole size={13} aria-label="Locked" className="course-library__lock" /> : null}
+    </button>
+  );
+}
+
+/** The same hit in the GRID format — the music library's thumbnail card. */
+function LibraryHitCard({ resource, onOpen }: { resource: LibraryResource; onOpen: (resource: LibraryResource) => void }) {
+  const Icon = resourceGlyph(resource);
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(resource)}
+      data-library-search-hit
+      data-library-hit-id={resource.id}
+      data-library-hit-kind={resource.kind}
+      data-library-hit-format="grid"
+      disabled={resource.locked}
+      className="library-hitcard"
+    >
+      <span className="library-hitcard__plate" style={{ background: KIND_GRADIENT[resource.kind] }} aria-hidden="true">
+        <Icon size={30} strokeWidth={2} />
+        <span className="library-hitcard__kind">{resourceKindLabel(resource.kind)}</span>
+        {resource.source ? <span className="library-hitcard__tag">{resource.source}</span> : null}
+      </span>
+      <span className="library-hitcard__title">{resource.title}</span>
+      <span className="library-hitcard__sub">{resourceLine(resource)}</span>
+      {resource.locked ? <span className="library-hitcard__lock"><LockKeyhole size={13} aria-label="Locked" /></span> : null}
+    </button>
+  );
+}
+
+/**
+ * A YouTube result: the same two formats, and the same artwork rules the Music
+ * pane uses (edge-to-edge picture, or a proper audio tile when there is none).
+ * It opens on YouTube itself — the official page, never a scraped stream.
+ */
+function YouTubeHit({ track, format }: { track: MusicTrack; format: LibrarySearchFormat }) {
+  if (format === "grid") {
+    return (
+      <a
+        href={track.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-library-search-youtube-hit
+        data-library-hit-id={track.url}
+        data-library-hit-format="grid"
+        className="library-hitcard library-hitcard--video"
+      >
+        <TrackArtwork track={track} variant="card" />
+        <span className="library-hitcard__title">{track.title}</span>
+        <span className="library-hitcard__sub">{track.subtitle || "YouTube"}</span>
+      </a>
+    );
+  }
+  return (
+    <a
+      href={track.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      data-library-search-youtube-hit
+      data-library-hit-id={track.url}
+      data-library-hit-format="list"
+      className="library-hit"
+    >
+      <TrackArtwork track={track} variant="tile" />
+      <span className="library-hit__text">
+        <span className="library-hit__title">{track.title}</span>
+        <span className="library-hit__sub">{track.subtitle || "YouTube"}</span>
+      </span>
+      <ExternalLink size={14} aria-hidden="true" className="library-hit__external" />
+    </a>
+  );
 }
 
 export type LibraryResourceKind = "lesson" | "note" | "mind-map" | "brain" | "experiment" | "read";
@@ -329,6 +484,17 @@ function resourceToItem(resource: LibraryResource): BranchedMenuItem {
   };
 }
 
+/** What ONE library search answers with: the course's own rows, and YouTube. */
+export interface LibrarySearchResults {
+  local: LibraryResource[];
+  online: MusicTrack[];
+  /** False when the learner's YouTube key is not set up (the honest hand-off). */
+  onlineReady: boolean;
+}
+
+/** The two listings the format button flips between — Music's own two. */
+export type LibrarySearchFormat = "list" | "grid";
+
 export default function CourseResourceLibrary({
   modules,
   courseTitle,
@@ -348,6 +514,20 @@ export default function CourseResourceLibrary({
   onRetry,
 }: CourseResourceLibraryProps) {
   void accessibleResourceIds;
+  /**
+   * The page's own search (owner brief, 2026-10-16). The header's rounded box
+   * opens a NESTED search page inside this same panel: a back arrow, the box
+   * (Enter inside it), the format button — and, until something is typed, the
+   * learner's recent searches, exactly like YouTube's own search page.
+   */
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [searchFormat, setSearchFormat] = useState<LibrarySearchFormat>("list");
+  /** A late api key must not need a reload: the subscription re-renders this
+   *  page, and every search then reads the key fresh. */
+  const [, setYouTubeKeyTick] = useState(0);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => subscribeYouTubeKey(() => setYouTubeKeyTick((tick) => tick + 1)), []);
   const built = useMemo(
     () => buildLibraryEntries(modules, {
       completedFileIds,
@@ -460,62 +640,344 @@ export default function CourseResourceLibrary({
   const activeValue = selectedFileId ? `file:${selectedFileId}` : null;
   const hasAnything = built.modulePaths.length > 0 || Boolean(personalEntry);
 
-  return (
-    <div className="course-resource-library" data-course-resource-library>
-      {/* The reference header every other Course Player page now matches:
-          the shared CoursePageHeader box (coursePageHeader.css). Its own
-          background and the library's appearance stay as they were. */}
-      <CoursePageHeader
-        title="Resource Library"
-        icon={<BookOpen size={20} aria-hidden="true" />}
-        className="library-header"
-        titleClassName="library-header__title"
-        dataAttrs={{ "data-library-header": "" }}
-      >
-        {status === "ready" && hasAnything ? (
-          <span className="library-header__count">{totalResources} {totalResources === 1 ? "resource" : "resources"}</span>
-        ) : null}
-      </CoursePageHeader>
+  /**
+   * ONE query, two answers: the library's own rows (the pure matcher in
+   * ./resourceSearch) and YouTube (the same key-gated, never-scraping search
+   * the Music pane owns). The one-second loading floor and the history are the
+   * shared experience's job — see ./searchExperience.
+   */
+  const runLibrarySearch = useCallback(async (text: string): Promise<LibrarySearchResults> => {
+    const local = matchResources(
+      built.entries.map(({ resource }) => ({
+        id: resource.id,
+        title: resource.title,
+        subtitle: resource.subtitle,
+        kind: resource.kind,
+        metadata: resource.metadata,
+        modulePath: resource.modulePath,
+        keywords: [resourceKindLabel(resource.kind), resource.source ?? ""],
+      })),
+      text,
+    ).map((hit) => resourceById.get(hit.resource.id))
+      .filter((resource): resource is LibraryResource => Boolean(resource));
 
-      <div className="library-body" data-library-body>
-        {status === "loading" ? (
-          <>
-            <StudyLibraryNotice state="loading" title="Loading the course library" message="Modules and resources appear as soon as the course is ready." />
-            <BranchedMenuSkeleton rows={5} label="Loading course modules" />
-          </>
-        ) : status === "error" ? (
-          <StudyLibraryNotice
-            state="error"
-            title="The course library could not load"
-            message={errorMessage || "Check your connection and try again. Your progress is safe."}
-            onRetry={onRetry}
-          />
-        ) : !hasAnything ? (
-          <StudyLibraryEmptyState
-            kind="note"
-            title="No course content available"
-            description={courseTitle
-              ? `The resource library for "${courseTitle}" will appear here once the course creator publishes modules and lessons.`
-              : "The resource library will appear here once the course creator publishes modules and lessons."}
-          />
+    let online: MusicTrack[] = [];
+    if (youTubeSearchAvailable()) {
+      try { online = await searchYouTube(text); } catch { online = []; }
+    }
+    return { local, online, onlineReady: youTubeSearchAvailable() };
+  }, [built.entries, resourceById]);
+
+  const search = useStudySearch<LibrarySearchResults>({
+    namespace: "course-library",
+    run: runLibrarySearch,
+  });
+
+  const openSearch = useCallback(() => {
+    setSearchOpen(true);
+    // "ready to write": the box is the reason this page opened, so it takes the
+    // caret — after the frame that mounts it.
+    window.setTimeout(() => searchInputRef.current?.focus(), 30);
+  }, []);
+
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
+
+  /** The self-convertible format button: ONE icon, the other listing's own. */
+  const flipSearchFormat = useCallback(
+    () => setSearchFormat((current) => (current === "list" ? "grid" : "list")),
+    [],
+  );
+
+  const openSearchHit = useCallback((resource: LibraryResource) => {
+    setSearchOpen(false);
+    handleSelect(resource.id);
+  }, [handleSelect]);
+
+  const searchResults = search.phase === "results" ? search.results : null;
+  const libraryHits = searchResults?.local ?? [];
+  const onlineHits = searchResults?.online ?? [];
+
+  /**
+   * The footer rule for this page (owner, 2026-10-16):
+   *
+   *   · the LIBRARY page keeps the footer navigation;
+   *   · the SEARCH page — the ready-to-write box, the recent searches and the
+   *     flash scan — does NOT ("search page par footer nahin");
+   *   · a RESULTS page shows it, and the scroll half below steps it away only
+   *     while the learner is scrolling down through the results.
+   */
+  const searchSurfaceView = !searchOpen
+    ? "closed"
+    : search.phase === "results"
+      ? "results"
+      : "page";
+  useEffect(() => {
+    setSearchSurface("library", searchSurfaceView);
+  }, [searchSurfaceView]);
+  // Leaving the tab (unmount) can never strand a hidden footer behind it.
+  useEffect(() => () => setSearchSurface("library", "closed"), []);
+
+  /**
+   * "Scroll down kare to hide ho jaye, wapas top par aate hi dikh jaye." The
+   * results live in `.library-body` (the page's own scroll host), so the
+   * shared rule reads that element and nothing else.
+   */
+  const { scrollerRef: searchScrollerRef, hidden: searchScrolledAway } =
+    useScrollAwayHidden(searchSurfaceView === "results");
+  useEffect(() => {
+    setSearchScrolledAway("library", searchScrolledAway);
+  }, [searchScrolledAway]);
+
+  return (
+    <div
+      className="course-resource-library"
+      data-course-resource-library
+      data-library-search-open={searchOpen ? "true" : "false"}
+      data-library-search-format={searchFormat}
+    >
+      {/* ── The top strip ────────────────────────────────────────────────────
+          The page's name, icon and count moved OFF the header and onto the
+          page itself (owner brief, 2026-10-16) — the header's area is now the
+          search box: fully rounded, with the long sentence sliding inside it.
+          On the search page this same strip becomes the box itself, with the
+          back arrow beside it and the format button on its other side. */}
+      {searchOpen ? (
+        <CoursePageHeader
+          className="library-header library-header--search"
+          dataAttrs={{ "data-library-header": "", "data-library-search-header": "" }}
+          leading={
+            <div className="library-searchbar" data-library-searchbar>
+              <button
+                type="button"
+                onClick={closeSearch}
+                data-library-search-back
+                aria-label="Back to the Resource Library"
+                title="Back to the Resource Library"
+                className="library-searchbar__back"
+              >
+                <ArrowLeft size={18} aria-hidden="true" />
+              </button>
+              <form
+                className="library-searchbar__box"
+                data-library-search-form
+                onSubmit={(event) => { event.preventDefault(); void search.search(searchText); }}
+              >
+                <Search size={16} className="library-searchbar__glyph" aria-hidden="true" />
+                <input
+                  ref={searchInputRef}
+                  value={searchText}
+                  onChange={(event) => setSearchText(event.target.value)}
+                  data-library-search-input
+                  aria-label="Search the course library, YouTube lectures and songs"
+                  className="library-searchbar__input"
+                />
+                {searchText ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearchText("")}
+                    data-library-search-clear
+                    aria-label="Clear the search box"
+                    className="library-searchbar__clear"
+                  >
+                    <X size={14} aria-hidden="true" />
+                  </button>
+                ) : null}
+                {/* The Enter button lives INSIDE the box, on its right — and the
+                    keyboard's own Enter runs the same search (the form above). */}
+                <button
+                  type="submit"
+                  data-library-search-enter
+                  disabled={!searchText.trim()}
+                  aria-label="Search"
+                  title="Search"
+                  className="library-searchbar__enter"
+                >
+                  <CornerDownLeft size={15} aria-hidden="true" />
+                </button>
+              </form>
+              {/* Self-convertible: ONE button, and the icon is the format it
+                  switches TO — no menu, no second option on screen. */}
+              <button
+                type="button"
+                onClick={flipSearchFormat}
+                data-library-search-format-toggle
+                data-library-search-format-next={searchFormat === "list" ? "grid" : "list"}
+                aria-label={searchFormat === "list" ? "Show results as thumbnails" : "Show results as a list"}
+                title={searchFormat === "list" ? "Thumbnail view" : "List view"}
+                aria-pressed={searchFormat === "grid"}
+                className="library-searchbar__format"
+              >
+                {searchFormat === "list" ? <LayoutGrid size={16} aria-hidden="true" /> : <Rows3 size={16} aria-hidden="true" />}
+              </button>
+            </div>
+          }
+        />
+      ) : (
+        <CoursePageHeader
+          className="library-header"
+          dataAttrs={{ "data-library-header": "" }}
+          leading={
+            <button
+              type="button"
+              onClick={openSearch}
+              data-library-search-open-button
+              className="library-searchbox"
+              aria-label="Search the course library, YouTube lectures and songs"
+            >
+              <Search size={16} className="library-searchbox__glyph" aria-hidden="true" />
+              <SlidingSearchText text={STUDY_SEARCH_SENTENCE} className="library-searchbox__slide" />
+            </button>
+          }
+        />
+      )}
+
+      <div className="library-body" data-library-body ref={searchScrollerRef}>
+        {searchOpen ? (
+          /* ── The nested search page ───────────────────────────────────── */
+          <div className="library-search-page" data-library-search-page-body>
+            {search.phase === "loading" ? (
+              <SearchFlashScan rows={5} label="Searching the course library and YouTube" />
+            ) : search.phase === "results" ? (
+              <>
+                <section className="library-search-section" data-library-search-section="library" data-library-search-count={libraryHits.length}>
+                  <p className="library-search-section__head">
+                    In this library
+                    <span className="library-search-section__count">{libraryHits.length}</span>
+                    {search.query ? <span className="library-search-section__query">“{search.query}”</span> : null}
+                  </p>
+                  {libraryHits.length ? (
+                    searchFormat === "grid" ? (
+                      <div className="library-search-grid" data-library-search-listing="grid">
+                        {libraryHits.map((resource) => (
+                          <LibraryHitCard key={resource.id} resource={resource} onOpen={openSearchHit} />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="library-search-list" data-library-search-listing="list">
+                        {libraryHits.map((resource) => (
+                          <LibraryHitRow key={resource.id} resource={resource} onOpen={openSearchHit} />
+                        ))}
+                      </div>
+                    )
+                  ) : (
+                    <p className="library-search-empty" data-library-search-no-library-hits>
+                      Nothing in this course matches “{search.query}” yet.
+                    </p>
+                  )}
+                </section>
+
+                <section className="library-search-section" data-library-search-section="youtube" data-library-search-count={onlineHits.length}>
+                  <p className="library-search-section__head">
+                    On YouTube
+                    <span className="library-search-section__count">{onlineHits.length}</span>
+                  </p>
+                  {onlineHits.length ? (
+                    searchFormat === "grid" ? (
+                      <div className="library-search-grid" data-library-search-listing="grid">
+                        {onlineHits.map((track) => (
+                          <YouTubeHit key={track.url} track={track} format="grid" />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="library-search-list" data-library-search-listing="list">
+                        {onlineHits.map((track) => (
+                          <YouTubeHit key={track.url} track={track} format="list" />
+                        ))}
+                      </div>
+                    )
+                  ) : (
+                    /* Honest hand-off, exactly like the Music pane: without a
+                       key the search happens ON YouTube — the link is the
+                       search — and a key can be set up for inline results. */
+                    <p className="library-search-empty" data-library-search-no-online-hits>
+                      {searchResults?.onlineReady
+                        ? `YouTube par kuch nahin mila “${search.query}” ke liye.`
+                        : "YouTube search ki key set nahin hai — neeche wale link se YouTube par search karo."}{" "}
+                      <a
+                        href={youTubeSearchUrl(search.query)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-library-search-external
+                        className="library-search-empty__link"
+                      >
+                        YouTube par search karo <ExternalLink size={12} aria-hidden="true" />
+                      </a>
+                    </p>
+                  )}
+                </section>
+              </>
+            ) : (
+              /* Nothing run yet: the learner's own recent searches, exactly the
+                 way YouTube's search page shows them. */
+              <>
+                <SearchHistoryList
+                  entries={search.history}
+                  onPick={(entry) => { setSearchText(entry); void search.rerun(entry); }}
+                  onRemove={search.forget}
+                  onClear={search.clearHistory}
+                />
+                {search.history.length ? null : (
+                  <p className="library-search-hint" data-library-search-hint>
+                    Search everything in this course — lessons, notes, mind maps, brain cards, experiments and PDFs —
+                    and YouTube, from one box.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
         ) : (
-          <BranchedMenu
-            items={tree}
-            openValues={openValues}
-            onToggle={toggleSection}
-            activeValue={activeValue}
-            onSelect={(value) => handleSelect(value)}
-            ariaLabel="Course modules and resources"
-            fullWidth
-            rowHeight={40}
-            fontSize={14}
-            indent={40}
-            className="course-library__menu"
-            dataAttrs={{ "data-course-library-menu": "", "data-listing": "modules" }}
-          />
+          <>
+            {/* The page's OWN name row, just under the header (owner brief): the
+                header above it is the search box now. */}
+            <div className="library-title-row" data-library-title-row>
+              <span className="library-title-row__icon" aria-hidden="true"><BookOpen size={20} /></span>
+              <h2 className="library-title-row__name" data-course-page-title>Resource Library</h2>
+              {status === "ready" && hasAnything ? (
+                <span className="library-header__count" data-library-count>
+                  {totalResources} {totalResources === 1 ? "resource" : "resources"}
+                </span>
+              ) : null}
+            </div>
+
+            {status === "loading" ? (
+              <>
+                <StudyLibraryNotice state="loading" title="Loading the course library" message="Modules and resources appear as soon as the course is ready." />
+                <BranchedMenuSkeleton rows={5} label="Loading course modules" />
+              </>
+            ) : status === "error" ? (
+              <StudyLibraryNotice
+                state="error"
+                title="The course library could not load"
+                message={errorMessage || "Check your connection and try again. Your progress is safe."}
+                onRetry={onRetry}
+              />
+            ) : !hasAnything ? (
+              <StudyLibraryEmptyState
+                kind="note"
+                title="No course content available"
+                description={courseTitle
+                  ? `The resource library for "${courseTitle}" will appear here once the course creator publishes modules and lessons.`
+                  : "The resource library will appear here once the course creator publishes modules and lessons."}
+              />
+            ) : (
+              <BranchedMenu
+                items={tree}
+                openValues={openValues}
+                onToggle={toggleSection}
+                activeValue={activeValue}
+                onSelect={(value) => handleSelect(value)}
+                ariaLabel="Course modules and resources"
+                fullWidth
+                rowHeight={40}
+                fontSize={14}
+                indent={40}
+                className="course-library__menu"
+                dataAttrs={{ "data-course-library-menu": "", "data-listing": "modules" }}
+              />
+            )}
+          </>
         )}
       </div>
     </div>
   );
 }
-

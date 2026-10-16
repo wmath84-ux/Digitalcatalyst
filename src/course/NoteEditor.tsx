@@ -98,6 +98,17 @@ export interface NoteEditorProps {
   onDirtyChange?: (dirty: boolean) => void;
   /** Ctrl / Cmd + Enter. */
   onSaveShortcut?: () => void;
+  /**
+   * The docked toolbar's Read button: leave the editor and show the note as a
+   * read view. The panel owns what "read" means (it commits the draft first).
+   */
+  onReadRequest?: () => void;
+  /**
+   * Whether the docked editing toolbar is on screen. The panel uses it to keep
+   * a way OUT of edit mode even when the caret has left the note (the dock
+   * follows the caret, the Read control may not disappear with it).
+   */
+  onDockChange?: (docked: boolean) => void;
   ref?: Ref<NoteEditorHandle>;
 }
 
@@ -267,11 +278,15 @@ function NoteEditorChrome({
   readOnly,
   titleRef,
   onBodyKeyDown,
+  onReadRequest,
+  onDockChange,
 }: {
   editor: NoteEditorInstance;
   readOnly: boolean;
   titleRef: React.RefObject<HTMLTextAreaElement | null>;
   onBodyKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
+  onReadRequest?: () => void;
+  onDockChange?: (docked: boolean) => void;
 }) {
   // ── THE TOOLBAR RULE: the caret decides, not the soft keyboard ──────────
   //
@@ -321,6 +336,12 @@ function NoteEditorChrome({
   }, [footerInset]);
 
   const slashItems = useNoteSlashItems(editor);
+
+  // Tell the panel whether the editing toolbar is up: its Read control lives in
+  // this toolbar, and the panel keeps a floating one for the moments the caret
+  // has left the note (so edit mode can ALWAYS be left).
+  useEffect(() => { onDockChange?.(docked); }, [docked, onDockChange]);
+  useEffect(() => () => { onDockChange?.(false); }, [onDockChange]);
 
   return (
     <div
@@ -374,7 +395,7 @@ function NoteEditorChrome({
           </div>
         </div>
       </div>
-      {docked ? <NoteDockedToolbar onFocusWithinChange={setDockFocused} /> : null}
+      {docked ? <NoteDockedToolbar onFocusWithinChange={setDockFocused} onRead={onReadRequest} /> : null}
     </div>
   );
 }
@@ -396,6 +417,8 @@ function NoteEditorSession({
   onEmptyChange,
   onDirtyChange,
   onSaveShortcut,
+  onReadRequest,
+  onDockChange,
   reseed,
   announce,
   ref,
@@ -656,7 +679,14 @@ function NoteEditorSession({
         data-note-editor=""
         data-note-readonly={readOnly ? "true" : "false"}
       >
-        <NoteEditorChrome editor={editor} readOnly={readOnly} titleRef={titleRef} onBodyKeyDown={onBodyKeyDown} />
+        <NoteEditorChrome
+          editor={editor}
+          readOnly={readOnly}
+          titleRef={titleRef}
+          onBodyKeyDown={onBodyKeyDown}
+          onReadRequest={onReadRequest}
+          onDockChange={onDockChange}
+        />
       </BlockNoteViewRaw>
     </ComponentsContext.Provider>
   );

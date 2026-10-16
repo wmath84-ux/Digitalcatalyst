@@ -1,0 +1,88 @@
+/* src/course/notesLibrary.css
+ *
+ * The Notes home page, its ONE library panel and the writing page's own
+ * furniture. Everything here is scoped to the notes surfaces (the panel, the
+ * homes, the editor's dock), so no other Course Player page is touched.
+ *
+ * ── The row fix (owner report) ─────────────────────────────────────────────
+ * The library's rows used to read "vertically spread out / shrunk": each name
+ * shared its line with a pencil and a trash button, so the label was squeezed,
+ * wrapped onto two or three lines and stretched the 44px row. The action
+ * buttons are GONE from the rows (rename and delete live in the row's
+ * long-press popup — see BranchedMenu's `leafActionMenu="long-press"`), and a
+ * row in this library is now exactly one clean line, its name truncated with
+ * an ellipsis instead of wrapped.
+ */
+
+/* ── The library panel ───────────────────────────────────────────────────── */
+
+[data-note-left-panel] {
+  border-top-right-radius: 18px;
+  border-bottom-right-radius: 18px;
+}
+
+/* One clean line per note: the panel is nearly a page wide, so only a
+   genuinely long title ever reaches the ellipsis. */
+[data-note-left-panel] .notes-library-menu .branched-menu__label,
+[data-note-left-panel] .notes-library-menu .branched-menu__head-label {
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-note-left-panel] .notes-library-menu .branched-menu__item,
+[data-note-left-panel] .notes-library-menu .branched-menu__item--section,
+[data-note-left-panel] .notes-library-menu .branched-menu__head {
+  padding-right: 12px;
+}
+
+/* The rows read as rows: a soft ink wash on the active note, a hairline that
+   only appears on the row a finger is on. */
+[data-note-left-panel] .notes-library-menu .branched-menu__item[data-active] {
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bm-accent) 10%, transparent);
+}
+
+/* A row's actions menu (long press / secondary click / keyboard menu key). */
+[data-note-left-panel] .branched-menu__popup {
+  margin-left: 4px;
+}
+
+/* The strip of page the panel leaves visible is the way out — make it obvious
+   that it is interactive. */
+[data-course-notes-panel] [data-note-panel-scrim] {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── The home page ──────────────────────────────────────────────────────── */
+
+[data-course-notes-home] {
+  color-scheme: light;
+}
+
+[data-notes-theme="dark"] [data-course-notes-home] {
+  color-scheme: dark;
+}
+
+/* ── The writing page's floating pieces ─────────────────────────────────── */
+
+[data-note-status-chip] [role="status"] {
+  max-width: 100%;
+}
+
+/* The floating fallback the writing page shows when the docked tray is not on
+   screen (the tray follows the caret; the way back never disappears): the same
+   EYE glyph as the tile at the head of the dock, so the two read-mode controls
+   are one control in two places. */
+[data-note-edit-read-float] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-note-left-panel],
+  [data-note-left-panel] .notes-library-menu .branched-menu__label {
+    transition: none;
+  }
+}

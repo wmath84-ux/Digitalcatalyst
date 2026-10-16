@@ -25,6 +25,11 @@ import { getNativePushPermission, isAndroidNative, registerForPush } from "../ut
 import { type PreferenceKey } from "../../utils/userPreferences";
 import { useUserPreferences } from "./useUserPreferences";
 import { setFooterNavigationStyle, useFooterNavigationStyle } from "../utils/footerNavigationStyle";
+import {
+  FOOTER_NAVIGATION_VISIBILITY_NOTE,
+  setFooterNavigationVisibility,
+  useFooterNavigationVisibility,
+} from "../utils/footerNavigationVisibility";
 import { setWorkLaunchChoice, useWorkLaunchChoice, type WorkLaunchChoice } from "../work/storage/workPrefs";
 import "./settings.css";
 
@@ -105,6 +110,7 @@ export default function SettingsPage() {
   const { purchasedIds } = useCatalog();
   const settings = useUserPreferences(user?.id);
   const footerNavigationStyle = useFooterNavigationStyle();
+  const footerNavigationVisibility = useFooterNavigationVisibility();
   const [deviceState, setDeviceState] = useState<DeviceState>("checking");
   const [deviceBusy, setDeviceBusy] = useState(false);
   const [deviceMessage, setDeviceMessage] = useState("");
@@ -344,6 +350,65 @@ export default function SettingsPage() {
                   <span className="settings-navigation-choice-copy"><strong>Work pill</strong><small>Six learning tools · compact rounded pill</small></span>
                   {footerNavigationStyle === "work-pill" ? <Check className="settings-navigation-choice-check" size={17} aria-hidden="true" /> : null}
                 </button>
+              </div>
+
+              {/* ── When the footer navigation shows (owner, 2026-10-16) ──────
+                  "Do option add karo — 'Visible footer navigation always' aur
+                  'Visible footer navigation accordingly' — aur neeche ek chhota
+                  sa instruction line English mein ki footer navigation kab kab
+                  nahin dikhega." The line under the two options is that
+                  instruction, and it is the exported sentence the footer rule
+                  itself documents, so the promise and the behaviour cannot
+                  drift apart. */}
+              <div className="settings-navigation-visibility" data-footer-visibility-preference>
+                <h3 className="settings-navigation-visibility__lead" id="settings-navigation-visibility">
+                  When should the footer navigation show?
+                </h3>
+                <div
+                  className="settings-navigation-options settings-navigation-options--visibility"
+                  role="radiogroup"
+                  aria-labelledby="settings-navigation-visibility"
+                >
+                  <button
+                    type="button"
+                    className="settings-navigation-choice"
+                    role="radio"
+                    aria-checked={footerNavigationVisibility === "always"}
+                    data-selected={footerNavigationVisibility === "always" ? "true" : undefined}
+                    data-footer-visibility="always"
+                    onClick={() => setFooterNavigationVisibility("always")}
+                  >
+                    <span className="settings-navigation-preview settings-navigation-preview--always" aria-hidden="true">
+                      <span><i /><i /><i /><i /><i /></span>
+                    </span>
+                    <span className="settings-navigation-choice-copy">
+                      <strong>Visible footer navigation always</strong>
+                      <small>Every page keeps the footer navigation, whatever is open.</small>
+                    </span>
+                    {footerNavigationVisibility === "always" ? <Check className="settings-navigation-choice-check" size={17} aria-hidden="true" /> : null}
+                  </button>
+                  <button
+                    type="button"
+                    className="settings-navigation-choice"
+                    role="radio"
+                    aria-checked={footerNavigationVisibility === "accordingly"}
+                    data-selected={footerNavigationVisibility === "accordingly" ? "true" : undefined}
+                    data-footer-visibility="accordingly"
+                    onClick={() => setFooterNavigationVisibility("accordingly")}
+                  >
+                    <span className="settings-navigation-preview settings-navigation-preview--accordingly" aria-hidden="true">
+                      <span><i /><i /><i /><i /><i /></span>
+                    </span>
+                    <span className="settings-navigation-choice-copy">
+                      <strong>Visible footer navigation accordingly</strong>
+                      <small>Follows the rule below — the Course Player's own behaviour, and the default.</small>
+                    </span>
+                    {footerNavigationVisibility === "accordingly" ? <Check className="settings-navigation-choice-check" size={17} aria-hidden="true" /> : null}
+                  </button>
+                </div>
+                <p className="settings-navigation-visibility__note" data-footer-visibility-note>
+                  {FOOTER_NAVIGATION_VISIBILITY_NOTE}
+                </p>
               </div>
             </section>
             <WorkLaunchPreference />

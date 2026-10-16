@@ -32,7 +32,7 @@
 // the undo history and the chrome.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Menu, Plus, Trash2 } from "lucide-react";
+import { Eraser, Eye, Menu, Pencil, PenLine, Plus, Redo2, Trash2, Undo2 } from "lucide-react";
 import "./quickSketch/quickSketch.css";
 import QuickSketchPanel from "./quickSketch/QuickSketchPanel";
 import {
@@ -114,6 +114,9 @@ export default function PerfectFreehandSketch({
   resourceName,
   debounceMs,
   readOnly = false,
+  onRequestEdit,
+  onRequestRead,
+  onShowFullEditor,
   localOnly = false,
   theme = "light",
 }: {
@@ -133,6 +136,15 @@ export default function PerfectFreehandSketch({
   localOnly?: boolean;
   /** Work's scoped page theme; Course Player behavior stays light-only. */
   theme?: "light" | "dark";
+  /**
+   * The page's own doors, on the chip's bottom tray: the pencil unlocks the
+   * editor when the sketch is read-only, the eye takes it back to reading, and
+   * the Full Editor button swaps this chip for the Excalidraw editor — the
+   * same three controls the page's trays carry, in the same order.
+   */
+  onRequestEdit?: () => void;
+  onRequestRead?: () => void;
+  onShowFullEditor?: () => void;
 }) {
   const sketch = usePerfectFreehandSketch({ uid, productId, moduleId, resourceId, resourceName, debounceMs, localOnly });
 
@@ -140,6 +152,11 @@ export default function PerfectFreehandSketch({
   const [style, setStyle] = useState<QuickSketchStyle>(() => readStoredStyle(uid));
   const [tool, setTool] = useState<"draw" | "erase">("draw");
   const [panelOpen, setPanelOpen] = useState(true);
+  // Read mode's tray starts visible and ONE tap on the canvas hides it — the
+  // whole tray, the pencil included — and the next tap brings it back. In edit
+  // mode the tray always stays: a tap there is ink, not chrome.
+  const [trayVisible, setTrayVisible] = useState(true);
+  const tapStartRef = useRef<{ x: number; y: number } | null>(null);
   const [canvasMenuOpen, setCanvasMenuOpen] = useState(false);
   const [liveStroke, setLiveStroke] = useState<QuickSketchStroke | null>(null);
   const [notice, setNotice] = useState("");
@@ -494,7 +511,27 @@ export default function PerfectFreehandSketch({
   const statusState = sketch.status === "error" ? "error" : sketch.status;
 
   return (
-    <div ref={rootRef} className="dc-qsk" data-quick-sketch="" data-quick-sketch-theme={theme} data-read-only={readOnly ? "true" : "false"} data-quick-sketch-tool={tool}>
+    <div
+      ref={rootRef}
+      className="dc-qsk"
+      data-quick-sketch=""
+      data-quick-sketch-theme={theme}
+      data-read-only={readOnly ? "true" : "false"}
+      data-quick-sketch-tool={tool}
+      data-quick-sketch-tray-visible={readOnly ? (trayVisible ? "true" : "false") : "true"}
+      onPointerDownCapture={(event) => {
+        tapStartRef.current = { x: event.clientX, y: event.clientY };
+      }}
+      onClickCapture={(event) => {
+        if (!readOnly) return;
+        const target = event.target as HTMLElement | null;
+        if (target?.closest?.("[data-quick-sketch-tray], [data-quick-sketch-menu], [data-quick-sketch-canvas-menu]")) return;
+        const start = tapStartRef.current;
+        tapStartRef.current = null;
+        if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) return;
+        setTrayVisible((visible) => !visible);
+      }}
+    >
       {sketch.loading ? (
         <div className="dc-qsk-loading" data-quick-sketch-loading="">
           <span aria-label="Loading your sketch" />
@@ -657,63 +694,109 @@ export default function PerfectFreehandSketch({
         notice={notice}
       />
 
-      {/* Bottom-left: the tools — the editor's "Draw" (and its eraser). */}
-      {!readOnly ? <div className="dc-qsk-corner dc-qsk-corner--bottom-left">
-        <button
-          type="button"
-          className="dc-qsk-text-button"
-          data-quick-sketch-tool-button="draw"
-          data-active={tool === "draw" ? "true" : "false"}
-          onClick={() => setTool("draw")}
-          title="Draw (D)"
-        >
-          Draw
-        </button>
-        <button
-          type="button"
-          className="dc-qsk-text-button"
-          data-quick-sketch-tool-button="erase"
-          data-active={tool === "erase" ? "true" : "false"}
-          onClick={() => setTool("erase")}
-          title="Erase whole strokes (E)"
-        >
-          Erase
-        </button>
-      </div> : null}
-
-      {/* Bottom-right: Undo · Redo · Clear — the editor's own three. */}
-      {!readOnly ? <div className="dc-qsk-corner dc-qsk-corner--bottom-right">
-        <button
-          type="button"
-          className="dc-qsk-text-button"
-          data-quick-sketch-undo=""
-          disabled={undoStack.length === 0}
-          onClick={undo}
-          title="Undo (Ctrl+Z)"
-        >
-          Undo
-        </button>
-        <button
-          type="button"
-          className="dc-qsk-text-button"
-          data-quick-sketch-redo=""
-          disabled={redoStack.length === 0}
-          onClick={redo}
-          title="Redo (Ctrl+Shift+Z)"
-        >
-          Redo
-        </button>
-        <button
-          type="button"
-          className="dc-qsk-text-button"
-          data-quick-sketch-clear=""
-          disabled={strokes.length === 0}
-          onClick={clearCanvas}
-          title="Clear the canvas (undoable)"
-        >
-          Clear
-        </button>
-      </div> : null}
+      {/* ── The bottom tray ────────────────────────────────────────────────
+          ONE row at the bottom of the chip, and it SLIDES: the editor's own
+          Draw / Erase / Undo / Redo / Clear first, then — beside them, the way
+          the page's tray keeps them — the Full Editor switch and the pencil
+          (or the eye once the sketch is being edited). Read-only mode keeps a
+          pencil instead: the chip's options panel cannot open while reading,
+          so this tray is the chip's own way back into editing. */}
+      {!readOnly || trayVisible ? (
+      <nav className="dc-qsk-tray" aria-label="Sketch tools" data-quick-sketch-tray>
+        {!readOnly ? (
+          <>
+            <button
+              type="button"
+              className="dc-qsk-text-button"
+              data-quick-sketch-tool-button="draw"
+              data-active={tool === "draw" ? "true" : "false"}
+              onClick={() => setTool("draw")}
+              title="Draw (D)"
+            >
+              <PenLine size={14} aria-hidden /> Draw
+            </button>
+            <button
+              type="button"
+              className="dc-qsk-text-button"
+              data-quick-sketch-tool-button="erase"
+              data-active={tool === "erase" ? "true" : "false"}
+              onClick={() => setTool("erase")}
+              title="Erase whole strokes (E)"
+            >
+              <Eraser size={14} aria-hidden /> Erase
+            </button>
+            <span className="dc-qsk-tray-sep" aria-hidden />
+            <button
+              type="button"
+              className="dc-qsk-text-button"
+              data-quick-sketch-undo=""
+              disabled={undoStack.length === 0}
+              onClick={undo}
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 size={14} aria-hidden /> Undo
+            </button>
+            <button
+              type="button"
+              className="dc-qsk-text-button"
+              data-quick-sketch-redo=""
+              disabled={redoStack.length === 0}
+              onClick={redo}
+              title="Redo (Ctrl+Shift+Z)"
+            >
+              <Redo2 size={14} aria-hidden /> Redo
+            </button>
+            <button
+              type="button"
+              className="dc-qsk-text-button"
+              data-quick-sketch-clear=""
+              disabled={strokes.length === 0}
+              onClick={clearCanvas}
+              title="Clear the canvas (undoable)"
+            >
+              <Trash2 size={14} aria-hidden /> Clear
+            </button>
+            <span className="dc-qsk-tray-sep" aria-hidden />
+          </>
+        ) : null}
+        {onShowFullEditor ? (
+          <button
+            type="button"
+            className="dc-qsk-text-button dc-qsk-text-button--lit"
+            data-quick-sketch-full-editor=""
+            onClick={onShowFullEditor}
+            title="Open the Full Editor (Excalidraw)"
+          >
+            Full Editor
+          </button>
+        ) : null}
+        {readOnly ? (
+          onRequestEdit ? (
+            <button
+              type="button"
+              className="dc-qsk-text-button"
+              data-quick-sketch-read-edit=""
+              onClick={onRequestEdit}
+              aria-label="Edit this sketch"
+              title="Edit this sketch"
+            >
+              <Pencil size={14} aria-hidden /> Edit
+            </button>
+          ) : null
+        ) : onRequestRead ? (
+          <button
+            type="button"
+            className="dc-qsk-text-button"
+            data-quick-sketch-edit-read=""
+            onClick={onRequestRead}
+            aria-label="Read mode"
+            title="Read mode — the canvas takes no marks"
+          >
+            <Eye size={14} aria-hidden /> Read
+          </button>
+        ) : null}
+      </nav>
+      ) : null}
 
       {!sketch.scoped && !sketch.loading ? (
         <div className="dc-qsk-scoped-note" data-quick-sketch-unscoped="">

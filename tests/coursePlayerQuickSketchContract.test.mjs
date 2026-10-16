@@ -518,17 +518,15 @@ test("the Sketch tab hosts Quick Sketch, and keeps Excalidraw's chrome out of it
   // One toggle, both bars — and no narrowing ambiguity around it.
   assert.match(sketchPanel, /data-course-sketch-mode=\{mode\}/);
   assert.match(sketchPanel, /setMode\(quickMode \? "editor" : "quick-sketch"\)/);
-  // In Quick Sketch the Excalidraw-only chrome (its own canvas list, the
-  // library pill, the canvas-colour cluster) steps aside: the canvas carries
-  // its own switcher and its own save state.
-  assert.match(sketchPanel, /data-course-sketch-quick-bar/);
-  // …and the way back is never hidden, not even in Clean Look (that sidebar is
+  // In Quick Sketch the Excalidraw-only chrome steps aside: the chip carries
+  // its own canvases, its own save state and its own bottom tray.
+  assert.doesNotMatch(sketchPanel, /data-course-sketch-quick-bar/);
+  assert.doesNotMatch(sketchPanel, /leading=\{sidePanelToggle\}/);
+  assert.match(sketchPanel, /\) : quickMode \? \(\s+\/\*/);
+  assert.match(sketchPanel, /<PerfectFreehandSketch[\s\S]{0,700}?onShowFullEditor=\{\(\) => setMode\("editor"\)\}/);
+  // The way back is never hidden, not even in Clean Look (that sidebar is
   // Excalidraw's, and Excalidraw is not mounted in Quick Sketch).
-  assert.match(sketchPanel, /\{cleanLook && !quickMode \? null : quickMode \? \(/);
-  // The Full header's left end is the side-panel button now: the canvas
-  // switcher moved into that panel (and the pages tray under the header).
-  assert.match(sketchPanel, /leading=\{sidePanelToggle\}/);
-  assert.match(sketchPanel, /\{quickMode \? null : \(/);
+  assert.match(sketchPanel, /\{cleanLook && !quickMode && readOnlySketch \? \(/);
   assert.equal(
     (sketchPanel.match(/mode === "quick-sketch"/g) || []).length,
     1,

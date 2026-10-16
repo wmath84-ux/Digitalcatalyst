@@ -100,8 +100,8 @@ test("NotesPanel talks to the editor only through its handle — no DOM, no Bloc
   assert.doesNotMatch(notesPanel, /@blocknote/);
   assert.doesNotMatch(notesPanel, /document\.(querySelector|getElementById)|contentEditable|execCommand|\.innerHTML\s*=/);
   assert.match(notesPanel, /const editorRef = useRef<NoteEditorHandle \| null>\(null\);/);
-  // Save writes what the editor holds NOW (flushed), not the debounced copy.
-  assert.match(notesPanel, /const live = editorRef\.current\?\.read\(\);/);
+  // Autosave reads what the editor holds NOW (flushed), not the debounced copy.
+  assert.ok(notesPanel.includes("const next = editorRef.current?.read() ?? latestDraftRef.current;"));
   for (const method of ["load", "read", "isEmpty", "focusTitle", "focusBody", "reset", "setReadOnly", "undo", "redo"]) {
     assert.match(read("src/course/noteEditor/editorTypes.ts"), new RegExp(`\\b${method}: `), `NoteEditorHandle.${method}`);
   }
@@ -117,25 +117,46 @@ test("one editor instance per open note: the panel keys it by the note's identit
   assert.equal((editor.match(/importLegacyHtml\(initialBodyHtml\)/g) || []).length, 1);
 });
 
-test("save semantics are the existing ones: explicit Save / Cancel, session sync, delete confirm", () => {
-  assert.match(notesPanel, /onAdd\(html\);/);
-  assert.match(notesPanel, /onEdit\(editingId, html\);/);
-  assert.match(notesPanel, /combineHtml\(live \? live\.title : fallbackTitle, live \? live\.bodyHtml : fallbackBody\)/);
-  assert.match(notesPanel, /setNotesSessionView\(\{ view: "compose", draft, title: draftTitle \}\)/);
-  assert.match(notesPanel, /setNotesSessionView\(\{ view: "edit", noteId: editingId, draft: editDraft, title: editTitle \}\)/);
+test("saving is automatic: leaving the editor commits the draft, delete still confirms", () => {
+  // The owner's decision (2026-10-15): a note SAVES ITSELF. There is no Save
+  // and no Cancel anywhere — the draft is committed on a trailing pause, and
+  // again the moment the learner leaves the writing page (the tray's black
+  // Read capsule, home, the library, hiding the tab or unmounting).
+  assert.ok(notesPanel.includes("const AUTOSAVE_IDLE_MS = 1200;"), "a pause in typing commits the note");
+  assert.ok(notesPanel.includes("const AUTOSAVE_MAX_WAIT_MS = 5000;"), "a long burst still commits");
+  assert.ok(notesPanel.includes("const saved = onAdd(html);"), "a brand-new note is created by an autosave");
+  assert.ok(notesPanel.includes("onEdit(openId, html);"), "an open note is updated by an autosave");
+  assert.ok(notesPanel.includes("if (html === savedHtmlRef.current) return false;"), "an unchanged draft is skipped");
+  assert.ok(notesPanel.includes("savedHtmlRef.current = html;"), "the written html becomes the baseline");
+  assert.ok(notesPanel.includes("editorRef.current?.markSaved();"), "the editor's dirty baseline moves with it");
+  // The session always mirrors the live view + draft, so a tab switch or the
+  // player's exit flush finds the latest words.
+  assert.ok(notesPanel.includes('setNotesSessionView({ view: "compose", draft: next.bodyHtml, title: next.title });'));
+  assert.ok(notesPanel.includes('setNotesSessionView({ view: "edit", noteId: editingIdRef.current, draft: next.bodyHtml, title: next.title });'));
+  // The way OUT of edit mode is the tray's Read capsule; the editor reports
+  // whether that tray is up so the panel can keep a floating one on screen.
+  assert.ok(notesPanel.includes("onReadRequest={enterReadMode}"));
+  assert.ok(notesPanel.includes("onSaveShortcut={readView ? undefined : enterReadMode}"));
+  assert.ok(notesPanel.includes("onDockChange={setDockUp}"));
+  // Delete is still a two-step act through the shared confirmation dialog.
   assert.match(notesPanel, /<ConfirmDeleteDialog/);
   for (const hook of [
-    "data-course-notes-save", "data-course-notes-cancel", "data-course-note-edit-save", "data-course-note-edit-cancel",
     "data-course-notes-composer", "data-course-notes-input", "data-course-note-edit-input", "data-course-notes-add",
+    "data-note-library-panel", "data-note-panel-new", "data-notes-home-new", "data-note-edit-read-float",
   ]) {
     assert.match(notesPanel, new RegExp(hook), `${hook} test hook is kept`);
   }
+  // …and the explicit Save / Cancel surfaces are gone for good.
+  assert.doesNotMatch(notesPanel, /data-course-notes-save|data-course-notes-cancel|data-course-note-edit-save|data-course-note-edit-cancel/);
 });
 
-test("Save never truncates silently: the stored-note cap is checked first", () => {
+test("autosave never truncates silently: the stored-note cap is checked first", () => {
   assert.match(notesPanel, /import \{ MAX_NOTE_HTML_LENGTH \} from "\.\.\/\.\.\/utils\/courseNotes";/);
-  assert.equal((notesPanel.match(/html\.length > MAX_NOTE_HTML_LENGTH\) \{ setTooLong\(true\); return; \}/g) || []).length, 2, "both Save paths");
-  assert.match(notesPanel, /disabled=\{empty \|\| tooLong\}/);
+  // The one write path refuses an over-long note instead of trimming it…
+  assert.ok(notesPanel.includes("if (html.length > MAX_NOTE_HTML_LENGTH) { setTooLong(true); return false; }"));
+  // …and every keystroke keeps the status chip honest about it.
+  assert.ok(notesPanel.includes("setTooLong(html.length > MAX_NOTE_HTML_LENGTH);"));
+  assert.match(notesPanel, /label = "Too long to save";/);
 });
 
 test("the subtle status chip: Unsaved · Saving… · Saved · Synced, fed by the persistence hook", () => {
@@ -339,7 +360,10 @@ test("a white continuous page: no card, no frame, no glass", () => {
     assert.doesNotMatch(block[0], /box-shadow|backdrop-filter|border(?!-box)|border-radius/, `${selector} must stay a flat page`);
   }
   assert.match(css, /color-scheme: light;/);
-  assert.match(notesPanel, /className="flex h-full flex-col overflow-hidden bg-white"/);
+  assert.ok(
+    notesPanel.includes('className={`relative flex h-full flex-col overflow-hidden ${darkNote ? "bg-slate-950" : "bg-white"}`}'),
+    "the writing page is one continuous plate — the dark theme gets a dark one",
+  );
 });
 
 test("the title is a large bold left-aligned serif, part of the page — not an input card", () => {

@@ -4,10 +4,13 @@
 // same NotesPanel/NoteEditor component, never a Work fork — with Work's own
 // device-only storage and shell chrome around it:
 //
-//   1. no conventional header over the editor (Work's page header drops too);
-//   2. top-left / top-right side-panel corner buttons;
-//   3. the reference editing pill at the bottom in edit mode;
-//   4. the reference bottom navigation in read mode;
+//   1. no conventional header over the editor (Work's page header drops too) —
+//      and no corner buttons either: nothing sits at the top of a notes page;
+//   2. the library is the ONE side panel, opened from the read pill;
+//   3. the reference editing pill at the bottom in edit mode, with the black
+//      Read capsule pinned at its front;
+//   4. the reference bottom navigation in read mode (library · prev · next |
+//      new · edit | home — the 3-dot drawer button is gone);
 //   5. existing text formatting untouched (same BlockNote building blocks);
 //   6. rename from the editor's side panel, saved through Work's onEdit;
 //   7. the Work footer navigation hides while the editor is open and
@@ -30,7 +33,7 @@ const notesPanel = source("src/course/NotesPanel.tsx");
 
 const editorBranch = notesPanel.slice(
   notesPanel.indexOf("if (editorOpen)"),
-  notesPanel.indexOf('data-course-notes-mode="list"'),
+  notesPanel.indexOf('data-course-notes-mode="home"'),
 );
 
 test("Work mounts the exact Course NotesPanel — the editor is shared, never forked", () => {
@@ -46,28 +49,44 @@ test("Work mounts the exact Course NotesPanel — the editor is shared, never fo
 });
 
 test("the editor design has no storage-only fork: same chrome in Work and Course", () => {
-  // 1 — no conventional header; the slim corner row is the only top chrome.
+  // 1 — no conventional header, and NO top chrome at all: the corner-button row
+  // is gone (nothing in a notes page may open a side panel from a header).
   assert.doesNotMatch(editorBranch, /<header/);
-  assert.match(editorBranch, /data-note-editor-chrome/);
-  // 2 — side-panel corner buttons, left and right.
-  assert.match(editorBranch, /data-note-open-left-panel[\s\S]{0,200}?setSidePanel\("left"\)/);
-  assert.match(editorBranch, /data-note-open-right-panel[\s\S]{0,200}?setSidePanel\("right"\)/);
-  // 4 — read mode's bottom navigation; 3 — it swaps out for the editing pill.
-  assert.match(editorBranch, /\{readView \? \([\s\S]{0,900}?data-note-read-nav/);
-  assert.match(editorBranch, /data-note-view-mode=\{editing && selfReadOnly \? "read" : "edit"\}/);
+  assert.doesNotMatch(editorBranch, /data-note-editor-chrome/);
+  assert.doesNotMatch(editorBranch, /data-note-open-left-panel|data-note-open-right-panel|PanelLeft|PanelRight/);
+  // 2 — the ONE side panel is reached from the read pill's library button.
+  // (Its markup is its own element, shared by both notes pages, so it is
+  // pinned on the panel rather than inside the editor branch.)
+  assert.match(editorBranch, /data-note-read-library[\s\S]{0,200}?openLibrary\("self"\)/);
+  assert.match(notesPanel, /data-note-left-panel/);
+  assert.match(notesPanel, /w-\[calc\(100%-2\.5rem\)\]/, "almost the full page, a thin strip left visible");
+  assert.match(notesPanel, /data-note-panel-scrim/, "the visible strip is the way out");
+  // 4 — read mode's bottom navigation (visible until one tap on the page hides
+  // it); 3 — it swaps out for the editing pill, whose FIRST control is the eye.
+  assert.match(editorBranch, /\{readView && readChromeVisible \? \([\s\S]{0,1600}?data-note-read-nav/);
+  assert.match(editorBranch, /setReadChromeVisible\(\(visible\) => !visible\)/);
+  assert.match(editorBranch, /data-note-view-mode=\{readView \? "read" : "edit"\}/);
+  assert.ok(notesPanel.includes("data-note-edit-read-float"), "the floating Read capsule keeps edit mode escapable");
+  assert.ok(notesPanel.includes("onClick={enterReadMode}"));
+  // …and the removed 3-dot drawer button is nowhere.
+  assert.doesNotMatch(editorBranch, /data-note-read-more|MoreHorizontal/);
   // 5 — formatting stays the shared BlockNote document in both modes.
-  assert.match(editorBranch, /<NoteEditor[\s\S]*?readOnly=\{Boolean\(editing && selfReadOnly\)\}/);
+  assert.match(editorBranch, /<NoteEditor[\s\S]*?readOnly=\{readView\}/);
   // The only storageOnly differences inside the editor are status wording —
   // never different chrome, tools or save semantics.
   assert.match(editorBranch, /storageOnly \? "Device save needs attention" : "Note sync needs attention"/);
 });
 
-test("rename rides the side panel into Work's device-only onEdit", () => {
-  assert.match(editorBranch, /data-note-left-panel[\s\S]*?<BranchedMenu\s+items=\{selfTree\}/);
-  assert.match(notesPanel, /onRename: \(nextTitle\) => \{[\s\S]{0,300}?onEdit\(note\.id, combineHtml\(nextTitle/);
-  // Save / Cancel keep their explicit hooks, so Work saving is the player's.
-  assert.match(editorBranch, /"data-course-note-edit-save": true/);
-  assert.match(editorBranch, /"data-course-notes-save": true/);
+test("rename rides the library panel's long-press menu into Work's device-only onEdit", () => {
+  assert.match(notesPanel, /data-note-left-panel[\s\S]*?<BranchedMenu\s+items=\{selfTree\}/);
+  // Rows carry NO pencil / trash buttons in this library: both actions live in
+  // the row's long-press popup, and rename still writes through onEdit.
+  assert.match(notesPanel, /leafActionMenu="long-press"/);
+  assert.match(notesPanel, /onRename: \(nextTitle\) => renameNote\(note, nextTitle\)/);
+  assert.ok(notesPanel.includes("onEdit(note.id, combineHtml(nextTitle, body));"));
+  assert.ok(notesPanel.includes("onDelete: () => setPendingDeleteId(note.id),"));
+  // Nothing in the editor saves explicitly: Work saving is the player's.
+  assert.doesNotMatch(notesPanel, /data-course-note-edit-save|data-course-notes-save/);
 });
 
 test("Work header and footer follow the editor boundary and restore on the library", () => {

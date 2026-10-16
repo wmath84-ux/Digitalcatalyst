@@ -1,0 +1,71 @@
+/* src/course/mindMapLibrary.css
+ *
+ * The mind map's headless home, its ONE library panel and read mode's tray.
+ * Everything here is scoped to the mind map's own surfaces (the panel, the
+ * home page, the tray), so no other Course Player page is touched — the same
+ * arrangement the notes page has in ./notesLibrary.css.
+ *
+ * ── Why the rows needed this ───────────────────────────────────────────────
+ * The map rows used to share their line with a floating "+" button and, in the
+ * old drawer, with a close button; the label was squeezed and wrapped. The rows
+ * are exactly one clean line now — the action button is GONE from the row
+ * (rename and delete live in the row's long-press popup: see BranchedMenu's
+ * `leafActionMenu="long-press"`) and a long map name truncates with an ellipsis.
+ */
+
+/* ── The ONE library panel ───────────────────────────────────────────────── */
+
+[data-mindmap-left-panel] {
+  border-top-right-radius: 18px;
+  border-bottom-right-radius: 18px;
+}
+
+/* One clean line per map, like the note library's rows. */
+[data-mindmap-left-panel] .mindmap-library-menu .branched-menu__label,
+[data-mindmap-left-panel] .mindmap-library-menu .branched-menu__head-label {
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-mindmap-left-panel] .mindmap-library-menu .branched-menu__item,
+[data-mindmap-left-panel] .mindmap-library-menu .branched-menu__item--section,
+[data-mindmap-left-panel] .mindmap-library-menu .branched-menu__head {
+  padding-right: 12px;
+}
+
+/* The row the canvas is showing: the same soft ink wash the notes library
+   gives the note that is open. */
+[data-mindmap-left-panel] .mindmap-library-menu .branched-menu__item[data-active] {
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bm-accent) 10%, transparent);
+}
+
+/* A row's actions menu (long press / secondary click / keyboard menu key). */
+[data-mindmap-left-panel] .branched-menu__popup {
+  margin-left: 4px;
+}
+
+/* The strip of page the panel leaves visible is the way out — make it obvious
+   that it is interactive. */
+[data-course-mindmap] [data-mindmap-panel-scrim] {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── The home page ──────────────────────────────────────────────────────── */
+
+[data-course-mindmap-home] {
+  color-scheme: light;
+}
+
+[data-mindmap-theme="dark"] [data-course-mindmap-home] {
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-mindmap-left-panel] {
+    transition: none;
+  }
+}

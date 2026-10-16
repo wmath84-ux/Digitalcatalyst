@@ -46,11 +46,31 @@
 // 52 px play button stops being a control. It is the reference player at every
 // size, which is what "flexible" means for a fixed-size artwork; a stage below
 // the floor keeps its own scrolling instead of shrinking the card into mush.
+//
+// ── THE MUSIC PAGE'S PLAYER IS A PAGE, NOT A CARD (owner brief, 2026-10-15) ─
+//   "jo audio player hai vah card ki tarah dikhta hai, usko full screen page ka
+//    jitna bhi area hai vah full screen mein open hona … card ki tarah nahin
+//    dikhna chahiye, vah pura jitna area uske pass hai split screen mein use
+//    pure area mein acche se dikhe, aur accordingly expand ho jab user increase
+//    kare area by dragging the divider."
+//
+// `presentation: "full"` is that player: it wears the same dark glass surface,
+// the same vinyl, the same transport row and the same `data-course-audio-*`
+// contract, but it has NO fixed card and NO scale-to-fit frame — it is laid out
+// to FILL the box it is given, and it re-solves live from the stage's own
+// measurement (`--audio-ui` + `--audio-stage-min`, `audioStageScale` in
+// src/course/panelFit.ts), so every divider drag re-lays the real thing out.
+// Its top-left control is the BACK arrow (`onBack`) and a library glyph
+// (`onOpenLibrary`) sits on the same row — the two controls the music page
+// needs. The lesson card is untouched: it is still the default presentation.
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { AnimatePresence, motion, useMotionValue, useTransform } from "framer-motion";
-import { ArrowLeft, Heart, Pause, Play, Repeat, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
-import { AUDIO_CARD_HEIGHT, AUDIO_CARD_WIDTH, audioFitScale, paddingOf, publishVar, useFitTarget } from "./panelFit";
+import { ArrowLeft, Heart, ListMusic, Pause, Play, Repeat, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
+import {
+  AUDIO_CARD_HEIGHT, AUDIO_CARD_WIDTH, audioFitScale, audioStageDirection, audioStageScale, paddingOf, publishVar,
+  useFitTarget,
+} from "./panelFit";
 
 interface AudioPlayerProps {
   url: string;
@@ -65,6 +85,27 @@ interface AudioPlayerProps {
   resumeAt?: number;
   /** Reports the live position so the Course Player can persist it. */
   onProgress?: (position: number, duration: number) => void;
+  /**
+   * ── Which player the learner gets (owner brief, 2026-10-15) ──────────────
+   *   "card" (default) — the lesson player: the 320 px glass card, scaled as
+   *                      ONE artwork to whatever stage the lesson pane gives
+   *                      it. Every audio lesson and every existing call site
+   *                      renders exactly this.
+   *   "full"           — the MUSIC page's player: no card. It fills the whole
+   *                      area it is given and re-solves itself live, so
+   *                      dragging the Course Player's divider widens the real
+   *                      layout (disc, title, seek bar, transport) instead of
+   *                      magnifying a fixed card.
+   */
+  presentation?: "card" | "full";
+  /**
+   * When given, the top-left control becomes a BACK arrow that returns to the
+   * library page (the music page's own control) instead of the redundant
+   * rewind shortcut — the transport row still carries Back 15 s.
+   */
+  onBack?: () => void;
+  /** When given, a library glyph joins the top row and opens the library. */
+  onOpenLibrary?: () => void;
 }
 
 const formatTime = (value: number) => {
@@ -85,7 +126,97 @@ const colorForTrack = (key: string) => {
 
 const SKIP_SECONDS = 15;
 
-export default function AudioPlayer({ url, name, active = true, resumeAt = 0, onProgress }: AudioPlayerProps) {
+/**
+ * The spinning vinyl — ONE implementation, worn by both presentations (the
+ * lesson card and the music page's full player). Everything is derived from
+ * `size`, so the same artwork is a 176 px disc on a lesson and a stage-sized
+ * disc on the music page.
+ */
+function VinylDisc({
+  color,
+  playing,
+  url,
+  size,
+  className = "",
+}: {
+  color: string;
+  playing: boolean;
+  url: string;
+  size: string;
+  className?: string;
+}) {
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={url}
+        initial={{ opacity: 0, scale: 0.85 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.85 }}
+        transition={{ type: "spring", stiffness: 260, damping: 26 }}
+        className={`relative ${className}`}
+        style={{ width: size, height: size }}
+      >
+        <div
+          aria-hidden
+          className="absolute inset-0 rounded-full"
+          style={{ background: color, opacity: 0.18, filter: "blur(28px)", transform: "scale(1.15)" }}
+        />
+        <div
+          className="relative flex items-center justify-center rounded-full"
+          style={{
+            width: size,
+            height: size,
+            background: `radial-gradient(circle at 38% 35%, ${color}28, ${color}08 60%, transparent)`,
+            border: `1.5px solid ${color}25`,
+            boxShadow: `0 0 0 8px rgba(255,255,255,0.03), 0 12px 40px rgba(0,0,0,0.5)`,
+          }}
+          data-course-audio-disc
+        >
+          <motion.div
+            animate={{ rotate: playing ? 360 : 0 }}
+            transition={playing ? { duration: 4, repeat: Infinity, ease: "linear" } : { duration: 0.3 }}
+            className="relative"
+            style={{ width: "63.6%", height: "63.6%" }}
+          >
+            {[1, 0.78, 0.58, 0.38].map((scale, index) => (
+              <div
+                key={scale}
+                aria-hidden
+                className="absolute inset-0 rounded-full"
+                style={{
+                  transform: `scale(${scale})`,
+                  border: `1px solid ${color}${index === 0 ? "30" : index === 1 ? "1e" : "14"}`,
+                }}
+              />
+            ))}
+            <div
+              aria-hidden
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+              style={{
+                width: "11.4%",
+                height: "11.4%",
+                background: `radial-gradient(circle, ${color}cc, ${color}66)`,
+                boxShadow: `0 0 10px ${color}55`,
+              }}
+            />
+          </motion.div>
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+export default function AudioPlayer({
+  url,
+  name,
+  active = true,
+  resumeAt = 0,
+  onProgress,
+  presentation = "card",
+  onBack,
+  onOpenLibrary,
+}: AudioPlayerProps) {
+  const full = presentation === "full";
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -184,6 +315,17 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
    */
   const publishAudioFit = (stage: HTMLElement | null) => {
     if (!stage) return;
+    // The full player (the Music page) is laid out to FILL its box: it
+    // publishes one UI scale, the box's smallest side (which sizes the vinyl)
+    // and the shape (disc beside or above the controls). No frame, no card.
+    if (full) {
+      const width = stage.clientWidth;
+      const height = stage.clientHeight;
+      publishVar(stage, "--audio-ui", String(audioStageScale(width, height)));
+      publishVar(stage, "--audio-stage-min", `${Math.min(width, height)}px`);
+      publishVar(stage, "--audio-body-direction", audioStageDirection(width, height));
+      return;
+    }
     const cardHeight = cardRef.current?.offsetHeight || AUDIO_CARD_HEIGHT;
     const pad = paddingOf(stage);
     const scale = audioFitScale(
@@ -214,6 +356,339 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
     observer.observe(card);
     return () => observer.disconnect();
   }, []);
+
+  /* ── The ONE audio element both presentations drive ───────────────────── */
+  const audioElement = (
+    <audio
+      ref={audioRef}
+      src={url}
+      preload="metadata"
+      loop={loop}
+      onPlay={() => setPlaying(true)}
+      onPause={(event) => {
+        setPlaying(false);
+        progressRef.current?.(event.currentTarget.currentTime, event.currentTarget.duration || 0);
+      }}
+      onEnded={() => setPlaying(false)}
+      onLoadedMetadata={(event) => {
+        const audio = event.currentTarget;
+        setDuration(audio.duration || 0);
+        if (!resumeApplied.current && resumeRef.current > 0) {
+          audio.currentTime = Math.min(resumeRef.current, Math.max(0, (audio.duration || 0) - 1));
+          setCurrentTime(audio.currentTime);
+        }
+        resumeApplied.current = true;
+      }}
+      onTimeUpdate={(event) => {
+        setCurrentTime(event.currentTarget.currentTime);
+        progressRef.current?.(event.currentTarget.currentTime, event.currentTarget.duration || 0);
+      }}
+      data-course-audio-element
+    />
+  );
+
+  /* ── The seek bar + the times under it — one control, both presentations ── */
+  const seekRow = (size: (design: number) => string) => (
+    <div className="w-full">
+      <div
+        ref={seekZoneRef}
+        role="slider"
+        aria-label="Seek"
+        aria-valuemin={0}
+        aria-valuemax={Math.round(duration) || 1}
+        aria-valuenow={Math.round(currentTime)}
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowRight") seek(currentTime + 5);
+          if (event.key === "ArrowLeft") seek(currentTime - 5);
+        }}
+        onPointerDown={onSeekPointerDown}
+        onPointerMove={onSeekPointerMove}
+        onPointerUp={onSeekPointerUp}
+        onPointerCancel={onSeekPointerUp}
+        className="relative w-full cursor-pointer touch-none select-none overflow-hidden rounded-full"
+        style={{ background: "rgba(255,255,255,0.16)", height: size(3) }}
+        data-course-audio-seek
+      >
+        <motion.div
+          className="absolute left-0 top-0 h-full rounded-full"
+          style={{ width: barWidth, background: `linear-gradient(90deg, ${color}70, ${color}dd)` }}
+          data-course-audio-seek-fill
+        />
+      </div>
+      <div className="flex justify-between" style={{ marginTop: size(8) }}>
+        <span className="font-medium tabular-nums" style={{ fontSize: size(10), color: "rgba(255,255,255,0.78)" }} data-course-audio-current>
+          {formatTime(currentTime)}
+        </span>
+        <span className="font-medium tabular-nums" style={{ fontSize: size(10), color: "rgba(255,255,255,0.78)" }} data-course-audio-duration>
+          {formatTime(duration)}
+        </span>
+      </div>
+    </div>
+  );
+
+  /** The three position segments (the reference's pagination dots). */
+  const positionDots = (size: (design: number) => string) => (
+    <div className="flex items-center" style={{ gap: size(7) }}>
+      {[0, 1, 2].map((index) => (
+        <motion.button
+          key={index}
+          type="button"
+          aria-label={`Jump to part ${index + 1}`}
+          onClick={() => seek(((index + 0.001) / 3) * duration)}
+          animate={{
+            width: index === segment ? size(20) : size(5),
+            opacity: index === segment ? 0.92 : 0.58,
+            backgroundColor: index === segment ? color : "#ffffff",
+          }}
+          transition={{ type: "spring", stiffness: 400, damping: 28 }}
+          className="h-[5px] cursor-pointer rounded-full"
+          style={{ minWidth: 5, height: size(5) }}
+        />
+      ))}
+    </div>
+  );
+
+  /**
+   * ── THE MUSIC PAGE'S PLAYER: the whole area, not a card ──────────────────
+   * The stage is measured (not the viewport): `audioStageScale` publishes the
+   * one UI scale, the stage's own smallest side sizes the vinyl, and the wide
+   * shape puts the disc beside the controls instead of above them. Every
+   * divider drag re-solves all three, so "expand by dragging" widens the real
+   * layout — it never magnifies a 320 px card.
+   */
+  if (full) {
+    const size = (design: number) => `calc(${design}px * var(--audio-ui, 1))`;
+    return (
+      <div
+        ref={stageRef}
+        className="relative h-full min-h-0 w-full min-w-0 overflow-hidden"
+        data-course-viewer-audio
+        data-audio-presentation="full"
+        data-compact="false"
+      >
+        <div
+          className="relative isolate flex h-full min-h-0 w-full flex-col overflow-hidden"
+          style={{
+            background: "linear-gradient(155deg, rgba(12,10,14,0.97) 0%, rgba(19,17,33,0.97) 55%, rgba(38,14,48,0.97) 100%)",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}
+          data-course-audio-player
+          data-course-theme-surface="dark"
+          data-playing={playing ? "true" : "false"}
+          data-audio-full-player="true"
+        >
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 z-[-1]"
+            style={{ backdropFilter: "blur(48px) saturate(1.6)", WebkitBackdropFilter: "blur(48px) saturate(1.6)" }}
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute left-12 right-12 top-0 h-[1px]"
+            style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)" }}
+          />
+
+          {/* 1) Top bar — BACK to the library on the left, the library on the
+              right (the owner's own control list for this player). */}
+          <div
+            className="flex w-full shrink-0 items-center justify-between gap-2"
+            style={{ padding: `${size(10)} ${size(14)} 0` }}
+          >
+            {onBack ? (
+              <motion.button
+                type="button"
+                data-course-audio-back
+                aria-label="Back to library"
+                onClick={onBack}
+                whileHover={{ scale: 1.12, color: "rgba(255,255,255,0.98)" }}
+                whileTap={{ scale: 0.9 }}
+                style={{ color: "rgba(255,255,255,0.88)" }}
+              >
+                <ArrowLeft size={22} />
+              </motion.button>
+            ) : (
+              <motion.button
+                type="button"
+                aria-label="Rewind 15 seconds"
+                onClick={() => skipTo(-1)}
+                whileHover={{ scale: 1.15, color: "rgba(255,255,255,0.95)" }}
+                whileTap={{ scale: 0.85 }}
+                style={{ color: "rgba(255,255,255,0.72)" }}
+              >
+                <ArrowLeft size={20} />
+              </motion.button>
+            )}
+            <span
+              className="min-w-0 flex-1 truncate text-center font-semibold uppercase"
+              style={{ fontSize: size(10), letterSpacing: "0.18em", color: "rgba(255,255,255,0.76)" }}
+            >
+              Now Playing
+            </span>
+            <span className="flex items-center" style={{ gap: size(6) }}>
+              {onOpenLibrary ? (
+                <motion.button
+                  type="button"
+                  data-course-audio-library
+                  aria-label="Open the music library"
+                  onClick={onOpenLibrary}
+                  whileHover={{ scale: 1.12, color: "rgba(255,255,255,0.98)" }}
+                  whileTap={{ scale: 0.9 }}
+                  style={{ color: "rgba(255,255,255,0.88)" }}
+                >
+                  <ListMusic size={21} />
+                </motion.button>
+              ) : null}
+              <motion.button
+                type="button"
+                aria-label="Like"
+                aria-pressed={liked}
+                onClick={() => setLiked((value) => !value)}
+                animate={{ color: liked ? color : "rgba(255,255,255,0.72)" }}
+                transition={{ duration: 0.2 }}
+                whileHover={{ scale: 1.15 }}
+                whileTap={{ scale: 0.85 }}
+              >
+                <Heart size={20} fill={liked ? color : "transparent"} />
+              </motion.button>
+            </span>
+          </div>
+
+          {/* 2) The player itself: disc + everything else, laid out for the
+              area this player actually has. */}
+          <div
+            className="flex min-h-0 w-full flex-1 items-center justify-center overflow-auto"
+            style={{
+              flexDirection: "var(--audio-body-direction, column)" as never,
+              padding: `${size(8)} ${size(20)} ${size(16)}`,
+              gap: size(18),
+            }}
+            data-audio-full-body
+          >
+            <VinylDisc color={color} playing={playing} url={url} size="clamp(104px, calc(var(--audio-stage-min, 300px) * 0.44), 320px)" />
+            <div className="flex min-h-0 w-full min-w-0 flex-col items-center" style={{ maxWidth: 660, gap: size(12) }}>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={url}
+                  initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, y: -10, filter: "blur(4px)" }}
+                  transition={{ type: "spring", duration: 0.4, bounce: 0 }}
+                  className="flex w-full min-w-0 flex-col items-center"
+                  style={{ gap: size(4) }}
+                >
+                  <h3
+                    className="max-w-full truncate font-bold tracking-tight text-white/95"
+                    style={{ fontSize: size(20) }}
+                    title={name}
+                  >
+                    {name}
+                  </h3>
+                  <p className="font-medium" style={{ fontSize: size(12.5), color: "rgba(255,255,255,0.78)" }}>
+                    {playing ? "Playing" : "Paused"}
+                  </p>
+                </motion.div>
+              </AnimatePresence>
+
+              {positionDots(size)}
+              {seekRow(size)}
+
+              <div className="flex w-full items-center justify-between">
+                <motion.button
+                  type="button"
+                  aria-label="Toggle loop"
+                  aria-pressed={loop}
+                  onClick={() => setLoop((value) => !value)}
+                  animate={{ color: loop ? color : "rgba(255,255,255,0.72)" }}
+                  transition={{ duration: 0.2 }}
+                  whileHover={{ scale: 1.15, color: loop ? color : "rgba(255,255,255,0.95)" }}
+                  whileTap={{ scale: 0.85 }}
+                  data-course-audio-loop
+                  data-active={loop ? "true" : "false"}
+                >
+                  <Repeat size={19} />
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  aria-label="Back 15 seconds"
+                  onClick={() => skipTo(-1)}
+                  style={{ color: "rgba(255,255,255,0.78)" }}
+                  whileHover={{ scale: 1.12, color: "rgba(255,255,255,0.95)" }}
+                  whileTap={{ scale: 0.9 }}
+                  data-course-audio-restart
+                >
+                  <SkipBack size={26} fill="currentColor" />
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  aria-label={playing ? "Pause" : "Play"}
+                  onClick={togglePlay}
+                  animate={{
+                    background: `radial-gradient(circle at 38% 35%, ${color}ee, ${color}99)`,
+                    boxShadow: `0 4px 20px ${color}55, 0 0 0 1px ${color}33`,
+                  }}
+                  transition={{ duration: 0.3 }}
+                  whileHover={{ scale: 1.07 }}
+                  whileTap={{ scale: 0.92 }}
+                  className="flex items-center justify-center rounded-full"
+                  style={{ width: size(58), height: size(58) }}
+                  data-course-audio-play
+                  data-playing={playing ? "true" : "false"}
+                >
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={playing ? "pause" : "play"}
+                      initial={{ scale: 0.6, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.6, opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="grid place-items-center text-white"
+                    >
+                      {playing ? <Pause size={23} fill="currentColor" /> : <Play size={23} fill="currentColor" className="ml-0.5" />}
+                    </motion.span>
+                  </AnimatePresence>
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  aria-label="Forward 15 seconds"
+                  onClick={() => skipTo(1)}
+                  style={{ color: "rgba(255,255,255,0.78)" }}
+                  whileHover={{ scale: 1.12, color: "rgba(255,255,255,0.95)" }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  <SkipForward size={26} fill="currentColor" />
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  aria-label="Toggle mute"
+                  aria-pressed={muted}
+                  onClick={() => {
+                    const audio = audioRef.current;
+                    if (!audio) return;
+                    audio.muted = !audio.muted;
+                    setMuted(audio.muted);
+                  }}
+                  animate={{ color: muted ? color : "rgba(255,255,255,0.72)" }}
+                  transition={{ duration: 0.2 }}
+                  whileHover={{ scale: 1.15, color: muted ? color : "rgba(255,255,255,0.95)" }}
+                  whileTap={{ scale: 0.85 }}
+                  data-course-audio-mute
+                  data-muted={muted ? "true" : "false"}
+                >
+                  {muted ? <VolumeX size={19} /> : <Volume2 size={19} />}
+                </motion.button>
+              </div>
+            </div>
+          </div>
+        </div>
+        {audioElement}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -303,57 +778,7 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
               </div>
 
               {/* 2) Album disc */}
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={url}
-                  initial={{ opacity: 0, scale: 0.85 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.85 }}
-                  transition={{ type: "spring", stiffness: 260, damping: 26 }}
-                  className="relative mb-7"
-                >
-                  <div
-                    aria-hidden
-                    className="absolute inset-0 rounded-full"
-                    style={{ background: color, opacity: 0.18, filter: "blur(28px)", transform: "scale(1.15)" }}
-                  />
-                  <div
-                    className="relative flex h-44 w-44 items-center justify-center rounded-full"
-                    style={{
-                      background: `radial-gradient(circle at 38% 35%, ${color}28, ${color}08 60%, transparent)`,
-                      border: `1.5px solid ${color}25`,
-                      boxShadow: `0 0 0 8px rgba(255,255,255,0.03), 0 12px 40px rgba(0,0,0,0.5)`,
-                    }}
-                    data-course-audio-disc
-                  >
-                    <motion.div
-                      animate={{ rotate: playing ? 360 : 0 }}
-                      transition={playing ? { duration: 4, repeat: Infinity, ease: "linear" } : { duration: 0.3 }}
-                      className="relative h-28 w-28"
-                    >
-                      {[1, 0.78, 0.58, 0.38].map((scale, index) => (
-                        <div
-                          key={scale}
-                          aria-hidden
-                          className="absolute inset-0 rounded-full"
-                          style={{
-                            transform: `scale(${scale})`,
-                            border: `1px solid ${color}${index === 0 ? "30" : index === 1 ? "1e" : "14"}`,
-                          }}
-                        />
-                      ))}
-                      <div
-                        aria-hidden
-                        className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full"
-                        style={{
-                          background: `radial-gradient(circle, ${color}cc, ${color}66)`,
-                          boxShadow: `0 0 10px ${color}55`,
-                        }}
-                      />
-                    </motion.div>
-                  </div>
-                </motion.div>
-              </AnimatePresence>
+              <VinylDisc color={color} playing={playing} url={url} size="176px" className="mb-7" />
 
               {/* 3) Track info */}
               <AnimatePresence mode="wait">
@@ -526,32 +951,7 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
         </div>
       </div>
 
-      <audio
-        ref={audioRef}
-        src={url}
-        preload="metadata"
-        loop={loop}
-        onPlay={() => setPlaying(true)}
-        onPause={(event) => {
-          setPlaying(false);
-          progressRef.current?.(event.currentTarget.currentTime, event.currentTarget.duration || 0);
-        }}
-        onEnded={() => setPlaying(false)}
-        onLoadedMetadata={(event) => {
-          const audio = event.currentTarget;
-          setDuration(audio.duration || 0);
-          if (!resumeApplied.current && resumeRef.current > 0) {
-            audio.currentTime = Math.min(resumeRef.current, Math.max(0, (audio.duration || 0) - 1));
-            setCurrentTime(audio.currentTime);
-          }
-          resumeApplied.current = true;
-        }}
-        onTimeUpdate={(event) => {
-          setCurrentTime(event.currentTarget.currentTime);
-          progressRef.current?.(event.currentTarget.currentTime, event.currentTarget.duration || 0);
-        }}
-        data-course-audio-element
-      />
+      {audioElement}
     </div>
   );
 }

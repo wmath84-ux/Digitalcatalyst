@@ -33,9 +33,21 @@ interface WorkPageSurfaceProps {
    */
   onImmersiveChange?: (slotKey: string, immersive: boolean) => void;
   myDay?: Omit<WorkMyDayPageProps, "slotKey" | "theme" | "orientation" | "onExit" | "onToggleTheme">;
+  /**
+   * The plus deck (768px up) draws ONE Work header line for the whole shell, so
+   * every block's page renders without its own 12-height header — the same way
+   * the Course Player's four blocks carry no per-block header. Below 768px this
+   * stays false and today's page header is untouched.
+   */
+  headless?: boolean;
 }
 
-const ACCENT_WASH: Record<WorkPageId, string> = {
+/**
+ * The page's own icon-plate wash — one row per Work page. Exported because the
+ * shell's single header line (768px up) shows the current page with the same
+ * plate every page header uses.
+ */
+export const WORK_ACCENT_WASH: Record<WorkPageId, string> = {
   myday: "rgba(6,214,160,.14)",
   notes: "rgba(58,134,255,.14)",
   mindmap: "rgba(179,136,255,.18)",
@@ -53,7 +65,7 @@ function WorkPageLoading({ page }: { page: WorkPageId }) {
   );
 }
 
-export default function WorkPageSurface({ page, slotKey, theme, orientation, notes, onExit, onToggleTheme, onImmersiveChange, myDay }: WorkPageSurfaceProps) {
+export default function WorkPageSurface({ page, slotKey, theme, orientation, notes, onExit, onToggleTheme, onImmersiveChange, myDay, headless = false }: WorkPageSurfaceProps) {
   // ── Headless editor/viewer state (Work-local) ──────────────────────────
   // Each reused Course surface reports its own editor boundary; Work only
   // mirrors it into shell chrome. Library/page states keep the Work header,
@@ -75,7 +87,7 @@ export default function WorkPageSurface({ page, slotKey, theme, orientation, not
   // footer stays up so pages can still be switched, and the theme keeps
   // flowing to the surface (and to every other page's theme toggle)
   // exactly as before.
-  const showHeader = !immersive && page !== "ai";
+  const showHeader = !headless && !immersive && page !== "ai";
   useEffect(() => {
     onImmersiveChange?.(slotKey, immersive);
   }, [immersive, onImmersiveChange, slotKey]);
@@ -122,7 +134,7 @@ export default function WorkPageSurface({ page, slotKey, theme, orientation, not
         >
           <ArrowLeft size={16} aria-hidden="true" />
         </button>
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg" style={{ color: record.color, background: ACCENT_WASH[page] }} aria-hidden="true">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg" style={{ color: record.color, background: WORK_ACCENT_WASH[page] }} aria-hidden="true">
           <PageIcon size={15} />
         </span>
         <div className="min-w-0 flex-1">

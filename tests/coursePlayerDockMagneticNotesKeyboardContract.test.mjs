@@ -512,8 +512,11 @@ test("Switching tabs inside the pane crossfades the content", () => {
   assert.match(overlay, /import \{ EASE_OUT_MOTION \} from "\.\/splitMotion";/);
   assert.match(overlay, /const paneCrossfade = useReducedMotion\(\) !== true;/);
   assert.match(splitMotion, /export const EASE_OUT_MOTION = \[0\.22, 1, 0\.36, 1\]/);
-  // The pane is the only home now, so there is exactly one studyBody mount.
-  assert.equal(overlay.match(/\{studyBody\}/g)?.length, 1);
+  // Two RENDER SITES, one live mount: the phone's study pane, and — from 768px
+  // up — the plus deck's borrowed block. `if (props.quad) { … return … }`
+  // means the deck's copy is the only one that ever mounts on a big stage.
+  assert.equal(overlay.match(/\{studyBody\}/g)?.length, 2);
+  assert.match(overlay, /if \(props\.quad\) \{[\s\S]{0,1200}?\{studyBody\}[\s\S]{0,1200}?return \(/);
 });
 
 test("A landscape pane never settles narrower than the dock inside it, on any device", () => {

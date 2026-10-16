@@ -601,15 +601,20 @@ test("the toolbar stays hidden until a SELF map is explicitly unlocked", () => {
 
 test("the toolbar rides at the bottom of the sheet as the note editor's pill", () => {
   // Owner: the strip moved to the BOTTOM of the screen and wears the note
-  // editor's toolbar design — one floating, opaque, fully-rounded pill at
-  // the bottom-left, so panned/zoomed content sliding underneath it never
-  // shows through.
-  assert.match(styles, /\[data-course-mindmap-status\] \{[^}]*position: absolute;[^}]*left: 0\.5rem;/);
+  // editor's toolbar design — one floating, opaque, fully-rounded pill, so
+  // panned/zoomed content sliding underneath it never shows through. It sits
+  // CENTRED on the pane (owner's brief, 2026-10-15): hugging the left edge
+  // read as a mistake next to the note editor's own pill.
+  assert.match(styles, /\[data-course-mindmap-status\] \{[^}]*position: absolute;[^}]*left: 50%;[^}]*transform: translateX\(-50%\);/);
+  assert.doesNotMatch(styles, /\[data-course-mindmap-status\] \{[^}]*left: 0\.5rem;/, "no left-hugging offset survives");
   assert.match(styles, /\[data-course-mindmap-status\] \{[^}]*bottom: calc\(max\(0\.5rem, env\(safe-area-inset-bottom\)\) \+ var\(--dc-note-footer-inset, 0px\)\);/);
   assert.match(styles, /\[data-course-mindmap-status\] \{[^}]*border-radius: 999px;[^}]*background: var\(--mm-pill-bg\);/);
   assert.match(styles, /--mm-pill-bg: #0d1424;/, "the dark pill surface is a solid colour, not glass");
   assert.match(styles, /\[data-mindmap-theme="light"\] \{[^}]*--mm-pill-bg: #ffffff;/);
   assert.match(toolbar, /className="absolute flex items-center overflow-x-auto/, "the strip itself floats — no in-flow top bar");
+  // The menus it opens are portalled to <body>, so centring it with a
+  // transform can never drag a drop-down along with it.
+  assert.match(panel, /return createPortal\(/, "menus render into their own layer, so the centring transform cannot drag one along");
   assert.doesNotMatch(toolbar, /data-course-mindmap-status[\s\S]{0,220}?border-b/, "no top-strip divider on the pill");
   // …and the drop-downs hang upward from their triggers instead of downward.
   assert.match(panel, /const spaceAbove = Math\.max\(120, anchor\.top - 16\);/);

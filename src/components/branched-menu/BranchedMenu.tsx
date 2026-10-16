@@ -99,6 +99,16 @@ export interface BranchedMenuProps {
   foldDuration?: number;
   className?: string;
   dataAttrs?: Record<string, string | number | undefined>;
+  /**
+   * How a leaf's rename / delete actions are OFFERED:
+   *   · "inline" (default) — the pencil + trash buttons the libraries have
+   *     always shown on every row;
+   *   · "long-press" — no row buttons at all: the row stays a clean single
+   *     line and both actions appear in a small popup on a long press (touch),
+   *     a secondary click (mouse) or the keyboard menu key. Rename still turns
+   *     the row's own label area into an input, whichever way it is reached.
+   */
+  leafActionMenu?: "inline" | "long-press";
 }
 
 const MARK = 16;
@@ -115,6 +125,9 @@ export function branchContains(item: BranchedMenuItem, value: string | null | un
 
 // ── Leaf row ───────────────────────────────────────────────────────────
 
+/** A long press on a row (a finger held in place) opens its actions popup. */
+const LONG_PRESS_MS = 450;
+
 function LeafRow({
   item,
   active,
@@ -122,6 +135,7 @@ function LeafRow({
   accent,
   connected,
   onSelect,
+  actionMenu = "inline",
 }: {
   item: BranchedMenuItem;
   active: boolean;
@@ -129,12 +143,21 @@ function LeafRow({
   accent: string;
   connected: boolean;
   onSelect: () => void;
+  actionMenu?: "inline" | "long-press";
 }) {
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(item.label);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [flipUp, setFlipUp] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const popupRef = useRef<HTMLDivElement | null>(null);
+  const pressTimer = useRef<number | null>(null);
+  const pressStart = useRef<{ x: number; y: number } | null>(null);
+  /** A long press opens the popup — the click that follows it must not select. */
+  const swallowClick = useRef(false);
   const helpId = useId();
   const color = item.color || accent;
+  const popupMode = actionMenu === "long-press" && Boolean(item.onRename || item.onDelete);
 
   useEffect(() => {
     if (!renaming) return;
@@ -142,8 +165,67 @@ function LeafRow({
     inputRef.current?.select();
   }, [renaming]);
 
+  // ── The long-press gesture (touch / pen) ─────────────────────────────────
+  const endPress = useCallback(() => {
+    if (pressTimer.current !== null) {
+      window.clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+    pressStart.current = null;
+  }, []);
+  const openMenu = useCallback(() => {
+    if (!popupMode || disabled) return;
+    endPress();
+    swallowClick.current = true;
+    setMenuOpen(true);
+  }, [disabled, endPress, popupMode]);
+  const onPointerDown = (event: { clientX: number; clientY: number; pointerType: string; button?: number }) => {
+    if (!popupMode || disabled || renaming) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    pressStart.current = { x: event.clientX, y: event.clientY };
+    pressTimer.current = window.setTimeout(() => { pressTimer.current = null; swallowClick.current = true; setMenuOpen(true); }, LONG_PRESS_MS);
+  };
+  const onPointerMove = (event: { clientX: number; clientY: number }) => {
+    const start = pressStart.current;
+    if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) endPress();
+  };
+  useEffect(() => endPress, [endPress]);
+
+  // While the popup is up: a press anywhere else (or Escape) closes it.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onDown = (event: Event) => {
+      if (popupRef.current && event.target instanceof Node && popupRef.current.contains(event.target)) return;
+      setMenuOpen(false);
+    };
+    const onKey = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") setMenuOpen(false); };
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
+  }, [menuOpen]);
+
+  // The popup stays inside the list: with no room below the row it opens upwards.
+  useLayoutEffect(() => {
+    const popup = popupRef.current;
+    if (!popup) return undefined;
+    const place = () => {
+      const row = popup.parentElement?.getBoundingClientRect();
+      const height = popup.offsetHeight || 44;
+      const viewport = window.visualViewport?.height ?? window.innerHeight;
+      if (!row) return;
+      setFlipUp(row.bottom + height + 8 > viewport && row.top - height - 8 > 0);
+    };
+    place();
+    return undefined;
+  }, [menuOpen]);
+
   const beginRename = () => {
     if (!item.onRename) return;
+    endPress();
+    setMenuOpen(false);
     setDraft(item.label);
     setRenaming(true);
   };
@@ -159,10 +241,20 @@ function LeafRow({
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (!item.onRename) return;
-    if (event.key === "F2" || (event.key === "Enter" && event.shiftKey)) {
+    if (item.onRename && (event.key === "F2" || (event.key === "Enter" && event.shiftKey))) {
       event.preventDefault();
       beginRename();
+      return;
+    }
+    // The popup's two actions stay reachable without a pointer at all.
+    if (popupMode && (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey))) {
+      event.preventDefault();
+      openMenu();
+      return;
+    }
+    if (popupMode && event.key === "Delete" && item.onDelete) {
+      event.preventDefault();
+      item.onDelete();
     }
   };
 
@@ -205,6 +297,12 @@ function LeafRow({
   }
 
   const handleClick = () => {
+    // A long press already opened this row's actions — it is not a selection.
+    if (swallowClick.current) {
+      swallowClick.current = false;
+      return;
+    }
+    if (menuOpen) { setMenuOpen(false); return; }
     if (disabled) return;
     onSelect();
   };
@@ -223,6 +321,16 @@ function LeafRow({
         aria-label={item.description || undefined}
         onClick={handleClick}
         onKeyDown={onKeyDown}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endPress}
+        onPointerLeave={endPress}
+        onPointerCancel={endPress}
+        onContextMenu={(event) => {
+          if (!popupMode) return;
+          event.preventDefault();
+          openMenu();
+        }}
         style={{ "--bm-leaf": color } as CSSProperties}
         {...mapDataAttrs(item.dataAttrs)}
       >
@@ -239,7 +347,40 @@ function LeafRow({
         ) : null}
         {item.meta ? <span className="branched-menu__meta">{item.meta}</span> : null}
       </button>
-      {item.onRename || item.onDelete ? (
+      {popupMode && menuOpen ? (
+        <div
+          ref={popupRef}
+          className="branched-menu__popup"
+          data-branched-menu-popup=""
+          data-flip={flipUp ? "up" : undefined}
+          role="menu"
+          aria-label={`Actions for ${item.label}`}
+        >
+          {item.onRename ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="branched-menu__popup-item"
+              data-branched-menu-rename=""
+              onClick={beginRename}
+            >
+              <Pencil size={14} aria-hidden="true" /> Rename
+            </button>
+          ) : null}
+          {item.onDelete ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="branched-menu__popup-item branched-menu__popup-item--danger"
+              data-branched-menu-delete=""
+              onClick={() => { setMenuOpen(false); item.onDelete?.(); }}
+            >
+              <Trash2 size={14} aria-hidden="true" /> {item.deleteLabel ? "Delete" : "Delete"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {!popupMode && (item.onRename || item.onDelete) ? (
         <span className="branched-menu__actions">
           {item.onRename ? (
             <button
@@ -304,6 +445,7 @@ export default function BranchedMenu({
   foldDuration = 300,
   className = "",
   dataAttrs,
+  leafActionMenu = "inline",
 }: BranchedMenuProps) {
   const navRef = useRef<HTMLElement | null>(null);
   const markerRef = useRef<HTMLSpanElement | null>(null);
@@ -429,6 +571,7 @@ export default function BranchedMenu({
             disabled={leafDisabled}
             accent="var(--bm-accent)"
             connected={connected}
+            actionMenu={leafActionMenu}
             onSelect={() => onSelect?.(item.value, item)}
           />
         </div>

@@ -432,7 +432,8 @@
 
 /* ── 10. Mind map: the mind wall ───────────────────────────────────────────
    The library overlay is the room's floating chooser. */
-.course-player-shell [data-course-mindmap-library] {
+.course-player-shell [data-course-mindmap-library],
+.course-player-shell [data-course-mindmap-home] {
   background-color: rgba(8, 11, 22, 0.96);
   background-image: var(--dc-flat-sheet);
   backdrop-filter: var(--dc-flat-blur-sheet);

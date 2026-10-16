@@ -8,7 +8,12 @@
 // plugins (React + Tailwind), so every utility class the panel relies on is real.
 //
 // What is proved (each is a separate test):
-//   · create / edit / cancel / delete flows and their stored HTML;
+//   · the headerless HOME (New note · My Library · Course Library) and the ONE
+//     library panel — nearly a page wide, MASTER / SELF top-centre, exactly one
+//     button at the bottom, no pencil / trash on the rows (rename + delete live
+//     in the row's long-press popup);
+//   · create / edit / delete flows and their stored HTML, with the AUTOMATIC
+//     save (the dock's eye button commits; there is no Save button);
 //   · legacy notes open with their tables, checklists, quotes and code intact;
 //   · slash menu (filter + apply), shortcuts, undo / redo, paste, links;
 //   · the selection toolbar floats over a selection and never steals it;
@@ -22,8 +27,9 @@
 //     double inset), menus stay inside what is visible, a tap on a tool keeps the
 //     selection and the keyboard;
 //   · typing is batched (a handful of renders for 120 characters) and nothing is
-//     persisted until Save; the last words survive the panel or the whole player
-//     unmounting a moment after the last keystroke;
+//     written per keystroke — a pause commits the note on its own; the last words
+//     survive the panel or the whole player unmounting a moment after the last
+//     keystroke;
 //   · 320 / 360 / 375 / 390 / 412 / 430 / 768 / 1024 px: no horizontal overflow.
 //
 // Needs Chromium: install Playwright's
@@ -108,32 +114,35 @@ async function open({ width = 1100, height = 760, touch = false, init, pagePath 
   if (pagePath === HANDLE_PATH) {
     await page.waitForSelector("[data-note-editor] .bn-editor");
   } else {
-    await page.waitForSelector("[data-course-notes-panel]");
-    // The panel remembers the MASTER/SELF collection separately; always make
-    // the private notes view explicit so an Add-note test never races a stored
-    // preference or tries to compose into the read-only master collection.
-    await press('[data-course-note-collection="self"]');
-    await page.waitForSelector("[data-course-notes-add]");
+    // Every notes flow starts on the headerless HOME page — three centred
+    // buttons (New note · My Library · Course Library) and nothing else. A
+    // fresh context has an empty panel session, so no note is open yet.
+    await page.waitForSelector("[data-course-notes-home]");
   }
   const editorReady = async () => { await page.waitForSelector("[data-note-editor] .bn-editor", { timeout: 30000 }); await page.waitForTimeout(350); };
   return { page, context, problems, press, editorReady };
 }
 
-/** Library selection reads; only a second, direct document gesture edits. */
+/**
+ * A note from the library ALWAYS opens in read mode first — one tap selects,
+ * it never edits — and only a second, direct gesture (a double tap on the page,
+ * or the read tray's pencil) unlocks the editor.
+ */
 async function openSavedNote(page, press, id) {
-  if (await page.locator('[data-note-view-mode="read"]').count()) {
-    await page.locator('[data-note-view-mode="read"]').focus();
-    await page.keyboard.press("Escape");
-  }
-  await press(`[data-note-id="${id}"]`);
+  await openLibrary(page, press);
+  await press(`[data-course-note-open][data-note-id="${id}"]`);
   await page.waitForSelector('[data-note-editor] .bn-editor');
-  assert.equal(await page.locator('[data-course-notes-bar]').count(), 0);
-  assert.equal(await page.locator('.bn-editor[contenteditable="true"]').count(), 0);
+  await page.waitForSelector('[data-note-view-mode="read"]');
+  assert.equal(await page.locator("[data-note-library-panel]").count(), 0, "the panel closes behind the note");
+  assert.equal(await page.locator('.bn-editor[contenteditable="true"]').count(), 0, "reading is not editing");
   const title = page.locator('.dc-note-title');
   if (await page.evaluate(() => navigator.maxTouchPoints > 0)) {
     const box = await title.boundingBox();
     await page.touchscreen.tap(box.x + 12, box.y + 12);
     await page.touchscreen.tap(box.x + 12, box.y + 12);
+    // The bounded double tap is the owner's gesture; the read tray's pencil is
+    // the same door if a tap pair lands too slowly on a loaded machine.
+    await page.waitForSelector('[data-note-view-mode="edit"]', { timeout: 3000 }).catch(async () => press("[data-note-read-edit]"));
   } else await title.dblclick();
   await page.waitForSelector('[data-note-view-mode="edit"]');
   await page.waitForSelector('.bn-editor[contenteditable="true"]');
@@ -149,22 +158,55 @@ const firstVisibleRect = (page, selector) =>
     }
     return null;
   }, selector);
-// Status, Save and Cancel live in the right side panel (the reference
-// design's chrome): peek at the status (the panel hands the caret back to
-// the document when it closes over an editing note), or act through it.
-const status = async (page, press) => {
-  await press("[data-note-open-right-panel]");
-  await page.waitForSelector("[data-note-right-panel]");
-  const text = await page.$eval("[data-course-notes-status]", (el) => el.textContent);
-  await press("[data-note-close-right-panel]");
-  await page.waitForSelector("[data-note-right-panel]", { state: "detached" });
-  return text;
+// The quiet autosave chip is the page's only top element: Unsaved · Saving… ·
+// Synced · Too long to save. There is no Save button and no options panel.
+const status = async (page) => (await page.$eval("[data-course-notes-status]", (el) => el.textContent || "")).trim();
+/**
+ * Leave the editor for the note's READ view. Saving is automatic, and this is
+ * the gesture that commits: the dock's eye button stores the draft and flips
+ * the SAME document back to read-only. (A brand-new note with words in it is
+ * given its id by that same commit.) The eye leads the dock while the caret is
+ * in the note and floats on its own the moment the caret leaves.
+ */
+const readMode = async (page, press) => {
+  await press("[data-note-edit-read], [data-note-edit-read-float]");
+  await page.waitForSelector('[data-note-view-mode="read"]');
 };
-const viaOptions = async (page, press, selector) => {
-  await press("[data-note-open-right-panel]");
-  await page.waitForSelector("[data-note-right-panel]");
-  await press(selector);
+/** The visible strip beside the panel is its way out — tap or Escape. */
+const closeLibrary = async (page, press) => {
+  if (!(await page.locator("[data-note-left-panel]").count())) return;
+  const panel = await page.locator("[data-note-left-panel]").boundingBox();
+  const stripX = await page.evaluate(() => window.innerWidth - 12);
+  if (stripX > panel.x + panel.width + 4) await page.mouse.click(stripX, Math.min(panel.height, 240));
+  else await page.keyboard.press("Escape");
+  await page.waitForSelector("[data-note-left-panel]", { state: "detached" });
 };
+/** Back to the headerless home page from wherever the notes page is. */
+async function notesHome(page, press) {
+  await closeLibrary(page, press);
+  if (await page.locator('[data-note-view-mode="read"]').count()) await press("[data-note-read-home]");
+  else if (await page.locator("[data-note-edit-read], [data-note-edit-read-float]").count()) {
+    await readMode(page, press);
+    await press("[data-note-read-home]");
+  }
+  await page.waitForSelector("[data-course-notes-home]");
+}
+/** The ONE library panel — reached from the home page's My Library button. */
+async function openLibrary(page, press) {
+  if (await page.locator("[data-note-left-panel]").count()) return;
+  await notesHome(page, press);
+  await press("[data-notes-home-library]");
+  await page.waitForSelector("[data-note-left-panel]");
+}
+/** A row's actions: rename + delete, behind a long press (no row buttons). */
+async function longPressRow(page, selector) {
+  const box = await page.locator(selector).boundingBox();
+  await page.mouse.move(box.x + Math.min(80, box.width / 2), box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(700);
+  await page.mouse.up();
+  await page.waitForSelector("[data-branched-menu-popup]");
+}
 const noteHtml = (page, id) => page.evaluate((i) => window.__notes.find((n) => n.id === i)?.html, id);
 
 // ── Flows ──────────────────────────────────────────────────────────────────
@@ -188,61 +230,74 @@ browserTest("create: title → body → slash command → bold → Save stores t
   await page.keyboard.press("Enter");
   await page.keyboard.type("revise chapter 4");
   await page.waitForTimeout(400);
-  assert.equal(await status(page, press), "Unsaved");
-  await viaOptions(page, press, "[data-course-notes-save]");
+  assert.equal(await status(page), "Unsaved");
+  // Leaving the editor IS the save: the dock's eye button commits the draft
+  // (there is no Save button anywhere on the page).
+  await readMode(page, press);
   await page.waitForFunction(() => window.__log.includes("add"));
   assert.equal(
     await page.evaluate(() => window.__notes[0].html),
     '<h1>Cell biology</h1><hr><p>Plain then <strong>bold</strong> after</p><ul><li data-checked="false">revise chapter 4</li></ul>',
   );
-  await page.waitForSelector('[data-note-view-mode="read"]');
-  assert.equal(await page.locator('[data-course-notes-bar]').count(), 0, "a new save goes straight to the headerless document");
+  assert.equal(
+    await page.locator("[data-note-editor-chrome], [data-course-notes-bar], [data-note-status-chip] button").count(),
+    0,
+    "the writing page carries no header, no corner button and no Save",
+  );
+  // Home, then the library: the committed note is in the list.
   await page.locator('[data-note-view-mode="read"]').focus();
   await page.keyboard.press("Escape");
-  assert.equal(await page.locator("[data-course-note-open]").count(), 7, "the new note is in the list");
+  await page.waitForSelector("[data-course-notes-home]");
+  await press("[data-notes-home-library]");
+  await page.waitForSelector("[data-note-left-panel]");
+  assert.equal(await page.locator("[data-course-note-open]").count(), 7, "the new note is in the library");
   assert.deepEqual(problems, []);
   await context.close();
 });
 
-browserTest("edit: every block round-trips; Cancel discards; Save keeps the rest of the note", async () => {
+browserTest("edit: every block round-trips through the automatic save; Read commits and nothing else is touched", async () => {
   const { page, press, editorReady, problems, context } = await open();
   await openSavedNote(page, press, "n1");
   await editorReady();
   assert.equal(await page.$eval(".dc-note-title", (el) => el.value), "Photosynthesis");
-  assert.equal(await status(page, press), "Synced", "an untouched note is not 'Unsaved'");
-  await page.keyboard.type("SHOULD NOT PERSIST");
+  assert.equal(await status(page), "Synced", "an untouched note is not 'Unsaved'");
+  await page.keyboard.type(" — appended");
   await page.waitForTimeout(400);
-  assert.equal(await status(page, press), "Unsaved");
-  await viaOptions(page, press, "[data-course-note-edit-cancel]");
-  await page.waitForTimeout(250);
-  assert.doesNotMatch(await noteHtml(page, "n1"), /SHOULD NOT/);
-
+  assert.equal(await status(page), "Unsaved");
+  // There is no Cancel any more: the words are stored by the read view's own
+  // commit, and by the autosave that runs under a pause in typing.
+  await readMode(page, press);
+  await page.waitForSelector('[data-note-view-mode="read"]');
   await openSavedNote(page, press, "n1");
   await editorReady();
-  await page.keyboard.type(" — appended");
+  await page.keyboard.type(" — and once more");
   await page.waitForTimeout(350);
-  await viaOptions(page, press, "[data-course-note-edit-save]");
+  await readMode(page, press);
   await page.waitForFunction(() => window.__log.some((l) => l.startsWith("edit:")));
   const saved = await noteHtml(page, "n1");
   assert.match(saved, /^<h1>Photosynthesis<\/h1><hr>/);
   assert.match(saved, /appended/);
   // The caret opens at the end of the body, so the words land on the last list item;
   // every other block — nested bullets, the numbered list, the bold — is untouched.
-  assert.match(saved, /<ul><li>Chlorophyll<\/li><li>Stomata<ul><li>gas exchange<\/li><\/ul><\/li><\/ul><ol><li>Light reactions<\/li><li>Calvin cycle — appended<\/li><\/ol>/);
+  assert.match(saved, /<ul><li>Chlorophyll<\/li><li>Stomata<ul><li>gas exchange<\/li><\/ul><\/li><\/ul><ol><li>Light reactions<\/li><li>Calvin cycle — appended — and once more<\/li><\/ol>/);
   assert.match(saved, /<p>Plants turn <strong>light<\/strong> into sugar\.<\/p>/);
   assert.deepEqual(problems, []);
   await context.close();
 });
 
-browserTest("delete is a two-step act: the card button only asks; Cancel keeps the note; confirm removes it", async () => {
+browserTest("delete is a two-step act: the row's long-press menu only asks; Cancel keeps the note; confirm removes it", async () => {
   const { page, press, context } = await open();
-  await press('.branched-menu__row:has([data-note-id="n5"]) [data-branched-delete]');
+  await openLibrary(page, press);
+  const row = '[data-course-note-open][data-note-id="n5"]';
+  await longPressRow(page, row);
+  await press("[data-branched-menu-delete]");
   await page.waitForSelector("[data-course-confirm-delete]");
   assert.equal(await page.evaluate(() => window.__log.length), 0, "the first tap deletes nothing");
   await press("[data-course-confirm-cancel]");
   await page.waitForTimeout(200);
   assert.equal(await page.locator('[data-note-id="n5"]').count(), 1);
-  await press('.branched-menu__row:has([data-note-id="n5"]) [data-branched-delete]');
+  await longPressRow(page, row);
+  await press("[data-branched-menu-delete]");
   await press("[data-course-confirm-delete]");
   await page.waitForFunction(() => window.__log.includes("delete:n5"));
   assert.equal(await page.locator('[data-note-id="n5"]').count(), 0);
@@ -255,7 +310,7 @@ browserTest("legacy notes open intact: table preserved verbatim, checklist / quo
   await editorReady();
   assert.deepEqual(await page.$$eval(".bn-block-content", (n) => n.map((x) => x.getAttribute("data-content-type"))), ["paragraph", "legacyHtml", "paragraph"]);
   assert.equal(await page.locator(".dc-note-legacy table").count(), 1);
-  await viaOptions(page, press, "[data-course-note-edit-save]");
+  await readMode(page, press);
   await page.waitForFunction(() => window.__log.some((l) => l.startsWith("edit:")));
   assert.match(await noteHtml(page, "n3"), /<table><tbody><tr><th>Term<\/th><th>Meaning<\/th><\/tr><tr><td>ATP<\/td><td>Energy<\/td><\/tr><\/tbody><\/table>/, "saving an untouched note must not alter the table");
 
@@ -272,7 +327,7 @@ browserTest("a plain-text-only legacy note (no html field) opens with its words 
   await editorReady();
   assert.equal(await bodyText(page), "Plain only");
   assert.equal(await page.$eval(".dc-note-title", (el) => el.value), "", "no heading → no title; the words stay in the body");
-  await viaOptions(page, press, "[data-course-note-edit-save]");
+  await readMode(page, press);
   await page.waitForFunction(() => window.__log.some((l) => l.startsWith("edit:")));
   assert.equal(await noteHtml(page, "n5"), "<p>Plain only</p>");
   await context.close();
@@ -283,15 +338,15 @@ browserTest("offline-first: if the editor chunk cannot load, the previous editor
   // Keep the lazy import from ever resolving: abort the editor chunk, then reload.
   await context.route(/\/assets\/NoteEditor-[^/]*\.js/, (route) => route.abort("internetdisconnected"));
   await page.reload();
-  await page.waitForSelector("[data-course-notes-add]");
-  await press("[data-course-notes-add]");
+  await page.waitForSelector("[data-course-notes-home]");
+  await press("[data-notes-home-new]");
   await page.waitForSelector("[data-course-rich-toolbar]", { timeout: 15000 });
   assert.equal(await page.locator("[data-note-editor]").count(), 0, "the block editor never mounted");
   await page.click("[data-course-note-heading-input]");
   await page.keyboard.type("Offline title");
   await page.keyboard.press("Enter");
   await page.keyboard.type("written with the fallback editor");
-  await viaOptions(page, press, "[data-course-notes-save]");
+  await readMode(page, press);
   await page.waitForFunction(() => window.__log.includes("add"));
   assert.equal(await page.evaluate(() => window.__notes[0].html), "<h1>Offline title</h1><hr>written with the fallback editor");
   await context.close();
@@ -315,7 +370,7 @@ browserTest("undo / redo and a clean history boundary per note", async () => {
   await page.waitForTimeout(150);
   assert.equal(await bodyText(page), before, "Ctrl+Y redoes");
   // A freshly opened note starts with an EMPTY history: undo can never reach the previous note.
-  await viaOptions(page, press, "[data-course-notes-cancel]");
+  // (Leaving the composer commits it — the words of a note are never thrown away.)
   await openSavedNote(page, press, "n2");
   await editorReady();
   const opened = await bodyText(page);
@@ -362,7 +417,7 @@ browserTest("every slash command creates its block: paragraph, headings 1–3, b
     `blocks created: ${JSON.stringify(blocks)}`,
   );
   // …and every one of them reaches the stored note: no block type is lost on the way out.
-  await viaOptions(page, press, "[data-course-notes-save]");
+  await readMode(page, press);
   await page.waitForFunction(() => window.__log.includes("add"));
   const stored = await page.evaluate(() => window.__notes[0].html);
   for (const fragment of ["<p>paragraph text</p>", "<h1>heading text</h1>", "<h2>heading text</h2>", "<h3>heading text</h3>", "<ul><li>bulletListItem text</li></ul>", "<ol><li>numberedListItem text</li></ol>", '<ul><li data-checked="false">checkListItem text</li></ul>', "<blockquote>quote text</blockquote>", "<hr>", "<pre><code>codeBlock text</code></pre>"]) {
@@ -413,8 +468,8 @@ browserTest("an older Android WebView (no findLast / toReversed): typing, copy, 
   await page.keyboard.press("Enter");
   await page.keyboard.type("quoted");
   await page.waitForTimeout(450);
-  assert.equal(await status(page, press), "Unsaved");
-  await viaOptions(page, press, "[data-course-notes-save]");
+  assert.equal(await status(page), "Unsaved");
+  await readMode(page, press);
   await page.waitForFunction(() => window.__log.includes("add"));
   const stored = await page.evaluate(() => window.__notes[0].html);
   assert.ok(stored.includes("<h1>Floor</h1>") && stored.includes("<p>typed on an older WebView</p><blockquote>quoted</blockquote>"), stored);
@@ -433,7 +488,9 @@ browserTest("typing is batched and nothing is persisted per keystroke", async ()
   await page.waitForTimeout(700);
   const renders = (await page.evaluate(() => window.__notesRenders)) - before;
   assert.ok(renders <= 6, `120 keystrokes re-rendered NotesPanel ${renders} times — it must be a handful, not 120`);
-  assert.deepEqual(await page.evaluate(() => window.__log), [], "no add / edit / delete until Save");
+  assert.deepEqual(await page.evaluate(() => window.__log), [], "nothing is written per keystroke");
+  // …and the pause that follows commits it on its own: the save is automatic.
+  await page.waitForFunction(() => window.__log.includes("add"), null, { timeout: 6000 });
   await context.close();
 });
 
@@ -524,7 +581,7 @@ browserTest("inline formulas stay editable source: replace LaTeX, type around it
   assert.match(await html(page), /<annotation encoding="application\/x-tex">x\^3<\/annotation>/);
   assert.match(await bodyText(page), /start Before/);
   assert.match(await bodyText(page), /after\s*end/, "the text following an inline math atom survives source replacement");
-  await viaOptions(page, press, "[data-course-notes-save]");
+  await readMode(page, press);
   await page.waitForFunction(() => window.__log.includes("add"));
   const saved = await page.evaluate(() => window.__notes[0].html);
   assert.match(saved, /data-note-math="inline"/);
@@ -534,9 +591,9 @@ browserTest("inline formulas stay editable source: replace LaTeX, type around it
   await context.close();
 });
 
-browserTest("Save never truncates: an over-long note says so and cannot be saved", async () => {
+browserTest("an over-long note says so, is never truncated and is never stored", async () => {
   const { page, press, editorReady, context } = await open();
-  await press("[data-course-notes-add]");
+  await press("[data-notes-home-new]");
   await editorReady();
   await page.keyboard.press("Enter");
   await page.evaluate(() => {
@@ -544,10 +601,13 @@ browserTest("Save never truncates: an over-long note says so and cannot be saved
     dt.setData("text/plain", "word ".repeat(13000));
     document.querySelector(".bn-editor").dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
   });
-  await press("[data-note-open-right-panel]");
-  await page.waitForSelector("[data-note-right-panel]");
   await page.waitForFunction(() => document.querySelector("[data-course-notes-status]")?.textContent === "Too long to save", null, { timeout: 15000 });
-  assert.equal(await page.$eval("[data-course-notes-save]", (b) => b.disabled), true);
+  // The status chip is the page's only top element — and it holds no button.
+  assert.equal(await page.locator("[data-note-status-chip] button").count(), 0, "no Save button exists to force it through");
+  // Nothing is stored, and the words themselves are still all in the editor:
+  // an over-long note is refused whole, never written out in part.
+  assert.deepEqual(await page.evaluate(() => window.__log), []);
+  assert.match(await bodyText(page), /word word word/);
   await context.close();
 });
 
@@ -855,7 +915,15 @@ for (const width of [320, 360, 375, 390, 412, 430, 768, 1024]) {
         return { doc: document.documentElement.scrollWidth - window.innerWidth, panel: panel ? panel.scrollWidth - panel.clientWidth : 0, scroller: scroller ? scroller.scrollWidth - scroller.clientWidth : 0 };
       });
     let o = await overflow();
-    assert.ok(o.doc <= 0 && o.panel <= 0, `list overflow ${JSON.stringify(o)}`);
+    assert.ok(o.doc <= 0 && o.panel <= 0, `home overflow ${JSON.stringify(o)}`);
+    // The ONE library panel is almost the whole page at every width — the old
+    // 280 / 300px drawer is gone — with a thin strip of page still visible.
+    await openLibrary(page, press);
+    const library = await page.locator("[data-note-left-panel]").boundingBox();
+    assert.ok(library.x <= 0.5 && library.x + library.width <= width + 0.5, `the panel stays inside the viewport ${JSON.stringify(library)}`);
+    assert.ok(library.width >= width * 0.85, `the panel is almost the full page (${library.width} of ${width}px)`);
+    assert.ok(width - (library.x + library.width) <= 44, "…and it still reads as a panel");
+    await closeLibrary(page, press);
     await openSavedNote(page, press, "n6");
     await editorReady();
     assert.equal(await page.locator(".dc-note-math-inline-trigger .katex").count(), 1, "inline math renders with KaTeX in the actual editor");
@@ -868,18 +936,29 @@ for (const width of [320, 360, 375, 390, 412, 430, 768, 1024]) {
       const title = document.querySelector(".dc-note-title");
       return { title: rect(".dc-note-title"), clipped: title.scrollHeight > title.clientHeight + 1, legacy: rect(".dc-note-legacy"), editor: rect(".bn-editor"), inner: window.innerWidth };
     });
-    await press("[data-note-open-right-panel]");
-    await page.waitForSelector("[data-note-right-panel]");
-    const actions = await page.evaluate(() => {
-      const rect = (s) => { const r = document.querySelector(s).getBoundingClientRect(); return { l: r.left, r: r.right, h: r.height }; };
-      return { save: rect("[data-course-note-edit-save]"), cancel: rect("[data-course-note-edit-cancel]") };
+    // The editing tray at the bottom: the eye (read) button first, then the
+    // tools in a SLIDING tray of full-size buttons — never squeezed to fit, and
+    // the tray itself is what scrolls when the pane is narrow.
+    await page.waitForSelector("[data-note-dock]");
+    const tray = await page.evaluate(() => {
+      const rect = (s) => { const el = document.querySelector(s); const r = el.getBoundingClientRect(); return { l: r.left, r: r.right, h: r.height, w: r.width }; };
+      const tools = document.querySelector("[data-note-dock-tools]");
+      const sizes = tools ? [...tools.querySelectorAll(".bn-ak-button")].map((b) => b.getBoundingClientRect().width) : [];
+      return {
+        read: rect("[data-note-edit-read], [data-note-edit-read-float]"),
+        tools: tools ? { scroll: tools.scrollWidth, client: tools.clientWidth } : null,
+        minButton: sizes.length ? Math.min(...sizes) : 0,
+        chromeButtons: document.querySelectorAll("[data-note-status-chip] button").length,
+      };
     });
-    m.save = actions.save;
-    m.cancel = actions.cancel;
+    m.tray = tray;
     assert.equal(m.clipped, false, "the title auto-grows instead of clipping");
     assert.ok(m.title.l >= 0 && m.title.r <= m.inner + 0.5);
-    assert.ok(m.save.r <= m.inner + 0.5 && m.cancel.l >= 0, "Save / Cancel are inside the viewport");
-    assert.ok(m.save.h >= 36 && m.cancel.h >= 36, "Save / Cancel are touch-sized");
+    assert.ok(tray.read.l >= 0 && tray.read.r <= m.inner + 0.5, "the eye (read) button is inside the viewport");
+    assert.ok(tray.read.h >= 36, "the read eye is touch-sized, like every tool beside it");
+    assert.ok(tray.minButton >= 36, `every tray button keeps its full size (smallest ${tray.minButton}px) — the tray scrolls instead`);
+    assert.ok(tray.tools && tray.tools.scroll >= tray.tools.client, "the tray is the part that scrolls sideways");
+    assert.equal(tray.chromeButtons, 0, "nothing at the top of a notes page is a button");
     assert.ok(m.legacy.r <= m.inner + 0.5, "the preserved table scrolls inside its block");
     if (width <= 430) assert.ok((m.editor.r - m.editor.l) / m.inner >= 0.85, "near-full width on a phone");
     if (width >= 1024) assert.ok((m.editor.r - m.editor.l) / m.inner <= 0.75, "a comfortable measure on desktop");
@@ -914,11 +993,17 @@ browserTest("the page is white and flat; the title is a bold serif; the focus ri
   await context.close();
 });
 
-browserTest("saved note is headerless, single tap cannot edit, and a second edit after Save is not discarded", async () => {
+browserTest("a saved note opens headless in READ mode; one tap cannot edit; nothing of a second edit is lost", async () => {
   const { page, press, editorReady, context } = await open();
-  await press('[data-note-id="n1"]');
+  await openLibrary(page, press);
+  await press('[data-course-note-open][data-note-id="n1"]');
   await editorReady();
-  assert.equal(await page.locator('[data-course-notes-bar], [data-note-dock]').count(), 0);
+  await page.waitForSelector('[data-note-view-mode="read"]');
+  assert.equal(
+    await page.locator("[data-note-editor-chrome], [data-note-dock], [data-note-status-chip] button").count(),
+    0,
+    "reading shows no header, no tools and no Save",
+  );
   await page.click('.dc-note-title');
   await page.keyboard.type('MUST NOT WRITE');
   assert.equal(await page.locator('.bn-editor[contenteditable="true"]').count(), 0);
@@ -926,38 +1011,70 @@ browserTest("saved note is headerless, single tap cannot edit, and a second edit
   await page.locator('.dc-note-title').dblclick();
   await page.waitForFunction(() => document.activeElement?.classList.contains('bn-editor'));
   await page.keyboard.type(' first edit');
-  await viaOptions(page, press, '[data-course-note-edit-save]');
+  await readMode(page, press);
   await page.waitForSelector('[data-note-view-mode="read"]');
-  assert.equal(await page.locator('[data-course-notes-bar]').count(), 0);
   await page.locator('.dc-note-title').dblclick();
   await page.waitForFunction(() => document.activeElement?.classList.contains('bn-editor'));
   await page.keyboard.type(' second edit');
   await page.waitForTimeout(400);
-  assert.equal(await status(page, press), 'Unsaved');
-  await viaOptions(page, press, '[data-course-note-edit-save]');
+  assert.equal(await status(page), 'Unsaved');
+  await readMode(page, press);
+  await page.waitForFunction(() => window.__log.filter((l) => l.startsWith("edit:")).length >= 2);
   assert.match(await noteHtml(page, 'n1'), /first edit second edit/);
   await context.close();
 });
 
+/**
+ * The mind map page, opened the way a learner opens it: a HEADLESS home (three
+ * centred buttons, no header) whose My Library button opens the ONE side panel
+ * — nearly a full page, MASTER / SELF top-centre, one button at its bottom.
+ */
 async function openMindMap({ touch = false } = {}) {
   const context = await browser.newContext({ viewport: { width: touch ? 390 : 1100, height: 760 }, hasTouch: touch, isMobile: touch });
   const page = await context.newPage();
   const problems = [];
   page.on('pageerror', error => problems.push(error.message));
+  const tap = (selector) => (touch ? page.tap(selector) : page.click(selector));
   await page.goto(`${origin}/tests/fixtures/noteEditorHarness/mindmap.html`);
-  await page.waitForSelector('[data-course-mindmap-library]');
+  await page.waitForSelector('[data-course-mindmap-home]');
+  assert.equal(await page.locator('header, [data-course-mindmap-header]').count(), 0, "a mind map page has no header");
+  await tap('[data-mindmap-home-mine]');
+  await page.waitForSelector('[data-mindmap-left-panel]');
   await page.getByRole('tab', { name: /SELF/ }).click();
-  return { page, context, problems };
+  return { page, context, problems, tap };
 }
 
-browserTest("saved mind map reads without tools; double-click never unlocks, the options panel unlocks, Done commits and locks, errors remain recoverable", async () => {
-  const { page, context, problems } = await openMindMap();
+/**
+ * Read mode's chrome. ONE tap on the canvas hides the whole tray — the
+ * side-panel button with it — and the next tap brings it straight back, so a
+ * flow that is about to press a tray button first makes sure the tray is up.
+ */
+const trayUp = (page) => page.locator('[data-mindmap-read-tray]').count().then((n) => n > 0);
+async function showTray(page) {
+  if (await trayUp(page)) return;
+  await page.mouse.click(40, 300);
+  await page.waitForSelector('[data-mindmap-read-tray]');
+}
+
+browserTest("a saved mind map reads without tools; no tap pair unlocks it, the tray's pencil does, the eye locks it again, errors remain recoverable", async () => {
+  const { page, context, problems, tap } = await openMindMap();
   await page.locator('[data-course-mindmap-map-grid] [data-branched-leaf]').click();
   await page.waitForSelector('[data-mindmap-mode="read"]');
-  assert.equal(await page.locator('[data-course-mindmap-status]').count(), 0);
+  // Read-first: the ONE tray — library · prev · next | new · edit | home — and
+  // no editing toolbar at all. The panel shut behind the map.
+  await page.waitForSelector('[data-mindmap-read-tray]');
+  assert.equal(await page.locator('[data-mindmap-left-panel]').count(), 0, "the panel closes behind the map");
+  assert.equal(await page.locator('[data-course-mindmap-status]').count(), 0, "a saved map opens without the editing toolbar");
   const root = page.locator('[data-mind-node="root"]');
+  // ONE tap on the canvas hides the whole tray — the side-panel button with it
+  // — and the next tap brings it straight back (owner brief).
+  await page.mouse.click(40, 300);
+  await page.waitForSelector('[data-mindmap-read-tray]', { state: "detached" });
+  assert.equal(await page.locator('[data-mindmap-read-library]').count(), 0, "the side-panel button hides with the rest of the tray");
+  await page.mouse.click(40, 300);
+  await page.waitForSelector('[data-mindmap-read-tray]');
   await root.click();
-  assert.equal(await page.locator('[data-mind-node-input]').count(), 0);
+  assert.equal(await page.locator('[data-mind-node-input]').count(), 0, "a tap only reads");
   // A double-click on the preview must NOT open editing: the map stays in
   // read mode and no toolbar appears. (Preview drags are locked too — the
   // nodes only move in edit mode.)
@@ -965,19 +1082,21 @@ browserTest("saved mind map reads without tools; double-click never unlocks, the
   await page.waitForTimeout(400);
   assert.equal(await page.locator('[data-course-mindmap-status]').count(), 0, "double-click must not unlock editing");
   assert.equal(await page.locator('[data-mindmap-mode="read"]').count(), 1, "still reading after the double-click");
-  // Editing is explicit: Map options (top-right) → Edit map.
-  await page.locator('[data-mindmap-open-right-panel]').click();
-  await page.waitForSelector('[data-mindmap-right-panel]');
-  await page.locator('[data-course-mindmap-edit]').click();
+  // Editing is explicit: read mode's tray pencil.
+  await showTray(page);
+  await tap('[data-mindmap-read-edit]');
   await page.waitForSelector('[data-course-mindmap-status]');
   assert.equal(await page.locator('[data-course-confirm-delete]').count(), 0, 'the unlocking gesture must not delete');
+  // …and the eye leads that toolbar back to reading.
+  assert.equal(await page.locator('[data-course-mindmap-status] > :first-child').getAttribute('data-mindmap-edit-read'), '', "the eye is the toolbar's first control");
   await root.click();
   const input = page.locator('[data-mind-node-input="root"]');
   await input.focus();
   await page.keyboard.press('Control+A');
   await page.keyboard.type('Edited root');
-  await page.locator('[data-course-mindmap-done]').click();
+  await tap('[data-mindmap-edit-read]');
   await page.waitForSelector('[data-mindmap-mode="read"]');
+  await page.waitForSelector('[data-mindmap-read-tray]', { state: "visible" });
   assert.equal(await page.locator('[data-course-mindmap-status]').count(), 0);
   assert.equal(await page.evaluate(() => window.__mind.rootTopic), 'Edited root');
   await page.evaluate(() => window.__syncError());
@@ -988,29 +1107,85 @@ browserTest("saved mind map reads without tools; double-click never unlocks, the
   await context.close();
 });
 
-browserTest("touch double tap unlocks a saved mind map, while new maps start with tools", async () => {
-  const { page, context, problems } = await openMindMap({ touch: true });
+browserTest("touch: a quick tap pair still only reads; the tray's pencil edits, the eye reads, and a new map starts with tools", async () => {
+  const { page, context, problems, tap } = await openMindMap({ touch: true });
   await page.locator('[data-course-mindmap-map-grid] [data-branched-leaf]').tap();
   await page.waitForSelector('[data-mind-node="root"]');
+  await page.waitForSelector('[data-mindmap-read-tray]');
   const root = await page.locator('[data-mind-node="root"]').boundingBox();
   await page.touchscreen.tap(root.x + root.width / 2, root.y + root.height / 2);
-  assert.equal(await page.locator('[data-course-mindmap-status]').count(), 0);
+  assert.equal(await page.locator('[data-course-mindmap-status]').count(), 0, "one tap reads");
   await page.touchscreen.tap(root.x + root.width / 2, root.y + root.height / 2);
-  await page.waitForSelector('[data-course-mindmap-status]');
-  await page.locator('[data-course-mindmap-done]').tap();
-  await page.locator('[data-course-mindmap-canvas]').focus();
-  await page.keyboard.press('Escape');
-  await page.locator('[data-course-mindmap-new]').tap();
+  await page.waitForTimeout(500);
+  assert.equal(await page.locator('[data-course-mindmap-status]').count(), 0, "and a tap pair on a phone does not unlock editing either");
+  assert.equal(await page.locator('[data-mindmap-mode="read"]').count(), 1);
+  // The tray's pencil is the phone's door into the editor…
+  await showTray(page);
+  await tap('[data-mindmap-read-edit]');
   await page.waitForSelector('[data-course-mindmap-status]');
   assert.equal(await page.locator('[data-mindmap-mode="edit"]').count(), 1);
+  assert.equal(await page.locator('[data-mindmap-read-tray]').count(), 0, "and the read tray stands down while editing");
+  // …and the eye takes it back out to the read tray.
+  await tap('[data-mindmap-edit-read]');
+  await page.waitForSelector('[data-mindmap-mode="read"]');
+  await page.waitForSelector('[data-mindmap-read-tray]');
+  // A NEW map has nothing to read yet: it opens in the editor, tools up.
+  await tap('[data-mindmap-read-new]');
+  await page.waitForSelector('[data-course-mindmap-status]');
+  assert.equal(await page.locator('[data-mindmap-mode="edit"]').count(), 1);
+  assert.equal(await page.locator('[data-mindmap-read-tray]').count(), 0);
+  // The tray's home button lands on the headless home, whose three buttons are
+  // the same three the notes page carries.
+  await tap('[data-mindmap-edit-read]');
+  await tap('[data-mindmap-read-home]');
+  await page.waitForSelector('[data-course-mindmap-home]');
+  for (const hook of ['[data-mindmap-home-new]', '[data-mindmap-home-mine]', '[data-mindmap-home-course]']) {
+    assert.equal(await page.locator(hook).count(), 1, `${hook} is on the home page`);
+  }
+  assert.equal(await page.locator('[data-course-mindmap-new], [data-mindmap-home-actions] button').count(), 3, "home is exactly three buttons");
+  // The panel's rows carry no buttons: a long press opens Rename + Delete, and
+  // Rename turns that row's own name into the input — never a dialog.
+  await tap('[data-mindmap-home-mine]');
+  await page.waitForSelector('[data-mindmap-left-panel]');
+  assert.equal(
+    await page.locator('[data-course-mindmap-map-grid] [data-branched-rename-button], [data-course-mindmap-map-grid] [data-branched-delete]').count(),
+    0,
+    "the rows carry no pencil / trash buttons",
+  );
+  assert.equal(await page.locator('[data-mindmap-panel-foot] button').count(), 1, "one button at the panel's bottom — New mind map");
+  await longPressRow(page, '[data-course-mindmap-map-grid] [data-branched-leaf]');
+  assert.equal(await page.locator('[data-branched-menu-rename]').count(), 1, "a long press offers Rename");
+  assert.equal(await page.locator('[data-branched-menu-delete]').count(), 1, "…and Delete");
+  await page.locator('[data-branched-menu-rename]').click();
+  const rename = page.locator('[data-branched-rename-input]');
+  await rename.waitFor();
+  assert.equal(await rename.inputValue(), 'Saved map', "the input is the row's own name");
+  await page.keyboard.press('Escape');
   assert.deepEqual(problems, []);
   await context.close();
 });
 
 browserTest("MASTER mind map cannot unlock via mouse, touch or keyboard", async () => {
-  const { page, context, problems } = await openMindMap({ touch: true });
+  const { page, context, problems, tap } = await openMindMap({ touch: true });
+  // The banner and the read-only shell live on the canvas: open one of the
+  // learner's own maps, then hand the module its course master map.
+  await page.locator('[data-course-mindmap-map-grid] [data-branched-leaf]').tap();
+  await page.waitForSelector('[data-mindmap-mode="read"]');
   await page.evaluate(() => window.__master());
   await page.waitForSelector('[data-course-mindmap-master-banner]');
+  // A master map's tray keeps the side-panel button and Home — and nothing
+  // that could open an editor.
+  await page.waitForSelector('[data-mindmap-read-tray]');
+  assert.equal(await page.locator('[data-mindmap-read-library]').count(), 1, "the side-panel button stays");
+  assert.equal(await page.locator('[data-mindmap-read-home]').count(), 1, "so does Home");
+  assert.equal(await page.locator('[data-mindmap-read-edit]').count(), 0, "a master map has no pencil");
+  assert.equal(await page.locator('[data-mindmap-read-new]').count(), 0, "and no New mind map either");
+  await tap('[data-mindmap-read-library]');
+  await page.waitForSelector('[data-mindmap-left-panel]');
+  assert.equal(await page.locator('[data-mindmap-panel-new]').count(), 1, "the panel still carries its ONE bottom button");
+  const stripX = await page.evaluate(() => window.innerWidth - 12);
+  await page.mouse.click(stripX, 200);
+  await page.waitForSelector('[data-mindmap-left-panel]', { state: "detached" });
   await page.locator('[data-mind-node="root"]').dblclick();
   await page.locator('[data-course-mindmap-canvas]').focus();
   await page.keyboard.press('Enter');

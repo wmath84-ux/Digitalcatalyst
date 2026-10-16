@@ -26,9 +26,11 @@
    ── 3. Page backgrounds ────────────────────────────────────────────────────
    Every Course Player page surface listed below sits on approximately 95%
    pure white: #f2f2f2 is rgb(242, 242, 242) ≈ 0.95 × 255.
-   The Resource Library (`[data-course-resource-library]`, `.library-header`,
-   `.library-body`) is deliberately NOT in that list and gets no rule here at
-   all: its existing background and appearance stay exactly as they were.
+   The Resource Library is the ONE exception, and it is the stronger one: the
+   owner asked for it in as many words (2026-10-16) — "resource library page ka
+   background color pure white karo INCLUDING HEADER" — so its page, its header
+   strip and its scrolling body are pure `#ffffff` (see the rule below this
+   one). It is NOT part of the ~95% list.
    Editor/chat working surfaces (Sketch canvas, Mind Map canvas, AI chat,
    the lesson viewer) are likewise untouched — this is the page background
    of the library/list pages and the panes behind them.
@@ -120,7 +122,19 @@ header.course-page-header {
   min-height: 31.5px;
 }
 
-/* ── 3. ~95% pure-white page backgrounds (Resource Library exempt) ─────── */
+/* ── 3. ~95% pure-white page backgrounds (Resource Library excepted) ───── */
+
+/* The Resource Library is PURE white — the page, the header strip and the
+   scrolling body (owner brief, 2026-10-16). One notch stronger than the plate
+   below, so nothing paints over it: the page's own sheet also says #ffffff,
+   and this !important rule is what makes the header strip and the body agree
+   with the page root. */
+.course-player-shell [data-course-resource-library],
+.course-player-shell [data-course-resource-library] .library-header,
+.course-player-shell [data-course-resource-library] .library-body,
+.course-player-shell [data-course-resource-library] header.course-page-header {
+  background: #ffffff !important;
+}
 
 .course-player-shell :is(
   [data-course-notes-panel][data-course-notes-mode="list"],
@@ -130,11 +144,15 @@ header.course-page-header {
   [data-course-music-panel],
   [data-course-personal-modules],
   [data-course-player-panel],
-  [data-course-mindmap-library],
   [data-course-overlay-tab="paid"]
 ) {
   background: var(--dc-course-page-bg, #f2f2f2) !important;
 }
+
+/* The mind map is NOT in the list above on purpose: its pages are headless
+   now (the map library is the ONE left panel, and the home is three centred
+   buttons), so they wear their own `--mm-*` palette — which follows the mind
+   map's own Light / Dark theme, not the player's page plate. */
 
 /* The Notes list used to own a pure-white plate with `!important`
    (study-light-surfaces.css). As a Course Player page it now sits on the

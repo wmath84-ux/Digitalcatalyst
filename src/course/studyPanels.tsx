@@ -47,7 +47,7 @@ import {
   type RefObject,
 } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useMotionValueEvent, type AnimationPlaybackControls, type MotionValue } from "framer-motion";
-import { ArrowLeftRight, ArrowUpDown, PanelBottom, PanelLeft, PanelRight, PanelTop, X } from "lucide-react";
+import { ArrowLeftRight, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, PanelBottom, PanelLeft, PanelRight, PanelTop, X } from "lucide-react";
 import { GlassSurface } from "../components/ui/glass";
 import {
   DEFAULT_SPLIT_RATIO,
@@ -64,6 +64,7 @@ import {
   KEY_STEP,
   KEY_STEP_FINE,
   PEEK_RAIL_PX,
+  PEEK_STRIP_PX,
   PARK_THRESHOLD,
   SNAP_TOLERANCE,
   SPLIT_DOCK_MIN_PX,
@@ -103,6 +104,20 @@ const CHROME_GLASS: CSSProperties = {
   backdropFilter: "var(--dc-chrome-glass-blur)",
   WebkitBackdropFilter: "var(--dc-chrome-glass-blur)",
   boxShadow: "var(--dc-chrome-glass-rim)",
+};
+
+/**
+ * The seam icon's own little plate: the chrome glass, at icon size — the strip
+ * itself never wears it any more (that plate WAS the white strip).
+ */
+const PEEK_ICON_STYLE: CSSProperties = {
+  width: 22,
+  height: 22,
+  ...CHROME_GLASS,
+  borderRadius: 999,
+  color: "var(--course-ink, #111827)",
+  display: "grid",
+  placeItems: "center",
 };
 
 /**
@@ -154,6 +169,48 @@ const railGlowStyle = (axis: SplitAxis, side: SplitSide, accent: string): CSSPro
   return { position: "absolute", left: 0, right: 0, height: 2, ...(side === "lesson" ? { bottom: 0 } : { top: 0 }), ...glow };
 };
 
+/** The small icon a compressed pane shows, centred in the gap it leaves. */
+const PEEK_ICON_PX = 16;
+
+/**
+ * The THIN white strip the gap wears, between the two panes.
+ *
+ * Owner (2026-10-16, baad mein — the earlier "remove the white strip" is hereby
+ * reversed): "jo patali white strip banti hai icon ke niche aur donon ke bich
+ * mein usko bhi add karo wapas, mobile users desktop sabhi jagah." So a 6px
+ * frosted strip (PEEK_STRIP_PX) runs the whole length of the gap, centred on
+ * the axis the divider used to sit on — and the small icon sits centred ON it,
+ * which is why it reads as the strip below (and above) the icon. The rail
+ * element itself stays unpainted; only this one thin child carries the glass.
+ */
+const peekStripStyle = (axis: SplitAxis): CSSProperties => {
+  const strip: CSSProperties = { position: "absolute", borderRadius: 999, ...CHROME_GLASS };
+  return axis === "row"
+    ? { ...strip, top: 0, bottom: 0, left: "50%", width: PEEK_STRIP_PX, transform: "translateX(-50%)" }
+    : { ...strip, left: 0, right: 0, top: "50%", height: PEEK_STRIP_PX, transform: "translateY(-50%)" };
+};
+
+/**
+ * The compressed pane's way back.
+ *
+ * Owner (2026-10-16): "agar usko kisi bhi edge per le jaya jaye … to vah ek
+ * patla sa white strip create ho jata hai — isko remove karo … unke bich mein
+ * ek chhota sa gap dikhna chahiye aur icon bhi dikhe … use per click karne per
+ * vah apne previous area mein directly expand ho jata tha."
+ *
+ * So the frosted glass PLATE that used to fill this 28px strip (CHROME_GLASS —
+ * the white strip) went away: the gap carries the accent hairline on the
+ * divider-facing edge and ONE small icon in the middle.
+ *
+ * …and then the owner asked the strip BACK, thin (2026-10-16, same day): "jo
+ * patali white strip banti hai icon ke niche aur donon ke bich mein usko bhi
+ * add karo wapas, mobile users desktop sabhi jagah." So the middle of the gap
+ * now wears a 6px frosted strip (PEEK_STRIP_PX, `data-peek-strip`) running its
+ * whole length, with the small icon centred on top of it. The rail itself still
+ * paints nothing — a plate across the whole 28px is what he rejected. The whole strip stays the tap target, and a press puts
+ * the pane back exactly where it was (`restore()` → the ratio it had before it
+ * collapsed, never a default).
+ */
 function PeekRail({
   side,
   glowSide,
@@ -171,6 +228,11 @@ function PeekRail({
   label: string;
   onRestore: () => void;
 }) {
+  // The icon points the way the pane will grow back: away from the deck edge
+  // it is parked on (both axes, both ends).
+  const SeamIcon = axis === "row"
+    ? (glowSide === "lesson" ? ChevronRight : ChevronLeft)
+    : (glowSide === "lesson" ? ChevronDown : ChevronUp);
   return (
     <motion.button
       type="button"
@@ -180,17 +242,27 @@ function PeekRail({
       data-course-peek-rail=""
       data-peek-side={side}
       data-axis={axis}
+      data-peek-gap=""
       className="absolute inset-0 z-20 flex cursor-pointer items-center justify-center overflow-hidden"
-      style={CHROME_GLASS}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.18, ease: EASE_OUT_MOTION }}
     >
-      {/* The rail carries NO icon (owner: the small glyph that appeared when
-          the divider reached the very top/bottom was unwanted). Only the 2px
-          accent glow on the divider-facing edge marks the collapsed pane;
-          the whole strip stays the tap target that restores it. */}
+      {/* The thin white strip BETWEEN the two panes — back on the owner's word
+          (2026-10-16); the small icon below sits centred on top of it. */}
+      <span aria-hidden data-peek-strip="" style={peekStripStyle(axis)} />
+      {/* The accent hairline on the edge the divider used to sit on. */}
       <span aria-hidden style={railGlowStyle(axis, glowSide, accent)} data-peek-glow="" />
+      {/* ONE small icon at the centre of the gap — the way back to the pane's
+          previous size. */}
+      <span
+        aria-hidden
+        data-course-peek-icon=""
+        className="pointer-events-none relative grid place-items-center rounded-full"
+        style={PEEK_ICON_STYLE}
+      >
+        <SeamIcon size={PEEK_ICON_PX} strokeWidth={2.4} />
+      </span>
     </motion.button>
   );
 }
