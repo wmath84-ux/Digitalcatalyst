@@ -788,7 +788,7 @@ export function PaidLibraryPanel({
         meta: (
           <>
             {priceLabel ? price(priceLabel) : null}
-            <span className="course-library__count">{entry.contents.length}</span>
+            <span className="course-library__count">{(entry.contents ?? []).length}</span>
           </>
         ),
         description: `${entry.title}. Paid ${entry.kind}`,

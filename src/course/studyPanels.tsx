@@ -304,11 +304,20 @@ const WAKE_BUTTON_STYLE: CSSProperties = {
 
 /** The toolbar's one glass pill — the same chrome glass as the peek rails,
  *  a clean rim border and a restrained shadow. The ONLY yellow on a divider
- *  stays the 2px core line itself. */
+ *  stays the 2px core line itself.
+ *
+ *  Owner (2026-10-16): "jo divider per click karne per pop up open hota hai
+ *  uska background thoda blur karo kyunki text dekhne mein problem ho rahi hai
+ *  options". The pill now wears a deep, saturated frost (3px extra blur on top
+ *  of the chrome glass) and a near-opaque ink tint, so the option labels stay
+ *  readable against any background the divider sits over. */
 const CLUSTER_GLASS: CSSProperties = {
   ...CHROME_GLASS,
-  border: "1px solid color-mix(in srgb, currentColor 16%, transparent)",
-  boxShadow: "var(--dc-chrome-glass-rim), 0 10px 30px rgba(2, 6, 16, 0.25)",
+  background: "color-mix(in srgb, rgb(8 10 16 / 0.78) 80%, var(--dc-chrome-glass))",
+  backdropFilter: "blur(22px) saturate(1.6)",
+  WebkitBackdropFilter: "blur(22px) saturate(1.6)",
+  border: "1px solid color-mix(in srgb, currentColor 18%, transparent)",
+  boxShadow: "var(--dc-chrome-glass-rim), 0 14px 40px rgba(2, 6, 16, 0.45)",
 };
 
 /**

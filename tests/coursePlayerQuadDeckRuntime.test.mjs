@@ -492,6 +492,48 @@ test("the horizontal divider drags too, and the panes never leave the band", asy
   deck.done();
 });
 
+test("dragging one divider leaves the other divider independent — both axes drag on their own (2026-10-16)", async () => {
+  const deck = await mount();
+  // Baseline: every divider sits on its starting percent, and the deck
+  // reports it owns none of them yet.
+  assert.equal(deckEl().getAttribute("data-quad-dragging"), "none", "no divider is live yet");
+  assert.equal(deckEl().getAttribute("data-quad-col"), "50", "vertical starts at 50%");
+  assert.equal(deckEl().getAttribute("data-quad-row"), "50", "horizontal starts at 50%");
+
+  // Pull the VERTICAL divider right by 120px (the deck is 1000x800). Only the
+  // column changes; the row stays put. The deck tags which axis is live so the
+  // CSS can disable the OTHER axis's pointer events.
+  await fireAt(dividerEl("v"), "pointerdown", 500, 400);
+  assert.equal(deckEl().getAttribute("data-quad-dragging"), "v", "the deck reports the vertical divider is live");
+  await fireAt(dividerEl("v"), "pointermove", 620, 400);
+  await fireAt(dividerEl("v"), "pointerup", 620, 400);
+  await settle(10);
+  assert.equal(deckEl().getAttribute("data-quad-col"), "62", "vertical → 62%");
+  assert.equal(deckEl().getAttribute("data-quad-row"), "50", "row untouched");
+  assert.equal(deckEl().getAttribute("data-quad-dragging"), "none", "the live divider is released");
+
+  // Now pull the HORIZONTAL divider down by 300px. The row climbs to 85% while
+  // the column stays at 62%. A drag of one divider MUST NOT resize the other
+  // axis's blocks.
+  await fireAt(dividerEl("h"), "pointerdown", 500, 400);
+  assert.equal(deckEl().getAttribute("data-quad-dragging"), "h", "the deck reports the horizontal divider is live");
+  await fireAt(dividerEl("h"), "pointermove", 500, 700);
+  await fireAt(dividerEl("h"), "pointerup", 500, 700);
+  await settle(10);
+  assert.equal(deckEl().getAttribute("data-quad-row"), "85", "horizontal → 85%");
+  assert.equal(deckEl().getAttribute("data-quad-col"), "62", "column untouched");
+  assert.equal(deckEl().getAttribute("data-quad-dragging"), "none");
+
+  // And the round-trip: row back to 50%, column back to 50%, again without
+  // the other axis moving — so both drags are independent end to end.
+  await dragTo(dividerEl("v"), [620, 400], [500, 400]);
+  await dragTo(dividerEl("h"), [500, 700], [500, 400]);
+  assert.equal(deckEl().getAttribute("data-quad-col"), "50", "vertical divider back to centre");
+  assert.equal(deckEl().getAttribute("data-quad-row"), "50", "horizontal divider back to centre");
+
+  deck.done();
+});
+
 test("a squeezed divider keeps a wider gap and ONE small icon — press it and it returns", async () => {
   const deck = await mount();
   // Roomy first: the vertical divider settles at 62.
