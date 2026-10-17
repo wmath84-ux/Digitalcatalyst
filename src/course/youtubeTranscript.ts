@@ -193,7 +193,19 @@ export async function loadYouTubeTranscript(
   if (!response.ok || record.ok === false) {
     const rawCode = String(record.code || "").trim();
     const code = (rawCode in TRANSCRIPT_ERROR_COPY ? rawCode : "fetch_failed") as TranscriptClientErrorCode;
-    const message = String(record.error || "").trim() || TRANSCRIPT_ERROR_COPY[code];
+    const rawMessage = String(record.error || "").trim();
+    // Never surface YouTube's raw bot-check strings ("Sign in to confirm
+    // you're not a bot") to the learner — the tab's own copy is what they
+    // should read. The server now sends friendly messages, but an older
+    // deployment may still leak the raw reason, so sanitize here as well.
+    const looksLikeBotMessage = /not a bot|sign in to confirm|unusual traffic|g-recaptcha|confirm you.*bot/i.test(rawMessage);
+    const shouldUseCopy =
+      !rawMessage ||
+      looksLikeBotMessage ||
+      code === "too_many_requests" ||
+      code === "video_unavailable" ||
+      code === "service_unavailable";
+    const message = shouldUseCopy ? TRANSCRIPT_ERROR_COPY[code] : rawMessage;
     throw new TranscriptRequestError(code, message);
   }
   const segments = Array.isArray(record.segments)

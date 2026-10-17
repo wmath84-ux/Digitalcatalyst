@@ -706,6 +706,17 @@
   line-height: 1.6;
 }
 
+.course-transcript__state-copy--hint {
+  margin-top: 10px;
+  padding: 9px 11px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.07);
+  color: #334155;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
 /* ── The video bar above the lines ──────────────────────────────────────── */
 
 .course-transcript__now {

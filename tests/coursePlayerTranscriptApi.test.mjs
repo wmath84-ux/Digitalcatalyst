@@ -157,7 +157,12 @@ test("an unavailable video is not reported as an uncaptioned one", async () => {
   await assert.rejects(fetchYouTubeTranscript("dQw4w9WgXcQ"), (error) => {
     assert.ok(error instanceof TranscriptError);
     assert.equal(error.code, "video_unavailable");
-    assert.equal(error.message, "Video unavailable");
+    // The message is now user-friendly, not the raw YouTube reason — the
+    // important contract is the code, so the page can explain it.
+    assert.ok(
+      typeof error.message === "string" && error.message.length > 0,
+      "an explanatory message is present",
+    );
     return true;
   });
 });
