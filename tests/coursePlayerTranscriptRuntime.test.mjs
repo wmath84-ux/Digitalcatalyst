@@ -63,6 +63,22 @@ function load(file, resolve) {
 let pendingFetch = null;
 const fetchedUrls = [];
 
+/* The page's SECOND OPINION — when the server cannot deliver the lines, the
+   browser tries YouTube itself (InnerTube, the get_transcript panel, the
+   legacy timedtext list). Those run on the real `fetch`, so this suite owns it
+   too. By default every direct YouTube door is closed, which is exactly what a
+   browser does when CORS refuses a cross-origin POST to youtube.com. */
+const youtubeCalls = [];
+let youtubeResponder = () => Promise.reject(new TypeError("Failed to fetch"));
+globalThis.fetch = (url, init) => {
+  youtubeCalls.push(String(url));
+  return Promise.resolve().then(() => youtubeResponder(String(url), init));
+};
+const resetYouTube = () => {
+  youtubeCalls.length = 0;
+  youtubeResponder = () => Promise.reject(new TypeError("Failed to fetch"));
+};
+
 function apiFetch(url, init) {
   fetchedUrls.push(String(url));
   return new Promise((resolve, reject) => {
@@ -253,6 +269,7 @@ test("the player's clock marks the live line, and a timestamp tap seeks that exa
 });
 
 test("an uncaptioned video shows the honest error with a retry, never a blank page", async () => {
+  resetYouTube();
   const id = "zzzzzzzzzzz";
   const file = { id: `yt:${id}`, name: "Silent film", type: "youtube", url: `https://www.youtube.com/watch?v=${id}` };
   const { host, root } = mount();
@@ -263,11 +280,78 @@ test("an uncaptioned video shows the honest error with a retry, never a blank pa
   });
   await flush();
 
+  // "No captions" from a datacentre IP is a claim worth checking once from the
+  // learner's own connection. Every browser door is closed in this suite, so
+  // the server's verdict is what stands — but the check really happened.
+  assert.ok(youtubeCalls.length > 0, "the browser gave the video its own second opinion");
+
   const error = host.querySelector("[data-course-transcript-error]");
   assert.ok(error, "the error state is shown");
   assert.match(error.textContent, /does not offer captions/);
   assert.ok(host.querySelector("[data-course-transcript-retry]"), "there is a retry button");
   assert.equal(host.querySelectorAll("[data-transcript-line]").length, 0);
+  // And the evidence: which layers were tried, so nobody has to guess again.
+  const details = host.querySelector("[data-course-transcript-attempts]");
+  assert.ok(details, "the failure lists the layers that were tried");
+  assert.match(details.textContent, /server/i);
+
+  await act(() => root.unmount());
+  host.remove();
+});
+
+test("when the server cannot read the captions but the browser can, the browser's lines win", async () => {
+  resetYouTube();
+  // The server was throttled; the learner's own connection answers through
+  // YouTube's transcript panel — lines, timestamps and all.
+  youtubeResponder = (url) => {
+    if (url.includes("/youtubei/v1/get_transcript")) {
+      return {
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          actions: [{
+            updateEngagementPanelAction: {
+              content: {
+                transcriptRenderer: {
+                  content: {
+                    transcriptSearchPanelRenderer: {
+                      body: {
+                        transcriptSegmentListRenderer: {
+                          initialSegments: [
+                            { transcriptSegmentRenderer: { startMs: "0", endMs: "4000", snippet: { runs: [{ text: "Panel line one." }] } } },
+                            { transcriptSegmentRenderer: { startMs: "9000", endMs: "13000", snippet: { runs: [{ text: "Panel line two." }] } } },
+                          ],
+                        },
+                      },
+                      footer: { transcriptFooterRenderer: { initialDescription: { runs: [{ text: "Hindi (auto-generated)" }] } } },
+                    },
+                  },
+                },
+              },
+            },
+          }],
+        }),
+      };
+    }
+    return { ok: false, status: 403, json: () => Promise.resolve({}) };
+  };
+
+  const id = "panelvideo1";
+  const file = { id: `yt:${id}`, name: "Throttled lecture", type: "youtube", url: `https://www.youtube.com/watch?v=${id}` };
+  const { host, root } = mount();
+  await renderPanel(root, { activeFile: file });
+
+  await act(async () => {
+    pendingFetch.settle({ ok: false, code: "too_many_requests", error: "Sign in to confirm you're not a bot" }, false, 429);
+  });
+  await flush();
+
+  const lines = host.querySelectorAll("[data-transcript-line]");
+  assert.equal(lines.length, 2, "the browser's own read painted the transcript");
+  assert.equal(host.querySelector("[data-course-transcript-error]"), null, "no error is shown at all");
+  assert.match(lines[0].textContent, /Panel line one/);
+  assert.match(lines[1].textContent, /0:09/);
+  assert.match(host.textContent, /Hindi/i, "the panel's own language is named");
 
   await act(() => root.unmount());
   host.remove();

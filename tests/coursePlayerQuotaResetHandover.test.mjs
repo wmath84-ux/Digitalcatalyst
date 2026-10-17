@@ -39,6 +39,17 @@ function load(file) {
   const mod = { exports: {} };
   const resolve = (id) => {
     if (id.endsWith('.css')) return {};
+    // googleSearch.ts can also send a query through the app's own server
+    // (/api/google-search). The real apiBase reads `import.meta.env` and walks
+    // several origins, which this CJS harness cannot evaluate; a pass-through
+    // to the stubbed global fetch keeps that path observable.
+    if (id.endsWith('utils/apiBase')) {
+      return {
+        apiFetch: (url, init) => globalThis.fetch(url, init),
+        apiUrl: (path) => path,
+        isNativeShell: () => false,
+      };
+    }
     if (id.startsWith('.')) {
       const base = path.resolve(path.dirname(resolved), id);
       for (const candidate of [base, `${base}.ts`, `${base}.tsx`, `${base}.js`, `${base}.mjs`]) {

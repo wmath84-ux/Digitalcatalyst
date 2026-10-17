@@ -32,6 +32,7 @@ const blockPages = read("src/course/blockPages.ts");
 const router = read("api/referral-leaderboard.ts");
 const vercel = JSON.parse(read("vercel.json"));
 const api = read("api/_lib/youtubeTranscript.ts");
+const vite = read("vite.config.ts");
 
 const {
   parseYouTubeVideoId,
@@ -190,4 +191,21 @@ test("the API never scrapes from the browser and is cached at the edge", () => {
   assert.match(api, /fmt", "json3"|searchParams\.set\("fmt", "json3"\)/);
   assert.match(api, /s-maxage=3600/);
   assert.match(api, /CAPTION_HOST/);
+});
+
+test("local dev runs the SAME transcript handler as Vercel — one status map, one layer trail", () => {
+  // Two implementations of one route is how localhost and production drift
+  // apart: the dev copy used to answer without the `?diagnostics=1` trail and
+  // without the success cache headers, so a bug found locally was not the bug
+  // that shipped. The middleware must delegate, not re-implement.
+  assert.match(vite, /import \{ handleYouTubeTranscript \} from "\.\/api\/_lib\/youtubeTranscript";/);
+  assert.match(vite, /server\.middlewares\.use\("\/api\/youtube-transcript"/);
+  assert.match(vite, /void handleYouTubeTranscript\(/);
+  assert.doesNotMatch(vite, /code === "no_transcript"/, "no second copy of the status map in the dev server");
+  assert.doesNotMatch(vite, /fetchYouTubeTranscript\(videoId/, "the dev server does not call the fetcher itself");
+
+  // The same delegation for the Google search server path.
+  assert.match(vite, /import \{ handleGoogleSearch \} from "\.\/api\/_lib\/googleSearchProxy";/);
+  assert.match(vite, /server\.middlewares\.use\("\/api\/google-search"/);
+  assert.match(vite, /void handleGoogleSearch\(/);
 });

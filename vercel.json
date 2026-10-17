@@ -43,6 +43,10 @@
       "destination": "/api/referral-leaderboard?route=youtube-transcript"
     },
     {
+      "source": "/api/google-search",
+      "destination": "/api/referral-leaderboard?route=google-search"
+    },
+    {
       "source": "/api/revision/generate",
       "destination": "/api/referral-leaderboard"
     },

@@ -17,18 +17,21 @@
 // in this device's localStorage and sent straight from the browser to Google.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Eye, EyeOff, Loader2, Search, ShieldCheck, Trash2 } from "lucide-react";
+import { Activity, CheckCircle2, Eye, EyeOff, Loader2, Search, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "../components/ui/glass-toast";
 import GoogleGlyph from "./GoogleGlyph";
 import {
   clearGoogleSearchConfig,
+  diagnoseGoogleSearch,
   googleSearchConfig,
   googleSearchOwnerConfigured,
   masterGoogleSearchAvailable,
+  resetGoogleSearchPathMemory,
   saveGoogleSearchConfig,
   setGoogleSearchSource,
   subscribeGoogleSearchConfig,
   testGoogleSearchConfig,
+  type GoogleSearchDiagnosis,
   type GoogleSearchErrorCode,
 } from "./googleSearch";
 import KeySourceSwitch from "./KeySourceSwitch";
@@ -60,8 +63,19 @@ const ERROR_TONE: Record<GoogleSearchErrorCode, string> = {
   "api-disabled": "text-amber-700",
   quota: "text-amber-700",
   referrer: "text-amber-700",
+  "ip-blocked": "text-amber-700",
+  permission: "text-amber-700",
+  "proxy-unavailable": "text-slate-600",
   network: "text-rose-700",
   unknown: "text-rose-700",
+};
+
+/** Where a value came from, in the learner's own words. */
+const SLOT_WORDS: Record<string, string> = {
+  account: "aapke account ki slot (isi browser me save)",
+  device: "is browser ki device-wide slot",
+  build: "BUILD me baked school/owner ki key (VITE_GOOGLE_SEARCH_API_KEY)",
+  none: "kahin se nahi",
 };
 
 export default function GoogleSearchCard({ uid = null, onChanged, className = "" }: GoogleSearchCardProps) {
@@ -75,6 +89,8 @@ export default function GoogleSearchCard({ uid = null, onChanged, className = ""
     return Boolean(config.apiKey && config.cx);
   });
   const [fromOwner, setFromOwner] = useState(() => googleSearchOwnerConfigured(uid));
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [diagnosis, setDiagnosis] = useState<GoogleSearchDiagnosis | null>(null);
 
   /** Re-read the configuration whenever it changes — here or in another tab. */
   const refresh = useCallback(() => {
@@ -127,16 +143,40 @@ export default function GoogleSearchCard({ uid = null, onChanged, className = ""
     setReveal(false);
     setReady(true);
     setFromOwner(false);
+    setDiagnosis(null);
     setResult({ ok: true, code: null, message: "Configuration save ho gayi — Google search ab chalu hai." });
     toast({ title: "Google search connected", variant: "success" });
     onChanged?.(true);
   }, [apiKey, cx, uid, onChanged]);
+
+  /**
+   * The honest check: WHICH key is in effect, from WHICH slot, and what Google
+   * answers to that key on BOTH paths — the browser's own call and the same
+   * call through the app's server. A refusal that only happens in the browser
+   * is a key restriction; a refusal on both paths is the key/engine itself.
+   * That distinction is the whole fix for "restriction None kar diya, phir bhi
+   * wahi error".
+   */
+  const runDiagnose = useCallback(async () => {
+    setDiagnosing(true);
+    try {
+      // Start from a clean slate: a key the browser path was refused for is
+      // remembered, and a diagnosis must measure both paths afresh.
+      resetGoogleSearchPathMemory();
+      const report = await diagnoseGoogleSearch(uid, undefined, apiKey.trim(), cx.trim());
+      setDiagnosis(report);
+      if (report.usable) toast({ title: "Google search chal sakta hai", variant: "success" });
+    } finally {
+      setDiagnosing(false);
+    }
+  }, [apiKey, cx, uid]);
 
   const runRemove = useCallback(() => {
     clearGoogleSearchConfig(uid);
     setApiKey("");
     setCx("");
     setResult(null);
+    setDiagnosis(null);
     setReady(Boolean(googleSearchConfig(uid).apiKey && googleSearchConfig(uid).cx));
     setFromOwner(googleSearchOwnerConfigured(uid));
     toast({ title: "Google search configuration hata di", variant: "info" });
@@ -180,7 +220,7 @@ export default function GoogleSearchCard({ uid = null, onChanged, className = ""
             <input
               type={reveal ? "text" : "password"}
               value={apiKey}
-              onChange={(event) => { setApiKey(event.target.value); setResult(null); }}
+              onChange={(event) => { setApiKey(event.target.value); setResult(null); setDiagnosis(null); }}
               placeholder={ready ? `Sahi key badalni hai? (${masked})` : "AIza…"}
               aria-label="Google API key"
               data-google-search-key-input
@@ -206,7 +246,7 @@ export default function GoogleSearchCard({ uid = null, onChanged, className = ""
           <input
             type="text"
             value={cx}
-            onChange={(event) => { setCx(event.target.value); setResult(null); }}
+            onChange={(event) => { setCx(event.target.value); setResult(null); setDiagnosis(null); }}
             placeholder="0123456789abcdef:xxxxxxx"
             aria-label="Google Search Engine ID"
             data-google-search-cx-input
@@ -228,6 +268,16 @@ export default function GoogleSearchCard({ uid = null, onChanged, className = ""
         >
           {busy ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
           Test karo
+        </button>
+        <button
+          type="button"
+          onClick={() => void runDiagnose()}
+          disabled={busy || diagnosing}
+          data-google-search-diagnose
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-[11.5px] font-black text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+        >
+          {diagnosing ? <Loader2 size={13} className="animate-spin" /> : <Activity size={13} />}
+          Diagnose karo
         </button>
         <button
           type="button"
@@ -263,6 +313,68 @@ export default function GoogleSearchCard({ uid = null, onChanged, className = ""
         >
           {result.message}
         </p>
+      ) : null}
+
+      {diagnosis ? (
+        <div
+          className="mt-2.5 rounded-xl border border-slate-200 bg-slate-50/70 p-3"
+          data-google-search-diagnosis
+          data-google-search-diagnosis-usable={diagnosis.usable ? "yes" : "no"}
+        >
+          <p className="text-[11px] font-black uppercase tracking-wide text-slate-500" data-google-search-keyinfo>
+            Abhi search is key se chalti hai:{" "}
+            <span className="font-mono text-[11px] text-slate-900">{diagnosis.config.fingerprint || "—"}</span>{" "}
+            <span className="font-semibold normal-case text-slate-500">
+              · {diagnosis.config.origin === "master" ? "school/owner ki" : "aapki"} · {SLOT_WORDS[diagnosis.config.slot] || diagnosis.config.slot}
+              {diagnosis.config.handover
+                ? ` · handover: ${diagnosis.config.handover.fingerprint}`
+                : ""}
+            </span>
+          </p>
+          <p
+            className={`mt-1.5 text-[11.5px] font-bold leading-5 ${diagnosis.usable ? "text-emerald-700" : "text-rose-700"}`}
+            data-google-search-verdict
+          >
+            {diagnosis.verdict}
+          </p>
+          <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+            {([["direct", diagnosis.direct], ["server", diagnosis.server]] as const).map(([label, probe]) => (
+              <div
+                key={label}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-2"
+                data-google-search-probe={label}
+                data-google-search-probe-ok={probe.ok ? "yes" : "no"}
+              >
+                <p className="text-[10.5px] font-black uppercase tracking-wide text-slate-500">
+                  {label === "direct" ? "Browser se seedha Google" : "App ke server ke through"}{" "}
+                  <span className={probe.ok ? "text-emerald-600" : "text-rose-600"}>
+                    {probe.ok ? "✓ chalu" : `✗ ${probe.code || "fail"}`}
+                  </span>
+                  {probe.ms ? <span className="font-semibold text-slate-400"> · {probe.ms}ms</span> : null}
+                </p>
+                {!probe.ok && probe.googleMessage ? (
+                  <p className="mt-1 break-words text-[10.5px] font-medium leading-4 text-slate-600" data-google-search-google-message>
+                    Google ka apna message{probe.googleStatus ? ` (HTTP ${probe.googleStatus}${probe.googleReason ? ` · ${probe.googleReason}` : ""})` : ""}: “{probe.googleMessage}”
+                  </p>
+                ) : null}
+                {!probe.ok && !probe.googleMessage ? (
+                  <p className="mt-1 text-[10.5px] font-medium leading-4 text-slate-600">{probe.message}</p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          {diagnosis.steps.length ? (
+            <ol className="mt-2 list-decimal space-y-1 pl-4 text-[11px] font-medium leading-5 text-slate-600" data-google-search-steps>
+              {diagnosis.steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+          ) : null}
+          <p className="mt-2 text-[10.5px] font-medium leading-4 text-slate-500">
+            Server path ka matlab: request app ke apne server se Google jaati hai, isliye browser ka origin/referer beech me nahi aata —
+            key par “Websites” restriction ho ya na ho, search chalti rehti hai (APK, PWA, localhost, preview domain — sab par).
+          </p>
+        </div>
       ) : null}
 
       <KeySourceSwitch
@@ -311,9 +423,12 @@ export default function GoogleSearchCard({ uid = null, onChanged, className = ""
             >
               Credentials
             </a>{" "}
-            → <strong>Create credentials → API key</strong>. Key copy karein. Web ke liye{" "}
-            <strong>Application restriction → Websites</strong> me origin add karein (jaise{" "}
-            <code className="rounded bg-slate-100 px-1 py-0.5 text-[10.5px]">https://eduvora.shop/*</code>). APK / PWA / localhost sab jagah chalana hai to restriction ko <strong>None</strong> kar do — tab har platform se search chalega.
+            → <strong>Create credentials → API key</strong>. Key copy karein. Restriction me{" "}
+            <strong>None</strong> sabse aasan hai (APK / PWA / localhost / preview domain — sab chal jaate hain);{" "}
+            <strong>Websites</strong> chunna ho to har origin add karein (jaise{" "}
+            <code className="rounded bg-slate-100 px-1 py-0.5 text-[10.5px]">https://eduvora.shop/*</code>). Save ke baad Google ko{" "}
+            <strong>1–5 minute</strong> lagte hain — turant test karne par purana 403 hi aayega. Agar restriction theek karne ke baad bhi error aaye to{" "}
+            <strong>“Diagnose karo”</strong> dabaiye: wo batata hai ki kaunsi key (aapki ya build ki) fail ho rahi hai aur Google ka apna message kya hai.
           </li>
         </ol>
         <p className="mt-2 flex items-start gap-1.5 text-[11px] font-medium leading-5 text-slate-500">

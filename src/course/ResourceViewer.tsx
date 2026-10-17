@@ -55,7 +55,13 @@ import { editableGoogleKind, getCourseDownload, isPdfJsEmbed, pdfJsSourceUrl, ge
 import { useDocsEditorAccess } from "../hooks/useDocsEditorAccess";
 import { resumePosition, type CoursePlaybackPatch, type CoursePlaybackStore } from "./playbackState";
 import { toggleFullscreen as toggleAppFullscreen } from "../utils/fullscreen";
-import { reportYouTubeProgress, subscribeYouTubeSeek } from "./youtubePlayerBus";
+import {
+  reportYouTubeCaptionTracks,
+  reportYouTubeProgress,
+  subscribeYouTubeCaptionsRequest,
+  subscribeYouTubeSeek,
+  type YouTubeCaptionTrack,
+} from "./youtubePlayerBus";
 
 /**
  * The ACTIVE file's action model, reported live to the Course Player so the
@@ -498,6 +504,14 @@ interface YouTubePlayer {
   getCurrentTime: () => number;
   getDuration: () => number;
   destroy: () => void;
+  /**
+   * The IFrame API's own module/option readers. `getOption("captions",
+   * "tracklist")` is YouTube telling US which caption tracks this video offers
+   * — the one answer that needs no scraping and no API key, which is why the
+   * Transcript page asks for it when a fetch comes back empty.
+   */
+  getOptions?: () => string[];
+  getOption?: (module: string, option: string) => unknown;
 }
 
 type YouTubeApiWindow = Window & {
@@ -698,6 +712,43 @@ function YouTubeFrame({ url, watchUrl, title, active, resumeAt, onProgress }: { 
       reportYouTubeProgress({ videoId, position: seconds, duration: 0 });
     });
   }, [videoId, apiFailed]);
+
+  // ── The caption probe ───────────────────────────────────────────────────
+  // The Transcript page asks "does this video have captions?" when a fetch
+  // came back empty. Only the ACTIVE player for THIS video answers, and the
+  // answer comes from YouTube's own caption module — so a "no captions"
+  // message is never shown for a video that plainly has them, and a real
+  // caption-less video is never blamed on the network.
+  useEffect(() => {
+    if (!videoId) return undefined;
+    return subscribeYouTubeCaptionsRequest((requestedId) => {
+      if (requestedId !== videoId || !activeRef.current) return;
+      const player = playerRef.current;
+      const tracks: YouTubeCaptionTrack[] = [];
+      try {
+        const modules = player?.getOptions?.() || [];
+        if (modules.includes("captions")) {
+          const list = player?.getOption?.("captions", "tracklist");
+          if (Array.isArray(list)) {
+            for (const entry of list) {
+              const record = (entry || {}) as Record<string, unknown>;
+              const languageCode = String(record.languageCode || record.language || "").trim();
+              if (!languageCode) continue;
+              tracks.push({
+                languageCode,
+                displayName: String(record.displayName || record.languageName || record.name || languageCode).trim(),
+                kind: String(record.kind || "").trim().toLowerCase(),
+              });
+            }
+          }
+        }
+      } catch {
+        // A player that is not ready simply has nothing to report; the probe
+        // then times out and the page treats the answer as "unknown".
+      }
+      reportYouTubeCaptionTracks({ videoId, tracks });
+    });
+  }, [videoId]);
 
   // No IFrame API available (offline / blocked) — fall back to the plain
   // embed, still resuming via the `start` parameter.
