@@ -37,12 +37,12 @@ const envExample = read('.env.example');
 const indexHtml = read('index.html');
 
 test('Music is a real dock tab, appended last so no existing tab or shortcut moves', () => {
-  assert.match(overlay, /export type DockTab = "modules" \| "brain" \| "notes" \| "mindmap" \| "ai" \| "paid" \| "player" \| "experiment" \| "sketch" \| "read" \| "music";/);
+  assert.match(overlay, /export type DockTab = "modules" \| "transcript" \| "brain" \| "notes" \| "mindmap" \| "ai" \| "paid" \| "player" \| "experiment" \| "sketch" \| "read" \| "music";/);
   assert.match(overlay, /\{ key: "music", label: "Music", heading: "Music", hint: "Music library[^"]*", color: "#FB7185", icon: Music \},/);
   // LAST entry of the tab list — the order below it (and therefore every
   // ⌘/Ctrl+1…9 shortcut) is untouched.
   assert.match(overlay, /icon: Music \},\n\];/);
-  assert.match(overlay, /import \{ BookOpen, Brain, File, FileText, FlaskConical, LockKeyhole, Music, Network, NotebookPen, PenLine, ShoppingBag, Sparkles \} from "lucide-react";/);
+  assert.match(overlay, /import \{ BookOpen, Brain, Captions, File, FileText, FlaskConical, LockKeyhole, Music, Network, NotebookPen, PenLine, ShoppingBag, Sparkles \} from "lucide-react";/);
   // The footer renders THAT list — it never keeps a copy of its own.
   assert.match(strip, /const items = TABS\.filter\(item => !hiddenTabs\.includes\(item\.key\)\)/);
   assert.match(strip, /data-work-nav-cell=\{item\.key\}/);

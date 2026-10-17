@@ -39,6 +39,10 @@
       "destination": "/api/referral-leaderboard"
     },
     {
+      "source": "/api/youtube-transcript",
+      "destination": "/api/referral-leaderboard?route=youtube-transcript"
+    },
+    {
       "source": "/api/revision/generate",
       "destination": "/api/referral-leaderboard"
     },

@@ -5,6 +5,7 @@ import { lazyWithChunkRecovery } from "./utils/lazyChunk";
 import useLocalCourseProgress from "./course/useLocalCourseProgress";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import ResourceViewer, { type CourseFileActions } from "./course/ResourceViewer";
+import TranscriptPanel from "./course/TranscriptPanel";
 import { isExperimentFileType } from "./types/course";
 import CourseOverlay, { STUDY_TAB_ORDER, dockTabRecord, unlockedModuleIds, type CourseOverlayQuadConfig, type DockTab } from "./course/CourseOverlay";
 import CourseHeaderNav from "./course/CourseHeaderNav";
@@ -2690,6 +2691,20 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
               ? Object.values(opts.quad.state.pages ?? {}).includes("music")
               : paneTab === "music"
           }
+        />
+      )}
+      // ── Transcript (owner brief, 2026-10-17) ──────────────────────────
+      // The page follows the file open in the lesson pane. A timestamp tap
+      // talks to that video through the player bus (the viewer stack keeps
+      // it mounted); a YouTube search hit is played in the MAIN lesson pane
+      // by the exact same callback the Resource Library uses, so the
+      // transcript then loads for it automatically.
+      transcriptPanel={opts.extra ? undefined : (
+        <TranscriptPanel
+          uid={user?.id ?? null}
+          activeFile={selectedFile}
+          onOpenLibrary={() => onPaneTabChange("modules")}
+          onPlayYouTube={openYouTubeSearchResult}
         />
       )}
       aiPanel={opts.extra ? undefined : (

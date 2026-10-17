@@ -21,7 +21,7 @@
 //   · the footer AREA keeps its size: the pill's height token
 //     (--work-nav-h) is set to the 44px the strip's buttons already
 //     occupied, so the in-flow footer strip is exactly as tall as before;
-//   · with ten study tools (Workspace has six), the pill is the horizontal
+//   · with eleven study tools (Workspace has six), the pill is the horizontal
 //     scroller: swipe/drag left-right inside it to reach the rest. (In
 //     Workspace every cell fits, so its pill never needs to scroll.)
 import { useRef, type CSSProperties, type KeyboardEvent } from 'react'
