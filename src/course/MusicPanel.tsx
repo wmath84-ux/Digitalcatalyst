@@ -579,6 +579,13 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
   const noResults = showResults && results.length === 0 && searchKeyReady;
   /** The last search's REAL reason, when it failed for a reason of its own. */
   const keyProblem = onlineError?.error ? onlineError : null;
+  /**
+   * The learner's own quota was gone, and the MASTER's key took over — the
+   * search went on without a break, so this is one quiet line, not an alarm.
+   */
+  const fallbackNote = onlineError?.usedFallback
+    ? "Aapki key ka quota khatam ho gaya — ab master ki key se chal raha hai. Search chalta rahega."
+    : "";
   /** The format control rides with whatever is on screen: saved online songs,
    *  the search's own results, or a search in flight (the flash scan's rows). */
   const showCardsToggle = shelves.includes("link") || showResults || (searchLoading && !urlMode);
@@ -1190,6 +1197,15 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
           outside ("no results"), so this is the one place that names the
           real cause. The key itself is configured in SETTINGS (never in the
           Course Player), so the note points there. */}
+      {fallbackNote ? (
+        <p
+          className="shrink-0 border-y border-amber-200 bg-amber-50 px-3 py-2 text-[11.5px] font-semibold leading-5 text-amber-800"
+          data-music-search-fallback
+        >
+          {fallbackNote}
+        </p>
+      ) : null}
+
       {keyProblem ? (
         <div
           className="shrink-0 border-y border-rose-200 bg-rose-50 px-3 py-2"

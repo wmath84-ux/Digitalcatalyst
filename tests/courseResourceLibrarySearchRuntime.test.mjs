@@ -625,6 +625,49 @@ test("the Google mark inside the search box opens the web search — its own pag
   assert.equal(Boolean(q("[data-library-search-page-body]")), true, "the library's search page is back");
 });
 
+test("the Google quota handover: the master's configuration takes over and the search goes on", async () => {
+  window.localStorage.clear();
+  window.localStorage.setItem("dc.google.searchKey", "learner-key");
+  window.localStorage.setItem("dc.google.searchCx", "learner-cx");
+  globalThis.__DC_GOOGLE_SEARCH_API_KEY__ = "owner-key";
+  globalThis.__DC_GOOGLE_SEARCH_CX__ = "owner-cx";
+  fetchResponder = (url) => {
+    const key = new URL(String(url)).searchParams.get("key");
+    if (key === "learner-key") {
+      return {
+        ok: false,
+        status: 403,
+        json: () => Promise.resolve({ error: { code: 403, errors: [{ reason: "dailyLimitExceeded" }] } }),
+      };
+    }
+    return {
+      ok: true,
+      json: () => Promise.resolve({
+        items: [{ title: "A web page", link: "https://example.test/one", snippet: "A snippet." }],
+      }),
+    };
+  };
+  mount();
+  await settle();
+  await click(q("[data-library-search-open-button]"));
+  await settle();
+  await click(q("[data-library-google-toggle]"));
+  await settle();
+  typeInto(q("[data-library-google-input]"), "neural networks");
+  await click(q("[data-library-google-enter]"));
+  await settle(1200);
+
+  // The results arrived — no error, no interruption.
+  assert.equal(qa("[data-library-google-hit]").length, 1, "the web result is on screen");
+  assert.equal(Boolean(q("[data-library-google-no-hits]")), false, "and there is no dead end");
+  // One quiet line says what happened.
+  const note = q("[data-library-google-fallback]");
+  assert.ok(Boolean(note), "the handover is mentioned, once, quietly");
+  assert.match(note.textContent, /master/i);
+  delete globalThis.__DC_GOOGLE_SEARCH_API_KEY__;
+  delete globalThis.__DC_GOOGLE_SEARCH_CX__;
+});
+
 test("the Google page offers Google's own Images tab, and a pager for the next page", async () => {
   window.localStorage.clear();
   window.localStorage.setItem("dc.google.searchKey", "test-key");

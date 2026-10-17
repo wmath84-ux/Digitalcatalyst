@@ -35,6 +35,12 @@
 // https://developers.google.com/custom-search/v1/reference/rest/v1/Search
 
 import { normaliseSearchQuery } from "./searchHistory";
+import {
+  announceSearchKeySource,
+  readSearchKeySource,
+  writeSearchKeySource,
+  type SearchKeySource,
+} from "./searchKeySource";
 
 declare const __DC_GOOGLE_SEARCH_API_KEY__: string | undefined;
 declare const __DC_GOOGLE_SEARCH_CX__: string | undefined;
@@ -99,13 +105,9 @@ export type GoogleSearchConfig = {
 };
 
 /**
- * The learner's own configuration, else the owner's.
- *
- *   1. this account's key + CX;
- *   2. this browser's key + CX;
- *   3. the owner's build-time key + CX.
+ * THE LEARNER'S OWN configuration — their account slot, else this browser's.
  */
-export function googleSearchConfig(uid?: string | null): GoogleSearchConfig {
+export function ownGoogleSearchConfig(uid?: string | null): GoogleSearchConfig {
   const user = typeof uid === "string" ? uid.trim() : "";
   if (user) {
     const key = readSlot(googleSearchUserKeyStorage(user));
@@ -115,12 +117,91 @@ export function googleSearchConfig(uid?: string | null): GoogleSearchConfig {
   const deviceKey = readSlot(GOOGLE_SEARCH_KEY_STORAGE);
   const deviceCx = readSlot(GOOGLE_SEARCH_CX_STORAGE);
   if (deviceKey && deviceCx) return { apiKey: deviceKey, cx: deviceCx };
+  return { apiKey: "", cx: "" };
+}
+
+/**
+ * THE OWNER'S configuration — the one baked into the build (or injected at
+ * serve time). The school owns its quota; the learner chooses whether to
+ * spend it.
+ */
+export function masterGoogleSearchConfig(): GoogleSearchConfig {
   const injectedKey = buildValue("__DC_GOOGLE_SEARCH_API_KEY__");
   const injectedCx = buildValue("__DC_GOOGLE_SEARCH_CX__");
   return {
     apiKey: injectedKey || clean((globalThis as Record<string, unknown>).__DC_GOOGLE_SEARCH_API_KEY__),
     cx: injectedCx || clean((globalThis as Record<string, unknown>).__DC_GOOGLE_SEARCH_CX__),
   };
+}
+
+/** Is there a master configuration at all? (The Settings switch needs it.) */
+export const masterGoogleSearchAvailable = (): boolean => {
+  const config = masterGoogleSearchConfig();
+  return Boolean(config.apiKey && config.cx);
+};
+
+/** The choice in effect: "mine" (their own) or "master" (the school's). */
+export function googleSearchKeySource(uid?: string | null): SearchKeySource {
+  return readSearchKeySource("google", uid);
+}
+
+/**
+ * The configuration a search uses FIRST, whose it is, and which one takes
+ * over when this one's daily quota is gone.
+ *
+ *   · "mine"   → the learner's own configuration first, the master's as the
+ *                background handover (this is the default);
+ *   · "master" → the school's configuration, because the learner asked for it.
+ *
+ * The choice is never a trap: if the chosen configuration is not there at
+ * all, the other one is used — a working search always beats a dead one.
+ */
+export type GoogleSearchPlan = {
+  apiKey: string;
+  cx: string;
+  /** Whose configuration that is. */
+  origin: "own" | "master";
+  /** The other configuration — the automatic handover on a dead quota. */
+  handover: GoogleSearchConfig | null;
+};
+
+export function googleSearchPlan(uid?: string | null): GoogleSearchPlan {
+  const own = ownGoogleSearchConfig(uid);
+  const master = masterGoogleSearchConfig();
+  const hasOwn = Boolean(own.apiKey && own.cx);
+  const hasMaster = Boolean(master.apiKey && master.cx);
+  if (googleSearchKeySource(uid) === "master") {
+    return {
+      apiKey: hasMaster ? master.apiKey : own.apiKey,
+      cx: hasMaster ? master.cx : own.cx,
+      origin: hasMaster ? "master" : "own",
+      handover: null,
+    };
+  }
+  return {
+    apiKey: hasOwn ? own.apiKey : master.apiKey,
+    cx: hasOwn ? own.cx : master.cx,
+    origin: hasOwn ? "own" : "master",
+    handover: hasOwn && hasMaster ? master : null,
+  };
+}
+
+/** The configuration a search actually uses. */
+export function googleSearchConfig(uid?: string | null): GoogleSearchConfig {
+  const plan = googleSearchPlan(uid);
+  return { apiKey: plan.apiKey, cx: plan.cx };
+}
+
+/**
+ * Store the choice the learner made in Settings: "mine" or "master". The
+ * page is told at once, so the search picks the new configuration at once.
+ */
+export function setGoogleSearchSource(source: SearchKeySource, uid?: string | null): boolean {
+  const stored = writeSearchKeySource("google", source, uid);
+  if (!stored) return false;
+  announceSearchKeySource();
+  announceGoogleSearchConfig();
+  return true;
 }
 
 /** True when a search can actually run. */
@@ -131,14 +212,9 @@ export const googleSearchAvailable = (uid?: string | null): boolean => {
 
 /** True when the OWNER's build-time configuration is the one in play. */
 export const googleSearchOwnerConfigured = (uid?: string | null): boolean => {
-  const { apiKey, cx } = googleSearchConfig(uid);
-  if (!apiKey || !cx) return false;
-  const user = typeof uid === "string" ? uid.trim() : "";
-  if (user) {
-    if (readSlot(googleSearchUserKeyStorage(user)) && readSlot(googleSearchUserCxStorage(user))) return false;
-  }
-  if (readSlot(GOOGLE_SEARCH_KEY_STORAGE) && readSlot(GOOGLE_SEARCH_CX_STORAGE)) return false;
-  return true;
+  const plan = googleSearchPlan(uid);
+  if (!plan.apiKey || !plan.cx) return false;
+  return plan.origin === "master";
 };
 
 function announceGoogleSearchConfig(): void {
@@ -308,6 +384,11 @@ export type GoogleSearchOutcome = {
   correctedQuery: string;
   /** Which of Google's two result kinds these rows are. */
   searchType: GoogleSearchType;
+  /**
+   * The learner's own quota was gone and the MASTER's configuration took
+   * over, without a word and without a break in the search.
+   */
+  usedFallback?: boolean;
 };
 
 /* ── The API's own shapes, exactly as the reference describes them ──────── */
@@ -522,16 +603,15 @@ export const googlePageOf = (start: number): number =>
  * between the two kinds of results the API serves: web pages, or the images
  * Google's own Images tab shows.
  */
-export async function searchGoogleOutcome(
-  query: string,
+/** The search itself, with ONE configuration in hand. */
+async function runGoogleSearch(
+  text: string,
+  apiKey: string,
+  cx: string,
+  type: GoogleSearchType,
+  start: number,
   signal?: AbortSignal,
-  uid?: string | null,
-  options?: { start?: number; type?: GoogleSearchType },
 ): Promise<GoogleSearchOutcome> {
-  const { apiKey, cx } = googleSearchConfig(uid);
-  const text = normaliseSearchQuery(query);
-  const type: GoogleSearchType = options?.type === "image" ? "image" : "web";
-  const start = Math.min(GOOGLE_MAX_START, Math.max(1, Math.round(options?.start || 1)));
   const empty = (error: GoogleSearchErrorCode | null, message: string): GoogleSearchOutcome => ({
     rows: [],
     error,
@@ -549,7 +629,6 @@ export async function searchGoogleOutcome(
   if (!apiKey || !cx) {
     return empty("no-config", GOOGLE_SEARCH_ERROR_MESSAGES["no-config"]);
   }
-  if (!text) return empty(null, "");
   const endpoint = new URL("https://www.googleapis.com/customsearch/v1");
   endpoint.searchParams.set("key", apiKey);
   endpoint.searchParams.set("cx", cx);
@@ -602,6 +681,44 @@ export async function searchGoogleOutcome(
   } catch {
     return empty("network", GOOGLE_SEARCH_ERROR_MESSAGES.network);
   }
+}
+
+/**
+ * Search the web through Google's official Custom Search JSON API, and say
+ * what happened.
+ *
+ * Never throws. THE BACKGROUND RULE: the learner's own configuration goes
+ * first, and the moment its daily quota is gone the MASTER's configuration
+ * takes over — the very same query is re-sent, the results simply arrive, and
+ * the learner never sees a break.
+ */
+export async function searchGoogleOutcome(
+  query: string,
+  signal?: AbortSignal,
+  uid?: string | null,
+  options?: { start?: number; type?: GoogleSearchType },
+): Promise<GoogleSearchOutcome> {
+  const text = normaliseSearchQuery(query);
+  const type: GoogleSearchType = options?.type === "image" ? "image" : "web";
+  const start = Math.min(GOOGLE_MAX_START, Math.max(1, Math.round(options?.start || 1)));
+  if (!text) return runGoogleSearch(text, "", "", type, start, signal);
+  const plan = googleSearchPlan(uid);
+  if (!plan.apiKey || !plan.cx) {
+    return runGoogleSearch(text, "", "", type, start, signal);
+  }
+  const first = await runGoogleSearch(text, plan.apiKey, plan.cx, type, start, signal);
+  if (first.error !== "quota" || !plan.handover) return first;
+  // The learner's own quota is gone — the master's configuration takes over.
+  const second = await runGoogleSearch(
+    text,
+    plan.handover.apiKey,
+    plan.handover.cx,
+    type,
+    start,
+    signal,
+  );
+  if (second.error) return first;
+  return { ...second, usedFallback: true };
 }
 
 /** The rows alone — a failure is an empty list, never a throw. */

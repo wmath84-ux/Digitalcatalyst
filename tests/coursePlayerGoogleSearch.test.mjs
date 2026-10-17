@@ -185,6 +185,99 @@ test('results become web rows that open where they live', async () => {
   assert.equal(rows[0].imageUrl, 'https://example.test/First result.png');
 });
 
+test("the learner CHOOSES: their own configuration, or the master's", () => {
+  resetWorld();
+  globalThis.__DC_GOOGLE_SEARCH_API_KEY__ = 'owner-key';
+  globalThis.__DC_GOOGLE_SEARCH_CX__ = 'owner-cx';
+  store.setItem(google.GOOGLE_SEARCH_KEY_STORAGE, 'learner-key');
+  store.setItem(google.GOOGLE_SEARCH_CX_STORAGE, 'learner-cx');
+
+  // The default: their own configuration first — the school pays nothing.
+  assert.equal(google.googleSearchKeySource(), 'mine');
+  assert.deepEqual(google.googleSearchConfig(), { apiKey: 'learner-key', cx: 'learner-cx' });
+  assert.equal(google.googleSearchPlan().origin, 'own');
+
+  // The choice in Settings: the school's configuration.
+  assert.equal(google.setGoogleSearchSource('master'), true);
+  assert.equal(google.googleSearchKeySource(), 'master');
+  assert.deepEqual(google.googleSearchConfig(), { apiKey: 'owner-key', cx: 'owner-cx' });
+  assert.equal(google.googleSearchPlan().origin, 'master');
+  assert.equal(google.googleSearchPlan().handover, null, 'the handover only ever goes own → master');
+
+  // The choice belongs to that account: another learner still has their own.
+  resetWorld();
+  globalThis.__DC_GOOGLE_SEARCH_API_KEY__ = 'owner-key';
+  globalThis.__DC_GOOGLE_SEARCH_CX__ = 'owner-cx';
+  store.setItem(google.GOOGLE_SEARCH_KEY_STORAGE, 'learner-key');
+  store.setItem(google.GOOGLE_SEARCH_CX_STORAGE, 'learner-cx');
+  assert.equal(google.setGoogleSearchSource('master', 'learner-1'), true);
+  assert.equal(google.googleSearchKeySource('learner-1'), 'master');
+  assert.equal(google.googleSearchKeySource('learner-2'), 'mine', 'another account is untouched');
+  assert.deepEqual(google.googleSearchConfig('learner-2'), { apiKey: 'learner-key', cx: 'learner-cx' });
+});
+
+test('the choice is never a trap: the other configuration keeps the search alive', () => {
+  resetWorld();
+  globalThis.__DC_GOOGLE_SEARCH_API_KEY__ = 'owner-key';
+  globalThis.__DC_GOOGLE_SEARCH_CX__ = 'owner-cx';
+  store.setItem(google.GOOGLE_SEARCH_KEY_STORAGE, 'learner-key');
+  store.setItem(google.GOOGLE_SEARCH_CX_STORAGE, 'learner-cx');
+  google.setGoogleSearchSource('master');
+  assert.deepEqual(google.googleSearchConfig(), { apiKey: 'owner-key', cx: 'owner-cx' });
+
+  // …and when the school has no configuration, the learner's own keeps the
+  // search alive.
+  delete globalThis.__DC_GOOGLE_SEARCH_API_KEY__;
+  delete globalThis.__DC_GOOGLE_SEARCH_CX__;
+  assert.deepEqual(google.googleSearchConfig(), { apiKey: 'learner-key', cx: 'learner-cx' });
+  assert.equal(google.googleSearchPlan().origin, 'own');
+});
+
+test("the quota handover: the master's configuration takes over and the search just works", async () => {
+  resetWorld();
+  globalThis.__DC_GOOGLE_SEARCH_API_KEY__ = 'owner-key';
+  globalThis.__DC_GOOGLE_SEARCH_CX__ = 'owner-cx';
+  store.setItem(google.GOOGLE_SEARCH_KEY_STORAGE, 'learner-key');
+  store.setItem(google.GOOGLE_SEARCH_CX_STORAGE, 'learner-cx');
+  responder = () => {
+    // The stub records every call, so the last URL is the one in hand.
+    const key = new URL(calls[calls.length - 1]).searchParams.get('key');
+    if (key === 'learner-key') {
+      return {
+        ok: false,
+        status: 403,
+        json: () => Promise.resolve({ error: { code: 403, errors: [{ reason: 'dailyLimitExceeded' }] } }),
+      };
+    }
+    return { ok: true, json: () => Promise.resolve({ items: [page('https://example.test/one', 'First result', 'A snippet.')] }) };
+  };
+
+  const outcome = await google.searchGoogleOutcome('neural networks');
+  assert.equal(outcome.rows.length, 1, 'the results arrived anyway');
+  assert.equal(outcome.error, null, 'and the learner sees no error at all');
+  assert.equal(outcome.usedFallback, true, "the master's configuration took over");
+  assert.equal(calls.length, 2, 'the very same query was re-sent with the master configuration');
+  assert.equal(new URL(calls[0]).searchParams.get('key'), 'learner-key');
+  assert.equal(new URL(calls[0]).searchParams.get('cx'), 'learner-cx');
+  assert.equal(new URL(calls[1]).searchParams.get('key'), 'owner-key');
+  assert.equal(new URL(calls[1]).searchParams.get('cx'), 'owner-cx');
+});
+
+test('the handover happens for a dead quota only — and only when there is somebody to hand over to', async () => {
+  resetWorld();
+  store.setItem(google.GOOGLE_SEARCH_KEY_STORAGE, 'learner-key');
+  store.setItem(google.GOOGLE_SEARCH_CX_STORAGE, 'learner-cx');
+  responder = () => ({
+    ok: false,
+    status: 403,
+    json: () => Promise.resolve({ error: { code: 403, errors: [{ reason: 'dailyLimitExceeded' }] } }),
+  });
+  let outcome = await google.searchGoogleOutcome('x');
+  assert.equal(outcome.error, 'quota', 'with no master configuration the honest error stands');
+  assert.equal(outcome.usedFallback, undefined);
+  assert.equal(calls.length, 1, 'and the request was not repeated');
+});
+
 test('every field the API gives is kept — the picture, the file, the date, the count, the time', async () => {
   resetWorld();
   store.setItem(google.GOOGLE_SEARCH_KEY_STORAGE, 'test-key');

@@ -24,14 +24,17 @@ import { CheckCircle2, ExternalLink, Eye, EyeOff, KeyRound, Loader2, ShieldCheck
 import { toast } from "../components/ui/glass-toast";
 import {
   clearYouTubeKey,
+  masterYouTubeKeyAvailable,
   MUSIC_YOUTUBE_KEY_STORAGE,
   ownYouTubeKey,
   ownYouTubeKeySlot,
   saveYouTubeKey,
+  setYouTubeKeySource,
   subscribeYouTubeKey,
   testYouTubeKey,
   type YouTubeKeyErrorCode,
 } from "./musicSearch";
+import KeySourceSwitch from "./KeySourceSwitch";
 
 export type YouTubeKeyCardProps = {
   /** The signed-in learner — their key is stored per account. */
@@ -238,6 +241,14 @@ export default function YouTubeKeyCard({ uid = null, onChanged, className = "" }
           {result.message}
         </p>
       ) : null}
+
+      <KeySourceSwitch
+        engine="youtube"
+        uid={uid}
+        masterAvailable={masterYouTubeKeyAvailable()}
+        onChoose={(source) => setYouTubeKeySource(source, uid)}
+        label="YouTube search ki API key"
+      />
 
       <details className="mt-3" data-you-tube-key-help>
         <summary className="cursor-pointer text-[11.5px] font-black text-slate-700">

@@ -292,7 +292,7 @@ export default function SettingsPage() {
                 <span className="settings-section-icon" aria-hidden="true"><KeyRound size={19} /></span>
                 <div className="settings-section-heading-copy">
                   <div className="settings-section-title-row"><h2 id="settings-youtube-search">YouTube search</h2><span className="settings-section-count">Apni key</span></div>
-                  <p>Course Player ke Music tab aur Resource Library ke search mein YouTube ke andar results laane ke liye ek YouTube Data API v3 key chahiye. Key aap apne Google account se banate ho aur woh sirf aapke device ke browser me save hoti hai — har user ka apna quota use hota hai, aapke account ka nahi.</p>
+                  <p>Course Player ke Music tab aur Resource Library ke search mein YouTube ke andar results laane ke liye ek YouTube Data API v3 key chahiye. Key aap apne Google account se banate ho aur woh sirf aapke device ke browser me save hoti hai — har user ka apna quota use hota hai, aapke account ka nahi. Neeche switch se chuno: <strong>meri apni key</strong> ya <strong>master ki key</strong> — aapki key ka quota khatam ho jaye to master ki key apne aap chalu ho jati hai, search chalta rehta hai.</p>
                 </div>
               </div>
               <YouTubeKeyCard uid={user?.id ?? null} className="settings-youtube-key-card" />
@@ -302,7 +302,7 @@ export default function SettingsPage() {
                 <span className="settings-section-icon" aria-hidden="true"><Globe size={19} /></span>
                 <div className="settings-section-heading-copy">
                   <div className="settings-section-title-row"><h2 id="settings-google-search">Google search</h2><span className="settings-section-count">Apni configuration</span></div>
-                  <p>Course Player ke search box me Google icon dabane par poore web ka search khulta hai. Iske liye ek Google API key aur ek Programmable Search Engine ID (cx) chahiye — dono aap apne Google account se banate ho aur sirf aapke device ke browser me save hote hain.</p>
+                  <p>Course Player ke search box me Google icon dabane par poore web ka search khulta hai. Iske liye ek Google API key aur ek Programmable Search Engine ID (cx) chahiye — dono aap apne Google account se banate ho aur sirf aapke device ke browser me save hote hain. Neeche switch se chuno: <strong>meri apni configuration</strong> ya <strong>master ki configuration</strong> — aapki quota khatam ho jaye to master ki configuration apne aap chalu ho jati hai.</p>
                 </div>
               </div>
               <GoogleSearchCard uid={user?.id ?? null} className="settings-google-search-card" />

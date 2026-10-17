@@ -47,6 +47,12 @@
 // Services → Credentials) — and the Data API to "YouTube Data API v3" alone.
 
 import { createMusicId, youTubeEmbedUrl, youTubeThumbnailUrl, type MusicTrack } from "./musicLibrary";
+import {
+  announceSearchKeySource,
+  readSearchKeySource,
+  writeSearchKeySource,
+  type SearchKeySource,
+} from "./searchKeySource";
 
 declare const __DC_YOUTUBE_API_KEY__: string | undefined;
 
@@ -146,18 +152,68 @@ export function ownYouTubeKeySlot(uid?: string | null): string {
 }
 
 /**
- * The key the search actually uses — see the header for the order.
- *
- *   1. the learner's own key (account slot, then this browser's slot);
- *   2. the owner's key (the build constant, then the serve-time global).
+ * THE OWNER'S KEY — the one baked into the build (or injected at serve
+ * time). The school owns its quota; the learner chooses whether to spend it.
  */
-export function youTubeSearchKey(uid?: string | null): string {
-  const own = ownYouTubeKey(uid);
-  if (own) return own;
+export function masterYouTubeKey(): string {
   return buildKey() || cleanKey((globalThis as Record<string, unknown>).__DC_YOUTUBE_API_KEY__);
 }
 
+/** Is there a master key at all? (The Settings switch needs to know.) */
+export const masterYouTubeKeyAvailable = (): boolean => Boolean(masterYouTubeKey());
+
+/** The choice in effect: "mine" (their own key) or "master" (the school's). */
+export function youTubeKeySource(uid?: string | null): SearchKeySource {
+  return readSearchKeySource("youtube", uid);
+}
+
+/**
+ * The key a search uses FIRST, whose it is, and which one takes over when
+ * this one's daily quota is gone.
+ *
+ *   · "mine"   → the learner's own key first, the master's as the background
+ *                handover (this is the default);
+ *   · "master" → the school's key, because the learner asked for it.
+ *
+ * The choice is never a trap: if the chosen key is not there at all, the
+ * other one is used — a working search always beats a dead one.
+ */
+export type YouTubeKeyPlan = {
+  /** The key to send first. */
+  key: string;
+  /** Whose key that is. */
+  origin: "own" | "master";
+  /** The other key — the automatic handover when this one's quota is gone. */
+  handover: string;
+};
+
+export function youTubeSearchPlan(uid?: string | null): YouTubeKeyPlan {
+  const own = ownYouTubeKey(uid);
+  const master = masterYouTubeKey();
+  if (youTubeKeySource(uid) === "master") {
+    return { key: master || own, origin: master ? "master" : "own", handover: "" };
+  }
+  return { key: own || master, origin: own ? "own" : "master", handover: own ? master : "" };
+}
+
+/** The key the search actually uses — see `youTubeSearchPlan`. */
+export function youTubeSearchKey(uid?: string | null): string {
+  return youTubeSearchPlan(uid).key;
+}
+
 export const youTubeSearchAvailable = (uid?: string | null): boolean => Boolean(youTubeSearchKey(uid));
+
+/**
+ * Store the choice the learner made in Settings: "mine" or "master". The
+ * page is told at once, so the search picks the new key on its next query.
+ */
+export function setYouTubeKeySource(source: SearchKeySource, uid?: string | null): boolean {
+  const stored = writeSearchKeySource("youtube", source, uid);
+  if (!stored) return false;
+  announceSearchKeySource();
+  announceYouTubeKey();
+  return true;
+}
 
 /**
  * Store a key for THIS LEARNER (their account slot) — or for this browser
@@ -283,6 +339,12 @@ export type YouTubeSearchOutcome = {
   rows: MusicTrack[];
   error: YouTubeKeyErrorCode | null;
   message: string;
+  /**
+   * The learner's own quota was gone and the MASTER's key took over, without
+   * a word and without a break in the search. The pane mentions it once, in
+   * passing — the results are what matter.
+   */
+  usedFallback?: boolean;
 };
 
 /**
@@ -292,17 +354,12 @@ export type YouTubeSearchOutcome = {
  * "nothing matched" are all answers the pane can render. The rows are the same
  * shape the library has always used.
  */
-export async function searchYouTubeOutcome(
-  query: string,
+/** The search itself, with ONE key in hand. */
+async function runYouTubeSearch(
+  text: string,
+  key: string,
   signal?: AbortSignal,
-  uid?: string | null,
 ): Promise<YouTubeSearchOutcome> {
-  const key = youTubeSearchKey(uid);
-  const text = String(query || "").trim();
-  if (!key) {
-    return { rows: [], error: "no-key", message: YOUTUBE_KEY_ERROR_MESSAGES["no-key"] };
-  }
-  if (!text) return { rows: [], error: null, message: "" };
   const endpoint = new URL("https://www.googleapis.com/youtube/v3/search");
   endpoint.searchParams.set("part", "snippet");
   endpoint.searchParams.set("type", "video");
@@ -350,6 +407,36 @@ export async function searchYouTubeOutcome(
   } catch {
     return { rows: [], error: "network", message: YOUTUBE_KEY_ERROR_MESSAGES.network };
   }
+}
+
+/**
+ * Search YouTube through the official Data API, and say what happened.
+ *
+ * Never throws: a refused key, an exhausted quota, a dead network and a plain
+ * "nothing matched" are all answers the pane can render. The rows are the same
+ * shape the library has always used.
+ *
+ * THE BACKGROUND RULE: the learner's own key goes first, and the moment its
+ * daily quota is gone the MASTER's key takes over — the very same query is
+ * re-sent, the results simply arrive, and the learner never sees a break.
+ */
+export async function searchYouTubeOutcome(
+  query: string,
+  signal?: AbortSignal,
+  uid?: string | null,
+): Promise<YouTubeSearchOutcome> {
+  const text = String(query || "").trim();
+  if (!text) return { rows: [], error: null, message: "" };
+  const plan = youTubeSearchPlan(uid);
+  if (!plan.key) {
+    return { rows: [], error: "no-key", message: YOUTUBE_KEY_ERROR_MESSAGES["no-key"] };
+  }
+  const first = await runYouTubeSearch(text, plan.key, signal);
+  if (first.error !== "quota" || !plan.handover || plan.handover === plan.key) return first;
+  // The learner's own quota is gone — the master's key takes over, silently.
+  const second = await runYouTubeSearch(text, plan.handover, signal);
+  if (second.error) return first;
+  return { ...second, usedFallback: true };
 }
 
 /**

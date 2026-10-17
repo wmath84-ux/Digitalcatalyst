@@ -254,6 +254,8 @@ beforeEach(() => {
   pickerOpens = 0;
   paneWidth = 900;
   paneHeight = 800;
+  // No master key unless a test asks for one.
+  delete globalThis.__DC_YOUTUBE_API_KEY__;
 });
 
 after(() => {
@@ -905,6 +907,45 @@ test("the key is configured in SETTINGS — the Course Player only says WHY a se
   assert.equal(banner.getAttribute("data-music-search-error-code"), "quota",
     "and it names the REAL reason — a dead quota is not the same as no results");
   assert.match(banner.textContent, /Settings/, "and it points at the place that configures the key");
+});
+
+test("the quota handover: the master's key takes over and the search simply goes on", async () => {
+  window.localStorage.clear();
+  // The learner's own key, and the school's (the master's) key.
+  window.localStorage.setItem("dc.music.youtubeKey", "learner-key");
+  globalThis.__DC_YOUTUBE_API_KEY__ = "owner-key";
+  fetchResponder = (url) => {
+    const key = new URL(String(url)).searchParams.get("key");
+    if (key === "learner-key") {
+      return {
+        ok: false,
+        status: 403,
+        json: () => Promise.resolve({ error: { code: 403, errors: [{ reason: "quotaExceeded" }] } }),
+      };
+    }
+    return {
+      ok: true,
+      json: () => Promise.resolve({
+        items: [{ id: { videoId: "dQw4w9WgXcQ" }, snippet: { title: "Never Gonna Give You Up", channelTitle: "Rick Astley" } }],
+      }),
+    };
+  };
+  mount({ courseAudio: [] });
+  await settle();
+
+  await click(q('[data-music-filter="online"]'));
+  await settle();
+  typeInto(q("[data-music-search]"), "koi bhi gaana");
+  await click(q("[data-music-search-run]"));
+  await settle(1200);
+
+  // The results arrived — no error, no interruption.
+  assert.equal(qa("[data-music-result]").length, 1, "the results are on screen");
+  assert.equal(Boolean(q("[data-music-search-error]")), false, "and there is NO error banner");
+  // One quiet line says what happened.
+  const note = q("[data-music-search-fallback]");
+  assert.ok(Boolean(note), "the handover is mentioned, once, quietly");
+  assert.match(note.textContent, /master/i);
 });
 
 test("the music library's search box opens the YouTube search page — on EVERY surface", async () => {

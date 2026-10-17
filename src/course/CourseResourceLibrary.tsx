@@ -1206,6 +1206,12 @@ export default function CourseResourceLibrary({
                     </span>
                   </div>
 
+                  {googleOutcome?.usedFallback ? (
+                    <p className="library-search-hint" data-library-google-fallback>
+                      Aapki configuration ka quota khatam ho gaya — ab master ki configuration se chal raha hai. Search chalta rahega.
+                    </p>
+                  ) : null}
+
                   {googleResults.length ? (
                     googleType === "image" ? (
                       <div

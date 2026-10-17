@@ -146,6 +146,29 @@ nahi deta — wahan search hamesha YouTube ka hota hai.
 
 ---
 
+## 5.4 Key kahan se aayegi — aapka choice (dono engines me)
+
+Settings → **YouTube search** aur Settings → **Google search** — dono cards me
+ek switch hai:
+
+| Option | Kya hota hai |
+|--------|--------------|
+| **Meri apni key** (default) | Pehle aapki hi key chalti hai. Aapki daily quota khatam ho jaye to **master ki key apne aap chalu ho jati hai** — wahi query dobara bhejti hai, results aa jaate hain, aapko koi tok nahi dikhti. |
+| **Master ki key** | Seedha school ki key se chalega — aapka apna quota bilkul nahi lagega. |
+
+**Ye choice kabhi trap nahi hai:** jis key ki choice ki hai, wo agar maujood hi
+nahi hai to doosri key use hoti hai — chalta hua search zyada acha hai.
+
+Master ki key school ke build me hoti hai (`.env`):
+`VITE_YOUTUBE_API_KEY`, `VITE_GOOGLE_SEARCH_API_KEY`, `VITE_GOOGLE_SEARCH_CX`.
+Jab tak owner inhe nahi bharta, "Master ki key" option grey rehta hai aur likha
+hota hai *"School ki key abhi configure nahi hai"*.
+
+Choice **har user ka apna** hota hai (account slot → device slot), aur
+browse karte hi turant apply ho jaata hai.
+
+---
+
 ## 6. Fail hone par kya dikhta hai
 
 Har failure ka apna message hai (sab "kuch nahin mila" nahi):
@@ -173,7 +196,9 @@ Aur har message ke saath ek pointer: **Settings → YouTube search** (ya
 | `src/course/googleResults.css` | un sab ka look |
 | `src/course/GoogleSearchCard.tsx` | Settings ka Google card (key + cx) |
 | `src/course/GoogleGlyph.tsx` | Google ka apna "G" (chaar rang) |
-| `src/course/musicSearch.ts` | YouTube key ka order, per-account slot, error diagnosis |
+| `src/course/musicSearch.ts` | YouTube key ka order, per-account slot, **quota handover**, error diagnosis |
+| `src/course/searchKeySource.ts` | "meri key ya master ki" — choice ka storage (per engine, per account) |
+| `src/course/KeySourceSwitch.tsx` | Settings ka switch (dono cards me) |
 | `src/course/YouTubeKeyCard.tsx` | Settings ka YouTube card |
 | `src/course/CourseResourceLibrary.tsx` | search box me Google icon + Google page |
 | `src/course/MusicPanel.tsx` | YouTube search + do-step ka back |

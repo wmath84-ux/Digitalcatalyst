@@ -24,11 +24,14 @@ import {
   clearGoogleSearchConfig,
   googleSearchConfig,
   googleSearchOwnerConfigured,
+  masterGoogleSearchAvailable,
   saveGoogleSearchConfig,
+  setGoogleSearchSource,
   subscribeGoogleSearchConfig,
   testGoogleSearchConfig,
   type GoogleSearchErrorCode,
 } from "./googleSearch";
+import KeySourceSwitch from "./KeySourceSwitch";
 
 export type GoogleSearchCardProps = {
   /** The signed-in learner — their configuration is stored per account. */
@@ -261,6 +264,14 @@ export default function GoogleSearchCard({ uid = null, onChanged, className = ""
           {result.message}
         </p>
       ) : null}
+
+      <KeySourceSwitch
+        engine="google"
+        uid={uid}
+        masterAvailable={masterGoogleSearchAvailable()}
+        onChoose={(source) => setGoogleSearchSource(source, uid)}
+        label="Google search ki configuration"
+      />
 
       <details className="mt-3" data-google-search-help>
         <summary className="cursor-pointer text-[11.5px] font-black text-slate-700">
