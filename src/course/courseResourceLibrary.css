@@ -399,23 +399,6 @@
   color: rgb(15 23 42 / 0.72);
 }
 
-/* The GOOGLE mark, INSIDE the search box on its right: one tap opens the
-   web search — the third answer this box gives (the course, YouTube, the
-   open web). */
-.library-searchbar__google {
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  transition: background-color 0.15s ease;
-}
-
-.library-searchbar__google:hover {
-  background: rgb(15 23 42 / 0.06);
-}
-
 /* ── A hit: the row ──────────────────────────────────────────────────── */
 
 .library-hit {

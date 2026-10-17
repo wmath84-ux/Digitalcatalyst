@@ -51,14 +51,12 @@ test("the editor is built on React Flow, which is the only candidate with touch 
 // Dock integration — the tab sits next to Note
 // ---------------------------------------------------------------------------
 
-test("Transcript sits beside Module, Mind map stays immediately after Note, appended tabs stay at the end", () => {
-  // The Transcript tab joined the dock right beside the Resource Library
-  // (owner brief, 2026-10-17). Mind map still sits immediately after Note;
-  // the independently rendered Player tab is not a TABS entry, and new
-  // feature tabs follow Paid.
-  assert.match(overlay, /export type DockTab = "modules" \| "transcript" \| "brain" \| "notes" \| "mindmap" \| "ai" \| "paid" \| "player" \| "experiment" \| "sketch" \| "read" \| "music";/);
-  const order = [...overlay.matchAll(/\{ key: "(modules|transcript|brain|notes|mindmap|ai|paid|player|experiment|sketch|read|music)"/g)].map((m) => m[1]);
-  assert.deepEqual(order.slice(0, 6), ["modules", "transcript", "brain", "notes", "mindmap", "ai"], "Transcript must sit right after Module; Mind map right after Note");
+test("Mind map stays immediately after Note, appended tabs stay at the end", () => {
+  // Mind map still sits immediately after Note; the independently rendered
+  // Player tab is not a TABS entry, and new feature tabs follow Paid.
+  assert.match(overlay, /export type DockTab = "modules" \| "brain" \| "notes" \| "mindmap" \| "ai" \| "paid" \| "player" \| "experiment" \| "sketch" \| "read" \| "music";/);
+  const order = [...overlay.matchAll(/\{ key: "(modules|brain|notes|mindmap|ai|paid|player|experiment|sketch|read|music)"/g)].map((m) => m[1]);
+  assert.deepEqual(order.slice(0, 5), ["modules", "brain", "notes", "mindmap", "ai"], "Mind map must sit right after Note");
   assert.deepEqual(order.slice(-5), ["paid", "experiment", "sketch", "read", "music"], "feature tabs stay appended at the end");
 });
 

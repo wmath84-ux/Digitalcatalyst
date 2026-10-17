@@ -6,8 +6,6 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import browserslist from "browserslist";
 import { defineConfig, loadEnv } from "vite";
-import { handleYouTubeTranscript } from "./api/_lib/youtubeTranscript";
-import { handleGoogleSearch } from "./api/_lib/googleSearchProxy";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -256,15 +254,6 @@ function pdfjsViewerAssets(): import("vite").Plugin {
  * SoundCloud / audio link — the search box then hands the query to YouTube's
  * own search page and the learner pastes the link straight back. A key only
  * turns on the in-player result list.
- *
- * The Course Player's GOOGLE search (src/course/googleSearch.ts) works the
- * same way, with TWO values:
- *
- *     VITE_GOOGLE_SEARCH_API_KEY=AIza…   # the Custom Search API key
- *     VITE_GOOGLE_SEARCH_CX=0123…:abc…   # the Programmable Search Engine id
- *
- * Leave them empty and every learner uses their OWN configuration from the
- * app's Settings page — the school is then never billed for a query.
  */
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -272,12 +261,6 @@ export default defineConfig(({ mode }) => {
   return {
   define: {
     __DC_YOUTUBE_API_KEY__: JSON.stringify(env.VITE_YOUTUBE_API_KEY || ""),
-    // The Course Player's Google search (src/course/googleSearch.ts). TWO
-    // values: the API key and the Programmable Search Engine's id (the `cx`).
-    // Both are optional — leave them empty and the learner's own Settings
-    // values are used instead, so the school is never billed.
-    __DC_GOOGLE_SEARCH_API_KEY__: JSON.stringify(env.VITE_GOOGLE_SEARCH_API_KEY || ""),
-    __DC_GOOGLE_SEARCH_CX__: JSON.stringify(env.VITE_GOOGLE_SEARCH_CX || ""),
   },
   plugins: [
     react(),
@@ -339,124 +322,6 @@ export default defineConfig(({ mode }) => {
           res.end();
         });
 
-        // ── The Transcript tab's API ─────────────────────────────────────
-        // Production serves this through the shared serverless function
-        // (`/api/referral-leaderboard?route=youtube-transcript`, see
-        // vercel.json). Local dev has no Vercel runtime, so the SAME handler
-        // (api/_lib/youtubeTranscript.ts) answers here through a small
-        // adapter — one implementation, so the status map, the cache headers,
-        // the `?diagnostics=1` layer trail and the honest `no_captions`
-        // verdict are identical on localhost and on Vercel.
-        server.middlewares.use("/api/youtube-transcript", (req: IncomingMessage, res: ServerResponse) => {
-          const url = new URL(req.url || "/", "http://localhost");
-          const query: Record<string, string> = {};
-          url.searchParams.forEach((value, key) => {
-            query[key] = value;
-          });
-          const adapter = {
-            status(code: number) {
-              res.statusCode = code;
-              return adapter;
-            },
-            setHeader(name: string, value: string) {
-              res.setHeader(name, value);
-              return adapter;
-            },
-            json(payload: unknown) {
-              if (!res.getHeader("content-type")) {
-                res.setHeader("content-type", "application/json; charset=utf-8");
-              }
-              res.end(JSON.stringify(payload));
-            },
-            end(payload?: string) {
-              res.end(payload);
-            },
-          };
-          void handleYouTubeTranscript(
-            { method: req.method, query, headers: req.headers as Record<string, string> },
-            adapter,
-          );
-        });
-
-        // ── The Google search proxy ──────────────────────────────────────
-        // Production serves `/api/google-search` through the shared
-        // serverless function (vercel.json → api/_lib/googleSearchProxy.ts).
-        // The SAME handler runs here, so `npm run dev` exercises the real
-        // server-side path: a browser Origin/Referer never reaches Google, and
-        // a key whose "HTTP referrers" restriction does not list localhost
-        // still works.
-        //
-        // The server-side key comes from the environment. Vite reads .env into
-        // `env` (loadEnv above) but does NOT put it on process.env, so mirror
-        // the two names the proxy reads — falling back to the VITE_ pair the
-        // build already uses, which keeps dev working with a single .env.
-        if (!process.env.GOOGLE_SEARCH_API_KEY) {
-          process.env.GOOGLE_SEARCH_API_KEY = env.GOOGLE_SEARCH_API_KEY || env.VITE_GOOGLE_SEARCH_API_KEY || "";
-        }
-        if (!process.env.GOOGLE_SEARCH_CX) {
-          process.env.GOOGLE_SEARCH_CX = env.GOOGLE_SEARCH_CX || env.VITE_GOOGLE_SEARCH_CX || "";
-        }
-        server.middlewares.use("/api/google-search", (req: IncomingMessage, res: ServerResponse) => {
-          const url = new URL(req.url || "/", "http://localhost");
-          const query: Record<string, string> = {};
-          url.searchParams.forEach((value, key) => {
-            query[key] = value;
-          });
-          const chunks: Buffer[] = [];
-          const finish = (body: unknown) => {
-            const adapter = {
-              status(code: number) {
-                res.statusCode = code;
-                return adapter;
-              },
-              setHeader(name: string, value: string) {
-                res.setHeader(name, value);
-                return adapter;
-              },
-              json(payload: unknown) {
-                if (!res.getHeader("content-type")) {
-                  res.setHeader("content-type", "application/json; charset=utf-8");
-                }
-                res.end(JSON.stringify(payload));
-              },
-              end(payload?: string) {
-                res.end(payload);
-              },
-            };
-            void handleGoogleSearch(
-              { method: req.method, query, body, headers: req.headers as Record<string, string> },
-              adapter,
-            );
-          };
-          if (String(req.method || "GET").toUpperCase() !== "POST") {
-            finish({});
-            return;
-          }
-          let total = 0;
-          req.on("data", (chunk: Buffer) => {
-            total += chunk.length;
-            if (total > 64 * 1024) {
-              res.statusCode = 413;
-              res.end(JSON.stringify({ ok: false, code: "bad-request", error: "Body bahut badi hai." }));
-              req.destroy();
-              return;
-            }
-            chunks.push(chunk);
-          });
-          req.on("end", () => {
-            const raw = Buffer.concat(chunks).toString("utf8").trim();
-            let parsed: unknown = {};
-            if (raw) {
-              try {
-                parsed = JSON.parse(raw);
-              } catch {
-                parsed = {};
-              }
-            }
-            finish(parsed);
-          });
-          req.on("error", () => finish({}));
-        });
       },
     },
     excalidrawAssets(),
