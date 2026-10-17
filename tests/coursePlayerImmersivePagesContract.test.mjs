@@ -97,10 +97,10 @@ test("4 — one resolver names every page the footer stays away from", () => {
 
 test("5 — every page publishes the fact the rule reads", () => {
   // Note Editor: WRITE mode only (a MASTER note being READ keeps the footer).
-  assert.match(notesPanel, /const notesEditMode = editorOpen && !viewingMasterNote && !\(Boolean\(editingId\) && selfReadOnly\);/);
+  assert.match(notesPanel, /const notesEditMode = editorOpen && !viewingMasterNote && !readView;/);
   assert.match(notesPanel, /setNotesEditMode\(notesEditMode\);/);
   // Mind map: the canvas AND edit mode (a read-only MASTER map is never edit).
-  assert.match(read("src/course/MindMapPanel.tsx"), /setMindMapEditMode\(!libraryOpen && !readOnlyCanvas\);/);
+  assert.match(read("src/course/MindMapPanel.tsx"), /setMindMapEditMode\(mapOpen && !readOnlyCanvas\);/);
   // Sketch: the panel's one edit flag, the Quick Sketch chip included.
   assert.match(read("src/course/SketchPanel.tsx"), /setSketchEditMode\(editing\);/);
   // Read reader (course PDF viewer, annotations viewer, Drive viewer).
@@ -111,7 +111,7 @@ test("5 — every page publishes the fact the rule reads", () => {
   assert.match(playerApp, /setExperimentSessionView\(studyExperiment \? "viewer" : "library"\)/);
   // Mind Map canvas was already published for session restore; it is
   // asserted here so the footer's source can never silently vanish.
-  assert.match(read("src/course/MindMapPanel.tsx"), /setMindMapSessionView\(libraryOpen \? "library" : "canvas"\)/);
+  assert.match(read("src/course/MindMapPanel.tsx"), /setMindMapSessionView\(mapOpen \? "canvas" : "empty"\)/);
   // Both search surfaces publish their page, and their scroll rule publishes
   // the "stepped away" half into the same session.
   const library = read("src/course/CourseResourceLibrary.tsx");

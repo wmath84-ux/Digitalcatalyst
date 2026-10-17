@@ -54,7 +54,9 @@ test("1 — preview never unlocks editing: no double-tap path into edit mode", (
   assert.match(panel, /if \(dragMovedRef\.current \|\| readOnlyRef\.current\) return;/);
   assert.match(panel, /zoomOnDoubleClick=\{false\}/);
   // Opening a map always lands on the preview first.
-  assert.match(panel, /const openMap = useCallback\([\s\S]{0,300}?setLibraryOpen\(false\);\s+setEditMode\(false\);/);
+  assert.match(panel, /const openMap = useCallback\([\s\S]{0,300}?setMapOpen\(true\);\s+setEditMode\(false\);/);
+  // …and the map it opens is FRAMED (fit-zoomed) into the screen.
+  assert.match(panel, /fitView\(\{ duration: 320, padding: 0\.2 \}\), 60\);/);
 });
 
 test("2 — nodes move only in edit mode", () => {
@@ -66,7 +68,7 @@ test("2 — nodes move only in edit mode", () => {
 
 test("3+4 — the editing toolbar: one opaque pill at the exact bottom, Note-Editor sizing, mind map icons", () => {
   // Mounted only on the canvas in edit mode.
-  assert.match(panel, /\{libraryOpen \|\| readOnlyCanvas \? null : \(\s+<div[\s\S]{0,300}?data-course-mindmap-status/);
+  assert.match(panel, /\{readOnlyCanvas \? null : \(\s+<div[\s\S]{0,300}?data-course-mindmap-status/);
   const strip = css.slice(css.indexOf("[data-course-mindmap-status] {"), css.indexOf("[data-course-mindmap-status][data-compact"));
   assert.match(strip, /position: absolute;/);
   assert.match(strip, /bottom: calc\(max\(0\.5rem, env\(safe-area-inset-bottom\)\) \+ var\(--dc-note-footer-inset, 0px\)\);/);
@@ -83,11 +85,12 @@ test("3+4 — the editing toolbar: one opaque pill at the exact bottom, Note-Edi
   assert.match(panel, /className="mm-tool"[\s\S]{0,160}?data-mindmap-edit-read/);
   assert.match(panel, /<Eye size=\{16\} aria-hidden="true" \/>/);
   // …and read mode's tray is the note page's read navigation: the side-panel
-  // button, New mind map, the pencil and Home.
+  // button, New mind map and the pencil (NO home button any more — owner,
+  // 2026-10-17).
   assert.match(panel, /data-mindmap-read-tray/);
   assert.match(panel, /data-mindmap-read-library/);
   assert.match(panel, /data-mindmap-read-new/);
-  assert.match(panel, /data-mindmap-read-home/);
+  assert.doesNotMatch(panel, /data-mindmap-read-home/);
   assert.match(panel, /const READ_TAP_SLOP_PX = 10;/, "ONE tap on the canvas hides the tray");
   assert.match(css, /\.mm-read-tray \{[\s\S]{0,500}?bottom: calc\(max\(0\.5rem, env\(safe-area-inset-bottom\)\) \+ var\(--dc-note-footer-inset, 0px\)\);/);
 });
@@ -96,10 +99,12 @@ test("5+6 — no corner buttons; the ONE panel is the library, and rename lives 
   assert.doesNotMatch(panel, /data-mindmap-open-left-panel|data-mindmap-open-right-panel|data-mindmap-editor-chrome/);
   assert.doesNotMatch(panel, /CoursePageHeader/, "the mind map is headless like the notes page");
   assert.match(panel, /data-mindmap-left-panel/);
-  assert.match(panel, /w-\[calc\(100%-2\.5rem\)\]/, "nearly a whole page, a thin strip still visible");
+  // The side panel BECAME the full-page main area (owner, 2026-10-17).
+  assert.match(panel, /absolute inset-0 z-40 flex flex-col shadow-2xl/);
+  assert.match(panel, /data-mindmap-panel-back[\s\S]{0,600}?onClick=\{closePanel\}/);
   const headAt = panel.indexOf("data-mindmap-panel-head");
   const libraryHead = panel.slice(panel.lastIndexOf("<div", headAt), panel.indexOf("data-course-mindmap-map-list"));
-  assert.match(libraryHead, /justify-center/, "the filter sits at its top centre");
+  assert.doesNotMatch(libraryHead, /justify-center/, "the filter is expanded, not a tiny centred pill");
   assert.match(libraryHead, /storageOnly \? \([\s\S]{0,200}?My mind maps/);
   assert.match(libraryHead, /data-course-mindmap-collections/);
   assert.match(panel, /leafActionMenu="long-press"/, "a row's actions open on a long press");
@@ -112,8 +117,9 @@ test("5+6 — no corner buttons; the ONE panel is the library, and rename lives 
 });
 
 test("7 — Work footer follows the canvas and restores on the library, without course-session leakage", () => {
-  assert.match(panel, /if \(!storageOnly\) setMindMapSessionView\(libraryOpen \? "library" : "canvas"\);/);
-  assert.match(panel, /onEditorOpenChange\?\.\(!libraryOpen\);/);
+  assert.match(panel, /if \(!storageOnly\) setMindMapSessionView\(mapOpen \? "canvas" : "empty"\);/);
+  // The canvas is always the page, so the editor area is always open.
+  assert.match(panel, /onEditorOpenChange\?\.\(true\);/);
   assert.match(page, /\(page === "mindmap" && mindMapEditorOpen\)/);
   assert.match(page, /onImmersiveChange\?\.\(slotKey, immersive\);/);
   assert.match(app, /\{\(page === "myday" && myDayView === "editor"\) \|\| anyImmersive \? null : \(\s+<WorkFooterNav/);

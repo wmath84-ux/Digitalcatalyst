@@ -90,6 +90,17 @@ export interface NoteEditorProps {
   ariaLabel: string;
   /** A `data-*` attribute name to stamp on the writing surface (test hook). */
   dataAttribute?: string;
+  /**
+   * The title field's placeholder. The blank "New note" page passes "New
+   * note"; every other editor keeps the default "Title".
+   */
+  titlePlaceholder?: string;
+  /**
+   * The body placeholder, for THIS editor only (see the factory's option of
+   * the same name). The blank "New note" page passes "Start writing from
+   * here…".
+   */
+  bodyPlaceholder?: string;
   /** Batched, debounced — the latest note model. */
   onDraftChange?: (draft: NoteDraft) => void;
   /** Fires only when "nothing to save" flips. */
@@ -277,6 +288,7 @@ function NoteEditorChrome({
   editor,
   readOnly,
   titleRef,
+  titlePlaceholder = "Title",
   onBodyKeyDown,
   onReadRequest,
   onDockChange,
@@ -284,6 +296,7 @@ function NoteEditorChrome({
   editor: NoteEditorInstance;
   readOnly: boolean;
   titleRef: React.RefObject<HTMLTextAreaElement | null>;
+  titlePlaceholder?: string;
   onBodyKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
   onReadRequest?: () => void;
   onDockChange?: (docked: boolean) => void;
@@ -363,7 +376,7 @@ function NoteEditorChrome({
             className="dc-note-title"
             rows={1}
             maxLength={200}
-            placeholder="Title"
+            placeholder={titlePlaceholder}
             aria-label="Note title"
             enterKeyHint="next"
             autoCapitalize="sentences"
@@ -413,6 +426,8 @@ function NoteEditorSession({
   autoFocus = false,
   ariaLabel,
   dataAttribute,
+  titlePlaceholder,
+  bodyPlaceholder,
   onDraftChange,
   onEmptyChange,
   onDirtyChange,
@@ -435,6 +450,7 @@ function NoteEditorSession({
       initialContent: imported.blocks,
       pasteHtml: pasteIntoEditor,
       pastePlain: pastePlainIntoEditor,
+      bodyPlaceholder,
       editableAttributes: {
         role: "textbox",
         "aria-multiline": "true",
@@ -688,6 +704,7 @@ function NoteEditorSession({
           editor={editor}
           readOnly={readOnly}
           titleRef={titleRef}
+          titlePlaceholder={titlePlaceholder}
           onBodyKeyDown={onBodyKeyDown}
           onReadRequest={onReadRequest}
           onDockChange={onDockChange}

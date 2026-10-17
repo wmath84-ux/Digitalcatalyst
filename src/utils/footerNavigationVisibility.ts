@@ -40,9 +40,9 @@ const DEFAULT_VISIBILITY: FooterNavigationVisibility = "accordingly";
 export const FOOTER_NAVIGATION_VISIBILITY_NOTE =
   "With “accordingly”, the footer navigation is not shown: while a note, mind map or sketch is open in edit mode " +
   "(reading any of them keeps it); on a Brain answer deck; inside a live experiment; inside a PDF or annotations " +
-  "reader; on the Music player or its YouTube player; and on the Resource Library or Music search page. On a search " +
-  "results page it is shown, and slides away while you scroll down and returns at the top. It also steps aside for " +
-  "the on-screen keyboard. Everything else keeps it visible.";
+  "reader; on the Music player or its YouTube player; and on the Resource Library or Music search page. Everywhere " +
+  "else in the Course Player it is shown — and it slides away while you scroll down, returning the moment you scroll " +
+  "up. It also steps aside for the on-screen keyboard. Everything else keeps it visible.";
 
 export function getFooterNavigationVisibility(): FooterNavigationVisibility {
   if (typeof window === "undefined") return DEFAULT_VISIBILITY;

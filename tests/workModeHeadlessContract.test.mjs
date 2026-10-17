@@ -57,8 +57,8 @@ test("Work page surface drops its outer header for headless states (the Revision
 test("reused Course panels expose parent chrome signals without leaking Work into the course session", () => {
   assert.match(notesPanel, /useEffect\(\(\) => \{ onEditorOpenChange\?\.\(editorOpen\); \}\);/);
   assert.match(mindMapSurface, /onEditorOpenChange=\{onEditorOpenChange\}/);
-  assert.match(mindMapPanel, /if \(!storageOnly\) setMindMapSessionView\(libraryOpen \? "library" : "canvas"\);/);
-  assert.match(mindMapPanel, /onEditorOpenChange\?\.\(!libraryOpen\);/);
+  assert.match(mindMapPanel, /if \(!storageOnly\) setMindMapSessionView\(mapOpen \? "canvas" : "empty"\);/);
+  assert.match(mindMapPanel, /onEditorOpenChange\?\.\(true\);/);
   assert.match(brainPanel, /if \(!workMode\) setBrainSessionView\(activeSet && mode === "question" \? "answer" : "home"\);/);
   assert.match(brainPanel, /onAnsweringChange\?\.\(Boolean\(activeSet && mode === "question"\)\);/);
 });

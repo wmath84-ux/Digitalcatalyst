@@ -390,6 +390,13 @@ export interface CreateNoteEditorOptions {
   pastePlain?: (text: string, editor: NoteEditorInstance) => boolean;
   /** Extra attributes on the contenteditable (aria-label, test hooks…). */
   editableAttributes?: Record<string, string>;
+  /**
+   * The body placeholder for THIS editor only. The dictionary is a shared
+   * constant, so the blank "New note" page passes its own hint
+   * ("Start writing from here…") here and every other editor keeps the
+   * default one.
+   */
+  bodyPlaceholder?: string;
 }
 
 /**
@@ -401,11 +408,16 @@ export function createNoteEditor(options: CreateNoteEditorOptions = {}): NoteEdi
   // The engine calls two array methods an older Android WebView lacks (see
   // ./editorRuntime); they must exist before the first transaction can.
   installRuntimeCompat();
-  const { initialContent, pasteHtml, pastePlain, editableAttributes } = options;
+  const { initialContent, pasteHtml, pastePlain, editableAttributes, bodyPlaceholder } = options;
+  // One editor, one placeholder: the dictionary is copied only when this
+  // editor asked for its own body hint.
+  const dictionary = bodyPlaceholder
+    ? { ...noteDictionary, placeholders: { ...noteDictionary.placeholders, default: bodyPlaceholder } }
+    : noteDictionary;
   return BlockNoteEditor.create({
     schema: noteSchema,
     initialContent: initialContent && initialContent.length ? initialContent : undefined,
-    dictionary: noteDictionary,
+    dictionary,
     animations: false,
     tabBehavior: "prefer-indent",
     trailingBlock: true,

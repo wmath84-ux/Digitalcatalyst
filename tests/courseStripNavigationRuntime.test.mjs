@@ -43,6 +43,8 @@ let keyboardVisible = false;
 // The two things the dock reads: the Course Player's page rule, and the
 // Settings choice that overrules it ("Visible footer navigation always").
 let pageRuleHidesFooter = false;
+// The scroll rule: the strip steps away while the learner scrolls down.
+let scrolledAway = false;
 let footerAlwaysVisible = false;
 function load(file, resolver = require) {
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -53,7 +55,7 @@ function load(file, resolver = require) {
 const Nav = load('src/course/CoursePeekDock.tsx', id => {
   if (id === './CourseOverlay') return { TABS: tabs };
   if (id === './useCourseKeyboard') return { useCourseKeyboard: () => ({ keyboardVisible }) };
-  if (id === './coursePanelSession') return { useFooterHiddenPage: () => pageRuleHidesFooter };
+  if (id === './coursePanelSession') return { useFooterHiddenPage: () => pageRuleHidesFooter, useFooterScrolledAway: () => scrolledAway };
   if (id === '../utils/footerNavigationVisibility') return { useFooterNavigationAlways: () => footerAlwaysVisible };
   if (id.endsWith('.css')) return {};
   return require(id);
@@ -135,6 +137,43 @@ test('the page rule hides the real strip — and Settings "always" brings it bac
   host.remove();
 });
 
+test('the scroll rule slides the real strip away — and "always" keeps it in place', async () => {
+  keyboardVisible = false;
+  pageRuleHidesFooter = false;
+  footerAlwaysVisible = false;
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const render = () => root.render(React.createElement(Nav, { tab: 'notes', onTabChange: () => {} }));
+
+  await act(render);
+  const nav = document.querySelector('nav');
+  assert.equal(nav.getAttribute('data-course-strip-scrolled'), 'home', 'the strip starts where it belongs');
+
+  // The learner scrolls down inside the player: the strip steps out of the
+  // way (it slides away — it is not unmounted, so nothing behind it jumps).
+  scrolledAway = true;
+  await act(render);
+  assert.equal(document.querySelector('nav').getAttribute('data-course-strip-scrolled'), 'away');
+  assert.ok(document.querySelector('nav'), 'the strip is still on the page — it only slid away');
+
+  // Scrolling up brings it straight back.
+  scrolledAway = false;
+  await act(render);
+  assert.equal(document.querySelector('nav').getAttribute('data-course-strip-scrolled'), 'home');
+
+  // "Visible footer navigation always" overrules the scroll rule too.
+  scrolledAway = true;
+  footerAlwaysVisible = true;
+  await act(render);
+  assert.equal(document.querySelector('nav').getAttribute('data-course-strip-scrolled'), 'home');
+
+  scrolledAway = false;
+  footerAlwaysVisible = false;
+  await act(() => root.unmount());
+  host.remove();
+});
+
 // ---------------------------------------------------------------------------
 // The PLACEABLE navigation (the owner's 2026-10-16 brief) — the same component
 // the course player puts in its header and Work mode places around its deck.
@@ -170,7 +209,7 @@ const Placement = load('src/utils/footerNavigationPlacement.ts', (id) => require
 const HeaderNav = load('src/course/CourseHeaderNav.tsx', (id) => {
   if (id === './CourseOverlay') return { TABS: tabs };
   if (id === './useCourseKeyboard') return { useCourseKeyboard: () => ({ keyboardVisible }) };
-  if (id === './coursePanelSession') return { useFooterHiddenPage: () => pageRuleHidesFooter };
+  if (id === './coursePanelSession') return { useFooterHiddenPage: () => pageRuleHidesFooter, useFooterScrolledAway: () => scrolledAway };
   if (id === '../utils/footerNavigationVisibility') return { useFooterNavigationAlways: () => footerAlwaysVisible };
   if (id === '../utils/footerNavigationPlacement') return Placement;
   if (id.endsWith('.css')) return {};

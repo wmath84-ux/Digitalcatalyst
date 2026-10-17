@@ -64,8 +64,8 @@ import {
   type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode,
 } from "react";
 import {
-  ArrowLeft, ArrowRight, AudioLines, ChevronRight, CornerDownLeft, ExternalLink, Globe, LayoutGrid, Link2,
-  LoaderCircle, Music, Plus, Rows3, Search, X,
+  ArrowLeft, ArrowRight, AudioLines, ChevronRight, CornerDownLeft, ExternalLink, Globe, LayoutGrid,
+  Link2, LoaderCircle, Music, Plus, Rows3, Search, X,
 } from "lucide-react";
 import AudioPlayer from "./AudioPlayer";
 import { toast } from "../components/ui/glass-toast";
@@ -75,7 +75,8 @@ import {
 } from "./musicLibrary";
 import { listLocalSongs, removeLocalSong, songObjectUrl, storeLocalSong } from "./musicDb";
 import {
-  resolveMusicTitle, searchYouTube, subscribeYouTubeKey, youTubeSearchAvailable, youTubeSearchUrl,
+  resolveMusicTitle, searchYouTubeOutcome, subscribeYouTubeKey, youTubeSearchAvailable, youTubeSearchUrl,
+  type YouTubeSearchOutcome,
 } from "./musicSearch";
 import {
   SearchFlashScan, SearchHistoryList, SlidingSearchText, STUDY_SEARCH_SENTENCE,
@@ -156,7 +157,27 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
   const [dragging, setDragging] = useState(false);
   /** The browser's Fullscreen API — YouTube's own inbuilt button lands here. */
   const [nativeFull, setNativeFull] = useState(false);
-  const [searchKeyReady, setSearchKeyReady] = useState(youTubeSearchAvailable);
+  /**
+   * Whether a YouTube key is ready. The LEARNER'S own key counts first (their
+   * account slot); the owner's build-time key is only the fallback — that is
+   * what keeps the school out of the quota bill.
+   */
+  const [searchKeyReady, setSearchKeyReady] = useState(() => youTubeSearchAvailable(uid));
+  /** The last online search's answer — WHY it failed, when it did. */
+  const [onlineError, setOnlineError] = useState<YouTubeSearchOutcome | null>(null);
+  /**
+   * The nested search page has TWO steps, and the back button walks them:
+   *
+   *   "board"   → the ready-to-write page: the recent searches, the box empty
+   *               and waiting (YouTube's own search-page shape);
+   *   "results" → what the search answered.
+   *
+   * So the back arrow on the RESULTS goes back to the board, and the board's
+   * back arrow goes back to the library page. Tapping the search box on the
+   * results does the same as that first back — the learner is asking to
+   * search again, not to stare at the old results.
+   */
+  const [searchPageStage, setSearchPageStage] = useState<"board" | "results">("board");
 
   const panelRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -171,7 +192,20 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
 
   const fullscreen = nativeFull;
 
-  useEffect(() => subscribeYouTubeKey(() => setSearchKeyReady(youTubeSearchAvailable())), []);
+  /**
+   * A key was saved or removed in SETTINGS — the pane re-reads it, and
+   * forgets the failure it was showing (that failure belonged to the old
+   * key). A different account means a different key, so the account's own
+   * slot is what counts, and signing in (or out) re-reads it right away.
+   */
+  useEffect(() => {
+    const read = () => setSearchKeyReady(youTubeSearchAvailable(uid));
+    read();
+    return subscribeYouTubeKey(() => {
+      read();
+      setOnlineError(null);
+    });
+  }, [uid]);
 
   /**
    * The pane — not the viewport — decides the workspace shape: a wide pane
@@ -383,7 +417,19 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
    * slow), and the results appear the moment they land. No nested page here:
    * the owner asked for the same behaviour on the SAME page structure.
    */
-  const runMusicSearch = useCallback((text: string) => searchYouTube(text), []);
+  /**
+   * The search — and its ANSWER. The rows are what the list shows; the
+   * outcome also says WHY a search found nothing (a wrong key, a dead
+   * quota, a referrer the key does not allow), so the pane can offer the fix
+   * instead of a dead end.
+   */
+  const runMusicSearch = useCallback(async (text: string) => {
+    const outcome = await searchYouTubeOutcome(text, undefined, uid);
+    setOnlineError(outcome);
+    // A search that RAN lands on the RESULTS step of the search page.
+    setSearchPageStage("results");
+    return outcome.rows;
+  }, [uid]);
   const search = useStudySearch<MusicTrack[]>({ namespace: "course-music", run: runMusicSearch });
 
   const searchLoading = search.phase === "loading";
@@ -407,7 +453,10 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
 
   const submitSearch = useCallback(async () => {
     if (isUrlFilter(filter)) { await addLink(query); return; }
-    if (filter !== "all" && filter !== "online") return;
+    // On the search page the search is YOUTUBE's own — the shelf the learner
+    // happened to be looking at does not get a say, so the results page opens
+    // whatever the filter was.
+    if (!searchPageOpen && filter !== "all" && filter !== "online") return;
     const text = query.trim();
     if (!text || !searchKeyReady) return;
     // "Jaise hi Enter karein keyboard close ho jaaye" — the box gives the
@@ -416,9 +465,9 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
     // A search is an ONLINE act: the results are shown in the Online list, and
     // they stay there for the rest of the visit — "online filter mein vah
     // sabhi dikhenge jo user search karke dekh chuka hai".
-    if (filter === "all") setFilter("online");
+    if (filter !== "online") setFilter("online");
     await search.search(text);
-  }, [addLink, filter, query, search, searchKeyReady]);
+  }, [addLink, filter, query, search, searchKeyReady, searchPageOpen]);
 
   const playResult = useCallback((track: MusicTrack) => {
     // Save the result AS the provider described it — real title, channel and
@@ -528,6 +577,15 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
   // is on All or Online, whatever the search box currently says.
   const showResults = (filter === "all" || filter === "online") && searched;
   const noResults = showResults && results.length === 0 && searchKeyReady;
+  /** The last search's REAL reason, when it failed for a reason of its own. */
+  const keyProblem = onlineError?.error ? onlineError : null;
+  /**
+   * The learner's own quota was gone, and the MASTER's key took over — the
+   * search went on without a break, so this is one quiet line, not an alarm.
+   */
+  const fallbackNote = onlineError?.usedFallback
+    ? "Aapki key ka daily quota khatam ho gaya — ab master ki key se chal raha hai. Search chalta rahega, aur jaise hi aapki quota reset hogi, apni key wapas apne aap chal hogi."
+    : "";
   /** The format control rides with whatever is on screen: saved online songs,
    *  the search's own results, or a search in flight (the flash scan's rows). */
   const showCardsToggle = shelves.includes("link") || showResults || (searchLoading && !urlMode);
@@ -555,8 +613,12 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
    * The open PLAYER is the other half of the rule and is published above (an
    * open audio player or YouTube player always takes the footer away).
    */
+  /** The search page shows its RESULTS only on the results step. */
+  const searchPageOnResults = searchPageOpen && searchPageStage === "results" && searched;
+  /** …and the footer rule follows that step: the board takes the footer away,
+   *  the results give it back. */
   const musicSearchView =
-    searchLoading || showHistory || (searchPageOpen && !searched) ? "page" : searched ? "results" : "closed";
+    searchLoading || showHistory || (searchPageOpen && !searchPageOnResults) ? "page" : searched ? "results" : "closed";
   useEffect(() => {
     setSearchSurface("music", musicSearchView);
   }, [musicSearchView]);
@@ -587,6 +649,28 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
 
   /* ── The pieces ───────────────────────────────────────────────────────── */
 
+  /**
+   * The search page's back button, in TWO steps: the results go back to the
+   * board, and the board goes back to the library page.
+   */
+  const stepBackFromSearch = useCallback(() => {
+    if (searchPageStage === "results") {
+      setSearchPageStage("board");
+      return;
+    }
+    setSearchPageOpen(false);
+  }, [searchPageStage]);
+
+  /**
+   * Opening (or returning to) the search page always lands on the BOARD —
+   * the recent searches, the box ready to write. That is also what the
+   * learner gets by tapping the search box on the results.
+   */
+  const openSearchPage = useCallback(() => {
+    setSearchPageOpen(true);
+    setSearchPageStage("board");
+  }, []);
+
   const searchBar = ({
     compact,
     onOpenFullPage,
@@ -599,7 +683,10 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
     onSearchIntent?: () => void;
   }) => {
     const height = compact ? "h-10" : "h-11";
-    const canSearchOnline = filter === "all" || filter === "online";
+    // On the search page the search is YOUTUBE's own, so the shelf filter
+    // does not get a say: the box always carries its Enter (or the hand-off
+    // to YouTube itself) there.
+    const canSearchOnline = filter === "all" || filter === "online" || searchPageOpen;
     return (
       <form
         onSubmit={(event) => { event.preventDefault(); void submitSearch(); }}
@@ -795,6 +882,20 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
     />
   ) : null;
 
+  /**
+   * The search page's BOARD: the whole recent-searches list, whether or not
+   * the box still holds a query. It is where the back stack lands when the
+   * learner walks back from the results — so it always has to be there.
+   */
+  const searchPageHistory = search.history.length ? (
+    <SearchHistoryList
+      entries={search.history}
+      onPick={(entry) => { setQuery(entry); void search.search(entry); }}
+      onRemove={search.forget}
+      onClear={search.clearHistory}
+    />
+  ) : null;
+
   /** Every song list in the pane comes out of here — sections, empty page, options. */
   const body = (searchPage = false) => {
     if (searchLoading && !urlMode) {
@@ -805,12 +906,15 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
 
     if (searchPage) {
       // ── The nested search page (module library's own shape) ──────────────
-      // Recent searches until something runs; then ONLY the results, which
-      // stay here until the back arrow closes the page.
+      // TWO steps, and the back arrow walks them:
+      //   · the BOARD — the recent searches, the box ready to write;
+      //   · the RESULTS — what the search answered.
+      // Coming back from the results lands on the board; the board's back
+      // arrow closes the page and returns to the library.
+      const onResults = searchPageStage === "results";
       return (
         <div data-music-search-page-body>
-          {historyPanel}
-          {searched ? (
+          {onResults ? (
             <>
               {noResults ? (
                 <p className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800" data-music-no-results>
@@ -840,11 +944,16 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
                 </div>
               ) : null}
             </>
-          ) : !showHistory ? (
-            <p className="px-3 py-6 text-center text-[11.5px] font-medium leading-5 text-slate-500" data-music-search-page-hint>
-              YouTube ke lectures aur songs — type karo aur Enter dabao.
-            </p>
-          ) : null}
+          ) : (
+            <>
+              {searchPageHistory}
+              {searchPageHistory ? null : (
+                <p className="px-3 py-6 text-center text-[11.5px] font-medium leading-5 text-slate-500" data-music-search-page-hint>
+                  YouTube ke lectures aur songs — type karo aur Enter dabao.
+                </p>
+              )}
+            </>
+          )}
         </div>
       );
     }
@@ -981,8 +1090,17 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
     onOpenFullPage?: () => void;
     onClose?: () => void;
   }) => {
-    /** The nested search page lives on the library PAGE surface only. */
-    const searchPageActive = mode === "page" && searchPageOpen && !urlMode;
+    /**
+     * The nested search page lives on EVERY surface the music library shows:
+     * the page itself, the panel over the player (the one whose header says
+     * "Music library"), and the half under a playing video.
+     *
+     * The owner asked for it "in any case": a tap in the music library's
+     * search box opens the YouTube search page — the recent-searches board
+     * and then the results — exactly the way the module library's own search
+     * box opens its search page.
+     */
+    const searchPageActive = searchPageOpen && !urlMode;
     /** The search strip. On the PAGE it rides above the scroller; under a
      *  playing VIDEO it is rendered INSIDE the scroller instead, so the box
      *  and the filter tray scroll away with the list (owner, 2026-10-16). */
@@ -994,15 +1112,16 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
             <div className="flex w-full min-w-0 items-center gap-2" data-music-search-page-bar>
               <button
                 type="button"
-                onClick={() => setSearchPageOpen(false)}
+                onClick={stepBackFromSearch}
                 data-music-search-back
-                aria-label="Back to the music library"
-                title="Back to the music library"
+                data-music-search-back-step={searchPageStage === "results" ? "results" : "board"}
+                aria-label={searchPageStage === "results" ? "Back to the search page" : "Back to the music library"}
+                title={searchPageStage === "results" ? "Back to the search page" : "Back to the music library"}
                 className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-100"
               >
                 <ArrowLeft size={18} aria-hidden="true" />
               </button>
-              <div className="min-w-0 flex-1">{searchBar({ compact: false })}</div>
+              <div className="min-w-0 flex-1">{searchBar({ compact: false, onSearchIntent: openSearchPage })}</div>
               <button
                 type="button"
                 onClick={flipDensity}
@@ -1025,7 +1144,8 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
             searchBar({
               compact: mode === "video",
               onOpenFullPage,
-              ...(mode === "page" ? { onSearchIntent: () => setSearchPageOpen(true) } : {}),
+              // Every surface: a tap in the box opens the YouTube search page.
+              onSearchIntent: openSearchPage,
             })
           )}
         </div>
@@ -1070,6 +1190,35 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
         <p className="shrink-0 border-y border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800" data-music-notice>
           {notice}
         </p>
+      ) : null}
+
+      {/* The KEY failed us — say exactly why. A refused key, a dead quota and
+          a referrer the key does not allow all look identical from the
+          outside ("no results"), so this is the one place that names the
+          real cause. The key itself is configured in SETTINGS (never in the
+          Course Player), so the note points there. */}
+      {fallbackNote ? (
+        <p
+          className="shrink-0 border-y border-amber-200 bg-amber-50 px-3 py-2 text-[11.5px] font-semibold leading-5 text-amber-800"
+          data-music-search-fallback
+        >
+          {fallbackNote}
+        </p>
+      ) : null}
+
+      {keyProblem ? (
+        <div
+          className="shrink-0 border-y border-rose-200 bg-rose-50 px-3 py-2"
+          data-music-search-error
+          data-music-search-error-code={keyProblem.error ?? "unknown"}
+          role="alert"
+        >
+          <p className="text-[11.5px] font-semibold leading-5 text-rose-800">
+            {keyProblem.message}{" "}
+            <span className="font-black text-rose-900">Settings → YouTube search</span> me apni key
+            badal do.
+          </p>
+        </div>
       ) : null}
 
       <div className="relative min-h-0 flex-1">

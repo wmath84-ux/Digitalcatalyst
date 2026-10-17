@@ -61,17 +61,22 @@ test("2 — nodes are draggable only in edit mode", () => {
 });
 
 test("3+4 — read mode's tray is the note page's tray, and ONE tap hides it", () => {
-  // Mounted only in the read view, and only while it is visible.
-  assert.match(panel, /\{libraryOpen \|\| !readOnlyCanvas \|\| !readChromeVisible \? null : \(/);
+  // Mounted only in the read view, and only while it is visible. The EMPTY
+  // page wears it too (owner, 2026-10-17): it is the only way into the map
+  // library.
+  assert.match(panel, /\{!readOnlyCanvas \|\| !readChromeVisible \? null : \(/);
   assert.match(panel, /<nav className="mm-read-tray" aria-label="Mind map navigation" data-mindmap-read-tray>/);
   for (const hook of [
     "data-mindmap-read-library",
     "data-mindmap-read-new",
     "data-mindmap-read-edit",
-    "data-mindmap-read-home",
   ]) {
     assert.match(panel, new RegExp(hook), hook);
   }
+  // There is NO home button any more (owner, 2026-10-17): the start screen is
+  // gone, and the empty canvas IS the page.
+  assert.doesNotMatch(panel, /data-mindmap-read-home/);
+  assert.doesNotMatch(panel, /aria-label="Mind map home"/);
   assert.match(panel, /const \[readChromeVisible, setReadChromeVisible\] = useState\(true\)/);
   // ONE tap on the canvas toggles it — and a press that travelled (a pan) never
   // counts as a tap.
@@ -87,9 +92,12 @@ test("3+4 — read mode's tray is the note page's tray, and ONE tap hides it", (
   assert.match(styles, /\.mm-read-tray-sep \{/);
   // …and the note page's read tray carries a control for every one of them, so
   // the two trays stay one design.
-  for (const hook of ["data-note-read-library", "data-note-read-new", "data-note-read-edit", "data-note-read-home"]) {
+  for (const hook of ["data-note-read-library", "data-note-read-new", "data-note-read-edit"]) {
     assert.match(notes, new RegExp(hook), hook);
   }
+  // Neither tray has a home button any more (owner, 2026-10-17).
+  assert.doesNotMatch(notes, /data-note-read-home/);
+  assert.doesNotMatch(panel, /data-mindmap-read-home/);
   assert.match(notes, /data-note-read-tray/);
 });
 
@@ -114,7 +122,7 @@ test("5 — the editing toolbar is CENTRED, note-editor sized, and eye-led", () 
   // Same geometry as the note editor's pill (36px tiles, same padding).
   assert.match(statusBlock, /--mm-tool-size: 36px;/);
   assert.match(statusBlock, /padding: 0\.375rem 0\.5rem;/);
-  assert.match(noteCss, /\.dc-note \.dc-note-dock \.bn-ak-button \{[\s\S]{0,200}?width: 2\.25rem;/, "the note pill's buttons are the same 36px");
+  assert.match(noteCss, /\.dc-note \.dc-note-dock \.bn-ak-button \{[\s\S]{0,200}?width: 2\.5rem;/, "the note pill's buttons are 40px (it scrolls, so it can afford them)");
   assert.match(styles, /\.mm-tool \{[\s\S]{0,200}?width: var\(--mm-tool-size\);/);
   assert.match(styles, /\.mm-tool > svg \{[\s\S]{0,120}?width: 1rem;/);
   // The EYE leads it — one more .mm-tool of the row, in the same design as the
@@ -148,15 +156,21 @@ test("5 — the editing toolbar is CENTRED, note-editor sized, and eye-led", () 
   assert.match(panel, /bottom: window\.innerHeight - anchor\.top \+ 8/);
   // BOTH bottom bars ride the measured footer lift, published on the shell (the
   // note editor's arrangement) so either bar clears the player's footer.
-  assert.match(panel, /useCourseFooterInset\(!libraryOpen, canvasRef\)/);
+  // The canvas is always on screen now, so the footer inset always applies.
+  assert.match(panel, /useCourseFooterInset\(true, canvasRef\)/);
   assert.match(panel, /shell\.style\.setProperty\(COURSE_FOOTER_INSET_PROPERTY, `\$\{footerInset\}px`\)/);
 });
 
 test("6 — the ONE panel is the map library, with the notes library's rows", () => {
   assert.match(panel, /data-course-mindmap-library/);
   assert.match(panel, /data-mindmap-left-panel/);
-  assert.match(panel, /w-\[calc\(100%-2\.5rem\)\]/, "nearly a whole page, a thin strip still visible");
-  assert.match(libraryCss, /\[data-mindmap-left-panel\] \{[\s\S]{0,200}?border-top-right-radius: 18px;/);
+  // The side panel BECAME the full-page main area (owner, 2026-10-17).
+  assert.match(panel, /absolute inset-0 z-40 flex flex-col shadow-2xl/);
+  assert.match(panel, /data-mindmap-panel-back[\s\S]{0,600}?onClick=\{closePanel\}/, "the panel carries the one way back");
+  assert.match(panel, /masterLabel="Course library"/);
+  assert.match(panel, /selfLabel="My library"/);
+  assert.match(panel, /expand/);
+  assert.match(libraryCss, /\[data-mindmap-left-panel\] \{[\s\S]{0,200}?border-radius: 0;/);
   assert.match(panel, /data-mindmap-panel-scrim/);
   assert.match(panel, /data-mindmap-panel-head/);
   assert.match(panel, /data-mindmap-panel-foot/);
@@ -186,15 +200,17 @@ test("7 — headless: no header, no corner buttons, no second drawer, notes' hom
     /data-mindmap-right-panel|data-mindmap-rename-input|data-mindmap-rename-save|data-mindmap-panel-read|data-mindmap-panel-save|data-mindmap-panel-stats/,
   );
   assert.doesNotMatch(panel, /renameDraft|sidePanel/);
-  // The home page: the notes home's three centred buttons, in the same order.
-  assert.match(panel, /data-course-mindmap-home/);
-  assert.match(panel, /data-mindmap-home-actions/);
-  assert.match(panel, /data-mindmap-home-new[\s\S]{0,400}?New mind map/);
-  assert.match(panel, /data-mindmap-home-mine[\s\S]{0,400}?My Library/);
-  assert.match(panel, /data-mindmap-home-course[\s\S]{0,400}?Course Library/);
-  assert.match(notes, /data-notes-home-new[\s\S]{0,400}?New note/);
-  assert.match(notes, /data-notes-home-library[\s\S]{0,400}?My Library/);
-  assert.match(notes, /data-notes-home-course[\s\S]{0,400}?Course Library/);
+  // There is NO start screen on either page any more (owner, 2026-10-17):
+  // the notes page opens on the blank "New note", the mind map page on the
+  // empty canvas.
+  assert.doesNotMatch(panel, /data-course-mindmap-home/);
+  assert.doesNotMatch(panel, /data-mindmap-home-actions/);
+  assert.doesNotMatch(panel, /data-mindmap-home-new|data-mindmap-home-mine|data-mindmap-home-course/);
+  assert.doesNotMatch(notes, /data-course-notes-home/);
+  assert.doesNotMatch(notes, /data-notes-home-actions/);
+  // The empty page says what it is, and the library is one tap away.
+  assert.match(panel, /data-mindmap-empty-hint/);
+  assert.match(panel, /data-mindmap-read-library/);
 });
 
 test("8 — rename through the panel's rows, saved through the library's own path", () => {

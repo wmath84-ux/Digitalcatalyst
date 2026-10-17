@@ -42,7 +42,7 @@ test('the Resource Library searches through the shared kit, and names itself on 
   assert.match(library, /<SearchHistoryList/);
   // ONE search, two answers: the library's own rows and YouTube.
   assert.match(library, /matchResources\(/);
-  assert.match(library, /await searchYouTube\(text\)/);
+  assert.match(library, /await searchYouTube(Outcome)?\(text/);
   assert.match(library, /useStudySearch<LibrarySearchResults>\(\{\n    namespace: "course-library",/);
   // No hand-rolled search state of its own anywhere.
   assert.doesNotMatch(library, /searchQuery|setSearchQuery/);

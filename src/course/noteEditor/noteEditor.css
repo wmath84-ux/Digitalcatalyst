@@ -505,16 +505,27 @@
    altogether — lifts nothing, so the pill sits at its resting offset instead
    of floating over a gap. The lift rides in the pill's `bottom`, below.
 
-   The pill itself is the reference design's: bottom-LEFT, fully rounded,
-   hairline border, paper at 95% over a blur, soft shadow — 36px round
-   buttons in a row that scrolls sideways on a narrow phone, split into
-   groups by hairline separators. */
+   The pill itself: fully rounded, hairline border, soft shadow, and it is
+   CENTRED on the pane (the mind map's own bottom bar was centred for the
+   same reason — a bar jammed against the edge reads as a mistake).
+
+   THE SPACING (owner, 2026-10-17: "bold button, checklist button aur page
+   switching … aapas mein shrink ho gaye hain — unko proper spacing ke
+   sath theek karo"): the tools used to be packed together — a 2px gap
+   between 36px tiles with 16px glyphs inside them — so Bold, the checklist
+   and the block-type switcher looked squeezed into one another. Now every
+   tile is a 40px round button with an 18px glyph, the gap is a real 4px of
+   air (6px between the groups), the separators have room to breathe, and
+   NOTHING is ever squeezed to fit: the row stays a sliding tray that
+   scrolls sideways, so every tool keeps its full size. */
 
 .dc-note .dc-note-dock {
   position: absolute;
-  left: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
   bottom: calc(max(0.5rem, env(safe-area-inset-bottom)) + var(--dc-note-footer-inset, 0px));
   z-index: 30;
+  width: max-content;
   max-width: calc(100% - 1rem);
 }
 .dc-note .dc-note-dock .dc-note-dock-bar {
@@ -522,7 +533,7 @@
   align-items: center;
   max-width: 100%;
   padding: 0.375rem 0.5rem;
-  gap: 0.25rem;
+  gap: 0.375rem;
   overflow: visible;
   border: 1px solid var(--dc-note-rule);
   border-radius: 999px;
@@ -549,7 +560,7 @@
   display: flex;
   align-items: center;
   flex: 1 1 auto;
-  gap: 0.125rem;
+  gap: 0.25rem;
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
@@ -558,29 +569,85 @@
   scroll-padding-inline: 0.25rem;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
 }
 .dc-note .dc-note-dock-tools > * {
   flex: 0 0 auto;
   scroll-snap-align: start;
 }
 .dc-note .dc-note-dock-tools::-webkit-scrollbar { display: none; }
-.dc-note .dc-note-dock-sep { flex: 0 0 auto; width: 1px; height: 1.25rem; margin: 0 0.25rem; background: var(--dc-note-rule); }
-.dc-note .dc-note-dock .bn-ak-button { min-width: 2.25rem; width: 2.25rem; height: 2.25rem; padding: 0; border-radius: 999px; }
-.dc-note .dc-note-dock .bn-ak-button svg { width: 1rem; height: 1rem; }
+.dc-note .dc-note-dock-sep { flex: 0 0 auto; width: 1px; height: 1.4rem; margin: 0 0.3rem; background: var(--dc-note-rule); }
+.dc-note .dc-note-dock .bn-ak-button {
+  flex: 0 0 auto;
+  min-width: 2.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border-radius: 999px;
+}
+.dc-note .dc-note-dock .bn-ak-button svg { width: 1.125rem; height: 1.125rem; }
 /* The block-type select ALWAYS spells out the type the caret is in — "Paragraph",
    "Bulleted list", "Check List" — beside its icon. The icon alone (and the
    `font-size: 0` that used to hide the label on a narrow pane) left the control
    unreadable: the owner read this one as "a three-line button that does
    nothing". It leads a tray that scrolls, so the label costs no reach. */
 .dc-note .dc-note-dock [role="combobox"] {
-  min-width: 2.25rem;
-  height: 2.25rem;
-  padding: 0 0.55rem;
+  flex: 0 0 auto;
+  min-width: 2.5rem;
+  max-width: 10rem;
+  height: 2.5rem;
+  padding: 0 0.75rem;
   border-radius: 999px;
-  gap: 0.3rem;
+  gap: 0.35rem;
   font-size: 0.8125rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.dc-note .dc-note-dock [role="combobox"] svg { width: 1rem; height: 1rem; }
+.dc-note .dc-note-dock [role="combobox"] svg { width: 1.125rem; height: 1.125rem; flex: 0 0 auto; }
+
+/* ── The Course Player's notes page: a BLACK bottom toolbar ───────────────
+   (owner, 2026-10-17: "notes page edit mode me jo bottom toolbar hai usko
+   bhi black karo background"). The pill, its tiles, the separators and the
+   block-type switcher all wear the dark material, and every glyph on them is
+   light — so Bold, the checklist and the page/block switcher read as proper
+   buttons with air between them, instead of pale marks squeezed together on
+   a white page. The mind map's own bottom bar wears the same black, so the
+   two pages of the player now share one toolbar language. */
+[data-course-notes-panel] .dc-note .dc-note-dock .dc-note-dock-bar {
+  color: rgb(226 232 240);
+  border-color: rgb(255 255 255 / 0.16);
+  background: #0b1020;
+  box-shadow: 0 14px 34px rgb(2 6 23 / 0.45);
+}
+[data-course-notes-panel] .dc-note .dc-note-dock .bn-ak-button {
+  color: rgb(226 232 240);
+}
+[data-course-notes-panel] .dc-note .dc-note-dock .bn-ak-button:hover {
+  background: rgb(255 255 255 / 0.12);
+  color: #ffffff;
+}
+[data-course-notes-panel] .dc-note .dc-note-dock .bn-ak-button[data-selected="true"],
+[data-course-notes-panel] .dc-note .dc-note-dock .bn-ak-button[data-pressed="true"] {
+  background: rgb(255 255 255 / 0.18);
+  color: #ffffff;
+}
+[data-course-notes-panel] .dc-note .dc-note-dock .bn-ak-button[aria-disabled="true"],
+[data-course-notes-panel] .dc-note .dc-note-dock .bn-ak-button:disabled {
+  color: rgb(148 163 184);
+}
+[data-course-notes-panel] .dc-note .dc-note-dock-sep {
+  background: rgb(255 255 255 / 0.22);
+}
+[data-course-notes-panel] .dc-note .dc-note-dock [role="combobox"] {
+  color: rgb(226 232 240);
+  background: rgb(255 255 255 / 0.08);
+  border: 1px solid rgb(255 255 255 / 0.16);
+}
+[data-course-notes-panel] .dc-note .dc-note-dock [role="combobox"]:hover {
+  background: rgb(255 255 255 / 0.14);
+  color: #ffffff;
+}
 
 /* ── Native, source-editable math nodes ──────────────────────────────────── */
 .dc-note-math-inline-node,

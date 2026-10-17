@@ -70,7 +70,17 @@ import {
   useScrollAwayHidden, useStudySearch,
 } from "./searchExperience";
 import { setSearchScrolledAway, setSearchSurface } from "./coursePanelSession";
-import { searchYouTube, subscribeYouTubeKey, youTubeSearchAvailable, youTubeSearchUrl } from "./musicSearch";
+import {
+  searchYouTubeOutcome, subscribeYouTubeKey, youTubeSearchAvailable, youTubeSearchUrl,
+  type YouTubeKeyErrorCode,
+} from "./musicSearch";
+import {
+  GOOGLE_PAGE_SIZE, googleSearchAvailable, googleSearchUrl, searchGoogleOutcome, subscribeGoogleSearchConfig,
+  type GoogleSearchOutcome,
+  type GoogleSearchType,
+} from "./googleSearch";
+import GoogleGlyph from "./GoogleGlyph";
+import { GoogleImageResult, GoogleWebCard, GoogleWebResult } from "./GoogleResults";
 import type { MusicTrack } from "./musicLibrary";
 import { TrackArtwork } from "./MusicTrackList";
 
@@ -87,10 +97,18 @@ export interface CourseResourceLibraryProps {
   accessibleResourceIds: Set<string>;
   /** Admin-authored notes projected from the course tree. */
   masterNotes: MasterCourseNote[];
+  /** The signed-in learner — their own YouTube key is stored per account. */
+  uid?: string | null;
   /** Open a playable lesson file (video, doc, youtube, etc.) in the viewer. */
   onSelectFile: (file: CourseFile) => void;
   /** Open a master note in the read-only viewer. */
   onOpenMasterNote: (note: MasterCourseNote) => void;
+  /**
+   * Open a COURSE note that is a file in the tree (and therefore not in the
+   * master projection) in the NOTES area. Owner, 2026-10-17: a course note
+   * always opens where the notes live — never in the lesson pane.
+   */
+  onOpenCourseNote?: (file: CourseFile, modulePath: string[]) => void;
   /** Open a mind map resource: the player focuses the owning module's map library. */
   onOpenMindMapResource: (file: CourseFile, modulePath: string[]) => void;
   /**
@@ -548,6 +566,10 @@ export interface LibrarySearchResults {
   online: MusicTrack[];
   /** False when the learner's YouTube key is not set up (the honest hand-off). */
   onlineReady: boolean;
+  /** Why the YouTube half failed, when it failed for a reason of its own. */
+  onlineError?: YouTubeKeyErrorCode | null;
+  /** The sentence that explains it. */
+  onlineMessage?: string;
 }
 
 /** The two listings the format button flips between — Music's own two. */
@@ -563,8 +585,10 @@ export default function CourseResourceLibrary({
   previewModuleIds,
   accessibleResourceIds,
   masterNotes,
+  uid = null,
   onSelectFile,
   onOpenMasterNote,
+  onOpenCourseNote,
   onOpenMindMapResource,
   onOpenYouTube,
   personalEntry,
@@ -581,12 +605,54 @@ export default function CourseResourceLibrary({
    */
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
+
+  // The course notes in THIS library open in the notes area, where they are
+  // rendered by the note editor. That editor is a heavy lazy chunk, and
+  // loading it at the moment the learner taps a note is exactly the "the
+  // note takes a while to open" report — so the chunk is warmed HERE, while
+  // the learner is still browsing the library.
+  useEffect(() => {
+    void import("./NoteEditor").catch(() => undefined);
+  }, []);
   const [searchFormat, setSearchFormat] = useState<LibrarySearchFormat>("list");
   /** A late api key must not need a reload: the subscription re-renders this
    *  page, and every search then reads the key fresh. */
   const [, setYouTubeKeyTick] = useState(0);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => subscribeYouTubeKey(() => setYouTubeKeyTick((tick) => tick + 1)), []);
+  /**
+   * The GOOGLE page — the third answer the search box can give (the course,
+   * YouTube, and the open web). It is its own nested page, with its own
+   * history, and it lives HERE only: the Music library keeps its own
+   * YouTube-shaped search.
+   */
+  const [googleSearchOpen, setGoogleSearchOpen] = useState(false);
+  const [googleSearchText, setGoogleSearchText] = useState("");
+  const googleInputRef = useRef<HTMLInputElement | null>(null);
+  const [googleConfigTick, setGoogleConfigTick] = useState(0);
+  /**
+   * The Google page has TWO steps, exactly like the YouTube one:
+   *
+   *   "board"   → the ready-to-write page: the recent searches, the box empty
+   *               and waiting (Google's own search-page shape);
+   *   "results" → what the web answered.
+   *
+   * The back arrow walks them (results ⇒ board, board ⇒ the library's own
+   * search page), and tapping the box on the results walks back the same way.
+   */
+  const [googleStage, setGoogleStage] = useState<"board" | "results">("board");
+  /** Google's own two result kinds: web pages, or the Images tab. */
+  const [googleType, setGoogleType] = useState<GoogleSearchType>("web");
+  /** Which page of results we are on (Google shows ten a page). */
+  const [googlePage, setGooglePage] = useState(1);
+  /** The Images tab's own thumbnail size — Google's own small ↔ large switch. */
+  const [googleImageSize, setGoogleImageSize] = useState<"compact" | "large">("compact");
+  /** The run reads the page and the kind from here — a ref, so the search
+   *  callback never has to be rebuilt when the page turns. */
+  const googleOptionsRef = useRef<{ start: number; type: GoogleSearchType }>({ start: 1, type: "web" });
+  useEffect(() => subscribeGoogleSearchConfig(() => setGoogleConfigTick((tick) => tick + 1)), []);
+  /** Is the web search ready? The learner's own configuration first. */
+  const googleReady = useMemo(() => googleSearchAvailable(uid), [uid, googleConfigTick]);
   const built = useMemo(
     () => buildLibraryEntries(modules, {
       completedFileIds,
@@ -687,14 +753,21 @@ export default function CourseResourceLibrary({
     if (!resource || resource.locked) return;
 
     if (resource.kind === "note") {
+      // A COURSE NOTE always opens in the notes area (owner, 2026-10-17) —
+      // the same place the learner's own notes live. It used to fall through
+      // to `onSelectFile`, which opened it as a lesson file in the OTHER
+      // split area.
       if (resource.masterNote) onOpenMasterNote(resource.masterNote);
-      else if (resource.file) onSelectFile(resource.file);
+      else if (resource.file) {
+        if (onOpenCourseNote) onOpenCourseNote(resource.file, resource.modulePath);
+        else onSelectFile(resource.file);
+      }
     } else if (resource.kind === "mind-map" && resource.file) {
       onOpenMindMapResource(resource.file, resource.modulePath);
     } else if (resource.file) {
       onSelectFile(resource.file);
     }
-  }, [resourceById, personalEntry, onOpenMasterNote, onSelectFile, onOpenMindMapResource]);
+  }, [resourceById, personalEntry, onOpenMasterNote, onOpenCourseNote, onSelectFile, onOpenMindMapResource]);
 
   const activeValue = selectedFileId ? `file:${selectedFileId}` : null;
   const hasAnything = built.modulePaths.length > 0 || Boolean(personalEntry);
@@ -721,16 +794,90 @@ export default function CourseResourceLibrary({
       .filter((resource): resource is LibraryResource => Boolean(resource));
 
     let online: MusicTrack[] = [];
-    if (youTubeSearchAvailable()) {
-      try { online = await searchYouTube(text); } catch { online = []; }
+    let onlineError: YouTubeKeyErrorCode | null = null;
+    let onlineMessage = "";
+    if (youTubeSearchAvailable(uid)) {
+      const outcome = await searchYouTubeOutcome(text, undefined, uid);
+      online = outcome.rows;
+      onlineError = outcome.error;
+      onlineMessage = outcome.message;
     }
-    return { local, online, onlineReady: youTubeSearchAvailable() };
-  }, [built.entries, resourceById]);
+    return { local, online, onlineReady: youTubeSearchAvailable(uid), onlineError, onlineMessage };
+  }, [built.entries, resourceById, uid]);
 
   const search = useStudySearch<LibrarySearchResults>({
     namespace: "course-library",
     run: runLibrarySearch,
   });
+
+  /**
+   * The web search — Google's own Programmable Search API, through the very
+   * same kit (the one-second flash scan, the recent-searches board). It
+   * never throws: a refused configuration is an ANSWER, not a crash.
+   */
+  const runGoogleSearch = useCallback(
+    async (text: string): Promise<GoogleSearchOutcome> =>
+      searchGoogleOutcome(text, undefined, uid, {
+        start: googleOptionsRef.current.start,
+        type: googleOptionsRef.current.type,
+      }),
+    [uid],
+  );
+  const googleSearch = useStudySearch<GoogleSearchOutcome>({
+    namespace: "course-library-google",
+    run: runGoogleSearch,
+  });
+
+  /** The Google page opens with the caret in its box. */
+  const openGoogleSearch = useCallback(() => {
+    setGoogleSearchOpen(true);
+    setGoogleStage("board");
+    setGooglePage(1);
+    googleOptionsRef.current = { start: 1, type: googleOptionsRef.current.type };
+    window.setTimeout(() => googleInputRef.current?.focus(), 30);
+  }, []);
+
+  const closeGoogleSearch = useCallback(() => {
+    setGoogleSearchOpen(false);
+  }, []);
+
+  /**
+   * The Google page's back button, in TWO steps: the results go back to the
+   * board, and the board goes back to the library's own search page.
+   */
+  const stepBackFromGoogle = useCallback(() => {
+    if (googleStage === "results") {
+      setGoogleStage("board");
+      return;
+    }
+    closeGoogleSearch();
+  }, [googleStage, closeGoogleSearch]);
+
+  /** Run a query from the box — always from the FIRST page of results. */
+  const runGoogleQuery = useCallback((text: string) => {
+    setGooglePage(1);
+    googleOptionsRef.current = { start: 1, type: googleOptionsRef.current.type };
+    setGoogleStage("results");
+    void googleSearch.search(text);
+  }, [googleSearch]);
+
+  /** Turn to another page of results — Google's own ten-a-page index. */
+  const turnGooglePage = useCallback((page: number) => {
+    const next = Math.max(1, page);
+    setGooglePage(next);
+    googleOptionsRef.current = { ...googleOptionsRef.current, start: (next - 1) * GOOGLE_PAGE_SIZE + 1 };
+    setGoogleStage("results");
+    void googleSearch.search(googleSearch.query);
+  }, [googleSearch]);
+
+  /** Google's own two kinds of results: the web, or the pictures. */
+  const switchGoogleType = useCallback((type: GoogleSearchType) => {
+    setGoogleType(type);
+    setGooglePage(1);
+    googleOptionsRef.current = { ...googleOptionsRef.current, type, start: 1 };
+    setGoogleStage("results");
+    void googleSearch.search(googleSearch.query);
+  }, [googleSearch]);
 
   const openSearch = useCallback(() => {
     setSearchOpen(true);
@@ -765,6 +912,9 @@ export default function CourseResourceLibrary({
   const searchResults = search.phase === "results" ? search.results : null;
   const libraryHits = searchResults?.local ?? [];
   const onlineHits = searchResults?.online ?? [];
+  /** The Google page's own answer — the rows, and WHY it failed if it did. */
+  const googleOutcome = googleSearch.results ?? null;
+  const googleResults = googleOutcome?.rows ?? [];
 
   /**
    * The footer rule for this page (owner, 2026-10-16):
@@ -775,11 +925,16 @@ export default function CourseResourceLibrary({
    *   · a RESULTS page shows it, and the scroll half below steps it away only
    *     while the learner is scrolling down through the results.
    */
-  const searchSurfaceView = !searchOpen
-    ? "closed"
-    : search.phase === "results"
-      ? "results"
-      : "page";
+  // The Google page is a page of its own, and it follows the same footer
+  // rule: the ready-to-write step takes the footer away, the results give it
+  // back.
+  const searchSurfaceView = googleSearchOpen
+    ? (googleStage === "results" ? "results" : "page")
+    : !searchOpen
+      ? "closed"
+      : search.phase === "results"
+        ? "results"
+        : "page";
   useEffect(() => {
     setSearchSurface("library", searchSurfaceView);
   }, [searchSurfaceView]);
@@ -810,7 +965,118 @@ export default function CourseResourceLibrary({
           search box: fully rounded, with the long sentence sliding inside it.
           On the search page this same strip becomes the box itself, with the
           back arrow beside it and the format button on its other side. */}
-      {searchOpen ? (
+      {googleSearchOpen ? (
+        /* ── The GOOGLE page's own strip: back · the box · the format ───── */
+        <CoursePageHeader
+          className="library-header library-header--search"
+          dataAttrs={{
+            "data-library-header": "",
+            "data-library-search-header": "",
+            "data-library-google-header": "",
+          }}
+          leading={
+            <div className="library-searchbar" data-library-searchbar data-library-google-bar>
+              <button
+                type="button"
+                onClick={stepBackFromGoogle}
+                data-library-google-back
+                data-library-google-back-step={googleStage === "results" ? "results" : "board"}
+                aria-label={googleStage === "results" ? "Back to the Google search page" : "Back to the course library search"}
+                title={googleStage === "results" ? "Back to the Google search page" : "Back to the course library search"}
+                className="library-searchbar__back"
+              >
+                <ArrowLeft size={18} aria-hidden="true" />
+              </button>
+              <form
+                className="library-searchbar__box"
+                data-library-google-form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  // The box gives the caret up the moment the search runs, so
+                  // the results get the screen — and a later tap on the box
+                  // walks back to the search page.
+                  googleInputRef.current?.blur();
+                  runGoogleQuery(googleSearchText);
+                }}
+              >
+                <GoogleGlyph size={16} className="library-searchbar__glyph" aria-hidden="true" />
+                <input
+                  ref={googleInputRef}
+                  value={googleSearchText}
+                  onChange={(event) => setGoogleSearchText(event.target.value)}
+                  onFocus={() => {
+                    // Tapping the box ON the results is the learner asking to
+                    // search again — it walks back to the search page, exactly
+                    // like the back arrow's first step.
+                    if (googleStage === "results") setGoogleStage("board");
+                  }}
+                  data-library-google-input
+                  aria-label="Search Google"
+                  className="library-searchbar__input"
+                />
+                {googleSearchText ? (
+                  <button
+                    type="button"
+                    onClick={() => setGoogleSearchText("")}
+                    data-library-google-clear
+                    aria-label="Clear the search box"
+                    className="library-searchbar__clear"
+                  >
+                    <X size={14} aria-hidden="true" />
+                  </button>
+                ) : null}
+                <button
+                  type="submit"
+                  data-library-google-enter
+                  disabled={!googleSearchText.trim()}
+                  aria-label="Search Google"
+                  title="Search Google"
+                  className="library-searchbar__enter"
+                >
+                  <CornerDownLeft size={15} aria-hidden="true" />
+                </button>
+              </form>
+              <button
+                type="button"
+                onClick={() => {
+                  // On the web tab the button converts the listing; on the
+                  // Images tab it is Google's own thumbnail-size switch.
+                  if (googleType === "image") {
+                    setGoogleImageSize((current) => (current === "compact" ? "large" : "compact"));
+                    return;
+                  }
+                  flipSearchFormat();
+                }}
+                data-library-search-format-toggle
+                data-library-google-format
+                data-library-search-format-next={
+                  googleType === "image"
+                    ? (googleImageSize === "compact" ? "large" : "compact")
+                    : (searchFormat === "list" ? "grid" : "list")
+                }
+                aria-label={
+                  googleType === "image"
+                    ? (googleImageSize === "compact" ? "Show bigger pictures" : "Show smaller pictures")
+                    : (searchFormat === "list" ? "Show results as thumbnails" : "Show results as a list")
+                }
+                title={
+                  googleType === "image"
+                    ? (googleImageSize === "compact" ? "Large pictures" : "Small pictures")
+                    : (searchFormat === "list" ? "Thumbnail view" : "List view")
+                }
+                aria-pressed={googleType === "image" ? googleImageSize === "large" : searchFormat === "grid"}
+                className="library-searchbar__format"
+              >
+                {googleType === "image"
+                  ? (googleImageSize === "compact" ? <LayoutGrid size={16} aria-hidden="true" /> : <Rows3 size={16} aria-hidden="true" />)
+                  : (searchFormat === "list" ? <LayoutGrid size={16} aria-hidden="true" /> : <Rows3 size={16} aria-hidden="true" />)}
+              </button>
+            </div>
+          }
+        />
+      ) : null}
+
+      {searchOpen && !googleSearchOpen ? (
         <CoursePageHeader
           className="library-header library-header--search"
           dataAttrs={{ "data-library-header": "", "data-library-search-header": "" }}
@@ -858,6 +1124,19 @@ export default function CourseResourceLibrary({
                     <X size={14} aria-hidden="true" />
                   </button>
                 ) : null}
+                {/* The GOOGLE mark, INSIDE the box on its right: one tap opens
+                    the web search (the third answer this box gives — the
+                    course, YouTube, and the open web). */}
+                <button
+                  type="button"
+                  onClick={openGoogleSearch}
+                  data-library-google-toggle
+                  aria-label="Google par search karo"
+                  title="Google par search karo"
+                  className="library-searchbar__google"
+                >
+                  <GoogleGlyph size={15} />
+                </button>
                 {/* The Enter button lives INSIDE the box, on its right — and the
                     keyboard's own Enter runs the same search (the form above). */}
                 <button
@@ -908,7 +1187,143 @@ export default function CourseResourceLibrary({
       )}
 
       <div className="library-body" data-library-body ref={searchScrollerRef}>
-        {searchOpen ? (
+        {googleSearchOpen ? (
+          /* ── The GOOGLE page: the same shape as the search page ─────────
+             the recent-searches board first, then the results — and the
+             results look like GOOGLE's own: the tabs, the count and the time
+             it took, the blue titles, the bold words, the pictures, and the
+             pager for the next page. */
+          <div className="library-search-page" data-library-google-page-body>
+            {googleStage === "results" ? (
+              googleSearch.phase === "loading" ? (
+                <SearchFlashScan rows={5} label="Google par search ho raha hai" />
+              ) : (
+                <>
+                  {/* Google's own two kinds of results, and its own count. */}
+                  <div className="gpage__tabs" role="tablist" aria-label="Google results" data-library-google-tabs>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={googleType === "web"}
+                      onClick={() => switchGoogleType("web")}
+                      data-library-google-tab="web"
+                      className="gpage__tab"
+                    >
+                      All
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={googleType === "image"}
+                      onClick={() => switchGoogleType("image")}
+                      data-library-google-tab="image"
+                      className="gpage__tab"
+                    >
+                      Images
+                    </button>
+                    <span className="gpage__count" data-library-google-count>
+                      {googleOutcome?.totalResults
+                        ? `About ${googleOutcome.totalResults} results`
+                        : `${googleResults.length} results`}
+                      {googleOutcome?.totalTime ? ` (${googleOutcome.totalTime} seconds)` : ""}
+                    </span>
+                  </div>
+
+                  {googleOutcome?.usedFallback ? (
+                    <p className="library-search-hint" data-library-google-fallback>
+                      Aapki configuration ka daily quota khatam ho gaya — ab master ki configuration se chal raha hai. Search chalta rahega, aur jaise hi aapki quota reset hogi, apni configuration wapas apne aap chal hogi.
+                    </p>
+                  ) : null}
+
+                  {googleResults.length ? (
+                    googleType === "image" ? (
+                      <div
+                        className="gpage__grid"
+                        data-library-search-listing="grid"
+                        data-library-google-size={googleImageSize}
+                      >
+                        {googleResults.map((result) => (
+                          <GoogleImageResult key={result.url} result={result} />
+                        ))}
+                      </div>
+                    ) : searchFormat === "grid" ? (
+                      <div className="library-search-grid" data-library-search-listing="grid">
+                        {googleResults.map((result) => (
+                          <GoogleWebCard key={result.url} result={result} />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="library-search-list" data-library-search-listing="list">
+                        {googleResults.map((result) => (
+                          <GoogleWebResult key={result.url} result={result} />
+                        ))}
+                      </div>
+                    )
+                  ) : (
+                    <p className="library-search-empty" data-library-google-no-hits>
+                      {googleOutcome?.error
+                        ? `${googleOutcome.message} Settings → Google search me apni configuration badal do.`
+                        : `Google par kuch nahin mila “${googleSearch.query}” ke liye.`}{" "}
+                      <a
+                        href={googleSearchUrl(googleSearch.query)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-library-google-external
+                        className="library-search-empty__link"
+                      >
+                        Google par khud search karo <ExternalLink size={12} aria-hidden="true" />
+                      </a>
+                    </p>
+                  )}
+
+                  {/* Google's own pager — the API serves ten a page, and at
+                      most a hundred results for one query. */}
+                  {googleType === "web" && (googleOutcome?.hasNext || googleOutcome?.hasPrevious || googlePage > 1) ? (
+                    <div className="gpage__pager" data-library-google-pager>
+                      <button
+                        type="button"
+                        onClick={() => turnGooglePage(Math.max(1, googlePage - 1))}
+                        disabled={!googleOutcome?.hasPrevious}
+                        data-library-google-prev
+                        className="gpage__page"
+                      >
+                        ‹ Previous
+                      </button>
+                      <span className="gpage__note" data-library-google-page>
+                        Page {googleOutcome?.page ?? googlePage}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => turnGooglePage(googlePage + 1)}
+                        disabled={!googleOutcome?.hasNext}
+                        data-library-google-next
+                        className="gpage__page"
+                      >
+                        Next ›
+                      </button>
+                    </div>
+                  ) : null}
+                </>
+              )
+            ) : (
+              <>
+                <SearchHistoryList
+                  entries={googleSearch.history}
+                  onPick={(entry) => { setGoogleSearchText(entry); runGoogleQuery(entry); }}
+                  onRemove={googleSearch.forget}
+                  onClear={googleSearch.clearHistory}
+                />
+                {googleSearch.history.length ? null : (
+                  <p className="library-search-hint" data-library-google-hint>
+                    {googleReady
+                      ? "Poore web ko search karo — type karo aur Enter dabao."
+                      : "Google search ki configuration set nahin hai — Settings → Google search me apni API key aur Search Engine ID jodo, ya Google par khud search karo."}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        ) : searchOpen ? (
           /* ── The nested search page ───────────────────────────────────── */
           <div className="library-search-page" data-library-search-page-body>
             {search.phase === "loading" ? (
@@ -967,9 +1382,11 @@ export default function CourseResourceLibrary({
                        key the search happens ON YouTube — the link is the
                        search — and a key can be set up for inline results. */
                     <p className="library-search-empty" data-library-search-no-online-hits>
-                      {searchResults?.onlineReady
-                        ? `YouTube par kuch nahin mila “${search.query}” ke liye.`
-                        : "YouTube search ki key set nahin hai — neeche wale link se YouTube par search karo."}{" "}
+                      {searchResults?.onlineError
+                        ? `${searchResults.onlineMessage} Settings → YouTube search me apni key badal do.`
+                        : searchResults?.onlineReady
+                          ? `YouTube par kuch nahin mila “${search.query}” ke liye.`
+                          : "YouTube search ki key set nahin hai — neeche wale link se YouTube par search karo."}{" "}
                       <a
                         href={youTubeSearchUrl(search.query)}
                         target="_blank"

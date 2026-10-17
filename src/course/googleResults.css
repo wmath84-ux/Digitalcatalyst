@@ -1,0 +1,350 @@
+/* src/course/googleResults.css
+ *
+ * The GOOGLE results page — Google's own look: the blue title, the grey
+ * breadcrumb, the snippet with its bold words, the picture on the right, and
+ * the Images tab's grid.
+ */
+
+.gweb {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0 10px;
+  padding: 10px 8px 12px;
+  border-radius: 12px;
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.gweb:hover {
+  background: rgb(15 23 42 / 0.035);
+}
+
+/* The site's own little mark. */
+.gweb__mark {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgb(15 23 42 / 0.06);
+  color: rgb(15 23 42 / 0.55);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.gweb__body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gweb__crumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgb(15 23 42 / 0.55);
+}
+
+.gweb__site {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.gweb__path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gweb__aside {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.gweb__popular {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgb(15 23 42 / 0.06);
+  padding: 1px 7px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Google's link blue. */
+.gweb__title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #1a0dab;
+}
+
+.gweb__title:hover {
+  text-decoration: underline;
+}
+
+.gweb__badge {
+  border: 1px solid rgb(15 23 42 / 0.16);
+  border-radius: 4px;
+  padding: 0 4px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgb(15 23 42 / 0.6);
+}
+
+.gweb__snippet {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #4d5156;
+}
+
+.gweb__mark,
+.gweb__snippet strong {
+  font-weight: 700;
+  color: rgb(15 23 42 / 0.9);
+}
+
+.gweb__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgb(15 23 42 / 0.45);
+}
+
+.gweb__thumb {
+  width: 92px;
+  height: 72px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: rgb(15 23 42 / 0.05);
+}
+
+.gweb__external {
+  align-self: center;
+  color: rgb(15 23 42 / 0.28);
+}
+
+/* ── The web results, in the library's own card format ────────────────── */
+
+.gcard {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 12px;
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.gcard:hover {
+  background: rgb(15 23 42 / 0.035);
+}
+
+.gcard__plate {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 10px;
+  background: rgb(15 23 42 / 0.05);
+}
+
+.gcard__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gcard__mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: rgb(15 23 42 / 0.07);
+  color: rgb(15 23 42 / 0.5);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.gcard__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #1a0dab;
+}
+
+.gcard__site {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgb(15 23 42 / 0.5);
+}
+
+/* ── The Images tab ──────────────────────────────────────────────────── */
+
+.gimage {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 12px;
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.gimage:hover {
+  background: rgb(15 23 42 / 0.035);
+}
+
+.gimage__plate {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 10px;
+  background: rgb(15 23 42 / 0.05);
+  color: rgb(15 23 42 / 0.35);
+}
+
+.gimage__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gimage__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #1a0dab;
+}
+
+.gimage__site {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgb(15 23 42 / 0.5);
+}
+
+/* ── The page's own furniture ────────────────────────────────────────── */
+
+.gpage__tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid rgb(15 23 42 / 0.08);
+  padding-bottom: 6px;
+}
+
+.gpage__tab {
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: rgb(15 23 42 / 0.55);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.gpage__tab:hover {
+  background: rgb(15 23 42 / 0.05);
+  color: rgb(15 23 42 / 0.8);
+}
+
+.gpage__tab[aria-selected="true"] {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.gpage__count {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgb(15 23 42 / 0.45);
+}
+
+.gpage__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+/* Google's own thumbnail-size switch: the Images tab's small ↔ large. */
+.gpage__grid[data-library-google-size="large"] {
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+}
+
+.gpage__pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.gpage__page {
+  border: 1px solid rgb(15 23 42 / 0.12);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: rgb(15 23 42 / 0.7);
+  background: #ffffff;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.gpage__page:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: rgb(15 23 42 / 0.28);
+}
+
+.gpage__page:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.gpage__page--current {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
+}
+
+.gpage__note {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgb(15 23 42 / 0.45);
+}

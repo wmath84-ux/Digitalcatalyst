@@ -107,8 +107,12 @@ test('the build-time constant, the injected global and the local override all wo
   store.setItem(search.MUSIC_YOUTUBE_KEY_STORAGE, 'local-key');
   assert.equal(search.youTubeSearchKey(), 'local-key');
 
+  // The OWNER's key is the FALLBACK: a learner who brings their own key
+  // always wins, because that is what keeps the school out of the quota
+  // bill (the owner's key is the one that would be billed).
   globalThis.__DC_YOUTUBE_API_KEY__ = 'injected-key';
-  assert.equal(search.youTubeSearchKey(), 'injected-key', 'a served global beats the local override');
+  assert.equal(search.youTubeSearchKey(), 'local-key',
+    "the learner's own key beats the owner's served key");
 
   delete globalThis.__DC_YOUTUBE_API_KEY__;
   assert.equal(search.youTubeSearchKey(), 'local-key');
@@ -124,6 +128,229 @@ test('the build-time constant, the injected global and the local override all wo
   assert.equal(search.youTubeSearchKey(), '');
   assert.equal(search.youTubeSearchAvailable(), false);
   delete globalThis.__DC_YOUTUBE_API_KEY__;
+});
+
+test("the learner's own key wins over the owner's — and belongs to that account", () => {
+  resetWorld();
+  // The owner's shared key: the one that would burn the school's quota.
+  globalThis.__DC_YOUTUBE_API_KEY__ = 'owner-key';
+  assert.equal(search.youTubeSearchKey(), 'owner-key');
+
+  // The learner brings their own key — it wins, so the school pays nothing.
+  store.setItem(search.MUSIC_YOUTUBE_KEY_STORAGE, 'learner-key');
+  assert.equal(search.youTubeSearchKey(), 'learner-key',
+    "the learner's own key beats the owner's");
+  assert.equal(search.youTubeSearchAvailable(), true);
+
+  // A signed-in learner's ACCOUNT slot beats the device slot too — and no
+  // other account inherits it.
+  store.setItem(search.musicYouTubeUserKeyStorage('learner-1'), 'account-key');
+  assert.equal(search.youTubeSearchKey('learner-1'), 'account-key');
+  assert.equal(search.ownYouTubeKey('learner-1'), 'account-key');
+  assert.equal(search.youTubeSearchKey('learner-2'), 'learner-key',
+    'another account never inherits this one\'s key');
+});
+
+test('saving and removing a key is per account, and it announces itself', () => {
+  resetWorld();
+  let notifications = 0;
+  const off = search.subscribeYouTubeKey(() => { notifications += 1; });
+
+  assert.equal(search.saveYouTubeKey('my-key', 'learner-1'), true);
+  assert.equal(notifications, 1, 'the pane is told at once');
+  assert.equal(search.youTubeSearchKey('learner-1'), 'my-key');
+  assert.equal(store.getItem(search.musicYouTubeUserKeyStorage('learner-1')), 'my-key');
+
+  // No account signed in → the device-wide slot.
+  assert.equal(search.saveYouTubeKey('device-key'), true);
+  assert.equal(store.getItem(search.MUSIC_YOUTUBE_KEY_STORAGE), 'device-key');
+
+  // Removing the account key leaves the device fallback in place.
+  search.clearYouTubeKey('learner-1');
+  assert.equal(search.youTubeSearchKey('learner-1'), 'device-key');
+  search.clearYouTubeKey();
+  assert.equal(search.youTubeSearchKey(), '');
+  off();
+});
+
+test('removing a key removes the one that is actually in effect', () => {
+  resetWorld();
+  store.setItem(search.MUSIC_YOUTUBE_KEY_STORAGE, 'device-key');
+  store.setItem(search.musicYouTubeUserKeyStorage('learner-1'), 'account-key');
+
+  assert.equal(search.ownYouTubeKeySlot('learner-1'), search.musicYouTubeUserKeyStorage('learner-1'),
+    "this account's own key");
+  assert.equal(search.ownYouTubeKeySlot('learner-2'), search.MUSIC_YOUTUBE_KEY_STORAGE,
+    'another account only has the device one');
+
+  // Removing the ACCOUNT key leaves the device fallback in place.
+  search.clearYouTubeKey('learner-1');
+  assert.equal(search.youTubeSearchKey('learner-1'), 'device-key');
+
+  // With only the device key, removing THAT is what disconnects.
+  search.clearYouTubeKey();
+  assert.equal(search.youTubeSearchKey(), '');
+});
+
+test("the learner CHOOSES: their own key, or the master's", () => {
+  resetWorld();
+  globalThis.__DC_YOUTUBE_API_KEY__ = 'owner-key';
+  store.setItem(search.MUSIC_YOUTUBE_KEY_STORAGE, 'learner-key');
+
+  // The default: their own key first — the school pays nothing.
+  assert.equal(search.youTubeKeySource(), 'mine');
+  assert.equal(search.youTubeSearchKey(), 'learner-key');
+  assert.equal(search.youTubeSearchPlan().origin, 'own');
+
+  // The choice in Settings: the master's key.
+  assert.equal(search.setYouTubeKeySource('master'), true);
+  assert.equal(search.youTubeKeySource(), 'master');
+  assert.equal(search.youTubeSearchKey(), 'owner-key');
+  assert.equal(search.youTubeSearchPlan().origin, 'master');
+  assert.equal(search.youTubeSearchPlan().handover, '', 'the handover only ever goes own → master');
+
+  // The choice belongs to that account: another learner still has their own.
+  resetWorld();
+  globalThis.__DC_YOUTUBE_API_KEY__ = 'owner-key';
+  store.setItem(search.MUSIC_YOUTUBE_KEY_STORAGE, 'learner-key');
+  assert.equal(search.setYouTubeKeySource('master', 'learner-1'), true);
+  assert.equal(search.youTubeKeySource('learner-1'), 'master');
+  assert.equal(search.youTubeKeySource('learner-2'), 'mine', 'another account is untouched');
+  assert.equal(search.youTubeSearchKey('learner-1'), 'owner-key');
+  assert.equal(search.youTubeSearchKey('learner-2'), 'learner-key');
+});
+
+test('the choice is never a trap: the other key keeps the search alive', () => {
+  resetWorld();
+  globalThis.__DC_YOUTUBE_API_KEY__ = 'owner-key';
+  store.setItem(search.MUSIC_YOUTUBE_KEY_STORAGE, 'learner-key');
+  search.setYouTubeKeySource('master');
+  assert.equal(search.youTubeSearchKey(), 'owner-key', 'the master is there, so it is used');
+
+  // …and when it is NOT there, the learner's own key keeps the search alive.
+  delete globalThis.__DC_YOUTUBE_API_KEY__;
+  assert.equal(search.youTubeSearchKey(), 'learner-key');
+
+  // The other way round too: "mine" with no own key falls back to the master.
+  resetWorld();
+  globalThis.__DC_YOUTUBE_API_KEY__ = 'owner-key';
+  assert.equal(search.youTubeSearchKey(), 'owner-key');
+  assert.equal(search.youTubeSearchPlan().origin, 'master');
+  assert.equal(search.youTubeSearchPlan().handover, '', 'and there is nobody to hand over to');
+});
+
+test("the quota handover: the master's key takes over and the search just works", async () => {
+  resetWorld();
+  globalThis.__DC_YOUTUBE_API_KEY__ = 'owner-key';
+  store.setItem(search.MUSIC_YOUTUBE_KEY_STORAGE, 'learner-key');
+  responder = () => {
+    // The stub records every call, so the last URL is the one in hand.
+    const key = new URL(calls[calls.length - 1]).searchParams.get('key');
+    if (key === 'learner-key') {
+      return {
+        ok: false,
+        status: 403,
+        json: () => Promise.resolve({ error: { code: 403, errors: [{ reason: 'quotaExceeded' }] } }),
+      };
+    }
+    return {
+      ok: true,
+      json: () => Promise.resolve({ items: [video('dQw4w9WgXcQ', 'Never Gonna Give You Up', 'Rick Astley')] }),
+    };
+  };
+
+  const outcome = await search.searchYouTubeOutcome('koi bhi gaana');
+  assert.equal(outcome.rows.length, 1, 'the results arrived anyway');
+  assert.equal(outcome.error, null, 'and the learner sees no error at all');
+  assert.equal(outcome.usedFallback, true, "the master's key took over");
+  assert.equal(calls.length, 2, 'the very same query was re-sent with the master key');
+  assert.equal(new URL(calls[0]).searchParams.get('key'), 'learner-key');
+  assert.equal(new URL(calls[1]).searchParams.get('key'), 'owner-key');
+});
+
+test('the handover happens for a dead quota only — and only when there is somebody to hand over to', async () => {
+  resetWorld();
+  store.setItem(search.MUSIC_YOUTUBE_KEY_STORAGE, 'learner-key');
+  responder = () => ({
+    ok: false,
+    status: 403,
+    json: () => Promise.resolve({ error: { code: 403, errors: [{ reason: 'quotaExceeded' }] } }),
+  });
+  let outcome = await search.searchYouTubeOutcome('x');
+  assert.equal(outcome.error, 'quota', 'with no master key the honest error stands');
+  assert.equal(outcome.usedFallback, undefined);
+  assert.equal(calls.length, 1, 'and the request was not repeated');
+
+  // A wrong key is not a dead quota — the master does not take over.
+  resetWorld();
+  globalThis.__DC_YOUTUBE_API_KEY__ = 'owner-key';
+  store.setItem(search.MUSIC_YOUTUBE_KEY_STORAGE, 'learner-key');
+  responder = () => ({
+    ok: false,
+    status: 403,
+    json: () => Promise.resolve({ error: { code: 403, errors: [{ reason: 'keyInvalid' }] } }),
+  });
+  outcome = await search.searchYouTubeOutcome('x');
+  assert.equal(outcome.error, 'invalid-key');
+  assert.equal(calls.length, 1, 'the request was not repeated');
+
+  // And the learner who CHOSE the master never hands over to their own key.
+  resetWorld();
+  store.setItem(search.MUSIC_YOUTUBE_KEY_STORAGE, 'learner-key');
+  search.setYouTubeKeySource('master');
+  responder = () => ({
+    ok: false,
+    status: 403,
+    json: () => Promise.resolve({ error: { code: 403, errors: [{ reason: 'quotaExceeded' }] } }),
+  });
+  outcome = await search.searchYouTubeOutcome('x');
+  assert.equal(outcome.error, 'quota');
+  assert.equal(calls.length, 1, 'the choice is respected — no silent handover');
+});
+
+test('a refused search says WHY it failed — and never throws', async () => {
+  resetWorld();
+  globalThis.__DC_YOUTUBE_API_KEY__ = 'test-key';
+  const googleError = (code, reason, message) => ({
+    ok: false,
+    status: code,
+    json: () => Promise.resolve({ error: { code, message, errors: [{ reason }] } }),
+  });
+
+  responder = () => googleError(403, 'keyInvalid', 'Invalid key');
+  let outcome = await search.searchYouTubeOutcome('x');
+  assert.deepEqual(outcome.rows, []);
+  assert.equal(outcome.error, 'invalid-key');
+  assert.ok(outcome.message.length > 0, 'every failure carries a sentence');
+
+  responder = () => googleError(403, 'accessNotConfigured', 'YouTube Data API has not been used in project 1');
+  assert.equal((await search.searchYouTubeOutcome('x')).error, 'api-disabled');
+
+  responder = () => googleError(403, 'quotaExceeded', 'Quota exceeded for quota metric');
+  assert.equal((await search.searchYouTubeOutcome('x')).error, 'quota');
+
+  responder = () => googleError(403, 'forbidden', 'The request cannot be satisfied because it was made from a disallowed referrer.');
+  assert.equal((await search.searchYouTubeOutcome('x')).error, 'referrer');
+
+  // The plain rows are unchanged: a failure is still an empty list.
+  assert.deepEqual(await search.searchYouTube('x'), []);
+});
+
+test('testing a key costs one unit and names the real problem', async () => {
+  resetWorld();
+  responder = () => ({ ok: true, json: () => Promise.resolve({ items: [] }) });
+  const good = await search.testYouTubeKey('test-key');
+  assert.equal(good.ok, true);
+  const url = new URL(calls[0]);
+  assert.equal(url.origin + url.pathname, 'https://www.googleapis.com/youtube/v3/videos',
+    'the cheapest call the Data API offers — one quota unit');
+  assert.equal(url.searchParams.get('key'), 'test-key');
+
+  responder = () => ({ ok: false, status: 403, json: () => Promise.resolve({ error: { errors: [{ reason: 'quotaExceeded' }] } }) });
+  const bad = await search.testYouTubeKey('test-key');
+  assert.equal(bad.ok, false);
+  assert.equal(bad.code, 'quota');
+  assert.ok(bad.message.length > 0);
 });
 
 test('storage that refuses reads never breaks the search', () => {

@@ -289,11 +289,11 @@ test("the panel ships a shared branched list of the module's maps", () => {
   // visit the learner's last view is restored from the panel session instead
   // (library stays library, canvas stays canvas), so tab switches never yank
   // them back to the picker — leaving the player is what resets it.
-  assert.match(panel, /useState\(\s*\(\) => storageOnly \|\| getCoursePanelSession\(\)\.mindMapView !== "canvas",?\s*\)/);
-  assert.match(panel, /setMindMapSessionView\(libraryOpen \? "library" : "canvas"\)/);
+  assert.match(panel, /useState\(\s*\(\) => !storageOnly && getCoursePanelSession\(\)\.mindMapView === "canvas",?\s*\)/);
+  assert.match(panel, /setMindMapSessionView\(mapOpen \? "canvas" : "empty"\)/);
   assert.match(panel, /if \(open && !prevOpenRef\.current\) \{/);
   assert.match(panel, /const resumeCanvas = !storageOnly && getCoursePanelSession\(\)\.mindMapView === "canvas";/);
-  assert.match(panel, /setLibraryOpen\(!resumeCanvas\);/);
+  assert.match(panel, /setMapOpen\(resumeCanvas\);/);
 });
 
 test("the map library's delete acts on a MAP, the toolbar trash on a BRANCH", () => {

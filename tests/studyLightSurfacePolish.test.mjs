@@ -13,9 +13,9 @@ test('AI sidebar owns an opaque white surface for docked and drawer modes', () =
 });
 test('note library owns its white plate, navigation ink and all empty/sync states', () => {
   assert.match(read('src/course/NotesPanel.tsx'), /import "\.\/study-light-surfaces.css"/);
-  // The plate now hangs off the headless home and the ONE library panel
-  // (the header, and with it data-course-notes-mode="list", is gone).
-  assert.match(css, /data-course-notes-home/);
+  // The plate hangs off the notes PAGE (the blank "New note" — there is no
+  // start screen any more) and the ONE library panel.
+  assert.match(css, /data-course-notes-panel/);
   assert.match(css, /\[data-note-library-panel\]/);
   assert.match(css, /\[data-note-left-panel\]/);
   assert.match(css, /background: #fff !important/);

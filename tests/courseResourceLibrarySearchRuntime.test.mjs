@@ -67,6 +67,7 @@ export function mountLibrary(host, modules, options = {}) {
         previewModuleIds: new Set(),
         accessibleResourceIds: new Set(),
         masterNotes: options.masterNotes || [],
+        uid: options.uid === undefined ? "learner-1" : options.uid,
         onSelectFile: (file) => { opened.push(["file", file.id]); },
         onOpenMasterNote: (note) => { opened.push(["note", note.id]); },
         onOpenMindMapResource: (file) => { opened.push(["mindmap", file.id]); },
@@ -295,6 +296,12 @@ test("a click on the box opens the nested search page: back arrow · box · self
     : node.getAttribute("data-library-search-form") !== null ? "box"
       : node.getAttribute("data-library-search-format-toggle") !== null ? "format" : "other");
   assert.deepEqual(cells, ["back", "box", "format"], "arrow left, box centre, format right");
+  // The GOOGLE mark lives INSIDE the box, on its right — the third answer
+  // this box gives (the course, YouTube, the open web).
+  assert.ok(Boolean(q("[data-library-searchbar] [data-library-google-toggle]")),
+    "the Google mark sits inside the search box");
+  assert.ok(Boolean(q("[data-library-searchbar] [data-library-search-form] [data-library-google-toggle]")),
+    "…inside the box itself, not beside it");
   assert.equal(window.document.activeElement, q("[data-library-search-input]"), "the box is ready to write");
 
   // The format control shows no options at all: one button, and its glyph is
@@ -540,4 +547,247 @@ test("the footer rule follows the search page: gone on the page, back with the r
   await click(q("[data-library-search-back]"));
   await settle();
   assert.deepEqual(fixture.footerSession(), { librarySearch: "closed", librarySearchScrolledAway: false });
+});
+
+test("the Google mark inside the search box opens the web search — its own page, history and results", async () => {
+  window.localStorage.clear();
+  window.localStorage.setItem("dc.google.searchKey", "test-key");
+  window.localStorage.setItem("dc.google.searchCx", "test-cx");
+  fetchResponder = () => ({
+    ok: true,
+    json: () => Promise.resolve({
+      items: [{
+        title: "A web page",
+        link: "https://example.test/one",
+        snippet: "A short snippet.",
+        displayLink: "example.test",
+        pagemap: { metatags: [{ "og:site_name": "Example Site" }] },
+      }],
+    }),
+  });
+  mount();
+  await settle();
+  await click(q("[data-library-search-open-button]"));
+  await settle();
+
+  // The Google mark lives INSIDE the box, on its right.
+  assert.ok(Boolean(q("[data-library-search-form] [data-library-google-toggle]")),
+    "the Google mark is inside the search box");
+
+  // One tap opens the web search — its own page, inside the library.
+  await click(q("[data-library-google-toggle]"));
+  await settle();
+  assert.ok(Boolean(q("[data-library-google-page-body]")), "the Google page is open");
+  assert.ok(Boolean(q("[data-library-google-input]")), "with its own box, ready to write in");
+
+  // A search RUN answers with the web.
+  typeInto(q("[data-library-google-input]"), "neural networks");
+  await click(q("[data-library-google-enter]"));
+  await settle(1200);
+  const hits = qa("[data-library-google-hit]");
+  assert.equal(hits.length, 1, "the web result is on screen");
+  assert.equal(hits[0].getAttribute("href"), "https://example.test/one");
+  assert.match(text("[data-library-google-hit]"), /A web page/);
+
+  // The history is saved — in the Google page's OWN list, not the course one.
+  const stored = JSON.parse(window.localStorage.getItem("dc.searchHistory.v1.course-library-google"));
+  assert.deepEqual(stored, ["neural networks"]);
+  assert.equal(window.localStorage.getItem("dc.searchHistory.v1.course-library"), null,
+    "the course library keeps its own history");
+
+  // The back arrow walks TWO steps, exactly like the YouTube page: the
+  // results step back to the board (the recent searches), and the board
+  // steps back to the library's own search page.
+  assert.equal(q("[data-library-google-back]").getAttribute("data-library-google-back-step"), "results",
+    "the back arrow knows it is on the results");
+  await click(q("[data-library-google-back]"));
+  await settle();
+  assert.ok(Boolean(q("[data-library-google-page-body]")), "the Google page is still open");
+  assert.equal(qa("[data-library-google-hit]").length, 0, "the results stepped aside");
+  assert.ok(Boolean(q("[data-dc-search-history]")), "the recent-searches board is back");
+  assert.equal(q("[data-library-google-back]").getAttribute("data-library-google-back-step"), "board",
+    "the back arrow now knows it is on the board");
+
+  // Tapping the BOX on the results walks back the very same way.
+  await click(q("[data-library-google-enter]"));
+  await settle(1200);
+  assert.equal(qa("[data-library-google-hit]").length, 1, "the results are back");
+  await act(async () => { q("[data-library-google-input]").focus(); });
+  await settle();
+  assert.equal(qa("[data-library-google-hit]").length, 0,
+    "the box on the results takes the learner back to the search page");
+  assert.ok(Boolean(q("[data-library-google-page-body]")), "…but the Google page is still open");
+
+  // The SECOND back closes the Google page and returns to the library.
+  await click(q("[data-library-google-back]"));
+  await settle();
+  assert.equal(Boolean(q("[data-library-google-page-body]")), false, "the Google page is closed");
+  assert.equal(Boolean(q("[data-library-search-page-body]")), true, "the library's search page is back");
+});
+
+test("the Google quota handover: the master's configuration takes over and the search goes on", async () => {
+  window.localStorage.clear();
+  window.localStorage.setItem("dc.google.searchKey", "learner-key");
+  window.localStorage.setItem("dc.google.searchCx", "learner-cx");
+  globalThis.__DC_GOOGLE_SEARCH_API_KEY__ = "owner-key";
+  globalThis.__DC_GOOGLE_SEARCH_CX__ = "owner-cx";
+  fetchResponder = (url) => {
+    const key = new URL(String(url)).searchParams.get("key");
+    if (key === "learner-key") {
+      return {
+        ok: false,
+        status: 403,
+        json: () => Promise.resolve({ error: { code: 403, errors: [{ reason: "dailyLimitExceeded" }] } }),
+      };
+    }
+    return {
+      ok: true,
+      json: () => Promise.resolve({
+        items: [{ title: "A web page", link: "https://example.test/one", snippet: "A snippet." }],
+      }),
+    };
+  };
+  mount();
+  await settle();
+  await click(q("[data-library-search-open-button]"));
+  await settle();
+  await click(q("[data-library-google-toggle]"));
+  await settle();
+  typeInto(q("[data-library-google-input]"), "neural networks");
+  await click(q("[data-library-google-enter]"));
+  await settle(1200);
+
+  // The results arrived — no error, no interruption.
+  assert.equal(qa("[data-library-google-hit]").length, 1, "the web result is on screen");
+  assert.equal(Boolean(q("[data-library-google-no-hits]")), false, "and there is no dead end");
+  // One quiet line says what happened.
+  const note = q("[data-library-google-fallback]");
+  assert.ok(Boolean(note), "the handover is mentioned, once, quietly");
+  assert.match(note.textContent, /master/i);
+  delete globalThis.__DC_GOOGLE_SEARCH_API_KEY__;
+  delete globalThis.__DC_GOOGLE_SEARCH_CX__;
+});
+
+test("the Google page offers Google's own Images tab, and a pager for the next page", async () => {
+  window.localStorage.clear();
+  window.localStorage.setItem("dc.google.searchKey", "test-key");
+  window.localStorage.setItem("dc.google.searchCx", "test-cx");
+  const calls = [];
+  fetchResponder = (url) => {
+    calls.push(String(url));
+    const isImage = String(url).includes("searchType=image");
+    return {
+      ok: true,
+      json: () => Promise.resolve({
+        searchInformation: { formattedTotalResults: "1,230,000", formattedSearchTime: "0.42" },
+        queries: { nextPage: [{ startIndex: 11 }] },
+        items: [{
+          title: "A picture",
+          link: "https://example.test/one",
+          displayLink: "example.test",
+          snippet: "A short snippet.",
+          ...(isImage ? { image: { thumbnailLink: "https://example.test/thumb.png" } } : {}),
+          pagemap: {
+            cse_image: [{ src: "https://example.test/pic.png" }],
+            metatags: [{ "og:site_name": "Example Site" }],
+          },
+        }],
+      }),
+    };
+  };
+  mount();
+  await settle();
+  await click(q("[data-library-search-open-button]"));
+  await settle();
+  await click(q("[data-library-google-toggle]"));
+  await settle();
+  typeInto(q("[data-library-google-input]"), "neural networks");
+  await click(q("[data-library-google-enter]"));
+  await settle(1200);
+
+  // The pager — Google's own next page.
+  assert.ok(Boolean(q("[data-library-google-pager]")), "the pager is there");
+  assert.equal(q("[data-library-google-next]").hasAttribute("disabled"), false, "and the next page is reachable");
+  assert.match(text("[data-library-google-page]"), /Page 1/);
+  await click(q("[data-library-google-next]"));
+  await settle(1200);
+  assert.match(text("[data-library-google-page]"), /Page 2/);
+  assert.ok(calls.some((url) => url.includes("start=11")), "and the request asked Google for the next page");
+
+  // The Images tab — Google's own second kind of result.
+  await click(q('[data-library-google-tab="image"]'));
+  await settle(1200);
+  assert.ok(calls.some((url) => url.includes("searchType=image")), "the Images tab asks Google for pictures");
+  assert.equal(qa('[data-library-google-hit-kind="image"]').length, 1, "the picture is on screen");
+  assert.equal(q('[data-library-google-hit-kind="image"] img').getAttribute("src"), "https://example.test/thumb.png");
+});
+
+test("the Google page shows what Google's own API gave — the picture, the site, the bold words, the count", async () => {
+  window.localStorage.clear();
+  window.localStorage.setItem("dc.google.searchKey", "test-key");
+  window.localStorage.setItem("dc.google.searchCx", "test-cx");
+  fetchResponder = () => ({
+    ok: true,
+    json: () => Promise.resolve({
+      searchInformation: {
+        totalResults: "1230000",
+        formattedTotalResults: "1,230,000",
+        searchTime: 0.42,
+        formattedSearchTime: "0.42",
+      },
+      items: [{
+        title: "Attention is all you need",
+        link: "https://arxiv.example.test/pdf/1706.03762",
+        displayLink: "arxiv.example.test",
+        snippet: "A <b>neural</b> network reads the paper.",
+        htmlSnippet: "A <b>neural</b> network reads the paper.",
+        mime: "application/pdf",
+        fileFormat: "PDF",
+        pagemap: {
+          cse_image: [{ src: "https://arxiv.example.test/cover.png", width: 400, height: 300 }],
+          metatags: [{
+            "og:site_name": "arXiv",
+            "og:image": "https://arxiv.example.test/og.png",
+            "article:published_time": "2017-06-12T00:00:00Z",
+          }],
+        },
+      }],
+    }),
+  });
+  mount();
+  await settle();
+  await click(q("[data-library-search-open-button]"));
+  await settle();
+  await click(q("[data-library-google-toggle]"));
+  await settle();
+  typeInto(q("[data-library-google-input]"), "attention is all you need");
+  await click(q("[data-library-google-enter]"));
+  await settle(1200);
+
+  // Google's own count and time.
+  assert.match(text("[data-library-google-count]"), /About 1,230,000 results/);
+  assert.match(text("[data-library-google-count]"), /0\.42 seconds/);
+
+  // The row: the site's name, the title, the snippet WITH ITS BOLD WORDS, the
+  // file's own badge, the date, and the page's picture.
+  const hit = q("[data-library-google-hit]");
+  assert.ok(Boolean(hit));
+  assert.equal(hit.getAttribute("href"), "https://arxiv.example.test/pdf/1706.03762");
+  assert.equal(text("[data-library-google-site]"), "arXiv");
+  assert.match(text("[data-library-google-title]"), /Attention is all you need/);
+  assert.equal(text("[data-library-google-fileformat]"), "PDF");
+  assert.match(text("[data-library-google-meta]"), /2017/);
+  const image = q("[data-library-google-image]");
+  assert.ok(Boolean(image), "the page's picture is on the row");
+  assert.equal(image.getAttribute("src"), "https://arxiv.example.test/cover.png");
+  assert.equal(image.getAttribute("loading"), "lazy");
+  // The matched word is really bold — not a <b> tag in the markup.
+  const bold = hit.querySelector("strong");
+  assert.ok(Boolean(bold), "the matched words are bold");
+  assert.equal(bold.textContent, "neural");
+  assert.equal(hit.querySelector("b"), null, "and no raw markup reaches the page");
+
+  // The two tabs Google itself offers.
+  assert.ok(Boolean(q('[data-library-google-tab="web"]')));
+  assert.ok(Boolean(q('[data-library-google-tab="image"]')));
 });

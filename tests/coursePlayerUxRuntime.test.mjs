@@ -76,22 +76,22 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     "data-course-overlay-buy-update",
     "data-course-overlay-paid",
     "data-course-landscape-content",
-    // Notes — owner brief 2026-10-15: a headless home, ONE side-panel library,
-    // read-first notes and an automatic save. The header, the right-hand
-    // options panel and every Save / Cancel button are gone, and with them
-    // their hooks; the surfaces that replaced them carry these.
+    // Notes — owner brief 2026-10-15 + 2026-10-17: a headless page that OPENS
+    // on the blank "New note" (the start screen is gone), ONE full-page
+    // library, read-first notes and an automatic save. The header, the
+    // right-hand options panel and every Save / Cancel button are gone, and
+    // with them their hooks; the surfaces that replaced them carry these.
     "data-course-notes-panel",
     "data-course-notes-add",
     "data-course-notes-composer",
     "data-course-notes-input",
     "data-course-note-edit-input",
-    "data-course-notes-home",
-    "data-notes-home-actions",
-    "data-notes-home-new",
-    "data-notes-home-library",
-    "data-notes-home-course",
+    "data-note-blank-page",
+    "data-note-blank-title",
+    "data-note-blank-body",
     "data-note-library-panel",
     "data-note-library-head",
+    "data-note-library-back",
     "data-note-library-foot",
     "data-note-panel-new",
     "data-note-panel-scrim",
@@ -101,7 +101,6 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     "data-note-read-next",
     "data-note-read-new",
     "data-note-read-edit",
-    "data-note-read-home",
     "data-note-edit-read-float",
     "data-course-notes-list",
     "data-course-note-open",

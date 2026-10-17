@@ -16,9 +16,10 @@
 
 /* ── The library panel ───────────────────────────────────────────────────── */
 
+/* The library IS the main area now (a full page, not a side sheet), so it
+   carries no sheet radii — the page's own edge is its edge. */
 [data-note-left-panel] {
-  border-top-right-radius: 18px;
-  border-bottom-right-radius: 18px;
+  border-radius: 0;
 }
 
 /* One clean line per note: the panel is nearly a page wide, so only a
@@ -56,13 +57,15 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ── The home page ──────────────────────────────────────────────────────── */
+/* ── The page itself ────────────────────────────────────────────────────── */
+/* The notes page is one page now (the blank "New note" and the notes that
+   live on it) — there is no start screen to dress. */
 
-[data-course-notes-home] {
+[data-course-notes-panel] {
   color-scheme: light;
 }
 
-[data-notes-theme="dark"] [data-course-notes-home] {
+[data-notes-theme="dark"] [data-course-notes-panel] {
   color-scheme: dark;
 }
 
@@ -85,4 +88,76 @@
   [data-note-left-panel] .notes-library-menu .branched-menu__label {
     transition: none;
   }
+}
+
+/* ── The blank "New note" page (owner, 2026-10-17) ────────────────────────
+ * The notes page opens on a blank note, and that page is a VIEWER page: the
+ * heading and the hint are REAL TEXT here, because the editor's own
+ * placeholders are only drawn while the editor is editable (in EDIT mode the
+ * very same two words become the editor's placeholders).
+ *
+ * The styles live HERE, not in noteEditor.css, because the blank page must
+ * not wait for the (lazy) editor chunk to arrive — it is the first thing the
+ * learner sees. It carries its own paper/ink so the page looks like a note
+ * even before the editor's stylesheet is loaded.
+ */
+.dc-note-blank {
+  --dc-note-blank-paper: #ffffff;
+  --dc-note-blank-ink: #111827;
+  --dc-note-blank-faint: #9ca3af;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--dc-note-blank-paper);
+  color: var(--dc-note-blank-ink);
+}
+
+[data-notes-theme="dark"] .dc-note-blank,
+.dc-note-blank[data-notes-theme="dark"] {
+  --dc-note-blank-paper: #0b1120;
+  --dc-note-blank-ink: #e5e7eb;
+  --dc-note-blank-faint: #94a3b8;
+}
+
+.dc-note-blank-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dc-note-blank-sheet {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: calc(44rem + max(1.25rem, env(safe-area-inset-left)) + max(1.125rem, env(safe-area-inset-right)));
+  margin: 0 auto;
+  padding: 0.75rem max(1.125rem, env(safe-area-inset-right)) 6rem max(1.25rem, env(safe-area-inset-left));
+}
+
+@media (min-width: 768px) {
+  .dc-note-blank-sheet { padding-top: 1.75rem; padding-bottom: 8rem; }
+}
+
+.dc-note-blank-title {
+  margin: 0 0 0.75rem;
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Noto Serif", "Source Serif Pro", Georgia, "Times New Roman", serif;
+  font-size: 1.875rem;
+  font-weight: 800;
+  line-height: 1.18;
+  letter-spacing: -0.012em;
+  color: var(--dc-note-blank-faint);
+}
+
+.dc-note-blank-body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Helvetica, Arial, sans-serif;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--dc-note-blank-faint);
+}
+
+@media (min-width: 768px) {
+  .dc-note-blank-title { font-size: 2.375rem; }
 }

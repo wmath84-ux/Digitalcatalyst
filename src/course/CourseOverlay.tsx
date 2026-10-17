@@ -51,7 +51,7 @@ import { BookOpen, Brain, File, FileText, FlaskConical, LockKeyhole, Music, Netw
 import { collectAccessibleReadResources } from "../../utils/readResources.js";
 import ReadLibraryPanel from "./ReadLibraryPanel";
 import type { ReadUpload } from "../../utils/readUploads.js";
-import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "../types/course";
+import type { CourseFile, CourseModule, CoursePlayerNote, MasterCourseNote, PaidCourseUpdate } from "../types/course";
 import { collectMasterCourseNotes } from "./masterNotes";
 import type { PersonalCourseModule } from "../types/personalCourse";
 import NotesPanel from "./NotesPanel";
@@ -386,7 +386,7 @@ interface CourseOverlayProps {
    * specified master note in its read-only viewer. The signal carries both
    * the target note id and a count (so re-tapping the same note re-opens).
    */
-  openMasterNoteSignal?: { id: string; count: number } | null;
+  openMasterNoteSignal?: { id: string; count: number; note?: MasterCourseNote } | null;
   /** The signed-in learner — lets Notes remember its MASTER/SELF choice. */
   uid?: string | null;
   /**

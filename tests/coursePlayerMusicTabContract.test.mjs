@@ -94,7 +94,7 @@ test('the ONE search box changes behaviour with the filter (URL becomes a URL in
   assert.match(panel, /onSubmit=\{\(event\) => \{ event\.preventDefault\(\); void submitSearch\(\); \}\}/);
   assert.match(panel, /if \(isUrlFilter\(filter\)\) \{ await addLink\(query\); return; \}/);
   // Course + Device: the same box only FILTERS that shelf — no online search.
-  assert.match(panel, /const canSearchOnline = filter === "all" \|\| filter === "online";/);
+  assert.match(panel, /const canSearchOnline = filter === "all" \|\| filter === "online" \|\| searchPageOpen;/);
   assert.match(panel, /musicQueryFilter\(shelfTracks\(source\), effectiveQuery\)/);
   assert.match(panel, /const effectiveQuery = urlMode \? "" : query;/);
   // One placeholder per filter, so a learner always knows what the box does.
@@ -223,7 +223,10 @@ test('a video opens COMPACT: official player, draggable divider, library below',
   assert.match(panel, /searchBar\(\{\n\s+compact: mode === "video",\n\s+onOpenFullPage,/);
   // Only the library PAGE's bar opens the nested search page on focus — the
   // video pane's compact bar keeps its old behaviour.
-  assert.match(panel, /\.\.\.\(mode === "page" \? \{ onSearchIntent: \(\) => setSearchPageOpen\(true\) \} : \{\}\)/);
+  // EVERY surface's box opens the YouTube search page — the page, the panel
+  // over the player, and the half under a playing video.
+  assert.match(panel, /onSearchIntent: openSearchPage,/);
+  assert.match(panel, /const searchPageActive = searchPageOpen && !urlMode;/);
   assert.match(panel, /data-music-open-library/);
   assert.match(panel, /const openFullLibrary = useCallback\(\(\) => \{\n    backToLibrary\(\);\n    chooseFilter\("all"\);/);
   // The platform's own official surface, never a rebuilt player.
@@ -260,7 +263,7 @@ test('search is key-gated, and without a key it hands the query to YouTube itsel
   assert.match(search, /https:\/\/www\.youtube\.com\/results\?search_query=/);
   // The key is read as STATE, so a key injected into a live browser is noticed
   // without a reload (the pane re-subscribes to the key event).
-  assert.match(panel, /const \[searchKeyReady, setSearchKeyReady\] = useState\(youTubeSearchAvailable\);/);
+  assert.match(panel, /const \[searchKeyReady, setSearchKeyReady\] = useState\(\(\) => youTubeSearchAvailable\(uid\)\);/);
   assert.match(panel, /data-music-search-mode=\{searchKeyReady \? "api" : "external"\}/);
   assert.match(panel, /data-music-search-run/);
   assert.match(panel, /<a\s*\n?\s*href=\{youTubeSearchUrl\(query\)\} target="_blank" rel="noopener noreferrer"\s*\n?\s*data-music-search-external/);
@@ -340,7 +343,9 @@ test('the optional YouTube key is INJECTED from the environment — never hard-c
   assert.ok(search.includes('!/^%.*%$/.test(key)'), 'the placeholder is never a key');
   assert.match(search, /export const MUSIC_YOUTUBE_KEY_STORAGE = "dc\.music\.youtubeKey";/);
   assert.match(search, /export function subscribeYouTubeKey\(listener: \(\) => void\): \(\) => void \{/);
-  assert.match(panel, /useEffect\(\(\) => subscribeYouTubeKey\(\(\) => setSearchKeyReady\(youTubeSearchAvailable\(\)\)\), \[\]\);/);
+  // The key is read WITH the account, and the pane listens for it changing.
+  assert.match(panel, /subscribeYouTubeKey\(\(\) => \{/);
+  assert.match(panel, /setSearchKeyReady\(youTubeSearchAvailable\(uid\)\)/);
   // A key never appears in the source, and is never logged.
   for (const source of [search, panel, library]) {
     assert.doesNotMatch(codeOnly(source), /AIza[0-9A-Za-z_-]{10,}/);

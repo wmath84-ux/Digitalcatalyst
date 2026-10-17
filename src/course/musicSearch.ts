@@ -17,30 +17,60 @@
 //                    (a new tab / the platform browser), and the learner pastes
 //                    the link back — which the library already plays.
 //
-// The key is a PUBLIC key (it ships in the client), so it is read from three
-// places, in this order — deliberately NOT through `import.meta.env`, so this
-// module still loads in every harness (node --test) as plain JavaScript:
+// ── THE KEY, AND WHO PAYS FOR IT ──────────────────────────────────────────
+// A YouTube Data API key is a PUBLIC key (it ships in the client), and every
+// search costs QUOTA UNITS out of a daily budget. So the question "whose key
+// is it?" is also "whose quota burns?".
 //
-//   1. the BUILD — `VITE_YOUTUBE_API_KEY` in `.env` (or the host's env
-//      settings). vite.config.ts injects it as the `__DC_YOUTUBE_API_KEY__`
-//      constant, which is what the first branch below reads;
-//   2. a deployment that would rather inject it at serve time:
-//      `<script>window.__DC_YOUTUBE_API_KEY__ = "AIza…"</script>`
-//   3. the OWNER's own browser, for verifying a key without a rebuild:
-//      `localStorage.setItem("dc.music.youtubeKey", "AIza…")`
+// The app therefore reads the key in this order — and the order is the whole
+// point of this module:
 //
-// Restrict the key to the site's HTTP referrers in Google Cloud (APIs &
-// Services → Credentials) — the Data API is billed per quota unit, and an
-// unrestricted key can be lifted out of any client bundle.
+//   1. THE LEARNER'S OWN KEY, in THEIR OWN browser:
+//        · their account slot  `dc.music.youtubeKey.u.<uid>`  (the BYOK slot)
+//        · this browser's slot  `dc.music.youtubeKey`         (the fallback,
+//          and the owner's own quick-check override)
+//   2. THE OWNER'S KEY, baked into the build:
+//        · `VITE_YOUTUBE_API_KEY` → `__DC_YOUTUBE_API_KEY__` (vite.config.ts)
+//        · or injected at serve time: `<script>window.__DC_YOUTUBE_API_KEY__ = "AIza…"</script>`
+//
+// The learner's own key ALWAYS wins. That is what lets the app run YouTube
+// search with the owner's billing account switched OFF: every learner brings
+// their own key (and their own quota), and the owner's key is only the
+// fallback for anyone who has not connected one. Leave `VITE_YOUTUBE_API_KEY`
+// empty and the owner is never billed for a single search.
+//
+// The learner's key never leaves their browser: it is stored in this device's
+// localStorage and sent straight from the browser to Google (the Data API is
+// called from the client, exactly as before).
+//
+// Restrict any key to the site's HTTP referrers in Google Cloud (APIs &
+// Services → Credentials) — and the Data API to "YouTube Data API v3" alone.
 
 import { createMusicId, youTubeEmbedUrl, youTubeThumbnailUrl, type MusicTrack } from "./musicLibrary";
+import {
+  announceSearchKeySource,
+  readSearchKeySource,
+  writeSearchKeySource,
+  type SearchKeySource,
+} from "./searchKeySource";
+import {
+  clearOwnQuotaExhausted,
+  markOwnQuotaExhausted,
+  ownQuotaExhausted,
+} from "./searchQuotaHandover";
 
 declare const __DC_YOUTUBE_API_KEY__: string | undefined;
 
-/** The owner's own override slot — see the header. */
+/** This browser's slot — "the key on this device". */
 export const MUSIC_YOUTUBE_KEY_STORAGE = "dc.music.youtubeKey";
+/** The per-account slot — "this learner's own key". */
+export const MUSIC_YOUTUBE_USER_KEY_PREFIX = "dc.music.youtubeKey.u.";
 /** Fired after the override is written, so a live pane re-reads it at once. */
 export const MUSIC_YOUTUBE_KEY_EVENT = "dc:music-youtube-key";
+
+/** The per-account slot's name — stable, and owned by exactly one account. */
+export const musicYouTubeUserKeyStorage = (uid: string): string =>
+  `${MUSIC_YOUTUBE_USER_KEY_PREFIX}${uid}`;
 
 /**
  * A value is only a key when it is a non-empty string that is not the
@@ -62,18 +92,165 @@ const buildKey = (): string => {
   }
 };
 
-/** The configured key, or "" — never throws, never logs it. */
-export function youTubeSearchKey(): string {
-  const injected = buildKey() || cleanKey((globalThis as Record<string, unknown>).__DC_YOUTUBE_API_KEY__);
-  if (injected) return injected;
+/** Read one storage slot — a browser that refuses reads simply has no key. */
+const readSlot = (slot: string): string => {
   try {
-    return cleanKey(globalThis.window?.localStorage.getItem(MUSIC_YOUTUBE_KEY_STORAGE));
+    return cleanKey(globalThis.window?.localStorage.getItem(slot));
   } catch {
     return "";
   }
+};
+
+/** Write one storage slot. Returns false when the browser refused to store. */
+const writeSlot = (slot: string, key: string): boolean => {
+  try {
+    const store = globalThis.window?.localStorage;
+    if (!store) return false;
+    if (key) store.setItem(slot, key);
+    else store.removeItem(slot);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** Tell every open pane that the key changed. */
+function announceYouTubeKey(): void {
+  const win = globalThis.window as (Window & typeof globalThis) | undefined;
+  if (!win?.dispatchEvent) return;
+  try {
+    const EventCtor = win.Event;
+    if (!EventCtor) return;
+    win.dispatchEvent(new EventCtor(MUSIC_YOUTUBE_KEY_EVENT));
+  } catch {
+    // A host without events simply does not need them.
+  }
 }
 
-export const youTubeSearchAvailable = (): boolean => Boolean(youTubeSearchKey());
+/**
+ * The key THIS LEARNER brought — their account slot, else this browser's
+ * slot. Never the owner's build-time key: the key manager must show the
+ * learner their own key, and removing it must leave the owner's fallback
+ * untouched.
+ */
+export function ownYouTubeKey(uid?: string | null): string {
+  const user = typeof uid === "string" ? uid.trim() : "";
+  if (user) {
+    const own = readSlot(musicYouTubeUserKeyStorage(user));
+    if (own) return own;
+  }
+  return readSlot(MUSIC_YOUTUBE_KEY_STORAGE);
+}
+
+/**
+ * The slot the effective own key came from. The card shows it (so a learner
+ * knows whether the key is THEIR account's or this device's), and "remove"
+ * clears exactly this one.
+ */
+export function ownYouTubeKeySlot(uid?: string | null): string {
+  const user = typeof uid === "string" ? uid.trim() : "";
+  if (user) {
+    const slot = musicYouTubeUserKeyStorage(user);
+    if (readSlot(slot)) return slot;
+  }
+  return MUSIC_YOUTUBE_KEY_STORAGE;
+}
+
+/**
+ * THE OWNER'S KEY — the one baked into the build (or injected at serve
+ * time). The school owns its quota; the learner chooses whether to spend it.
+ */
+export function masterYouTubeKey(): string {
+  return buildKey() || cleanKey((globalThis as Record<string, unknown>).__DC_YOUTUBE_API_KEY__);
+}
+
+/** Is there a master key at all? (The Settings switch needs to know.) */
+export const masterYouTubeKeyAvailable = (): boolean => Boolean(masterYouTubeKey());
+
+/** The choice in effect: "mine" (their own key) or "master" (the school's). */
+export function youTubeKeySource(uid?: string | null): SearchKeySource {
+  return readSearchKeySource("youtube", uid);
+}
+
+/**
+ * The key a search uses FIRST, whose it is, and which one takes over when
+ * this one's daily quota is gone.
+ *
+ *   · "mine"   → the learner's own key first, the master's as the background
+ *                handover (this is the default);
+ *   · "master" → the school's key, because the learner asked for it.
+ *
+ * The choice is never a trap: if the chosen key is not there at all, the
+ * other one is used — a working search always beats a dead one.
+ */
+export type YouTubeKeyPlan = {
+  /** The key to send first. */
+  key: string;
+  /** Whose key that is. */
+  origin: "own" | "master";
+  /** The other key — the automatic handover when this one's quota is gone. */
+  handover: string;
+};
+
+export function youTubeSearchPlan(uid?: string | null): YouTubeKeyPlan {
+  const own = ownYouTubeKey(uid);
+  const master = masterYouTubeKey();
+  if (youTubeKeySource(uid) === "master") {
+    return { key: master || own, origin: master ? "master" : "own", handover: "" };
+  }
+  // The learner's own quota is a DAILY budget: once it is spent, the
+  // master's key takes over — but only until Google's next daily reset. The
+  // moment that reset comes, the learner's own key is back on its own.
+  if (own && master && ownQuotaExhausted("youtube", uid)) {
+    return { key: master, origin: "master", handover: "" };
+  }
+  return { key: own || master, origin: own ? "own" : "master", handover: own ? master : "" };
+}
+
+/** The key the search actually uses — see `youTubeSearchPlan`. */
+export function youTubeSearchKey(uid?: string | null): string {
+  return youTubeSearchPlan(uid).key;
+}
+
+export const youTubeSearchAvailable = (uid?: string | null): boolean => Boolean(youTubeSearchKey(uid));
+
+/**
+ * Store the choice the learner made in Settings: "mine" or "master". The
+ * page is told at once, so the search picks the new key on its next query.
+ */
+export function setYouTubeKeySource(source: SearchKeySource, uid?: string | null): boolean {
+  const stored = writeSearchKeySource("youtube", source, uid);
+  if (!stored) return false;
+  announceSearchKeySource();
+  announceYouTubeKey();
+  return true;
+}
+
+/**
+ * Store a key for THIS LEARNER (their account slot) — or for this browser
+ * when there is no account. The owner's build-time key is never touched: it
+ * stays the fallback, so a learner who removes their own key simply falls
+ * back to the owner's instead of breaking the search.
+ */
+export function saveYouTubeKey(key: string, uid?: string | null): boolean {
+  const clean = cleanKey(key);
+  if (!clean) return false;
+  const user = typeof uid === "string" ? uid.trim() : "";
+  const slot = user ? musicYouTubeUserKeyStorage(user) : MUSIC_YOUTUBE_KEY_STORAGE;
+  if (!writeSlot(slot, clean)) return false;
+  // A NEW key is a fresh daily budget: the old "quota is gone" pause is
+  // meaningless now.
+  clearOwnQuotaExhausted("youtube", uid);
+  announceYouTubeKey();
+  return true;
+}
+
+/** Remove the key that is actually in effect — this account's, else this browser's. */
+export function clearYouTubeKey(uid?: string | null): void {
+  writeSlot(ownYouTubeKeySlot(uid), "");
+  clearOwnQuotaExhausted("youtube", uid);
+  announceYouTubeKey();
+}
 
 /**
  * Watch for the key appearing (or being cleared) without a reload: the
@@ -103,15 +280,101 @@ interface YouTubeSearchItem {
   };
 }
 
+/* ------------------------------------------------------------------ */
+/* Why a search failed — the learner can act on every one of these     */
+/* ------------------------------------------------------------------ */
+
+export type YouTubeKeyErrorCode =
+  | "no-key"
+  | "invalid-key"
+  | "api-disabled"
+  | "quota"
+  | "referrer"
+  | "network"
+  | "unknown";
+
+/** The one sentence each failure deserves — a learner can act on all of them. */
+export const YOUTUBE_KEY_ERROR_MESSAGES: Record<YouTubeKeyErrorCode, string> = {
+  "no-key":
+    "YouTube search ke liye ek API key chahiye — apni key jodo, ya YouTube par khud search karke link yahan paste kar do.",
+  "invalid-key":
+    "Ye API key Google ne accept nahi ki. Key dobara copy karke check karo.",
+  "api-disabled":
+    "Is key ke Google Cloud project mein YouTube Data API v3 enable nahi hai — console mein API ON karna hoga.",
+  quota:
+    "Is key ki daily quota khatam ho gayi hai. Kal try karo, ya doosri key use karo.",
+  referrer:
+    "Google ne request rok di — is key ki “Website” restriction mein app ki site ka address add karna hoga.",
+  network: "Network error — apna internet check karke dobara try karo.",
+  unknown: "YouTube se connect nahi ho paya. Dobara try karo.",
+};
+
 /**
- * Search YouTube through the official Data API. Returns [] on any failure
- * (quota, offline, wrong key) — the pane then shows the paste hint instead of
- * an error the learner can do nothing about.
+ * Read Google's own error body and say what actually went wrong.
+ *
+ * The Data API answers a refused request with
+ * `{ error: { code, message, errors: [{ domain, reason }] } }`, and the reason
+ * is the only honest answer:
+ *   · `keyInvalid`            → the key itself is wrong;
+ *   · `accessNotConfigured`   → the API is not enabled in that project;
+ *   · `quotaExceeded`         → the daily budget is gone;
+ *   · `forbidden`             → the referrer restriction did not match.
  */
-export async function searchYouTube(query: string, signal?: AbortSignal): Promise<MusicTrack[]> {
-  const key = youTubeSearchKey();
-  const text = String(query || "").trim();
-  if (!key || !text) return [];
+export function classifyYouTubeError(status: number, body: unknown): YouTubeKeyErrorCode {
+  const error = (body as { error?: { message?: string; errors?: Array<{ reason?: string }> } } | null)?.error;
+  const reason = String(error?.errors?.[0]?.reason || "").trim();
+  const message = String(error?.message || "").trim();
+  if (reason === "keyInvalid" || reason === "keyNotFound" || reason === "badRequest") return "invalid-key";
+  if (
+    reason === "accessNotConfigured" ||
+    reason === "youtubeApiNotEnabled" ||
+    reason === "SERVICE_DISABLED" ||
+    /has not been used in project|is not enabled|SERVICE_DISABLED/i.test(message)
+  ) {
+    return "api-disabled";
+  }
+  if (
+    reason === "quotaExceeded" ||
+    reason === "dailyLimitExceeded" ||
+    reason === "rateLimitExceeded" ||
+    /quota exceeded|daily limit exceeded/i.test(message) ||
+    status === 429
+  ) {
+    return "quota";
+  }
+  if (reason === "refererNotAllowed" || reason === "forbidden" || /disallowed referrer/i.test(message) || status === 403) {
+    return "referrer";
+  }
+  if (status >= 500) return "network";
+  return "unknown";
+}
+
+/** What a search answered: the rows, and — when it failed — WHY. */
+export type YouTubeSearchOutcome = {
+  rows: MusicTrack[];
+  error: YouTubeKeyErrorCode | null;
+  message: string;
+  /**
+   * The learner's own quota was gone and the MASTER's key took over, without
+   * a word and without a break in the search. The pane mentions it once, in
+   * passing — the results are what matter.
+   */
+  usedFallback?: boolean;
+};
+
+/**
+ * Search YouTube through the official Data API, and say what happened.
+ *
+ * Never throws: a refused key, an exhausted quota, a dead network and a plain
+ * "nothing matched" are all answers the pane can render. The rows are the same
+ * shape the library has always used.
+ */
+/** The search itself, with ONE key in hand. */
+async function runYouTubeSearch(
+  text: string,
+  key: string,
+  signal?: AbortSignal,
+): Promise<YouTubeSearchOutcome> {
   const endpoint = new URL("https://www.googleapis.com/youtube/v3/search");
   endpoint.searchParams.set("part", "snippet");
   endpoint.searchParams.set("type", "video");
@@ -120,9 +383,18 @@ export async function searchYouTube(query: string, signal?: AbortSignal): Promis
   endpoint.searchParams.set("key", key);
   try {
     const response = await fetch(endpoint.toString(), { signal });
-    if (!response.ok) return [];
+    if (!response.ok) {
+      let body: unknown = null;
+      try {
+        body = await response.json();
+      } catch {
+        body = null;
+      }
+      const code = classifyYouTubeError(response.status, body);
+      return { rows: [], error: code, message: YOUTUBE_KEY_ERROR_MESSAGES[code] };
+    }
     const payload = (await response.json()) as { items?: YouTubeSearchItem[] };
-    return (payload.items || [])
+    const rows = (payload.items || [])
       .map((item) => {
         const id = String(item?.id?.videoId || "");
         if (!/^[a-zA-Z0-9_-]{11}$/.test(id)) return null;
@@ -146,8 +418,101 @@ export async function searchYouTube(query: string, signal?: AbortSignal): Promis
         return track;
       })
       .filter((track): track is MusicTrack => Boolean(track));
+    return { rows, error: null, message: "" };
   } catch {
-    return [];
+    return { rows: [], error: "network", message: YOUTUBE_KEY_ERROR_MESSAGES.network };
+  }
+}
+
+/**
+ * Search YouTube through the official Data API, and say what happened.
+ *
+ * Never throws: a refused key, an exhausted quota, a dead network and a plain
+ * "nothing matched" are all answers the pane can render. The rows are the same
+ * shape the library has always used.
+ *
+ * THE BACKGROUND RULE: the learner's own key goes first, and the moment its
+ * daily quota is gone the MASTER's key takes over — the very same query is
+ * re-sent, the results simply arrive, and the learner never sees a break.
+ */
+export async function searchYouTubeOutcome(
+  query: string,
+  signal?: AbortSignal,
+  uid?: string | null,
+): Promise<YouTubeSearchOutcome> {
+  const text = String(query || "").trim();
+  if (!text) return { rows: [], error: null, message: "" };
+  const plan = youTubeSearchPlan(uid);
+  if (!plan.key) {
+    return { rows: [], error: "no-key", message: YOUTUBE_KEY_ERROR_MESSAGES["no-key"] };
+  }
+  const first = await runYouTubeSearch(text, plan.key, signal);
+  if (first.error !== "quota" || !plan.handover || plan.handover === plan.key) return first;
+  // The learner's own daily quota is gone — remember it (until Google's next
+  // daily reset) and let the master's key take over, silently. When the
+  // reset comes, the learner's own key is back on its own.
+  markOwnQuotaExhausted("youtube", uid);
+  const second = await runYouTubeSearch(text, plan.handover, signal);
+  if (second.error) return first;
+  return { ...second, usedFallback: true };
+}
+
+/**
+ * The rows alone — the shape every caller has always used. A failure is an
+ * empty list, exactly as before; use `searchYouTubeOutcome` when the REASON
+ * matters (the key manager does).
+ */
+export async function searchYouTube(
+  query: string,
+  signal?: AbortSignal,
+  uid?: string | null,
+): Promise<MusicTrack[]> {
+  const outcome = await searchYouTubeOutcome(query, signal, uid);
+  return outcome.rows;
+}
+
+/* ------------------------------------------------------------------ */
+/* Checking a key BEFORE it is saved                                    */
+/* ------------------------------------------------------------------ */
+
+export type YouTubeKeyTest = {
+  ok: boolean;
+  code: YouTubeKeyErrorCode | null;
+  message: string;
+};
+
+/**
+ * Check a key with the CHEAPEST call the Data API offers: `videos.list` for
+ * one known id costs a single quota unit, where a `search` costs a hundred.
+ * A learner can therefore press "Test" as often as they like, and the answer
+ * names the real problem (wrong key · API not enabled · quota gone ·
+ * referrer restriction) instead of a bare "failed".
+ */
+export async function testYouTubeKey(key: string, signal?: AbortSignal): Promise<YouTubeKeyTest> {
+  const clean = cleanKey(key);
+  if (!clean) {
+    return { ok: false, code: "no-key", message: YOUTUBE_KEY_ERROR_MESSAGES["no-key"] };
+  }
+  const endpoint = new URL("https://www.googleapis.com/youtube/v3/videos");
+  endpoint.searchParams.set("part", "id");
+  endpoint.searchParams.set("id", "dQw4w9WgXcQ");
+  endpoint.searchParams.set("maxResults", "1");
+  endpoint.searchParams.set("key", clean);
+  try {
+    const response = await fetch(endpoint.toString(), { signal });
+    if (response.ok) {
+      return { ok: true, code: null, message: "Key sahi hai — YouTube search chalu hai." };
+    }
+    let body: unknown = null;
+    try {
+      body = await response.json();
+    } catch {
+      body = null;
+    }
+    const code = classifyYouTubeError(response.status, body);
+    return { ok: false, code, message: YOUTUBE_KEY_ERROR_MESSAGES[code] };
+  } catch {
+    return { ok: false, code: "network", message: YOUTUBE_KEY_ERROR_MESSAGES.network };
   }
 }
 

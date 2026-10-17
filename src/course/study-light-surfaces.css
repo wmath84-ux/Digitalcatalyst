@@ -1,6 +1,6 @@
 /* Feature-owned solid surfaces: do not inherit the legacy dark player plate.
    Kept scoped to library UI, never to authored note/editor content. */
-html[data-theme="light"] .course-player-shell [data-course-notes-panel][data-notes-theme="light"][data-course-notes-home],
+html[data-theme="light"] .course-player-shell [data-course-notes-panel][data-notes-theme="light"],
 html[data-theme="light"] .course-player-shell [data-course-notes-panel][data-notes-theme="light"] [data-note-library-panel],
 html[data-theme="light"] [data-course-notes-panel][data-notes-theme="light"] [data-course-notes-list] {
   background: #fff !important;
@@ -19,9 +19,9 @@ html[data-theme="light"] [data-course-notes-list] .branched-menu {
   --bm-accent: var(--dc-brand, #4338ca);
   --bm-line: #cbd5e1;
 }
-/* The notes home page and its one library panel: the same solid plate, the
-   same ink, in the light palette. */
-html[data-theme="light"] [data-course-notes-home] { background: #fff !important; }
+/* The notes page and its one library panel: the same solid plate, the same
+   ink, in the light palette. */
+html[data-theme="light"] [data-course-notes-panel][data-notes-theme="light"] { background: #fff !important; }
 /* The library panel's MASTER / SELF control and its single New note button. */
 html[data-theme="light"] [data-note-library-head] { background: #fff; }
 html[data-theme="light"] [data-note-left-panel] { background: #fff; color: var(--dc-ink, #0f172a); }

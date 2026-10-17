@@ -15,9 +15,10 @@
 
 /* ── The ONE library panel ───────────────────────────────────────────────── */
 
+/* The library IS the main area now (a full page, not a side sheet), so it
+   carries no sheet radii — the page's own edge is its edge. */
 [data-mindmap-left-panel] {
-  border-top-right-radius: 18px;
-  border-bottom-right-radius: 18px;
+  border-radius: 0;
 }
 
 /* One clean line per map, like the note library's rows. */
@@ -54,13 +55,15 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ── The home page ──────────────────────────────────────────────────────── */
+/* ── The page itself ────────────────────────────────────────────────────── */
+/* The mind map page is the canvas now (the empty viewer page and the maps
+   that live on it) — there is no start screen to dress. */
 
-[data-course-mindmap-home] {
+[data-course-mindmap] {
   color-scheme: light;
 }
 
-[data-mindmap-theme="dark"] [data-course-mindmap-home] {
+[data-mindmap-theme="dark"] [data-course-mindmap] {
   color-scheme: dark;
 }
 

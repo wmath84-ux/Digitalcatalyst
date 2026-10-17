@@ -142,7 +142,7 @@ test("saving is automatic: leaving the editor commits the draft, delete still co
   assert.match(notesPanel, /<ConfirmDeleteDialog/);
   for (const hook of [
     "data-course-notes-composer", "data-course-notes-input", "data-course-note-edit-input", "data-course-notes-add",
-    "data-note-library-panel", "data-note-panel-new", "data-notes-home-new", "data-note-edit-read-float",
+    "data-note-library-panel", "data-note-panel-new", "data-note-blank-page", "data-note-edit-read-float",
   ]) {
     assert.match(notesPanel, new RegExp(hook), `${hook} test hook is kept`);
   }

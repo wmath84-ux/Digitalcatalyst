@@ -35,6 +35,24 @@
   container-type: inline-size;
   padding: 0 max(8px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
   background: #fff; border-top: 1px solid #e2e8f0;
+  /* The scroll rule: the strip slides out of the way while the learner
+     scrolls DOWN inside the player and slides back the moment they scroll
+     up (owner, 2026-10-17). It keeps its place in the flow, so nothing
+     behind it jumps — only the strip itself moves. */
+  transition: transform 220ms cubic-bezier(.22,.61,.36,1), opacity 180ms ease-out;
+  will-change: transform;
+}
+
+[data-course-strip-nav][data-course-strip-scrolled="away"] {
+  transform: translateY(130%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-course-strip-nav] {
+    transition: none;
+  }
 }
 
 /* ── 1 · The Workspace wrapper, re-homed in-flow ────────────────────────── */

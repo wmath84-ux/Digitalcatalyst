@@ -38,6 +38,18 @@
 // the Music library's search page). A search RESULTS page is NOT hidden: the
 // footer is there and steps away only while the learner scrolls down, coming
 // straight back at the top (see `SearchSurfaceView` below).
+//
+// ── The SCROLL half (2026-10-17) ───────────────────────────────────────────
+//
+//   "Course player ke andar agar kahin bhi scroll kiya ja raha ho footer
+//    navigation automatically hide show scrolling behaviour ke according."
+//
+// So the rule above is about PAGES, and this one is about SCROLLING: wherever
+// the learner scrolls inside the player, the footer navigation slides out of
+// the way on the way down and comes straight back on the way up. It is
+// published here (`footerScrolledAway`) and read by the strip, which SLIDES
+// (it is not unmounted, so nothing behind it jumps). The watcher lives in
+// ./footerScrollAway.ts and sees every scroller in one place.
 
 import { useSyncExternalStore } from "react";
 
@@ -46,7 +58,12 @@ export type NotesPanelSessionView =
   | { view: "compose"; draft: string; title: string }
   | { view: "edit"; noteId: string; draft: string; title: string };
 
-export type MindMapPanelSessionView = "library" | "canvas";
+/**
+ * Mind Map tab: the EMPTY viewer page (no map on the canvas — the page a
+ * fresh visit opens on, owner 2026-10-17) or a map that is open on the
+ * canvas. There is no start screen any more, so "library" is gone.
+ */
+export type MindMapPanelSessionView = "empty" | "canvas";
 
 /** Read tab: the shelf ("library") or an open PDF ("reader" — the course /
  * annotations PDF viewers and the Google Drive viewer alike). */
@@ -114,12 +131,20 @@ interface CoursePanelSessionState {
   musicSearch: SearchSurfaceView;
   /** That page is scrolled away from the top, with results on screen. */
   musicSearchScrolledAway: boolean;
+  /**
+   * The learner is scrolling DOWN inside the Course Player, so the footer
+   * navigation steps out of the way. Any scroll up — or a return to the top —
+   * brings it straight back (owner, 2026-10-17: "course player ke andar agar
+   * kahin bhi scroll kiya ja raha ho footer navigation automatically hide show
+   * scrolling behaviour ke according").
+   */
+  footerScrolledAway: boolean;
 }
 
 const defaultState = (): CoursePanelSessionState => ({
   notes: { view: "list" },
   notesEditMode: false,
-  mindMapView: "library",
+  mindMapView: "empty",
   mindMapEditMode: false,
   readView: "library",
   brainView: "home",
@@ -130,6 +155,7 @@ const defaultState = (): CoursePanelSessionState => ({
   librarySearchScrolledAway: false,
   musicSearch: "closed",
   musicSearchScrolledAway: false,
+  footerScrolledAway: false,
 });
 
 let session: CoursePanelSessionState = defaultState();
@@ -156,6 +182,7 @@ const projectionOf = (state: CoursePanelSessionState): string =>
     state.librarySearchScrolledAway,
     state.musicSearch,
     state.musicSearchScrolledAway,
+    state.footerScrolledAway,
   ].join("|");
 
 const emitIfProjectionChanged = (before: string) => {
@@ -211,6 +238,20 @@ export const setSketchEditMode = (editing: boolean) => {
 
 /** Which search surface a publish belongs to. */
 export type SearchSurface = "library" | "music";
+
+/**
+ * The learner is scrolling down inside the player: the footer navigation
+ * steps away. Scrolling up (or coming back to the top) brings it back.
+ */
+export const setFooterScrolledAway = (away: boolean): void => {
+  if (session.footerScrolledAway === away) return;
+  const before = projectionOf(session);
+  session.footerScrolledAway = away;
+  emitIfProjectionChanged(before);
+};
+
+/** Reactive form of `footerScrolledAway` — the footer reads it. */
+export const useFooterScrolledAway = (): boolean => useCoursePanelSession().footerScrolledAway;
 
 export const setSearchSurface = (surface: SearchSurface, view: SearchSurfaceView) => {
   const before = projectionOf(session);

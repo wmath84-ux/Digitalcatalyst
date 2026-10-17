@@ -109,7 +109,7 @@ test("MASTER and SELF are subtle tags, shown for notes and maps", () => {
 
 test("the master and self resources open from the right page", () => {
   // Notes: master opens the read-only viewer, self opens the editor.
-  assert.match(notes, /setViewingMasterNoteId\(note\.id\)/);
+  assert.match(notes, /setViewingMasterNote\(note\)/);
   assert.match(notes, /openNote\(note\)/);
   // Mind maps: master goes through the player (its module), self opens its map.
   assert.match(maps, /onOpenMasterMap\?\.\(key\)/);

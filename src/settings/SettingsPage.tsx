@@ -8,6 +8,7 @@ import {
   Globe,
   Home,
   ChevronRight,
+  KeyRound,
   Loader2,
   PanelsTopLeft,
   ShieldCheck,
@@ -31,6 +32,8 @@ import {
   useFooterNavigationVisibility,
 } from "../utils/footerNavigationVisibility";
 import { setWorkLaunchChoice, useWorkLaunchChoice, type WorkLaunchChoice } from "../work/storage/workPrefs";
+import YouTubeKeyCard from "../course/YouTubeKeyCard";
+import GoogleSearchCard from "../course/GoogleSearchCard";
 import "./settings.css";
 
 const LABELS: Record<PreferenceKey, string> = {
@@ -283,6 +286,26 @@ export default function SettingsPage() {
               {renderSwitch("profileVisible", "Show your name and profile photo on your public learner profile and community leaderboard.", !settings.preferences.profileVisible ? "Hidden profiles are removed from the public leaderboard. Your learning activity is hidden too." : undefined)}
               {renderSwitch("shareActivity", "Show only the number of courses started and completed learning items on your public profile. Course names and private content stay hidden.", !settings.preferences.profileVisible ? "This choice is saved, but nothing is shared while your public profile is off." : "Off by default. Sharing starts only when you explicitly turn this on.")}
               <a className="settings-public-link" href={`#/learner/${encodeURIComponent(user.id)}`}>View your public profile <ArrowUpRight size={15} /></a>
+            </section>
+            <section className="settings-section" aria-labelledby="settings-youtube-search" data-youtube-key-section>
+              <div className="settings-section-heading">
+                <span className="settings-section-icon" aria-hidden="true"><KeyRound size={19} /></span>
+                <div className="settings-section-heading-copy">
+                  <div className="settings-section-title-row"><h2 id="settings-youtube-search">YouTube search</h2><span className="settings-section-count">Apni key</span></div>
+                  <p>Course Player ke Music tab aur Resource Library ke search mein YouTube ke andar results laane ke liye ek YouTube Data API v3 key chahiye. Key aap apne Google account se banate ho aur woh sirf aapke device ke browser me save hoti hai — har user ka apna quota use hota hai, aapke account ka nahi. Neeche switch se chuno: <strong>meri apni key</strong> ya <strong>master ki key</strong> — aapki key ka quota khatam ho jaye to master ki key apne aap chalu ho jati hai, search chalta rehta hai.</p>
+                </div>
+              </div>
+              <YouTubeKeyCard uid={user?.id ?? null} className="settings-youtube-key-card" />
+            </section>
+            <section className="settings-section" aria-labelledby="settings-google-search" data-google-search-section>
+              <div className="settings-section-heading">
+                <span className="settings-section-icon" aria-hidden="true"><Globe size={19} /></span>
+                <div className="settings-section-heading-copy">
+                  <div className="settings-section-title-row"><h2 id="settings-google-search">Google search</h2><span className="settings-section-count">Apni configuration</span></div>
+                  <p>Course Player ke search box me Google icon dabane par poore web ka search khulta hai. Iske liye ek Google API key aur ek Programmable Search Engine ID (cx) chahiye — dono aap apne Google account se banate ho aur sirf aapke device ke browser me save hote hain. Neeche switch se chuno: <strong>meri apni configuration</strong> ya <strong>master ki configuration</strong> — aapki quota khatam ho jaye to master ki configuration apne aap chalu ho jati hai.</p>
+                </div>
+              </div>
+              <GoogleSearchCard uid={user?.id ?? null} className="settings-google-search-card" />
             </section>
             <section className="settings-section" aria-labelledby="settings-navigation" data-footer-navigation-preference>
               <div className="settings-section-heading">

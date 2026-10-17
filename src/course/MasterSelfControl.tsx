@@ -25,6 +25,18 @@ interface MasterSelfControlProps {
   ariaLabel: string;
   /** Hook for the shared contract test + per-feature CSS. */
   feature: "notes" | "mindMap" | "brain" | "experiment";
+  /**
+   * The two labels. The NOTES and the MIND MAP call them "Course library" and
+   * "My library" (the owner, 2026-10-17) — the plain MASTER / SELF words stay
+   * the default for the other features.
+   */
+  masterLabel?: string;
+  selfLabel?: string;
+  /**
+   * The EXPANDED control: both halves fill the header's width, so the two
+   * libraries are readable at a glance instead of a tiny centred pill.
+   */
+  expand?: boolean;
 }
 
 export default function MasterSelfControl({
@@ -34,15 +46,27 @@ export default function MasterSelfControl({
   selfCount,
   ariaLabel,
   feature,
+  masterLabel = "MASTER",
+  selfLabel = "SELF",
+  expand = false,
 }: MasterSelfControlProps) {
   const tile = (selected: boolean) =>
-    `rounded-lg px-3 py-2 text-xs font-black tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current ${
+    `rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current ${
+      expand
+        ? "flex min-w-0 flex-1 items-center justify-center gap-1.5 px-3 py-2.5 text-[13px] font-black"
+        : "px-3 py-2 text-xs font-black tracking-wide"
+    } ${
       selected ? "bg-[var(--dc-flat-ink)] text-[var(--dc-flat-board)] shadow-sm" : "text-[var(--dc-flat-ink-sub)] hover:text-[var(--dc-flat-ink)]"
     }`;
 
+  const count = (value: number | undefined) =>
+    typeof value === "number" ? (
+      <span className="shrink-0 text-[10px] font-black tabular-nums opacity-80">{value}</span>
+    ) : null;
+
   return (
     <div
-      className="inline-flex shrink-0 rounded-xl p-1"
+      className={`inline-flex shrink-0 rounded-xl p-1 ${expand ? "w-full" : ""}`}
       style={{
         background: "var(--dc-flat-box)",
         boxShadow: "inset 0 0 0 1px var(--dc-flat-row-line)",
@@ -50,6 +74,7 @@ export default function MasterSelfControl({
       role="tablist"
       aria-label={ariaLabel}
       data-master-self-control={feature}
+      data-master-self-expanded={expand ? "true" : undefined}
     >
       <button
         type="button"
@@ -59,10 +84,8 @@ export default function MasterSelfControl({
         onClick={() => onChange("master")}
         className={tile(mode === "master")}
       >
-        MASTER{" "}
-        {typeof masterCount === "number" ? (
-          <span className="ml-1 text-[10px] tabular-nums opacity-80">{masterCount}</span>
-        ) : null}
+        <span className="truncate">{masterLabel}</span>
+        {count(masterCount)}
       </button>
       <button
         type="button"
@@ -72,10 +95,8 @@ export default function MasterSelfControl({
         onClick={() => onChange("self")}
         className={tile(mode === "self")}
       >
-        SELF{" "}
-        {typeof selfCount === "number" ? (
-          <span className="ml-1 text-[10px] tabular-nums opacity-80">{selfCount}</span>
-        ) : null}
+        <span className="truncate">{selfLabel}</span>
+        {count(selfCount)}
       </button>
     </div>
   );

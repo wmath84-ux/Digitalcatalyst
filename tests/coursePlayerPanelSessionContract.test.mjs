@@ -37,7 +37,7 @@ test("the panel session stores the notes view and the mind map view", () => {
   assert.doesNotMatch(session, /mindMapThemeOverride/);
   // Defaults = the entry state: notes list and map library.
   assert.match(session, /notes: \{ view: "list" \}/);
-  assert.match(session, /mindMapView: "library"/);
+  assert.match(session, /mindMapView: "empty"/);
   // A single reset function hands every field back to those defaults.
   assert.match(session, /export const resetCoursePanelSession/);
   assert.match(session, /session = defaultState\(\);/);
@@ -47,7 +47,7 @@ test("the panel session stores the notes view and the mind map view", () => {
 test("NotesPanel restores its editor from the session and syncs it on every render", () => {
   // The mount state comes from the session (view + draft survive tab switches).
   assert.match(notesPanel, /const sessionNotes = storageOnly \? \{ view: "list" as const \} : getCoursePanelSession\(\)\.notes/);
-  assert.match(notesPanel, /useState\(sessionNotes\.view === "compose"\)/);
+  assert.match(notesPanel, /useState\(!restoreEdit\)/);
   assert.match(notesPanel, /sessionNotes\.view === "compose" \? sessionNotes\.draft : ""/);
   assert.match(notesPanel, /restoreEdit/);
   assert.match(notesPanel, /sessionNotes\.noteId/);
@@ -73,12 +73,12 @@ test("tab switches never flush a notes draft — the editor keeps its place", ()
 
 test("the mind map restores library vs canvas from the session", () => {
   // Mount state comes from the session; the live view is written back.
-  assert.match(mindMapPanel, /storageOnly \|\| getCoursePanelSession\(\)\.mindMapView !== "canvas"/);
-  assert.match(mindMapPanel, /setMindMapSessionView\(libraryOpen \? "library" : "canvas"\)/);
+  assert.match(mindMapPanel, /!storageOnly && getCoursePanelSession\(\)\.mindMapView === "canvas"/);
+  assert.match(mindMapPanel, /setMindMapSessionView\(mapOpen \? "canvas" : "empty"\)/);
   // Reopening the sheet (same-tab toggle) restores the learner's last view
   // instead of force-resetting to the library.
   assert.match(mindMapPanel, /const resumeCanvas = !storageOnly && getCoursePanelSession\(\)\.mindMapView === "canvas";/);
-  assert.match(mindMapPanel, /setLibraryOpen\(!resumeCanvas\);/);
+  assert.match(mindMapPanel, /setMapOpen\(resumeCanvas\);/);
 });
 
 test("the mind map theme pick is the shared persisted control, not a per-visit override", () => {

@@ -348,19 +348,25 @@
   border-top: 0;
   background: transparent;
 }
+/* The My Day editor wears the SAME spacing as the Course Player's notes
+   page (owner, 2026-10-17): the tools used to be packed together — a 2px
+   gap between 36px tiles — so they read as shrunken. Here too every tile is
+   a 40px round button with real air around it, and the row scrolls instead
+   of squeezing. */
 .work-myday-note-surface .dc-note .dc-note-dock .dc-note-dock-bar {
   width: max-content;
   max-width: 100%;
   margin: 0 auto;
-  padding: 0.24rem;
-  gap: 0.18rem;
+  padding: 0.3rem;
+  gap: 0.3rem;
   overflow: hidden;
   border: 1px solid var(--border-color);
   border-radius: 999px;
   background: var(--surface-bg);
   box-shadow: var(--work-shadow-card);
 }
-.work-myday-note-surface .dc-note .dc-note-dock .bn-ak-button { width: 2.25rem; height: 2.25rem; min-width: 2.25rem; padding: 0; border-radius: 50%; }
+.work-myday-note-surface .dc-note .dc-note-dock .bn-ak-button { width: 2.5rem; height: 2.5rem; min-width: 2.5rem; padding: 0; border-radius: 50%; }
+.work-myday-note-surface .dc-note .dc-note-dock .dc-note-dock-tools { gap: 0.25rem; }
 .work-myday-note-surface .dc-note .dc-note-dock .dc-note-dock-history { border-left-color: var(--border-color); }
 .work-myday-reminder-disclosure,
 .work-myday-editor-platform-note { flex: 0 0 auto; padding: 0.35rem 0.75rem; color: var(--text-tertiary); background: var(--workspace-bg); font-size: 0.58rem; line-height: 1.35; text-align: center; }
