@@ -1143,7 +1143,7 @@ export default function NotesPanel({
         data-note-empty={editorEmpty ? "true" : undefined}
         data-note-editor-fallback={legacyFallback ? "true" : undefined}
         tabIndex={readView ? 0 : undefined}
-        aria-label={readView ? "Saved note. Double tap or press Enter to edit." : undefined}
+        aria-label={readView ? (blankPage ? "New note. Press Enter to start writing." : "Saved note. Double tap or press Enter to edit.") : undefined}
         {...editGesture}
         onPointerDown={(event) => { readTapStartRef.current = { x: event.clientX, y: event.clientY }; }}
         onClick={(event) => {
