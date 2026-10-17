@@ -197,8 +197,10 @@ test("10 — the editing pill: the EYE tile FIRST, then the sliding tray", () =>
   assert.match(dock, /<Components\.FormattingToolbar\.Button/);
   assert.doesNotMatch(dock, /dc-note-dock-read/, "no capsule, no <span>Read</span>");
   assert.doesNotMatch(css, /0b1220/, "and no black capsule left in the sheet");
-  // The tile takes the dock's own sizing rules, like every button beside it.
-  assert.match(css, /\.dc-note \.dc-note-dock \.bn-ak-button[\s\S]{0,400}?width: 2\.25rem;/);
+  // The tile takes the dock's own sizing rules, like every button beside it —
+  // 40px round buttons with an 18px glyph, so a tool never reads as shrunken
+  // (owner, 2026-10-17).
+  assert.match(css, /\.dc-note \.dc-note-dock \.bn-ak-button[\s\S]{0,400}?width: 2\.5rem;/);
   assert.match(css, /\.dc-note \.dc-note-dock \.dc-note-read-eye \{[\s\S]{0,120}?flex: 0 0 auto;/);
   // The tools are a sliding tray: nothing shrinks, it scrolls sideways.
   assert.match(css, /\.dc-note \.dc-note-dock-tools \{[\s\S]{0,400}?overflow-x: auto;/);
@@ -262,11 +264,14 @@ test("the editing pill's tools are the reference order — and every one of them
   assert.match(toolbar, /<InlineActions \/>/);
 });
 
-test("the pill's geometry is the reference's: bottom-left, round, 36px buttons", () => {
-  assert.match(css, /\.dc-note \.dc-note-dock \{[^}]*position: absolute;[^}]*left: 0\.5rem;/);
+test("the pill's geometry: centred, round, 40px buttons with real air around them", () => {
+  // The pill is CENTRED on the pane (the mind map's own bar was centred for
+  // the same reason — a bar jammed against the edge reads as a mistake) and
+  // every tool is a 40px round button that is never squeezed to fit.
+  assert.match(css, /\.dc-note \.dc-note-dock \{[^}]*position: absolute;[^}]*left: 50%;[^}]*transform: translateX\(-50%\);/);
   assert.match(css, /\.dc-note \.dc-note-dock \.dc-note-dock-bar \{[^}]*border-radius: 999px;[^}]*box-shadow: 0 10px 25px/);
-  assert.match(css, /\.dc-note \.dc-note-dock \.bn-ak-button \{[^}]*height: 2\.25rem;[^}]*border-radius: 999px;/);
-  assert.match(css, /\.dc-note \.dc-note-dock-sep \{[^}]*height: 1\.25rem;/);
+  assert.match(css, /\.dc-note \.dc-note-dock \.bn-ak-button \{[^}]*height: 2\.5rem;[^}]*border-radius: 999px;/);
+  assert.match(css, /\.dc-note \.dc-note-dock-sep \{[^}]*height: 1\.4rem;/);
   assert.equal((toolbar.match(/<DockSeparator/g) || []).length, 3, "history | inline | link | lists");
 });
 

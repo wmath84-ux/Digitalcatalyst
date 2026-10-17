@@ -2667,10 +2667,12 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    Every control in the status strip is a single icon tile (no words), so the
    whole bar reads the same on a 320px phone and on a desktop split view.
    The tiles no longer step with the viewport: the pill is the NOTE EDITOR's
-   toolbar, so its buttons are the note pill's 36px circles everywhere, and
-   the row scrolls sideways inside the pill on a narrow sheet instead of
+   toolbar, so its buttons are the note pill's circles everywhere, and the
+   row scrolls sideways inside the pill on a narrow sheet instead of
    shrinking (the strip still measures itself — see data-compact — but the
-   geometry no longer depends on it).
+   geometry no longer depends on it). The note pill's own tiles are 40px
+   (it scrolls, so it can afford them); the strip keeps 36px so that it
+   still fits a 320px phone — both wear the same 4px gap.
 
    A scrollable bar can look "khisak gaya" (shifted left): any focused tile
    is scrolled into view by the browser when the layout changes — the soft
@@ -2688,9 +2690,12 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    The measured footer lift (--dc-note-footer-inset, published on the
    strip by useCourseFooterInset) raises it clear of the player's footer
    navigation exactly like the note editor's pill. */
+/* 4px of air between the tiles (was 2px): the tools used to sit on top of
+   one another and read as shrunken (owner, 2026-10-17). The tiles keep
+   their 36px size so the strip still fits a 320px phone. */
 [data-course-mindmap-status] {
   --mm-tool-size: 36px;
-  --mm-tool-gap: 2px;
+  --mm-tool-gap: 4px;
   --mm-tool-radius: 999px;
   position: absolute;
   /* CENTRED on the pane (the owner's brief): the bar used to hug the left
@@ -2727,6 +2732,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    by the same measured footer inset. ONE tap on the canvas hides it. */
 .mm-read-tray {
   --mm-tool-size: 36px;
+  --mm-tool-gap: 4px;
   --mm-tool-radius: 999px;
   position: absolute;
   left: 50%;
@@ -2746,8 +2752,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 .mm-read-tray-sep {
   flex: 0 0 auto;
   width: 1px;
-  height: 1.25rem;
-  margin: 0 0.25rem;
+  height: 1.4rem;
+  margin: 0 0.3rem;
   background: var(--mm-border);
 }
 

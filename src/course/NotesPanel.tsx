@@ -1131,8 +1131,14 @@ export default function NotesPanel({
     const editingIndex = editingId ? notes.findIndex((note) => note.id === editingId) : -1;
     const prevNote = editingIndex > 0 ? notes[editingIndex - 1] : null;
     const nextNote = editingIndex >= 0 && editingIndex < notes.length - 1 ? notes[editingIndex + 1] : null;
-    const pillButtonClass = `grid h-9 w-9 shrink-0 place-items-center rounded-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:pointer-events-none disabled:opacity-35 ${darkNote ? "hover:bg-slate-800 active:bg-slate-700" : "hover:bg-slate-100 active:bg-slate-200"}`;
-    const pillSepClass = `mx-1 h-5 w-px shrink-0 ${darkNote ? "bg-slate-700" : "bg-slate-200"}`;
+    // The bottom toolbar of the notes page is a BLACK pill with light glyphs
+    // (owner, 2026-10-17) — the same material the mind map's bottom bar wears
+    // and the same one the edit-mode toolbar wears, so the page has ONE
+    // toolbar language. The tiles are 40px with a real 4px of air between
+    // them: the old 2px gap made the library, the note switching and the
+    // edit button look squeezed into one another.
+    const pillButtonClass = "grid h-10 w-10 shrink-0 place-items-center rounded-full text-slate-200 transition hover:bg-white/12 active:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400 disabled:pointer-events-none disabled:opacity-35";
+    const pillSepClass = "mx-1.5 h-5 w-px shrink-0 bg-white/20";
     return (
       <div
         className={`relative flex h-full flex-col overflow-hidden ${darkNote ? "bg-slate-950" : "bg-white"}`}
@@ -1247,7 +1253,7 @@ export default function NotesPanel({
         {readView && readChromeVisible ? (
           <div className="pointer-events-none absolute inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 flex justify-center px-4" data-note-read-tray>
             <nav
-              className={`pointer-events-auto flex items-center gap-0.5 rounded-full border px-2 py-1.5 shadow-lg backdrop-blur ${darkNote ? "border-slate-700 bg-slate-900/95 text-slate-200 shadow-black/40" : "border-slate-200 bg-white/95 text-slate-600 shadow-slate-950/15"}`}
+              className="pointer-events-auto flex items-center gap-1 rounded-full border border-white/15 bg-slate-950/95 text-slate-200 shadow-lg shadow-black/40 backdrop-blur"
               aria-label="Note navigation"
               data-note-read-nav
             >
@@ -1285,9 +1291,7 @@ export default function NotesPanel({
           <div className="pointer-events-none absolute inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 flex justify-center px-4">
             <button
               type="button"
-              className={`pointer-events-auto grid h-10 w-10 place-items-center rounded-full border shadow-lg transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400 ${
-                darkNote ? "border-slate-700 bg-slate-900/95 text-slate-200 hover:bg-slate-800" : "border-slate-200 bg-white/95 text-slate-700 hover:bg-slate-50"
-              }`}
+              className="pointer-events-auto grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-slate-950/95 text-slate-200 shadow-lg shadow-black/40 transition hover:bg-white/12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
               data-note-edit-read-float
               aria-label="Read mode"
               title="Read mode"

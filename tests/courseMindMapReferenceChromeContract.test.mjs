@@ -122,7 +122,7 @@ test("5 — the editing toolbar is CENTRED, note-editor sized, and eye-led", () 
   // Same geometry as the note editor's pill (36px tiles, same padding).
   assert.match(statusBlock, /--mm-tool-size: 36px;/);
   assert.match(statusBlock, /padding: 0\.375rem 0\.5rem;/);
-  assert.match(noteCss, /\.dc-note \.dc-note-dock \.bn-ak-button \{[\s\S]{0,200}?width: 2\.25rem;/, "the note pill's buttons are the same 36px");
+  assert.match(noteCss, /\.dc-note \.dc-note-dock \.bn-ak-button \{[\s\S]{0,200}?width: 2\.5rem;/, "the note pill's buttons are 40px (it scrolls, so it can afford them)");
   assert.match(styles, /\.mm-tool \{[\s\S]{0,200}?width: var\(--mm-tool-size\);/);
   assert.match(styles, /\.mm-tool > svg \{[\s\S]{0,120}?width: 1rem;/);
   // The EYE leads it — one more .mm-tool of the row, in the same design as the
