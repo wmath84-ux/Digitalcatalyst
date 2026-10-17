@@ -311,9 +311,9 @@ export default function GoogleSearchCard({ uid = null, onChanged, className = ""
             >
               Credentials
             </a>{" "}
-            → <strong>Create credentials → API key</strong>. Key copy karein, aur{" "}
-            <strong>Application restriction → Websites</strong> me app ka origin add karein (jaise{" "}
-            <code className="rounded bg-slate-100 px-1 py-0.5 text-[10.5px]">https://eduvora.shop/*</code>).
+            → <strong>Create credentials → API key</strong>. Key copy karein. Web ke liye{" "}
+            <strong>Application restriction → Websites</strong> me origin add karein (jaise{" "}
+            <code className="rounded bg-slate-100 px-1 py-0.5 text-[10.5px]">https://eduvora.shop/*</code>). APK / PWA / localhost sab jagah chalana hai to restriction ko <strong>None</strong> kar do — tab har platform se search chalega.
           </li>
         </ol>
         <p className="mt-2 flex items-start gap-1.5 text-[11px] font-medium leading-5 text-slate-500">

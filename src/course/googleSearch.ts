@@ -345,7 +345,7 @@ export const GOOGLE_SEARCH_ERROR_MESSAGES: Record<GoogleSearchErrorCode, string>
     "Is key ke Google Cloud project mein Custom Search API enable nahi hai — console mein API ON karna hoga.",
   quota: "Is key ki daily search quota khatam ho gayi hai. Kal try karo, ya doosri key use karo.",
   referrer:
-    "Google ne request rok di — is key ki “Website” restriction mein app ki site ka address add karna hoga.",
+    "Google ne request rok di — is key ki “Website” restriction mein app ki site ka address add karna hoga. APK / PWA / localhost sab jagah chalana hai to Google Cloud → Credentials → API key → Application restriction ko 'None' kar do, ya har origin add karo (https://yourdomain.com/*, http://localhost/*, capacitor://*).",
   network: "Network error — apna internet check karke dobara try karo.",
   unknown: "Google se connect nahi ho paya. Dobara try karo.",
 };

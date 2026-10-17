@@ -284,9 +284,8 @@ export default function YouTubeKeyCard({ uid = null, onChanged, className = "" }
           </li>
           <li>
             Key ko do restrictions do: <strong>API restriction</strong> → sirf{" "}
-            <em>YouTube Data API v3</em>, aur <strong>Application restriction</strong> →{" "}
-            <em>Websites</em> → app ki site ka address (jaise{" "}
-            <code className="rounded bg-slate-100 px-1 py-0.5 text-[10.5px]">https://eduvora.shop/*</code>).
+            <em>YouTube Data API v3</em>. Web ke liye <strong>Application restriction → Websites</strong> → site address (jaise{" "}
+            <code className="rounded bg-slate-100 px-1 py-0.5 text-[10.5px]">https://eduvora.shop/*</code>). APK / PWA / localhost sab jagah chalana hai to restriction ko <strong>None</strong> kar do.
           </li>
         </ol>
         <p className="mt-2 flex items-start gap-1.5 text-[11px] font-medium leading-5 text-slate-500">

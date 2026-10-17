@@ -9,13 +9,18 @@
 // the app's own serverless function — the same public caption pipeline, with no
 // extra dependency and no API key:
 //
-//   1. Ask YouTube's InnerTube player API (the ANDROID client — the same
-//      public client `youtube-transcript` uses) for the caption track list.
+//   1. Ask YouTube's InnerTube player API (multiple clients — ANDROID, WEB,
+//      IOS, MWEB — the same public clients `youtube-transcript` libraries use)
+//      for the caption track list. ANDROID is tried first because it is the
+//      most permissive, but WEB/IOS often succeed when ANDROID is flagged.
 //   2. If that fails, read the public watch page and parse
 //      `ytInitialPlayerResponse` (balanced-brace scan, never a greedy regex).
-//   3. Fetch the chosen track as JSON3 (`&fmt=json3`) and fall back to the
+//   3. If that also fails, try the legacy timedtext list endpoint
+//      `/api/timedtext?type=list&v=ID` which sometimes bypasses InnerTube bot
+//      checks entirely.
+//   4. Fetch the chosen track as JSON3 (`&fmt=json3`) and fall back to the
 //      classic / srv3 XML shapes when a track ignores the format parameter.
-//   4. Merge YouTube's 2–3 second caption bites into readable ~8–15 second
+//   5. Merge YouTube's 2–3 second caption bites into readable ~8–15 second
 //      lines. Every line keeps the START of its first caption, which is what
 //      the page's timestamp button seeks to.
 //
@@ -109,6 +114,10 @@ const WEB_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
+/** iOS client UA — often succeeds when ANDROID is flagged as bot. */
+const IOS_USER_AGENT =
+  "com.google.ios.youtube/20.10.38 (iPhone14,3; U; CPU iOS 17_5_1 like Mac OS X;)";
+
 /** The InnerTube ANDROID client (the one `youtube-transcript` uses today). */
 const INNERTUBE_CLIENT_VERSION = "20.10.38";
 const INNERTUBE_USER_AGENT =
@@ -116,8 +125,8 @@ const INNERTUBE_USER_AGENT =
 const INNERTUBE_API_URL = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false";
 
 /** A total request budget that fits Vercel's default function window. */
-const REQUEST_BUDGET_MS = 9_000;
-const SINGLE_FETCH_MS = 6_000;
+const REQUEST_BUDGET_MS = 14_000;
+const SINGLE_FETCH_MS = 5_000;
 /** The course player shows the first N lines immediately; 4,000 is ~10 hours. */
 const MAX_SEGMENTS = 4_000;
 /** Long videos stay useful in memory (and under the CDN's object size). */
@@ -346,51 +355,159 @@ const PLAYER_HEADERS = {
   cookie: "CONSENT=YES+cb.20210328-17-p0.en+FX+678",
 };
 
-/* ── YouTube player: InnerTube first, watch page second ─────────────────── */
+/* ── Bot detection helper ────────────────────────────────────────────────── */
+function isBotOrLoginReason(reason: string): boolean {
+  const lower = String(reason || "").toLowerCase();
+  return (
+    lower.includes("bot") ||
+    lower.includes("sign in to confirm") ||
+    lower.includes("confirm you're not a bot") ||
+    lower.includes("confirm you are not a bot") ||
+    lower.includes("sign in") && lower.includes("confirm") ||
+    /login.*required/i.test(reason) && /bot/i.test(reason) ||
+    lower.includes("not a bot")
+  );
+}
 
-async function readInnerTube(videoId: string, deadline: Deadline): Promise<RawPlayer | null> {
+/* ── YouTube player: InnerTube with multiple clients ────────────────────── */
+
+type InnerTubeClientConfig = {
+  name: string;
+  clientName: string;
+  clientVersion: string;
+  userAgent: string;
+  extraContext?: Record<string, unknown>;
+};
+
+const INNERTUBE_CLIENTS: InnerTubeClientConfig[] = [
+  {
+    name: "ANDROID",
+    clientName: "ANDROID",
+    clientVersion: INNERTUBE_CLIENT_VERSION,
+    userAgent: INNERTUBE_USER_AGENT,
+    extraContext: {
+      androidSdkVersion: 34,
+      hl: "en",
+      gl: "US",
+    },
+  },
+  {
+    name: "WEB",
+    clientName: "WEB",
+    clientVersion: "2.20250222.10.00",
+    userAgent: WEB_USER_AGENT,
+    extraContext: {
+      hl: "en",
+      gl: "US",
+      timeZone: "UTC",
+      utcOffsetMinutes: 0,
+    },
+  },
+  {
+    name: "IOS",
+    clientName: "IOS",
+    clientVersion: INNERTUBE_CLIENT_VERSION,
+    userAgent: IOS_USER_AGENT,
+    extraContext: {
+      deviceMake: "Apple",
+      deviceModel: "iPhone16,2",
+      osName: "iPhone",
+      osVersion: "17.5.1.21F90",
+      hl: "en",
+      gl: "US",
+    },
+  },
+  {
+    name: "MWEB",
+    clientName: "MWEB",
+    clientVersion: "2.20250222.10.00",
+    userAgent: WEB_USER_AGENT,
+    extraContext: {
+      hl: "en",
+      gl: "US",
+      timeZone: "UTC",
+      utcOffsetMinutes: 0,
+    },
+  },
+];
+
+async function readInnerTubeWithClient(
+  videoId: string,
+  client: InnerTubeClientConfig,
+  deadline: Deadline,
+): Promise<RawPlayer | null> {
   try {
+    const body: Record<string, unknown> = {
+      context: {
+        client: {
+          clientName: client.clientName,
+          clientVersion: client.clientVersion,
+          ...(client.extraContext || {}),
+        },
+      },
+      videoId,
+      contentCheckOk: true,
+      racyCheckOk: true,
+    };
+
     const response = await fetchWithDeadline(
       INNERTUBE_API_URL,
       {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "user-agent": INNERTUBE_USER_AGENT,
+          "user-agent": client.userAgent,
           "accept-language": "en-US,en;q=0.9",
           origin: "https://www.youtube.com",
           referer: `https://www.youtube.com/watch?v=${videoId}`,
+          "x-youtube-client-name": client.clientName === "WEB" || client.clientName === "MWEB" ? "1" : client.clientName === "IOS" ? "5" : "3",
+          "x-youtube-client-version": client.clientVersion,
         },
-        body: JSON.stringify({
-          context: {
-            client: {
-              clientName: "ANDROID",
-              clientVersion: INNERTUBE_CLIENT_VERSION,
-              androidSdkVersion: 34,
-              hl: "en",
-              gl: "US",
-            },
-          },
-          videoId,
-          contentCheckOk: true,
-          racyCheckOk: true,
-        }),
+        body: JSON.stringify(body),
       },
       deadline,
     );
     if (response.status === 429) {
-      throw new TranscriptError("too_many_requests", "YouTube is limiting player requests from this server.");
+      throw new TranscriptError("too_many_requests", "YouTube is limiting transcript requests from this network. Please try again in a little while.");
     }
     if (!response.ok) return null;
     const json = (await response.json()) as unknown;
     const player = readPlayerResponse(json);
     return player;
   } catch (error) {
-    // A rate limit must reach the page as a rate limit, not disappear into
-    // the watch-page fallback (which would only hit the same wall).
     if (error instanceof TranscriptError && error.code === "too_many_requests") throw error;
+    if (error instanceof TranscriptError && error.code === "timeout") throw error;
     return null;
   }
+}
+
+async function readInnerTubeAllClients(videoId: string, deadline: Deadline): Promise<RawPlayer | null> {
+  let lastPlayerWithoutTracks: RawPlayer | null = null;
+  for (const client of INNERTUBE_CLIENTS) {
+    if (remainingMs(deadline) < 500) break; // almost out of budget
+    let player: RawPlayer | null = null;
+    try {
+      player = await readInnerTubeWithClient(videoId, client, deadline);
+    } catch (error) {
+      if (error instanceof TranscriptError && error.code === "too_many_requests") throw error;
+      if (error instanceof TranscriptError && error.code === "timeout") {
+        // If we timed out on first client, try next quickly before giving up
+        if (client.name !== "ANDROID") continue;
+        throw error;
+      }
+      continue;
+    }
+    if (!player) continue;
+    // If this client says bot/login, remember it but try next client before failing
+    if (!player.tracks.length && isBotOrLoginReason(player.reason)) {
+      lastPlayerWithoutTracks = player;
+      continue;
+    }
+    if (player.tracks.length) return player;
+    // No tracks but not a bot reason — keep as fallback
+    if (!lastPlayerWithoutTracks) lastPlayerWithoutTracks = player;
+  }
+  return lastPlayerWithoutTracks;
 }
 
 async function readWatchPage(videoId: string, deadline: Deadline): Promise<RawPlayer | null> {
@@ -401,11 +518,12 @@ async function readWatchPage(videoId: string, deadline: Deadline): Promise<RawPl
       { headers: PLAYER_HEADERS },
       deadline,
     );
-  } catch {
+  } catch (error) {
+    if (error instanceof TranscriptError) throw error;
     return null;
   }
   if (response.status === 429) {
-    throw new TranscriptError("too_many_requests", "YouTube is limiting page requests from this server.");
+    throw new TranscriptError("too_many_requests", "YouTube is temporarily limiting transcript requests from this network. Please try again in a little while.");
   }
   if (!response.ok) return null;
   let html = "";
@@ -414,12 +532,90 @@ async function readWatchPage(videoId: string, deadline: Deadline): Promise<RawPl
   } catch {
     return null;
   }
-  if (/class="g-recaptcha"/.test(html)) {
-    throw new TranscriptError("too_many_requests", "YouTube is asking this server to prove it is not a bot.");
+  const lowerHtml = html.toLowerCase();
+  if (
+    /class="g-recaptcha"/.test(html) ||
+    lowerHtml.includes("sign in to confirm you're not a bot") ||
+    lowerHtml.includes("confirm you're not a bot") ||
+    lowerHtml.includes("confirm you are not a bot") ||
+    /detected unusual traffic/.test(lowerHtml)
+  ) {
+    throw new TranscriptError("too_many_requests", "YouTube is temporarily limiting transcript requests from this network. Please try again in a little while.");
   }
   const playerJson = parseInlineJson(html, "ytInitialPlayerResponse");
   if (!playerJson) return null;
   return readPlayerResponse(playerJson);
+}
+
+/**
+ * Legacy timedtext list endpoint — sometimes works when InnerTube is blocked.
+ * https://www.youtube.com/api/timedtext?type=list&v=VIDEOID
+ */
+async function readTimedTextList(videoId: string, deadline: Deadline): Promise<RawPlayer | null> {
+  let response: Response;
+  try {
+    response = await fetchWithDeadline(
+      `https://www.youtube.com/api/timedtext?type=list&v=${encodeURIComponent(videoId)}&hl=en`,
+      {
+        headers: {
+          "user-agent": WEB_USER_AGENT,
+          "accept-language": "en-US,en;q=0.9",
+          accept: "text/xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+      },
+      deadline,
+    );
+  } catch (error) {
+    if (error instanceof TranscriptError) throw error;
+    return null;
+  }
+  if (response.status === 429) {
+    throw new TranscriptError("too_many_requests", "YouTube is temporarily limiting transcript requests from this network. Please try again in a little while.");
+  }
+  if (!response.ok) return null;
+  let xml = "";
+  try {
+    xml = await response.text();
+  } catch {
+    return null;
+  }
+  const lower = xml.toLowerCase();
+  if (
+    lower.includes("sign in to confirm you're not a bot") ||
+    lower.includes("confirm you're not a bot") ||
+    lower.includes("class=\"g-recaptcha\"")
+  ) {
+    throw new TranscriptError("too_many_requests", "YouTube is temporarily limiting transcript requests from this network. Please try again in a little while.");
+  }
+  // Parse <track lang_code="en" name="English" kind="asr" ...>
+  const tracks: RawTrack[] = [];
+  const seen = new Set<string>();
+  const trackRegex = /<track[^>]+>/g;
+  let match: RegExpExecArray | null;
+  while ((match = trackRegex.exec(xml)) !== null) {
+    const tag = match[0];
+    const langMatch = tag.match(/lang_code="([^"]+)"/);
+    const nameMatch = tag.match(/name="([^"]*)"/);
+    const kindMatch = tag.match(/kind="([^"]*)"/);
+    const lang = langMatch ? langMatch[1].trim().toLowerCase() : "";
+    if (!lang) continue;
+    const label = nameMatch ? decodeTranscriptEntities(nameMatch[1]).trim() : transcriptLanguageLabel(lang);
+    const kind = kindMatch ? kindMatch[1].trim().toLowerCase() : "";
+    const autoGenerated = kind === "asr";
+    const key = `${lang}|${autoGenerated ? "asr" : "manual"}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    // Build a baseUrl that fetchCaptionCues can use — host-locked to youtube.com
+    const baseUrl = `https://www.youtube.com/api/timedtext?lang=${encodeURIComponent(lang)}&v=${encodeURIComponent(videoId)}`;
+    tracks.push({ baseUrl, language: lang, label: label || transcriptLanguageLabel(lang), autoGenerated });
+  }
+  if (!tracks.length) return null;
+  return {
+    tracks,
+    title: "",
+    playability: "OK",
+    reason: "",
+  };
 }
 
 /* ── Caption body parsing ───────────────────────────────────────────────── */
@@ -597,10 +793,13 @@ async function fetchCaptionCues(track: RawTrack, deadline: Deadline): Promise<Ra
   try {
     const response = await fetchWithDeadline(json3.toString(), { headers }, deadline);
     if (response.status === 429) {
-      throw new TranscriptError("too_many_requests", "YouTube is limiting caption downloads right now.");
+      throw new TranscriptError("too_many_requests", "YouTube is temporarily limiting transcript requests from this network. Please try again in a little while.");
     }
     if (response.ok) {
       const body = await response.text();
+      if (/not a bot|sign in to confirm|g-recaptcha|unusual traffic/i.test(body)) {
+        throw new TranscriptError("too_many_requests", "YouTube is temporarily limiting transcript requests from this network. Please try again in a little while.");
+      }
       if (body.trim().startsWith("{")) {
         const cues = parseCaptionJson3(body);
         if (cues.length) return cues;
@@ -615,12 +814,15 @@ async function fetchCaptionCues(track: RawTrack, deadline: Deadline): Promise<Ra
   // The plain track URL (classic XML/srv3) as the second chance.
   const response = await fetchWithDeadline(url.toString(), { headers }, deadline);
   if (response.status === 429) {
-    throw new TranscriptError("too_many_requests", "YouTube is limiting caption downloads right now.");
+    throw new TranscriptError("too_many_requests", "YouTube is temporarily limiting transcript requests from this network. Please try again in a little while.");
   }
   if (!response.ok) {
     throw new TranscriptError("no_transcript", "YouTube did not return this caption track.");
   }
   const body = await response.text();
+  if (/not a bot|sign in to confirm|g-recaptcha|unusual traffic/i.test(body)) {
+    throw new TranscriptError("too_many_requests", "YouTube is temporarily limiting transcript requests from this network. Please try again in a little while.");
+  }
   const xmlCues = parseCaptionXml(body);
   if (xmlCues.length) return xmlCues;
   throw new TranscriptError("no_transcript", "This caption track came back empty.");
@@ -668,44 +870,78 @@ export async function fetchYouTubeTranscript(videoIdInput: string, requestedLang
   if (cached) return cached;
 
   const deadline = createDeadline();
-  let player = await readInnerTube(videoId, deadline);
-  // InnerTube can answer with playable metadata but no caption list (age /
-  // region / bot checks); the public watch page often still carries the
-  // tracks, so it is always consulted when the first answer had none.
-  if (!player || !player.tracks.length) {
-    const page = await readWatchPage(videoId, deadline);
-    if (page?.tracks.length) player = page;
-    else if (!player) player = page;
+  let player: RawPlayer | null = null;
+
+  // 1. Try all InnerTube clients — ANDROID first, then WEB, IOS, MWEB
+  try {
+    player = await readInnerTubeAllClients(videoId, deadline);
+  } catch (error) {
+    if (error instanceof TranscriptError) throw error;
+    player = null;
   }
+
+  // 2. InnerTube can answer with playable metadata but no caption list
+  // (age / region / bot checks); the public watch page often still carries
+  // the tracks, so it is always consulted when the first answer had none.
+  if (!player || !player.tracks.length) {
+    try {
+      const page = await readWatchPage(videoId, deadline);
+      if (page?.tracks.length) player = page;
+      else if (!player) player = page;
+    } catch (error) {
+      // A bot-check on the watch page is a rate limit — don't hide it behind
+      // the next fallback which would hit the same wall.
+      if (error instanceof TranscriptError && error.code === "too_many_requests") {
+        // But if we already have a player with tracks from InnerTube, keep it
+        if (!player || !player.tracks.length) throw error;
+      }
+    }
+  }
+
+  // 3. Legacy timedtext list — sometimes works when both InnerTube and watch
+  // page are gated. This is the final network attempt before giving up.
+  if (!player || !player.tracks.length) {
+    try {
+      const timed = await readTimedTextList(videoId, deadline);
+      if (timed?.tracks.length) player = timed;
+      else if (!player) player = timed;
+    } catch (error) {
+      if (error instanceof TranscriptError && error.code === "too_many_requests") {
+        if (!player || !player.tracks.length) throw error;
+      }
+    }
+  }
+
   if (!player) {
-    throw new TranscriptError("fetch_failed", "YouTube's player data could not be read.");
+    throw new TranscriptError("fetch_failed", "YouTube's player data could not be read. Please try again in a moment.");
   }
   if (!player.tracks.length) {
-    // YouTube tells us WHY a player carried no caption list. A private /
-    // age-gated / region-locked video is not the same thing as a video that
-    // simply has no captions, and a bot check is a rate limit — say so.
     const reason = player.reason || "";
     const status = player.playability.toUpperCase();
-    if (/bot|sign in|confirm/i.test(reason)) {
-      throw new TranscriptError("too_many_requests", reason);
+
+    // Bot / sign-in checks are ALWAYS rate limits with a friendly message —
+    // never leak YouTube's raw "Sign in to confirm you're not a bot" string
+    // to the learner, because the Transcript tab's copy is what they should see.
+    if (isBotOrLoginReason(reason) || status === "LOGIN_REQUIRED") {
+      throw new TranscriptError("too_many_requests", "YouTube is temporarily limiting transcript requests from this network. Please try again in a little while.");
     }
     if (status && status !== "OK") {
       throw new TranscriptError(
-        status === "LOGIN_REQUIRED" ? "too_many_requests" : "video_unavailable",
-        reason || "YouTube did not make this video playable.",
+        "video_unavailable",
+        "YouTube didn't share this video's player data. It may be private, age-restricted or region-locked.",
       );
     }
-    throw new TranscriptError("no_captions", "This video does not offer captions.");
+    throw new TranscriptError("no_captions", "This video has no captions (neither manual nor auto-generated), so there is no transcript to show.");
   }
 
   const chosen = chooseCaptionTrack(player.tracks, requested);
-  if (!chosen) throw new TranscriptError("no_captions", "This video does not offer captions.");
+  if (!chosen) throw new TranscriptError("no_captions", "This video has no captions (neither manual nor auto-generated), so there is no transcript to show.");
 
   const cues = await fetchCaptionCues(chosen, deadline);
-  if (!cues.length) throw new TranscriptError("no_transcript", "This caption track came back empty.");
+  if (!cues.length) throw new TranscriptError("no_transcript", "YouTube returned an empty caption track for this video. Try another video from the library.");
 
   const allSegments = groupTranscriptCues(cues);
-  if (!allSegments.length) throw new TranscriptError("no_transcript", "This caption track came back empty.");
+  if (!allSegments.length) throw new TranscriptError("no_transcript", "YouTube returned an empty caption track for this video. Try another video from the library.");
   const truncated = allSegments.length > MAX_SEGMENTS;
   const segments = truncated ? allSegments.slice(0, MAX_SEGMENTS) : allSegments;
 

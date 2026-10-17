@@ -304,7 +304,7 @@ export const YOUTUBE_KEY_ERROR_MESSAGES: Record<YouTubeKeyErrorCode, string> = {
   quota:
     "Is key ki daily quota khatam ho gayi hai. Kal try karo, ya doosri key use karo.",
   referrer:
-    "Google ne request rok di — is key ki “Website” restriction mein app ki site ka address add karna hoga.",
+    "Google ne request rok di — is key ki “Website” restriction mein app ki site ka address add karna hoga. APK / PWA / localhost sab jagah chalana hai to Google Cloud → Credentials → API key → Application restriction ko 'None' kar do, ya har origin add karo (https://yourdomain.com/*, http://localhost/*, capacitor://*).",
   network: "Network error — apna internet check karke dobara try karo.",
   unknown: "YouTube se connect nahi ho paya. Dobara try karo.",
 };

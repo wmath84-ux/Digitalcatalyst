@@ -121,21 +121,32 @@ const copyToClipboard = async (text: string): Promise<boolean> => {
 
 function ErrorState({
   message,
+  code,
   watchUrl,
   onRetry,
 }: {
   message: string;
+  code?: string;
   watchUrl: string;
   onRetry: () => void;
 }) {
+  const isRateLimited = code === "too_many_requests";
+  const isNoCaptions = code === "no_captions";
   return (
-    <div className="course-transcript__state" data-course-transcript-error role="alert">
+    <div className="course-transcript__state" data-course-transcript-error role="alert" data-course-transcript-error-code={code || ""}>
       <span className="course-transcript__state-icon course-transcript__state-icon--warn">
         <AlertTriangle size={24} aria-hidden="true" />
       </span>
       <p className="course-transcript__state-eyebrow">Transcript unavailable</p>
-      <h3 className="course-transcript__state-title">We couldn't read this video's captions</h3>
+      <h3 className="course-transcript__state-title">
+        {isRateLimited ? "YouTube is limiting requests right now" : isNoCaptions ? "No captions for this video" : "We couldn't read this video's captions"}
+      </h3>
       <p className="course-transcript__state-copy">{message}</p>
+      {isRateLimited ? (
+        <p className="course-transcript__state-copy course-transcript__state-copy--hint">
+          This happens when many transcript requests come from the same network. Waiting a minute and retrying usually works. You can also open the video on YouTube and use its own transcript button (⋯ → Show transcript).
+        </p>
+      ) : null}
       <div className="course-transcript__actions">
         <button type="button" className="course-transcript__btn course-transcript__btn--primary" onClick={onRetry} data-course-transcript-retry>
           <RefreshCw size={14} aria-hidden="true" /> Try again
@@ -586,6 +597,7 @@ export default function TranscriptPanel({
           <div className="course-transcript__center">
             <ErrorState
               message={error?.message || TRANSCRIPT_ERROR_COPY.fetch_failed}
+              code={error?.code}
               watchUrl={watchUrl}
               onRetry={retry}
             />
