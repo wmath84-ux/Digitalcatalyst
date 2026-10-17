@@ -162,7 +162,7 @@ test("the switch starts on the learner's own key, and the master is one tap away
 test("with no master key configured the master option stays out of the way", async () => {
   const chosen = [];
   fixture.mountSwitch(host(), {
-    engine: "google",
+    engine: "youtube",
     uid: "learner-1",
     masterAvailable: false,
     onChoose: (source) => chosen.push(source),
@@ -178,17 +178,3 @@ test("with no master key configured the master option stays out of the way", asy
   assert.deepEqual(chosen, [], "and it cannot be chosen");
 });
 
-test("both Settings cards carry the switch — one per engine", () => {
-  const youtube = fs.readFileSync(path.join(ROOT, "src/course/YouTubeKeyCard.tsx"), "utf8");
-  const google = fs.readFileSync(path.join(ROOT, "src/course/GoogleSearchCard.tsx"), "utf8");
-
-  assert.match(youtube, /import KeySourceSwitch from "\.\/KeySourceSwitch";/);
-  assert.match(youtube, /<KeySourceSwitch[\s\S]*?engine="youtube"/);
-  assert.match(youtube, /masterAvailable=\{masterYouTubeKeyAvailable\(\)\}/);
-  assert.match(youtube, /onChoose=\{\(source\) => setYouTubeKeySource\(source, uid\)\}/);
-
-  assert.match(google, /import KeySourceSwitch from "\.\/KeySourceSwitch";/);
-  assert.match(google, /<KeySourceSwitch[\s\S]*?engine="google"/);
-  assert.match(google, /masterAvailable=\{masterGoogleSearchAvailable\(\)\}/);
-  assert.match(google, /onChoose=\{\(source\) => setGoogleSearchSource\(source, uid\)\}/);
-});

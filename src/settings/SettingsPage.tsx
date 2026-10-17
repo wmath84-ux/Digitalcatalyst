@@ -4,8 +4,8 @@ import {
   ArrowUpRight,
   Bell,
   BriefcaseBusiness,
-  Check,
   Globe,
+  Check,
   Home,
   ChevronRight,
   KeyRound,
@@ -33,7 +33,6 @@ import {
 } from "../utils/footerNavigationVisibility";
 import { setWorkLaunchChoice, useWorkLaunchChoice, type WorkLaunchChoice } from "../work/storage/workPrefs";
 import YouTubeKeyCard from "../course/YouTubeKeyCard";
-import GoogleSearchCard from "../course/GoogleSearchCard";
 import "./settings.css";
 
 const LABELS: Record<PreferenceKey, string> = {
@@ -296,16 +295,6 @@ export default function SettingsPage() {
                 </div>
               </div>
               <YouTubeKeyCard uid={user?.id ?? null} className="settings-youtube-key-card" />
-            </section>
-            <section className="settings-section" aria-labelledby="settings-google-search" data-google-search-section>
-              <div className="settings-section-heading">
-                <span className="settings-section-icon" aria-hidden="true"><Globe size={19} /></span>
-                <div className="settings-section-heading-copy">
-                  <div className="settings-section-title-row"><h2 id="settings-google-search">Google search</h2><span className="settings-section-count">Apni configuration</span></div>
-                  <p>Course Player ke search box me Google icon dabane par poore web ka search khulta hai. Iske liye ek Google API key aur ek Programmable Search Engine ID (cx) chahiye — dono aap apne Google account se banate ho aur sirf aapke device ke browser me save hote hain. Neeche switch se chuno: <strong>meri apni configuration</strong> ya <strong>master ki configuration</strong> — aapki quota khatam ho jaye to master ki configuration apne aap chalu ho jati hai.</p>
-                </div>
-              </div>
-              <GoogleSearchCard uid={user?.id ?? null} className="settings-google-search-card" />
             </section>
             <section className="settings-section" aria-labelledby="settings-navigation" data-footer-navigation-preference>
               <div className="settings-section-heading">

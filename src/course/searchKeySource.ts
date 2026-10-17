@@ -10,7 +10,7 @@
 //      no interruption, the search simply keeps working.
 //
 // So this module stores the CHOICE (per engine, per account, then per
-// device), and each engine module (musicSearch.ts, googleSearch.ts) reads it
+// device), and each engine module (musicSearch.ts) reads it
 // and does the handover.
 //
 // The choice is a PREFERENCE, never a trap: whichever way it is set, the
@@ -21,18 +21,16 @@
 export type SearchKeySource = "mine" | "master";
 
 /** The two engines that have a key to choose from. */
-export type SearchEngineId = "youtube" | "google";
+export type SearchEngineId = "youtube";
 
 /** This browser's slot for the choice — one per engine. */
 const SOURCE_STORAGE: Record<SearchEngineId, string> = {
   youtube: "dc.music.youtubeKey.source",
-  google: "dc.google.searchKey.source",
 };
 
 /** The per-account slots — "this learner's own choice". */
 const SOURCE_USER_PREFIX: Record<SearchEngineId, string> = {
   youtube: "dc.music.youtubeKey.source.u.",
-  google: "dc.google.searchKey.source.u.",
 };
 
 /** Fired after the choice is written, so a live page re-reads it. */

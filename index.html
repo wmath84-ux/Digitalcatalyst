@@ -22,14 +22,10 @@
     <!-- Optional integrations. Vite substitutes %VITE_*% from .env / the
          host's env settings (see .env.example); the Course Player's Music tab
          turns its YouTube search on when a key is present and falls back to
-         YouTube's own search page when it is not, and the Resource Library's
-         Google icon opens the web search when a Google key + Search Engine ID
-         are present (and falls back to google.com when they are not). An
+         YouTube's own search page when it is not. An
          un-substituted %…% placeholder counts as "not configured". -->
     <script>
       window.__DC_YOUTUBE_API_KEY__ = "%VITE_YOUTUBE_API_KEY%";
-      window.__DC_GOOGLE_SEARCH_API_KEY__ = "%VITE_GOOGLE_SEARCH_API_KEY%";
-      window.__DC_GOOGLE_SEARCH_CX__ = "%VITE_GOOGLE_SEARCH_CX%";
     </script>
     <title>Eduvora | Digital Catalyst</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />

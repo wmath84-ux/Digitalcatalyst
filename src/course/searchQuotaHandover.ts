@@ -23,7 +23,7 @@
 // because that is where the daily budget actually rolls over.
 
 /** The two engines that burn a daily quota. */
-export type QuotaEngine = "youtube" | "google";
+export type QuotaEngine = "youtube";
 
 /** Google's own reset timezone — the daily budget rolls over there. */
 export const QUOTA_RESET_TIME_ZONE = "America/Los_Angeles";
@@ -31,13 +31,11 @@ export const QUOTA_RESET_TIME_ZONE = "America/Los_Angeles";
 /** This browser's slot — "my own quota is gone until …". */
 const SLOT: Record<QuotaEngine, string> = {
   youtube: "dc.music.youtubeKey.quota",
-  google: "dc.google.searchKey.quota",
 };
 
 /** The per-account slots — "this learner's own quota is gone until …". */
 const USER_PREFIX: Record<QuotaEngine, string> = {
   youtube: "dc.music.youtubeKey.quota.u.",
-  google: "dc.google.searchKey.quota.u.",
 };
 
 /** The slot the memory lives in — the account's, else this device's. */

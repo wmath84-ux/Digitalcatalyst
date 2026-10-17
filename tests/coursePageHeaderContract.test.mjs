@@ -43,7 +43,6 @@ const PAGES = [
   ["src/course/CourseBrainPanel.tsx", "Brain"],
   ["src/course/ExperimentPanel.tsx", "Live Experiment"],
   ["src/course/ReadLibraryPanel.tsx", "Read library"],
-  ["src/course/TranscriptPanel.tsx", "Transcript"],
   ["src/course/PersonalModulesPanel.tsx", "My Modules"],
   ["src/course/PlayerPanel.tsx", "Player"],
   ["src/course/CourseOverlay.tsx", "Paid content"],
@@ -177,7 +176,6 @@ test("the other pages sit on approximately 95% pure white", () => {
     "data-course-experiment-panel",
     "data-course-read-panel",
     "data-course-music-panel",
-    "data-course-transcript-panel",
     "data-course-personal-modules",
     "data-course-player-panel",
     // The mind map's pages are headless now, so they wear their own --mm-*

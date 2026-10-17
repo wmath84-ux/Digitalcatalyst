@@ -55,13 +55,6 @@ import { editableGoogleKind, getCourseDownload, isPdfJsEmbed, pdfJsSourceUrl, ge
 import { useDocsEditorAccess } from "../hooks/useDocsEditorAccess";
 import { resumePosition, type CoursePlaybackPatch, type CoursePlaybackStore } from "./playbackState";
 import { toggleFullscreen as toggleAppFullscreen } from "../utils/fullscreen";
-import {
-  reportYouTubeCaptionTracks,
-  reportYouTubeProgress,
-  subscribeYouTubeCaptionsRequest,
-  subscribeYouTubeSeek,
-  type YouTubeCaptionTrack,
-} from "./youtubePlayerBus";
 
 /**
  * The ACTIVE file's action model, reported live to the Course Player so the
@@ -499,19 +492,9 @@ function DirectVideo({ url, active, resumeAt, onProgress }: { url: string; activ
 interface YouTubePlayer {
   pauseVideo: () => void;
   playVideo?: () => void;
-  /** The transcript page's timestamp taps land here. */
-  seekTo?: (seconds: number, allowSeekAhead?: boolean) => void;
   getCurrentTime: () => number;
   getDuration: () => number;
   destroy: () => void;
-  /**
-   * The IFrame API's own module/option readers. `getOption("captions",
-   * "tracklist")` is YouTube telling US which caption tracks this video offers
-   * — the one answer that needs no scraping and no API key, which is why the
-   * Transcript page asks for it when a fetch comes back empty.
-   */
-  getOptions?: () => string[];
-  getOption?: (module: string, option: string) => unknown;
 }
 
 type YouTubeApiWindow = Window & {
@@ -549,22 +532,6 @@ function YouTubeFrame({ url, watchUrl, title, active, resumeAt, onProgress }: { 
   const resumeRef = useRef(resumeAt);
   const progressRef = useRef(onProgress);
   progressRef.current = onProgress;
-  /**
-   * The active flag as the player's own timers see it. The viewer stack keeps
-   * every opened file mounted, so a hidden player must never publish its
-   * paused position as "now playing" for a transcript.
-   */
-  const activeRef = useRef(active);
-  activeRef.current = active;
-  /** A seek that arrived before the IFrame API was ready. */
-  const pendingSeekRef = useRef<number | null>(null);
-  /**
-   * The plain-embed fallback cannot seek through the API (the API never
-   * loaded), so a transcript tap reloads that frame at the requested second
-   * with autoplay on. The nonce makes a second tap on the same second reload
-   * too instead of being ignored as an unchanged `src`.
-   */
-  const [manualSeek, setManualSeek] = useState<{ seconds: number; nonce: number } | null>(null);
 
   const videoId = (() => {
     const match = url.match(/\/embed\/([^?/#]+)/);
@@ -619,17 +586,6 @@ function YouTubeFrame({ url, watchUrl, title, active, resumeAt, onProgress }: { 
             if (readyTimeout) clearTimeout(readyTimeout);
             if (cancelled) return;
             setLoading(false);
-            // A timestamp tapped while the player was booting is honoured now.
-            const pending = pendingSeekRef.current;
-            if (pending !== null) {
-              pendingSeekRef.current = null;
-              try {
-                playerRef.current?.seekTo?.(pending, true);
-                playerRef.current?.playVideo?.();
-                progressRef.current(pending, playerRef.current?.getDuration?.() || 0);
-                reportYouTubeProgress({ videoId, position: pending, duration: playerRef.current?.getDuration?.() || 0 });
-              } catch { /* player refused the seek; the poll still banks it */ }
-            }
           },
           onError: () => {
             ready.value = true;
@@ -639,7 +595,6 @@ function YouTubeFrame({ url, watchUrl, title, active, resumeAt, onProgress }: { 
         },
       });
       // Bank the position every second so an abrupt exit loses at most 1s.
-      // The ACTIVE player also announces its clock to the Transcript tab.
       poll = setInterval(() => {
         const player = playerRef.current;
         if (!player?.getCurrentTime) return;
@@ -647,7 +602,6 @@ function YouTubeFrame({ url, watchUrl, title, active, resumeAt, onProgress }: { 
           const position = player.getCurrentTime() || 0;
           const duration = player.getDuration() || 0;
           progressRef.current(position, duration);
-          if (activeRef.current) reportYouTubeProgress({ videoId, position, duration });
         } catch { /* player not ready yet */ }
       }, 1000);
     });
@@ -674,93 +628,12 @@ function YouTubeFrame({ url, watchUrl, title, active, resumeAt, onProgress }: { 
     } catch { /* player torn down */ }
   }, [active]);
 
-  // ── Transcript timestamps ─────────────────────────────────────────────
-  // The Transcript page lives in the study pane; this effect is the player's
-  // half of the contract. Only the ACTIVE player for THIS video reacts, so a
-  // hidden copy of the same lesson can never start playing behind the page.
-  useEffect(() => {
-    if (!videoId) return undefined;
-    // If the IFrame API gave up while a timestamp tap was waiting for it,
-    // honour that tap in the plain-embed fallback instead of dropping it.
-    const waiting = pendingSeekRef.current;
-    if (apiFailed && waiting !== null) {
-      pendingSeekRef.current = null;
-      setManualSeek({ seconds: waiting, nonce: Date.now() });
-      reportYouTubeProgress({ videoId, position: waiting, duration: 0 });
-    }
-    return subscribeYouTubeSeek((detail) => {
-      if (!detail || detail.videoId !== videoId || !activeRef.current) return;
-      const seconds = Math.max(0, Number(detail.seconds) || 0);
-      const player = playerRef.current;
-      if (player?.seekTo) {
-        try {
-          player.seekTo(seconds, true);
-          player.playVideo?.();
-          const duration = player.getDuration?.() || 0;
-          progressRef.current(seconds, duration);
-          reportYouTubeProgress({ videoId, position: seconds, duration });
-          return;
-        } catch { /* fall through to the pending/fallback path */ }
-      }
-      if (!apiFailed) {
-        // Still booting: apply the seek the moment `onReady` fires.
-        pendingSeekRef.current = seconds;
-        return;
-      }
-      // The IFrame API never arrived — reload the plain embed at this second.
-      setManualSeek({ seconds, nonce: Date.now() });
-      reportYouTubeProgress({ videoId, position: seconds, duration: 0 });
-    });
-  }, [videoId, apiFailed]);
-
-  // ── The caption probe ───────────────────────────────────────────────────
-  // The Transcript page asks "does this video have captions?" when a fetch
-  // came back empty. Only the ACTIVE player for THIS video answers, and the
-  // answer comes from YouTube's own caption module — so a "no captions"
-  // message is never shown for a video that plainly has them, and a real
-  // caption-less video is never blamed on the network.
-  useEffect(() => {
-    if (!videoId) return undefined;
-    return subscribeYouTubeCaptionsRequest((requestedId) => {
-      if (requestedId !== videoId || !activeRef.current) return;
-      const player = playerRef.current;
-      const tracks: YouTubeCaptionTrack[] = [];
-      try {
-        const modules = player?.getOptions?.() || [];
-        if (modules.includes("captions")) {
-          const list = player?.getOption?.("captions", "tracklist");
-          if (Array.isArray(list)) {
-            for (const entry of list) {
-              const record = (entry || {}) as Record<string, unknown>;
-              const languageCode = String(record.languageCode || record.language || "").trim();
-              if (!languageCode) continue;
-              tracks.push({
-                languageCode,
-                displayName: String(record.displayName || record.languageName || record.name || languageCode).trim(),
-                kind: String(record.kind || "").trim().toLowerCase(),
-              });
-            }
-          }
-        }
-      } catch {
-        // A player that is not ready simply has nothing to report; the probe
-        // then times out and the page treats the answer as "unknown".
-      }
-      reportYouTubeCaptionTracks({ videoId, tracks });
-    });
-  }, [videoId]);
-
   // No IFrame API available (offline / blocked) — fall back to the plain
   // embed, still resuming via the `start` parameter.
   if (apiFailed || !videoId) {
     const separator = url.includes("?") ? "&" : "?";
-    // The ordinary resume path is unchanged: the first frame is already the
-    // stored second. A transcript seek on this API-less fallback reloads the
-    // frame at the requested second instead, with autoplay on.
-    const resumeUrl = resumeRef.current > 0 ? `${url}${separator}start=${Math.floor(resumeRef.current)}` : url;
-    const fallbackUrl = manualSeek
-      ? `${url}${separator}start=${Math.floor(manualSeek.seconds)}&autoplay=1`
-      : resumeUrl;
+    // The first frame is the stored resume second.
+    const fallbackUrl = resumeRef.current > 0 ? `${url}${separator}start=${Math.floor(resumeRef.current)}` : url;
     // If the privacy-enhanced host is the one being filtered by a browser,
     // give the ordinary player one chance to use an existing YouTube session.
     // This is still only an iframe fallback; authentication is never attempted
@@ -768,7 +641,7 @@ function YouTubeFrame({ url, watchUrl, title, active, resumeAt, onProgress }: { 
     const standardFallbackUrl = fallbackUrl.replace("www.youtube-nocookie.com", "www.youtube.com");
     return (
       <EmbedFrame
-        key={manualSeek ? `seek-${manualSeek.nonce}` : "resume"}
+        key="resume"
         url={standardFallbackUrl}
         originalUrl={watchUrl}
         title={title}

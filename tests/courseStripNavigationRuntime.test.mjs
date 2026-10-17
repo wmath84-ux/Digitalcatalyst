@@ -61,13 +61,13 @@ const Nav = load('src/course/CoursePeekDock.tsx', id => {
   return require(id);
 }).default;
 test('real strip render, click, keyboard focus, hidden tabs and soft keyboard', async () => {
-  assert.equal(tabs.length, 11);
+  assert.equal(tabs.length, 10);
   const root = createRoot(document.getElementById('root'));
   const selected = [];
   const render = () => root.render(React.createElement(Nav, { tab: 'notes', hiddenTabs: ['paid'], onTabChange: key => selected.push(key) }));
   await act(render);
   const buttons = [...document.querySelectorAll('button')];
-  assert.equal(buttons.length, 10);
+  assert.equal(buttons.length, 9);
   assert.equal(document.querySelector('[data-course-strip="paid"]'), null);
   // The Workspace pill's cells: every tool is a work-nav cell with its icon…
   assert.ok(buttons.every(button => button.hasAttribute('data-work-nav-cell') && button.querySelector('svg')));
@@ -122,7 +122,7 @@ test('the page rule hides the real strip — and Settings "always" brings it bac
   await act(render);
   const nav = document.querySelector('nav');
   assert.ok(nav, 'the Settings choice keeps it on the page');
-  assert.equal(nav.querySelectorAll('[data-course-strip]').length, 11, 'every tool is still there');
+  assert.equal(nav.querySelectorAll('[data-course-strip]').length, 10, 'every tool is still there');
 
   // Unticking it hands the page rule its say back.
   footerAlwaysVisible = false;
@@ -236,7 +236,7 @@ test('the placeable navigation renders every tool with its label, and respects h
   await act(render);
 
   const items = [...host.querySelectorAll('[data-dc-header-nav-tab]')];
-  assert.equal(items.length, 10, 'every tool except the hidden one');
+  assert.equal(items.length, 9, 'every tool except the hidden one');
   assert.equal(host.querySelector('[data-dc-header-nav-tab="paid"]'), null, 'a learner-authored course hides Paid');
   assert.ok(
     items.every((item) => item.querySelector('svg') && item.querySelector('[data-dc-header-nav-label]')?.textContent.trim().length > 0),

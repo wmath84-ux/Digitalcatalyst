@@ -39,10 +39,8 @@ function load(file) {
   const mod = { exports: {} };
   const resolve = (id) => {
     if (id.endsWith('.css')) return {};
-    // googleSearch.ts can also send a query through the app's own server
-    // (/api/google-search). The real apiBase reads `import.meta.env` and walks
-    // several origins, which this CJS harness cannot evaluate; a pass-through
-    // to the stubbed global fetch keeps that path observable.
+    // The real apiBase reads `import.meta.env`, which this CJS harness cannot
+    // evaluate; a pass-through to the stubbed global fetch keeps it observable.
     if (id.endsWith('utils/apiBase')) {
       return {
         apiFetch: (url, init) => globalThis.fetch(url, init),
@@ -65,7 +63,6 @@ function load(file) {
 }
 
 const music = load('src/course/musicSearch.ts');
-const google = load('src/course/googleSearch.ts');
 const handover = load('src/course/searchQuotaHandover.ts');
 
 /* ── a stubbed network + a clock we can move ────────────────────────────── */
@@ -99,8 +96,6 @@ const resetWorld = () => {
   installFetch();
   store.clear();
   delete globalThis.__DC_YOUTUBE_API_KEY__;
-  delete globalThis.__DC_GOOGLE_SEARCH_API_KEY__;
-  delete globalThis.__DC_GOOGLE_SEARCH_CX__;
   now = Date.parse('2026-10-17T12:00:00Z');
 };
 
@@ -114,7 +109,7 @@ after(() => {
 
 /* ── the reset moment ───────────────────────────────────────────────────── */
 
-test("the daily reset is the next midnight in Google's own reset timezone", () => {
+test("the daily reset is the next midnight in the quota's own reset timezone", () => {
   resetWorld();
   const reset = handover.dailyQuotaResetAt(now);
   assert.ok(reset > now, 'the reset is always in the future');
@@ -205,50 +200,4 @@ test("YouTube: a NEW key is a fresh budget — the old pause is dropped", async 
   music.saveYouTubeKey('fresh-key');
   assert.equal(handover.ownQuotaExhausted('youtube'), false, 'a new key starts with a fresh daily budget');
   assert.equal(music.youTubeSearchPlan().key, 'fresh-key');
-});
-
-/* ── Google: the same curve ─────────────────────────────────────────────── */
-
-test('Google: the own configuration first, the master on a dead quota, the own one back after the reset', async () => {
-  resetWorld();
-  globalThis.__DC_GOOGLE_SEARCH_API_KEY__ = 'owner-key';
-  globalThis.__DC_GOOGLE_SEARCH_CX__ = 'owner-cx';
-  store.setItem(google.GOOGLE_SEARCH_KEY_STORAGE, 'learner-key');
-  store.setItem(google.GOOGLE_SEARCH_CX_STORAGE, 'learner-cx');
-
-  const plan = google.googleSearchPlan();
-  assert.equal(plan.apiKey, 'learner-key');
-  assert.equal(plan.origin, 'own');
-  assert.equal(plan.handover.apiKey, 'owner-key');
-
-  responder = () => {
-    const key = new URL(calls[calls.length - 1]).searchParams.get('key');
-    if (key === 'learner-key') return quotaError();
-    return { ok: true, json: () => Promise.resolve({ items: [] }) };
-  };
-  const outcome = await google.searchGoogleOutcome('kuch bhi');
-  assert.equal(outcome.error, null, 'the learner sees no error');
-  assert.equal(outcome.usedFallback, true, "the master's configuration took over");
-  assert.equal(calls.length, 2, 'the very same query was re-sent');
-
-  const paused = google.googleSearchPlan();
-  assert.equal(paused.apiKey, 'owner-key', 'the master is in charge while the quota is spent');
-  assert.equal(paused.origin, 'master');
-
-  now = handover.dailyQuotaResetAt(now) + 1000;
-  const restored = google.googleSearchPlan();
-  assert.equal(restored.apiKey, 'learner-key', 'the own configuration is back — nobody pressed anything');
-  assert.equal(restored.origin, 'own');
-});
-
-test('Google: a NEW configuration is a fresh budget — the old pause is dropped', () => {
-  resetWorld();
-  globalThis.__DC_GOOGLE_SEARCH_API_KEY__ = 'owner-key';
-  globalThis.__DC_GOOGLE_SEARCH_CX__ = 'owner-cx';
-  store.setItem(google.GOOGLE_SEARCH_KEY_STORAGE, 'learner-key');
-  store.setItem(google.GOOGLE_SEARCH_CX_STORAGE, 'learner-cx');
-  handover.markOwnQuotaExhausted('google');
-  assert.equal(handover.ownQuotaExhausted('google'), true);
-  google.saveGoogleSearchConfig('fresh-key', 'fresh-cx');
-  assert.equal(handover.ownQuotaExhausted('google'), false, 'a new configuration starts fresh');
 });

@@ -26,8 +26,6 @@
 // under it as usual. No sliding content animations.
 //
 //   - Modules   → every unlocked module (expandable to its files).
-//   - Transcript → the active YouTube lesson's captions, timestamp by
-//                 timestamp; a tap seeks that very video (owner, 2026-10-17).
 //   - Brain     → the practice sets the admin imported for this course's
 //                 modules (resource type "Brain · practice set"), rendered as
 //                 the revision test-taking page (src/course/CourseBrainPanel).
@@ -49,7 +47,7 @@ import {
 } from "react";
 import { DEFAULT_MODULE_LISTING_STYLE } from "./playerPreferences";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from "framer-motion";
-import { BookOpen, Brain, Captions, File, FileText, FlaskConical, LockKeyhole, Music, Network, NotebookPen, PenLine, ShoppingBag, Sparkles } from "lucide-react";
+import { BookOpen, Brain, File, FileText, FlaskConical, LockKeyhole, Music, Network, NotebookPen, PenLine, ShoppingBag, Sparkles } from "lucide-react";
 import { collectAccessibleReadResources } from "../../utils/readResources.js";
 import ReadLibraryPanel from "./ReadLibraryPanel";
 import type { ReadUpload } from "../../utils/readUploads.js";
@@ -75,7 +73,7 @@ import { buildPaidEntries, modulePriceLabel, type PaidContentEntry } from "./pai
 // library sheet's row marks (lock, count — and the price below).
 import "./courseResourceLibrary.css";
 
-export type DockTab = "modules" | "transcript" | "brain" | "notes" | "mindmap" | "ai" | "paid" | "player" | "experiment" | "sketch" | "read" | "music";
+export type DockTab = "modules" | "brain" | "notes" | "mindmap" | "ai" | "paid" | "player" | "experiment" | "sketch" | "read" | "music";
 export type DockOrientation = "portrait" | "landscape";
 
 type FlatModule = { module: CourseModule; depth: number };
@@ -351,12 +349,6 @@ interface CourseOverlayProps {
    */
   aiPanel?: ReactNode;
   /**
-   * The Transcript tab's page. Owned by the Course Player (it reads the file
-   * open in the lesson pane, and plays a YouTube search hit in the MAIN
-   * viewer), so this overlay stays presentational. Absent → a titled hint.
-   */
-  transcriptPanel?: ReactNode;
-  /**
    * The Brain tab's practice panel. Owned by the Course Player (it reads the
    * course tree's `brain` resources — the practice sets the admin imported on
    * the Product / Course-content page) and handed down ready-rendered, same
@@ -414,15 +406,6 @@ interface CourseOverlayProps {
  */
 export const TABS: Array<{ key: DockTab; label: string; heading: string; hint: string; color: string; icon: ComponentType<{ size?: number; className?: string; style?: CSSProperties }> }> = [
   { key: "modules", label: "Module", heading: "Modules", hint: "Lessons on a connected path", color: "#FFBE0B", icon: BookOpen },
-  // ── Transcript (owner brief, 2026-10-17) ────────────────────────────────
-  // "Resource Library button ke bagal mein footer navigation mein ek aur
-  // button add karo." It sits immediately after Module: the page follows the
-  // video that is open in the lesson pane, fetches its YouTube captions
-  // automatically, and every timestamp line seeks the player. Owned by the
-  // Course Player (the panel reads the selected file and the search key) and
-  // handed down ready-rendered, the same ownership pattern as the mind map,
-  // Brain and Music panels.
-  { key: "transcript", label: "Transcript", heading: "Transcript", hint: "Video ka poora text, timestamp ke saath", color: "#0EA5E9", icon: Captions },
   // The old Resources panel is gone — the Brain button sits in its slot: the
   // practice sets the admin imported for this course's modules (resource type
   // "Brain · practice set"), played back with the revision test-taking design.
@@ -484,13 +467,6 @@ export const MINDMAP_FALLBACK = (
 export const PLAYER_FALLBACK = (
   <p className="px-4 py-6 text-center text-[11px] font-semibold text-[var(--course-muted)]">
     Player settings abhi available nahi hain.
-  </p>
-);
-
-/** A call site without a transcript panel gets a hint, never a blank page. */
-export const TRANSCRIPT_FALLBACK = (
-  <p className="px-4 py-6 text-center text-[11px] font-semibold text-[var(--course-muted)]">
-    Transcript is course me abhi available nahi hai.
   </p>
 );
 
@@ -922,7 +898,6 @@ export function StudyContent({
   resourceLibraryPanel,
   musicPanel,
   paidPanel,
-  transcriptPanel,
   moduleListingStyle = DEFAULT_MODULE_LISTING_STYLE,
 }: {
   tab: DockTab;
@@ -943,11 +918,6 @@ export function StudyContent({
   resourceLibraryPanel?: ReactNode;
   /** Music — the glass player plus the learner's library. */
   musicPanel?: ReactNode;
-  /**
-   * Transcript — the active YouTube video's timestamped captions. This is the
-   * keyed tab body's slot; absent → a titled hint instead of a blank page.
-   */
-  transcriptPanel?: ReactNode;
   /** Paid — the library-design listing of purchasable content (PaidLibraryPanel). */
   paidPanel?: ReactNode;
   moduleListingStyle?: "classic" | "modern";
@@ -965,11 +935,6 @@ export function StudyContent({
         // Structured resource library: the full course hierarchy with note,
         // mind map, lesson and practice cards grouped by module/submodule.
         resourceLibraryPanel
-      ) : tab === "transcript" ? (
-        // The active lesson's transcript. Parent-owned, exactly like the
-        // music / mind map / Brain panels — the page has to read the file
-        // that is open in the OTHER pane.
-        transcriptPanel ?? TRANSCRIPT_FALLBACK
       ) : tab === "notes" ? (
         notesPanel
       ) : tab === "mindmap" ? (
@@ -1192,7 +1157,6 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       sketchPanel={props.sketchPanel}
       resourceLibraryPanel={props.resourceLibraryPanel}
       musicPanel={props.musicPanel}
-      transcriptPanel={props.transcriptPanel}
       paidPanel={paidLibraryNode}
     />
   );
@@ -1310,8 +1274,6 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           return props.quad?.playerPane ?? null;
         case "modules":
           return props.resourceLibraryPanel ?? RESOURCES_FALLBACK;
-        case "transcript":
-          return props.transcriptPanel ?? TRANSCRIPT_FALLBACK;
         case "notes":
           return notesPanelNode;
         case "mindmap":
