@@ -3,6 +3,7 @@ import { normalizeUserPreferences } from "../utils/userPreferences.js";
 import { adminDb, errorResponse, type VercelRequest, type VercelResponse } from "./_lib/firebaseAdmin.js";
 import { referralCodeForUid, runReferralRepairOnce } from "./_lib/referrals.js";
 import { handleEmbedProxy } from "./_lib/embedProxy.js";
+import { handleYouTubeTranscript } from "./_lib/youtubeTranscript.js";
 import { handleRevisionGenerate } from "./_lib/revisionGenerate.js";
 import { handleRevisionData } from "./_lib/revisionData.js";
 import { handleMyDay } from "./_lib/myDay.js";
@@ -143,6 +144,7 @@ const SHARED_ROUTES = [
   "subscription-gate",
   "course-access",
   "embed-proxy",
+  "youtube-transcript",
 ] as const;
 
 type SharedRoute = (typeof SHARED_ROUTES)[number];
@@ -180,6 +182,7 @@ const ROUTE_LABEL: Record<SharedRoute, string> = {
   "subscription-gate": "the subscription gate",
   "course-access": "course access verification",
   "embed-proxy": "the embed proxy",
+  "youtube-transcript": "the Course Player transcript",
 };
 
 const jsonBody = (res: VercelResponse, status: number, body: unknown) => res.status(status).json(body);
@@ -286,6 +289,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Which feature this request was addressed at, per vercel.json's rewrites.
   const route = sharedRouteAddressed(reqWithUrl);
   if (route === "course-access") return handleCourseAccess(req, res);
+  // Course Player → Transcript tab. `?v=<videoId>&lang=<code>` answers the
+  // timestamped caption lines. Public (no learner data), CDN-cacheable, and
+  // dispatched here because the Hobby plan's 12-function cap is full. It runs
+  // BEFORE the embed-proxy's `?url=` branch so a transcript request that
+  // carries a full watch URL is never mistaken for an embed.
+  if (route === "youtube-transcript") return handleYouTubeTranscript(req, res);
   if (route === "account/preferences") return handleAccountPreferences(req, res);
   if (route === "public-profile") return handlePublicProfile(req, res);
   if (matchesApiRoute(reqWithUrl, "manifest")) {

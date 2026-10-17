@@ -17,6 +17,7 @@ import type { ComponentType, CSSProperties } from "react";
 import {
   Brain,
   BookOpen,
+  Captions,
   FileText,
   FlaskConical,
   GraduationCap,
@@ -44,6 +45,7 @@ export type BlockPageKey =
   | "lesson"
   | "personal"
   | "modules"
+  | "transcript"
   | "notes"
   | "mindmap"
   | "sketch"
@@ -76,6 +78,7 @@ export interface BlockPageRecord {
 export const BLOCK_PAGE_ORDER: readonly BlockPageKey[] = [
   "lesson",
   "modules",
+  "transcript",
   "notes",
   "mindmap",
   "sketch",
@@ -92,6 +95,7 @@ export const BLOCK_PAGE_ORDER: readonly BlockPageKey[] = [
 export const BLOCK_PAGES: readonly BlockPageRecord[] = [
   { key: "lesson", label: "Lesson", hint: "Video / lesson viewer", icon: PlayCircle, accent: "#6366f1", accentTo: "#8b5cf6" },
   { key: "modules", label: "Module", hint: "Lessons on a connected path", icon: BookOpen, accent: "#2563eb", accentTo: "#38bdf8" },
+  { key: "transcript", label: "Transcript", hint: "Video ka text, timestamp ke saath", icon: Captions, accent: "#0ea5e9", accentTo: "#6366f1" },
   { key: "notes", label: "Note", hint: "Your private writing pad", icon: NotebookPen, accent: "#f59e0b", accentTo: "#f97316" },
   { key: "mindmap", label: "Mind map", hint: "Is module ka apna diagram", icon: Network, accent: "#8b5cf6", accentTo: "#d946ef" },
   { key: "sketch", label: "Sketch", hint: "Lecture ke saath likhein", icon: PenLine, accent: "#ec4899", accentTo: "#f43f5e" },
