@@ -1208,7 +1208,7 @@ export default function CourseResourceLibrary({
 
                   {googleOutcome?.usedFallback ? (
                     <p className="library-search-hint" data-library-google-fallback>
-                      Aapki configuration ka quota khatam ho gaya — ab master ki configuration se chal raha hai. Search chalta rahega.
+                      Aapki configuration ka daily quota khatam ho gaya — ab master ki configuration se chal raha hai. Search chalta rahega, aur jaise hi aapki quota reset hogi, apni configuration wapas apne aap chal hogi.
                     </p>
                   ) : null}
 

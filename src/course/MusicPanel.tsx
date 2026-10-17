@@ -584,7 +584,7 @@ export default function MusicPanel({ uid = null, courseAudio = [], active = true
    * search went on without a break, so this is one quiet line, not an alarm.
    */
   const fallbackNote = onlineError?.usedFallback
-    ? "Aapki key ka quota khatam ho gaya — ab master ki key se chal raha hai. Search chalta rahega."
+    ? "Aapki key ka daily quota khatam ho gaya — ab master ki key se chal raha hai. Search chalta rahega, aur jaise hi aapki quota reset hogi, apni key wapas apne aap chal hogi."
     : "";
   /** The format control rides with whatever is on screen: saved online songs,
    *  the search's own results, or a search in flight (the flash scan's rows). */

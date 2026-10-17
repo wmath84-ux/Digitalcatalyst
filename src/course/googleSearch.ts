@@ -41,6 +41,11 @@ import {
   writeSearchKeySource,
   type SearchKeySource,
 } from "./searchKeySource";
+import {
+  clearOwnQuotaExhausted,
+  markOwnQuotaExhausted,
+  ownQuotaExhausted,
+} from "./searchQuotaHandover";
 
 declare const __DC_GOOGLE_SEARCH_API_KEY__: string | undefined;
 declare const __DC_GOOGLE_SEARCH_CX__: string | undefined;
@@ -178,6 +183,18 @@ export function googleSearchPlan(uid?: string | null): GoogleSearchPlan {
       handover: null,
     };
   }
+  // The learner's own configuration burns a DAILY budget: once it is spent,
+  // the master's takes over — but only until Google's next daily reset. The
+  // moment that reset comes, the learner's own configuration is back on its
+  // own, with nothing to press.
+  if (hasOwn && hasMaster && ownQuotaExhausted("google", uid)) {
+    return {
+      apiKey: master.apiKey,
+      cx: master.cx,
+      origin: "master",
+      handover: null,
+    };
+  }
   return {
     apiKey: hasOwn ? own.apiKey : master.apiKey,
     cx: hasOwn ? own.cx : master.cx,
@@ -239,6 +256,9 @@ export function saveGoogleSearchConfig(apiKey: string, cx: string, uid?: string 
   const cxSlot = user ? googleSearchUserCxStorage(user) : GOOGLE_SEARCH_CX_STORAGE;
   if (!writeSlot(keySlot, key)) return false;
   writeSlot(cxSlot, engine);
+  // A NEW configuration is a fresh daily budget: the old "quota is gone"
+  // pause is meaningless now.
+  clearOwnQuotaExhausted("google", uid);
   announceGoogleSearchConfig();
   return true;
 }
@@ -248,6 +268,7 @@ export function clearGoogleSearchConfig(uid?: string | null): void {
   const user = typeof uid === "string" ? uid.trim() : "";
   writeSlot(user ? googleSearchUserKeyStorage(user) : GOOGLE_SEARCH_KEY_STORAGE, "");
   writeSlot(user ? googleSearchUserCxStorage(user) : GOOGLE_SEARCH_CX_STORAGE, "");
+  clearOwnQuotaExhausted("google", uid);
   announceGoogleSearchConfig();
 }
 
@@ -708,7 +729,10 @@ export async function searchGoogleOutcome(
   }
   const first = await runGoogleSearch(text, plan.apiKey, plan.cx, type, start, signal);
   if (first.error !== "quota" || !plan.handover) return first;
-  // The learner's own quota is gone — the master's configuration takes over.
+  // The learner's own daily quota is gone — remember it (until Google's next
+  // daily reset) and let the master's configuration take over. When the
+  // reset comes, the learner's own configuration is back on its own.
+  markOwnQuotaExhausted("google", uid);
   const second = await runGoogleSearch(
     text,
     plan.handover.apiKey,

@@ -53,6 +53,11 @@ import {
   writeSearchKeySource,
   type SearchKeySource,
 } from "./searchKeySource";
+import {
+  clearOwnQuotaExhausted,
+  markOwnQuotaExhausted,
+  ownQuotaExhausted,
+} from "./searchQuotaHandover";
 
 declare const __DC_YOUTUBE_API_KEY__: string | undefined;
 
@@ -193,6 +198,12 @@ export function youTubeSearchPlan(uid?: string | null): YouTubeKeyPlan {
   if (youTubeKeySource(uid) === "master") {
     return { key: master || own, origin: master ? "master" : "own", handover: "" };
   }
+  // The learner's own quota is a DAILY budget: once it is spent, the
+  // master's key takes over — but only until Google's next daily reset. The
+  // moment that reset comes, the learner's own key is back on its own.
+  if (own && master && ownQuotaExhausted("youtube", uid)) {
+    return { key: master, origin: "master", handover: "" };
+  }
   return { key: own || master, origin: own ? "own" : "master", handover: own ? master : "" };
 }
 
@@ -227,6 +238,9 @@ export function saveYouTubeKey(key: string, uid?: string | null): boolean {
   const user = typeof uid === "string" ? uid.trim() : "";
   const slot = user ? musicYouTubeUserKeyStorage(user) : MUSIC_YOUTUBE_KEY_STORAGE;
   if (!writeSlot(slot, clean)) return false;
+  // A NEW key is a fresh daily budget: the old "quota is gone" pause is
+  // meaningless now.
+  clearOwnQuotaExhausted("youtube", uid);
   announceYouTubeKey();
   return true;
 }
@@ -234,6 +248,7 @@ export function saveYouTubeKey(key: string, uid?: string | null): boolean {
 /** Remove the key that is actually in effect — this account's, else this browser's. */
 export function clearYouTubeKey(uid?: string | null): void {
   writeSlot(ownYouTubeKeySlot(uid), "");
+  clearOwnQuotaExhausted("youtube", uid);
   announceYouTubeKey();
 }
 
@@ -433,7 +448,10 @@ export async function searchYouTubeOutcome(
   }
   const first = await runYouTubeSearch(text, plan.key, signal);
   if (first.error !== "quota" || !plan.handover || plan.handover === plan.key) return first;
-  // The learner's own quota is gone — the master's key takes over, silently.
+  // The learner's own daily quota is gone — remember it (until Google's next
+  // daily reset) and let the master's key take over, silently. When the
+  // reset comes, the learner's own key is back on its own.
+  markOwnQuotaExhausted("youtube", uid);
   const second = await runYouTubeSearch(text, plan.handover, signal);
   if (second.error) return first;
   return { ...second, usedFallback: true };

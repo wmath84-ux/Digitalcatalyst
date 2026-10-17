@@ -34,7 +34,7 @@ import { TABS, type DockTab } from './CourseOverlay'
 // Workspace footer does.
 const FOOTER_COLOR = '#4f46e5'
 import { useCourseKeyboard } from './useCourseKeyboard'
-import { useFooterHiddenPage } from './coursePanelSession'
+import { useFooterHiddenPage, useFooterScrolledAway } from './coursePanelSession'
 import { useFooterNavigationAlways } from '../utils/footerNavigationVisibility'
 // The Workspace footer's design, shared — imported FIRST so the course
 // strip's area/scroll overrides (course-strip-nav.css) win their ties.
@@ -63,6 +63,12 @@ export default function CoursePeekDock({ tab, onTabChange, hiddenTabs = [] }: {
   // "Cannot read properties of undefined (reading 'length')".
   const footerNavigationAlways = useFooterNavigationAlways()
   const immersivePage = pageRuleHidesFooter && !footerNavigationAlways
+  // The scroll rule (owner, 2026-10-17): wherever the learner scrolls INSIDE
+  // the Course Player, the footer steps out of the way on the way down and
+  // comes straight back on the way up — so a long list is read without the
+  // strip covering its last rows. "Visible footer navigation always" wins
+  // over it, exactly as it wins over every other page rule.
+  const scrolledAway = useFooterScrolledAway() && !footerNavigationAlways
   const navRef = useRef<HTMLElement>(null)
   const items = TABS.filter(item => !hiddenTabs.includes(item.key))
   const moveFocus = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -76,7 +82,7 @@ export default function CoursePeekDock({ tab, onTabChange, hiddenTabs = [] }: {
   }
   if (keyboardVisible || immersivePage) return null
   return (
-    <nav ref={navRef} data-course-strip-nav aria-label="Course study tools">
+    <nav ref={navRef} data-course-strip-nav data-course-strip-scrolled={scrolledAway ? 'away' : 'home'} aria-label="Course study tools">
       {/* The Workspace pill, in-flow: its wrapper is re-homed (not restyled)
           by course-strip-nav.css so the strip keeps its exact area. No
           [data-site-footer-nav]: that hook belongs to the measured site

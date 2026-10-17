@@ -167,6 +167,26 @@ hota hai *"School ki key abhi configure nahi hai"*.
 Choice **har user ka apna** hota hai (account slot → device slot), aur
 browse karte hi turant apply ho jaata hai.
 
+### 5.4.1 Daily quota khatam hone par — aur quota reset hone par
+
+Ye quota **daily** hota hai: Google ka free daily budget har raat (Pacific
+time ki raat) reset ho jaata hai. Isliye master ki key ka takeover ek
+**switch nahi, ek pause** hai:
+
+1. Aapki quota khatam hoti hai → master ki configuration apne aap chalu ho
+   jaati hai, wahi query dobara jaati hai, results aa jaate hain. Aapko sirf
+   ek halki si line dikhti hai: *"aapki key ka daily quota khatam ho gaya —
+   ab master ki key se chal raha hai"*.
+2. Jaise hi **aapki quota reset ho jaati hai** (Google ka daily reset), app
+   **apne aap wapas aapki configuration par shift ho jaata hai** — kuch press
+   karne ki zaroorat nahi, koi setting badalne ki zaroorat nahi. Agla search
+   seedha aapki hi key se chalta hai.
+3. Aap nayi key paste karte ho to bhi purana "quota khatam" record mit jaata
+   hai — nayi key ka budget toh fresh hota hai.
+
+Ye dono engines me chalta hai (YouTube aur Google) aur har user ke liye
+alag hai (account slot → device slot).
+
 ---
 
 ## 6. Fail hone par kya dikhta hai

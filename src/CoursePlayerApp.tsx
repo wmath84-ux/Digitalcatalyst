@@ -71,6 +71,7 @@ const AddOfficialResourceDialog = lazyWithChunkRecovery(() => import("./personal
 const LumenChat = lazyWithChunkRecovery(() => import("./lumen/App"));
 import PlayerPanel from "./course/PlayerPanel";
 import CoursePeekDock from "./course/CoursePeekDock";
+import { useCourseFooterScrollAway } from "./course/footerScrollAway";
 // ONE keyboard-visible state for the whole player: the footer navigation (peek
 // dock + legacy in-pane dock), the Notes editor, the mind map and the AI chat
 // all read this same state — no feature carries its own keyboard detection.
@@ -93,7 +94,12 @@ import useCourseSketch from "./course/useCourseSketch";
 import useCourseNotes from "./course/useCourseNotes";
 import { appendCloudNote, patchCloudNote } from "./course/cloudNotes";
 import { combineHtml } from "./course/notesStore";
-import { getCoursePanelSession, resetCoursePanelSession, setExperimentSessionView } from "./course/coursePanelSession";
+import {
+  getCoursePanelSession,
+  resetCoursePanelSession,
+  setExperimentSessionView,
+  setFooterScrolledAway,
+} from "./course/coursePanelSession";
 import { useCourseTheme, usePersistedBooleanPreference, useModuleListingStyle, isModernModuleListing, DEFAULT_MODULE_LISTING_STYLE } from "./course/playerPreferences";
 import CourseGradientWavesBackground from "./course/CourseGradientWavesBackground";
 import type { Product } from "./data/products";
@@ -598,6 +604,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // and the study pane (tabs + footer dock) on the other. Tapping the active
   // dock tab peek-collapses the study pane; the divider drags it back.
   const splitDeckRef = useRef<SplitDeckHandle | null>(null);
+
+  // ── The footer navigation follows the scroll ───────────────────────────
+  // Wherever the learner scrolls INSIDE the player, the footer navigation
+  // steps out of the way on the way down and comes straight back on the way
+  // up (owner, 2026-10-17). One capture-phase listener watches every
+  // scroller in the player, so no surface has to know about it.
+  useCourseFooterScrollAway(true);
 
   // ── The plus deck: tablet (every size) and desktop, 768px and up ────────
   // The owner's brief (2026-10-16): from 768px the course area is FOUR blocks
@@ -2002,6 +2015,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       splitDeckRef.current?.toggleStudy();
       return;
     }
+    // A new page starts with the footer where it belongs: the scroll that
+    // pushed it away belonged to the page just left.
+    setFooterScrolledAway(false);
     setDockTab(next);
     splitDeckRef.current?.activateStudy();
   };
