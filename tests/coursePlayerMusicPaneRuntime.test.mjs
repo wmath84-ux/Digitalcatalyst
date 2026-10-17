@@ -877,3 +877,175 @@ test("the music search page takes the footer, the results give it back, a scroll
   assert.equal(fixture.panelSession().musicSearch, "page", "the search page takes the footer again");
   assert.equal(fixture.panelSession().musicSearchScrolledAway, false, "…and never stays scrolled away");
 });
+
+test("the key is configured in SETTINGS — the Course Player only says WHY a search failed", async () => {
+  window.localStorage.clear();
+  mount();
+  await settle();
+
+  // No configuration UI lives in the Course Player any more — the key is set
+  // up in Settings, so the school can keep its billing account switched off.
+  assert.equal(q("[data-music-youtube-key-toggle]"), null, "no key button in the pane");
+  assert.equal(q("[data-you-tube-key-card]"), null, "no key card in the pane");
+
+  // A key that the API refuses still has to SAY WHY, and point at Settings.
+  window.localStorage.setItem("dc.music.youtubeKey", "test-key");
+  await act(async () => { window.dispatchEvent(new window.Event("dc:music-youtube-key")); });
+  await settle();
+  fetchResponder = () => ({
+    ok: false,
+    status: 403,
+    json: () => Promise.resolve({ error: { code: 403, message: "Quota exceeded", errors: [{ reason: "quotaExceeded" }] } }),
+  });
+  typeInto(q("[data-music-search]"), "koi bhi gaana");
+  await click(q("[data-music-search-run]"));
+  await settle(1200);
+  const banner = q("[data-music-search-error]");
+  assert.ok(Boolean(banner), "the failure is announced");
+  assert.equal(banner.getAttribute("data-music-search-error-code"), "quota",
+    "and it names the REAL reason — a dead quota is not the same as no results");
+  assert.match(banner.textContent, /Settings/, "and it points at the place that configures the key");
+});
+
+test("the music library's search box opens the YouTube search page — on EVERY surface", async () => {
+  window.localStorage.clear();
+  window.localStorage.setItem("dc.music.youtubeKey", "test-key");
+  fetchResponder = () => ({
+    ok: true,
+    json: () => Promise.resolve({
+      items: [{ id: { videoId: "dQw4w9WgXcQ" }, snippet: { title: "Never Gonna Give You Up", channelTitle: "Rick Astley" } }],
+    }),
+  });
+  mount({ courseAudio: [COURSE_TRACK] });
+  await settle();
+
+  // ── 1. THE PAGE: the library page's own box opens the search page. ──────
+  await act(async () => { q("[data-music-search]").focus(); });
+  await settle();
+  assert.equal(q('[data-music-library="page"]').getAttribute("data-music-search-page"), "open",
+    "a tap in the box opens the YouTube search page");
+  assert.ok(Boolean(q("[data-music-search-back]")), "with its own back arrow in the header");
+  // …and the results page opens from there.
+  typeInto(q("[data-music-search]"), "purane gaane");
+  await click(q("[data-music-search-run]"));
+  await settle(1200);
+  assert.equal(qa("[data-music-result]").length, 1, "the results page opens");
+  // …and the back arrow walks back to the board, then to the library.
+  await click(q("[data-music-search-back]"));
+  await settle();
+  assert.ok(Boolean(q("[data-dc-search-history]")), "the board is back");
+  await click(q("[data-music-search-back]"));
+  await settle();
+  assert.equal(q('[data-music-library="page"]').getAttribute("data-music-search-page"), "closed",
+    "and the second back returns to the library");
+
+  // ── 2. THE PANEL over the player — the one whose header says "Music
+  //       library". Its box opens the very same search page. ──────────────
+  // (a search is an online act, so the shelf filter is back on "online")
+  await click(q('[data-music-filter="course"]'));
+  await settle();
+  await click(q('[data-music-track="course-f1"] button[aria-label^="Play"]'));
+  await settle();
+  await click(q("[data-course-audio-library]"));
+  await settle();
+  const sheet = '[data-music-library="sheet"]';
+  assert.ok(Boolean(q(`${sheet} [data-music-search]`)), "the panel carries the same search box");
+  await act(async () => { q(`${sheet} [data-music-search]`).focus(); });
+  await settle();
+  assert.equal(q(sheet).getAttribute("data-music-search-page"), "open",
+    "the panel's box opens the YouTube search page too");
+  assert.ok(Boolean(q(`${sheet} [data-music-search-back]`)), "with its own back arrow");
+
+  // The results page opens from there as well.
+  typeInto(q(`${sheet} [data-music-search]`), "purane gaane");
+  await click(q(`${sheet} [data-music-search-run]`));
+  await settle(1200);
+  assert.equal(qa(`${sheet} [data-music-result]`).length, 1, "the results page opens in the panel");
+  await click(q(`${sheet} [data-music-search-back]`));
+  await settle();
+  assert.equal(qa(`${sheet} [data-music-result]`).length, 0, "the back arrow steps back to the board");
+  assert.ok(Boolean(q(`${sheet} [data-dc-search-history]`)));
+
+  // ── 3. THE HALF UNDER A PLAYING VIDEO — the compact bar opens it too. ──
+  await click(q("[data-music-open-library]"));
+  await settle();
+  // The search page is still open (on its board) — close it, the way the
+  // learner would: the back arrow walks the board, then the library.
+  await click(q("[data-music-search-back]"));
+  await settle();
+  assert.equal(Boolean(q("[data-music-search-back]")), false, "the search page is closed");
+  await click(q('[data-music-filter="url"]'));
+  await settle();
+  typeInto(q("[data-music-url]"), "https://youtu.be/dQw4w9WgXcQ");
+  await submitForm();
+  await settle();
+  const video = '[data-music-library="video"]';
+  // The URL filter turned the box into a paste box — the shelf goes back to
+  // "All", and the box is a search box again.
+  await click(q(`${video} [data-music-filter="all"]`));
+  await settle();
+  assert.ok(Boolean(q(`${video} [data-music-search]`)), "the half under the video carries the same box");
+  await act(async () => { q(`${video} [data-music-search]`).focus(); });
+  await settle();
+  assert.equal(q(video).getAttribute("data-music-search-page"), "open",
+    "the compact bar opens the YouTube search page as well");
+  assert.ok(Boolean(q(`${video} [data-music-search-back]`)), "with its own back arrow");
+});
+
+test("the search page's back walks TWO steps: results → board → library", async () => {
+  window.localStorage.clear();
+  window.localStorage.setItem("dc.music.youtubeKey", "test-key");
+  fetchResponder = () => ({
+    ok: true,
+    json: () => Promise.resolve({
+      items: [{ id: { videoId: "dQw4w9WgXcQ" }, snippet: { title: "Never Gonna Give You Up", channelTitle: "Rick Astley" } }],
+    }),
+  });
+  mount({ courseAudio: [] });
+  await settle();
+
+  // The search page opens with the box ready to write — the BOARD.
+  await act(async () => { q("[data-music-search]").focus(); });
+  await settle();
+  assert.equal(q("[data-music-library]").getAttribute("data-music-search-page"), "open",
+    "the search page is open");
+  assert.ok(Boolean(q("[data-music-search-back]")), "with its own back arrow in the header");
+
+  // A search RUN lands on the RESULTS.
+  typeInto(q("[data-music-search]"), "purane gaane");
+  await click(q("[data-music-search-run]"));
+  await settle(1200);
+  assert.equal(qa("[data-music-result]").length, 1, "the results are on screen");
+  assert.equal(q("[data-music-search-back]").getAttribute("data-music-search-back-step"), "results",
+    "the back arrow now knows it is on the results");
+
+  // The FIRST back goes to the board — the recent searches, the box waiting.
+  await click(q("[data-music-search-back]"));
+  await settle();
+  assert.equal(q("[data-music-library]").getAttribute("data-music-search-page"), "open",
+    "the search page is still open");
+  assert.equal(qa("[data-music-result]").length, 0, "the results stepped aside");
+  assert.ok(Boolean(q("[data-dc-search-history]")), "the recent-searches board is back");
+  assert.equal(q("[data-music-search-back]").getAttribute("data-music-search-back-step"), "board",
+    "the back arrow now knows it is on the board");
+
+  // The SECOND back closes the page and returns to the library.
+  await click(q("[data-music-search-back]"));
+  await settle();
+  assert.equal(q("[data-music-library]").getAttribute("data-music-search-page"), "closed",
+    "the search page is closed");
+  assert.ok(Boolean(q("[data-music-filter]")), "the library's own tray is back");
+
+  // And tapping the search BOX on the results walks back the same way.
+  await act(async () => { q("[data-music-search]").focus(); });
+  await settle();
+  typeInto(q("[data-music-search]"), "purane gaane");
+  await click(q("[data-music-search-run]"));
+  await settle(1200);
+  assert.equal(qa("[data-music-result]").length, 1);
+  await act(async () => { q("[data-music-search]").focus(); });
+  await settle();
+  assert.equal(qa("[data-music-result]").length, 0,
+    "the box on the results takes the learner back to the board");
+  assert.equal(q("[data-music-library]").getAttribute("data-music-search-page"), "open");
+});

@@ -114,7 +114,7 @@ test("4 — the editors publish EDIT mode, not merely being open", () => {
   // The search surfaces publish their page and its results.
   assert.match(LIBRARY, /setSearchSurface\("library", searchSurfaceView\)/);
   assert.match(MUSIC, /setSearchSurface\("music", musicSearchView\)/);
-  assert.match(MUSIC, /const musicSearchView =\n\s+searchLoading \|\| showHistory \|\| \(searchPageOpen && !searched\) \? "page" : searched \? "results" : "closed";/);
+  assert.match(MUSIC, /const musicSearchView =\n\s+searchLoading \|\| showHistory \|\| \(searchPageOpen && !searchPageOnResults\) \? "page" : searched \? "results" : "closed";/);
   // …and a search surface left behind can never strand a hidden footer.
   assert.match(LIBRARY, /useEffect\(\(\) => \(\) => setSearchSurface\("library", "closed"\), \[\]\);/);
   assert.match(MUSIC, /useEffect\(\(\) => \(\) => setSearchSurface\("music", "closed"\), \[\]\);/);

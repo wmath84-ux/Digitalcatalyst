@@ -254,6 +254,15 @@ function pdfjsViewerAssets(): import("vite").Plugin {
  * SoundCloud / audio link — the search box then hands the query to YouTube's
  * own search page and the learner pastes the link straight back. A key only
  * turns on the in-player result list.
+ *
+ * The Course Player's GOOGLE search (src/course/googleSearch.ts) works the
+ * same way, with TWO values:
+ *
+ *     VITE_GOOGLE_SEARCH_API_KEY=AIza…   # the Custom Search API key
+ *     VITE_GOOGLE_SEARCH_CX=0123…:abc…   # the Programmable Search Engine id
+ *
+ * Leave them empty and every learner uses their OWN configuration from the
+ * app's Settings page — the school is then never billed for a query.
  */
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -261,6 +270,12 @@ export default defineConfig(({ mode }) => {
   return {
   define: {
     __DC_YOUTUBE_API_KEY__: JSON.stringify(env.VITE_YOUTUBE_API_KEY || ""),
+    // The Course Player's Google search (src/course/googleSearch.ts). TWO
+    // values: the API key and the Programmable Search Engine's id (the `cx`).
+    // Both are optional — leave them empty and the learner's own Settings
+    // values are used instead, so the school is never billed.
+    __DC_GOOGLE_SEARCH_API_KEY__: JSON.stringify(env.VITE_GOOGLE_SEARCH_API_KEY || ""),
+    __DC_GOOGLE_SEARCH_CX__: JSON.stringify(env.VITE_GOOGLE_SEARCH_CX || ""),
   },
   plugins: [
     react(),

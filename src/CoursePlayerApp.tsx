@@ -2362,6 +2362,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       previewModuleIds={resolution.previewModuleIds}
       accessibleResourceIds={resolution.accessibleResourceIds}
       masterNotes={libraryMasterNotes}
+      uid={user?.id ?? null}
       onSelectFile={selectFile}
       onOpenMasterNote={handleOpenMasterNoteFromLibrary}
       onOpenMindMapResource={handleOpenMindMapResourceFromLibrary}
