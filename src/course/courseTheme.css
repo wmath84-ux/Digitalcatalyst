@@ -1442,8 +1442,7 @@
   background-color: #0b1120;
   background-image: linear-gradient(180deg, #111827 0%, #0b1120 100%);
 }
-.course-mindmap-shell[data-mindmap-theme="light"] [data-course-mindmap-library],
-.course-mindmap-shell[data-mindmap-theme="light"] [data-course-mindmap-home] {
+.course-mindmap-shell[data-mindmap-theme="light"] [data-course-mindmap-library] {
   background-color: #f8fafc;
   background-image: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
   backdrop-filter: none;

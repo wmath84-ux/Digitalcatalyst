@@ -5,19 +5,21 @@
 // hi hoga", "library ke naam shrink ho gaye hain", "3 dot button remove",
 // "sabse aage ek clear Read button"). The three places are:
 //
-//   · HOME   — a clean, headerless page whose centre carries three buttons:
-//              New note · My Library · Course Library.
-//   · LIBRARY — the ONE side panel, anchored left and nearly a page wide (a
-//              thin strip of the page stays visible on the right). Headerless:
-//              the shared MASTER / SELF control sits top-centre, the list fills
-//              the middle, and exactly ONE button — New note — sits at the very
+//   · THE PAGE — there is NO start screen any more (owner, 2026-10-17): the
+//              notes page opens on the blank "New note" — the heading
+//              "New note" and the hint "Start writing from here…".
+//   · LIBRARY — the ONE panel, and it is the FULL-PAGE main area. Its header
+//              carries the way back plus the shared control, EXPANDED and
+//              renamed "Course library" / "My library"; the list fills the
+//              middle, and exactly ONE button — New note — sits at the very
 //              bottom. Rows are one clean line with NO pencil / trash buttons:
 //              rename + delete live in the row's long-press popup, and Rename
 //              turns that row's own name into an input.
 //   · WRITING — read mode first, always: the bottom pill is
-//              library(→ the panel) · prev · next | new · edit | home, and edit
-//              mode swaps it for the editing pill whose FIRST control is the
-//              black Read capsule, then a SLIDING tray of tools.
+//              library(→ the panel) · prev · next | new · edit (NO home
+//              button), and edit mode swaps it for the editing pill whose
+//              FIRST control is the black Read capsule, then a SLIDING tray
+//              of tools.
 //
 // Saving is automatic (the owner's decision), so there is no Save, no Cancel
 // and no right-hand options panel anywhere in notes.
@@ -35,11 +37,12 @@ const notesCss = read("src/course/notesLibrary.css");
 const menu = read("src/components/branched-menu/BranchedMenu.tsx");
 const toolbar = read("src/course/NoteEditorToolbar.tsx");
 const css = read("src/course/noteEditor/noteEditor.css");
+const editorFactory = read("src/course/noteEditor/editorFactory.ts");
 
-// The editor branch of NotesPanel (its early return) and the home branch.
-const editorBranch = notesPanel.slice(notesPanel.indexOf("if (editorOpen)"), notesPanel.indexOf('data-course-notes-mode="home"'));
-const homeBranch = notesPanel.slice(notesPanel.indexOf('data-course-notes-mode="home"'));
-const panelBranch = notesPanel.slice(notesPanel.indexOf("const libraryPanel"), notesPanel.indexOf("if (viewingMasterNote)"));
+// The editor branch of NotesPanel (its early return) and the blank-page
+// fallback that closes the file.
+const editorBranch = notesPanel.slice(notesPanel.indexOf("if (editorOpen)"), notesPanel.indexOf('data-course-notes-mode="blank"'));
+const panelBranch = notesPanel.slice(notesPanel.indexOf("const libraryPanel"), notesPanel.indexOf("if (viewingMasterNote) {"));
 
 test("1 — no header on any notes page, and nothing at the top of one", () => {
   assert.doesNotMatch(notesPanel, /CoursePageHeader|data-course-page-header|<header/);
@@ -56,33 +59,52 @@ test("1 — no header on any notes page, and nothing at the top of one", () => {
   assert.doesNotMatch(editorBranch, /justify-center[^"]*"[\s\S]{0,200}?data-note-status-chip/, "no visible centred chip row");
 });
 
-test("home — a clean headless page with three centred buttons", () => {
-  assert.match(homeBranch, /data-course-notes-home/);
-  assert.match(homeBranch, /data-notes-home-actions/);
-  for (const [hook, label, handler] of [
-    ["data-notes-home-new", "New note", "onClick={openComposer}"],
-    ["data-notes-home-library", "My Library", 'onClick={() => openLibrary("self")}'],
-    ["data-notes-home-course", "Course Library", 'onClick={() => openLibrary("master")}'],
-  ]) {
-    assert.ok(homeBranch.includes(hook), `${label} carries ${hook}`);
-    assert.ok(homeBranch.includes(label), `the button is named "${label}"`);
-    assert.ok(homeBranch.includes(handler), `${label} -> ${handler}`);
-  }
-  // The three buttons are the whole page: no header, no other action.
-  assert.equal((homeBranch.match(/<button/g) || []).length, 3, "three buttons and nothing else");
-  assert.match(homeBranch, /flex min-h-0 flex-1 items-center justify-center/, "centred");
+test("the page opens on the blank 'New note' — there is NO start screen", () => {
+  // The start screen is gone (owner, 2026-10-17): no home branch, no three
+  // centred buttons, no "My Library" / "Course Library" buttons on a page of
+  // their own. The library is opened from the bottom toolbar's library button.
+  assert.doesNotMatch(notesPanel, /data-course-notes-home/);
+  assert.doesNotMatch(notesPanel, /data-notes-home-actions/);
+  assert.doesNotMatch(notesPanel, /data-notes-home-new|data-notes-home-library|data-notes-home-course/);
+  // The blank page's own two words.
+  assert.match(notesPanel, /export const BLANK_NOTE_TITLE = "New note";/);
+  assert.match(notesPanel, /export const BLANK_NOTE_BODY = "Start writing from here…";/);
+  assert.match(notesPanel, /data-note-blank-title/);
+  assert.match(notesPanel, /data-note-blank-body/);
+  // The page OPENS on it: the composer state starts true (a session that was
+  // left on a real note restores that note instead).
+  assert.match(notesPanel, /const \[composing, setComposing\] = useState\(!restoreEdit\);/);
+  // It is a VIEWER page: read mode, with the bottom tray and its library
+  // button — the only way into the library.
+  assert.match(notesPanel, /const readView = selfReadOnly;/);
+  assert.match(notesPanel, /const blankPage = readView && !editing;/);
+  assert.match(notesPanel, /\{blankPage \? <BlankNotePage theme=\{noteTheme\} \/>/);
+  // …and in EDIT mode the very same two words are the editor's placeholders.
+  assert.match(notesPanel, /titlePlaceholder=\{editing \? undefined : BLANK_NOTE_TITLE\}/);
+  assert.match(notesPanel, /bodyPlaceholder=\{editing \? undefined : BLANK_NOTE_BODY\}/);
+  // The placeholder is per editor instance (the shared dictionary keeps the
+  // default one for every other editor).
+  assert.match(editorFactory, /bodyPlaceholder\?: string;/);
+  assert.match(editorFactory, /placeholders: \{ \.\.\.noteDictionary\.placeholders, default: bodyPlaceholder \}/);
+  // The blank page's styles live with the panel, not in the lazy editor chunk.
+  assert.match(notesCss, /\.dc-note-blank-title/);
+  assert.match(notesCss, /\.dc-note-blank-body/);
 });
 
-test("2 — the ONE side panel: nearly a page wide, MASTER / SELF top-centre, one button at the bottom", () => {
+test("2 — the ONE panel: the FULL-PAGE main area, Course library / My library on top, one button at the bottom", () => {
   assert.match(panelBranch, /data-note-left-panel/);
-  assert.match(panelBranch, /absolute inset-y-0 left-0 z-40 flex w-\[calc\(100%-2\.5rem\)\] flex-col/);
-  assert.match(panelBranch, /border-r shadow-2xl/, "which is what makes it read as a panel");
-  assert.match(panelBranch, /data-note-panel-scrim[\s\S]{0,200}?closeLibrary/, "the visible strip dismisses it");
+  // The side panel BECAME the main area (owner, 2026-10-17): it fills the
+  // page, so it carries the one way back.
+  assert.match(panelBranch, /absolute inset-0 z-40 flex flex-col shadow-2xl/);
+  assert.match(panelBranch, /data-note-panel-scrim[\s\S]{0,200}?closeLibrary/, "the scrim dismisses it");
   assert.match(editorBranch, /event\.key === "Escape" && libraryOpen\) \{ closeLibrary\(\);/);
-  // MASTER / SELF, top centre.
+  // The top control: the way back + the EXPANDED, renamed filter.
   assert.match(panelBranch, /data-note-library-head/);
-  assert.match(panelBranch, /items-center justify-center px-3/);
-  assert.match(panelBranch, /<MasterSelfControl[\s\S]{0,400}?ariaLabel="Note collection"[\s\S]{0,200}?feature="notes"/);
+  assert.match(panelBranch, /data-note-library-back[\s\S]{0,600}?onClick=\{closeLibrary\}/);
+  assert.match(panelBranch, /<MasterSelfControl[\s\S]{0,700}?ariaLabel="Note collection"[\s\S]{0,300}?feature="notes"/);
+  assert.match(panelBranch, /masterLabel="Course library"/);
+  assert.match(panelBranch, /selfLabel="My library"/);
+  assert.match(panelBranch, /expand/);
   // The list is the same branched library it has always been…
   assert.match(panelBranch, /data-course-notes-list/);
   assert.match(panelBranch, /<BranchedMenu\s+items=\{selfTree\}/);
@@ -93,9 +115,6 @@ test("2 — the ONE side panel: nearly a page wide, MASTER / SELF top-centre, on
   assert.match(panelBranch, /data-note-panel-new[\s\S]{0,600}?onClick=\{openComposer\}/);
   const foot = panelBranch.slice(panelBranch.indexOf("data-note-library-foot"));
   assert.equal((foot.match(/<button/g) || []).length, 1, "the panel's foot carries exactly one button");
-  // The panel's only other button is the scrim that dismisses it.
-  assert.equal((panelBranch.match(/<button/g) || []).length, 2, "New note + the dismissing scrim");
-  assert.doesNotMatch(panelBranch, /Back to library|data-note-panel-back/);
 });
 
 test("3 — rows are one line with NO pencil / trash; long press opens Rename + Delete", () => {
@@ -125,11 +144,15 @@ test("3 — rows are one line with NO pencil / trash; long press opens Rename + 
   assert.match(notesCss, /\[data-note-left-panel\] \.notes-library-menu \.branched-menu__label,[\s\S]{0,200}?white-space: nowrap;[\s\S]{0,120}?text-overflow: ellipsis;/);
 });
 
-test("4+7 — read mode's bottom navigation: library · prev · next | new · edit | home", () => {
+test("4+7 — read mode's bottom navigation: library · prev · next | new · edit (NO home)", () => {
   assert.match(editorBranch, /\{readView && readChromeVisible \? \([\s\S]{0,1600}?data-note-read-nav/);
-  for (const hook of ["data-note-read-library", "data-note-read-prev", "data-note-read-next", "data-note-read-new", "data-note-read-edit", "data-note-read-home"]) {
+  for (const hook of ["data-note-read-library", "data-note-read-prev", "data-note-read-next", "data-note-read-new", "data-note-read-edit"]) {
     assert.match(editorBranch, new RegExp(hook), hook);
   }
+  // The home button is GONE (owner, 2026-10-17): there is no start screen to
+  // go back to — the blank "New note" IS the page.
+  assert.doesNotMatch(notesPanel, /data-note-read-home/);
+  assert.doesNotMatch(notesPanel, /aria-label="Notes home"/);
   // The library button opens the ONE side panel…
   assert.match(editorBranch, /data-note-read-library[\s\S]{0,200}?openLibrary\("self"\)/);
   // …prev / next walk the SELF collection, the pencil edits, home leaves.
@@ -150,13 +173,14 @@ test("4+7 — read mode's bottom navigation: library · prev · next | new · ed
   // …and the tray only ever exists while that flag is on, so the tap really
   // takes the side-panel button away with everything else.
   assert.match(editorBranch, /\{readView && readChromeVisible \? \(/);
-  assert.match(editorBranch, /data-note-read-home onClick=\{goHome\}/);
+  // The double tap works on the blank page as well (it is a viewer page).
+  assert.match(notesPanel, /useDoubleTapToEdit\(readView, enterEditMode\)/);
   // The 3-dot drawer button is gone for good.
   assert.doesNotMatch(notesPanel, /data-note-read-more|MoreHorizontal/);
   // A note ALWAYS lands in read mode first, and the mode flips by the
   // established gestures: a double tap on the page, or Enter / F2.
   assert.match(notesPanel, /setSelfReadOnly\(true\); \/\/ §14 — a saved note opens as a read-only view/);
-  assert.match(notesPanel, /useDoubleTapToEdit\(Boolean\(editingId && selfReadOnly\), enterEditMode\)/);
+  assert.match(notesPanel, /useDoubleTapToEdit\(readView, enterEditMode\)/);
   assert.match(editorBranch, /data-note-view-mode=\{readView \? "read" : "edit"\}/);
 });
 
@@ -246,16 +270,19 @@ test("the pill's geometry is the reference's: bottom-left, round, 36px buttons",
   assert.equal((toolbar.match(/<DockSeparator/g) || []).length, 3, "history | inline | link | lists");
 });
 
-test("the MASTER viewer stays read-only, and its one control returns to the library", () => {
+test("the course-note viewer stays read-only, and its controls return to the notes page", () => {
   const viewer = notesPanel.slice(notesPanel.indexOf("function MasterNoteViewer"), notesPanel.indexOf("export default function NotesPanel"));
   assert.doesNotMatch(viewer, /<header/);
   assert.match(viewer, /data-course-master-note-viewer/);
   assert.match(viewer, /data-course-notes-mode="master-readonly"/);
   assert.match(viewer, /Read only · Master/);
   assert.match(viewer, /readOnly/);
-  // A master note is opened FROM the panel, so its single control goes back
-  // there (the panel is the library — there is no other library page).
+  // A course note is opened FROM the notes page, so its back control returns
+  // to that page, and the library button opens the ONE panel (owner,
+  // 2026-10-17: the library is opened by a direct toolbar button).
   assert.match(viewer, /data-course-master-note-chrome/);
   assert.match(viewer, /data-course-master-note-back/);
-  assert.match(notesPanel, /onClose=\{\(\) => \{ setViewingMasterNoteId\(null\); openLibrary\("master"\); \}\}/);
+  assert.match(viewer, /data-course-master-note-library/);
+  assert.match(notesPanel, /onClose=\{\(\) => \{ setViewingMasterNote\(null\); \}\}/);
+  assert.match(notesPanel, /onOpenLibrary=\{\(\) => openLibrary\("master"\)\}/);
 });

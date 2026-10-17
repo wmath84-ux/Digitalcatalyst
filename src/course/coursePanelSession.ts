@@ -58,7 +58,12 @@ export type NotesPanelSessionView =
   | { view: "compose"; draft: string; title: string }
   | { view: "edit"; noteId: string; draft: string; title: string };
 
-export type MindMapPanelSessionView = "library" | "canvas";
+/**
+ * Mind Map tab: the EMPTY viewer page (no map on the canvas — the page a
+ * fresh visit opens on, owner 2026-10-17) or a map that is open on the
+ * canvas. There is no start screen any more, so "library" is gone.
+ */
+export type MindMapPanelSessionView = "empty" | "canvas";
 
 /** Read tab: the shelf ("library") or an open PDF ("reader" — the course /
  * annotations PDF viewers and the Google Drive viewer alike). */
@@ -139,7 +144,7 @@ interface CoursePanelSessionState {
 const defaultState = (): CoursePanelSessionState => ({
   notes: { view: "list" },
   notesEditMode: false,
-  mindMapView: "library",
+  mindMapView: "empty",
   mindMapEditMode: false,
   readView: "library",
   brainView: "home",

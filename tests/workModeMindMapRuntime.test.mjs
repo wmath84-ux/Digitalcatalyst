@@ -301,32 +301,27 @@ test("Work Mind Map Editor: headless home, ONE panel, read-first maps, the eye, 
   const mounted = await fixture.mountWorkMindMap();
   await settle(120);
 
-  /* 1 — HOME: headless, with Work's own header still on it. */
-  assert.ok(workHeader(), "the Work header is present on the map home page");
-  const home = $("[data-course-mindmap-home]");
-  assert.ok(home, "the map home is the headless home page");
+  /* 1 — the page IS the canvas now: the EMPTY viewer page, headless, with
+        Work's own header gone (the map page is the page). There is no start
+        screen any more (owner, 2026-10-17). */
+  assert.equal(workHeader(), null, "no Work header over the map page");
+  assert.equal($("[data-course-mindmap-home]"), null, "no start screen any more");
   assert.equal($("[data-course-mindmap-library]"), null, "no library panel until it is asked for");
-  assert.equal(mode(), "read", "the shell is not in edit mode on the home page");
-  assert.equal(surface()?.getAttribute("data-work-immersive"), "false");
-  const actions = home.querySelector("[data-mindmap-home-actions]");
-  assert.ok(actions, "the home page has its action stack");
-  assert.equal(actions.querySelectorAll("button").length, 3, "New mind map · My Library · Course Library");
-  for (const hook of ["data-mindmap-home-new", "data-mindmap-home-mine", "data-mindmap-home-course"]) {
-    assert.ok(actions.querySelector(`[${hook}]`), `${hook} is on the home page`);
-  }
-  assert.equal(home.querySelector("header"), null, "and no header of its own");
+  assert.equal(mode(), "read", "the empty canvas is read-only");
+  assert.equal(surface()?.getAttribute("data-work-immersive"), "true");
+  assert.ok($("[data-mindmap-empty-hint]"), "the empty page says what it is");
 
-  /* 2 — My Library opens the ONE side panel: nearly a page wide, MASTER / SELF
-        at the top centre, exactly one button at the very bottom. */
-  await click($("[data-mindmap-home-mine]"), "My Library");
+  /* 2 — the tray's library button opens the ONE panel: the FULL-PAGE main
+        area, exactly one button at the very bottom. */
+  await click($("[data-mindmap-read-library]"), "the tray's library button");
   await settle(60);
   const panel = $("[data-mindmap-left-panel]");
   assert.ok(panel, "the ONE side panel opens");
   assert.ok(panel.hasAttribute("data-course-mindmap-library"), "…and it IS the map library");
-  assert.ok(panel.classList.contains("w-[calc(100%-2.5rem)]"), "nearly a page wide — a thin strip stays visible");
+  assert.ok(panel.classList.contains("inset-0"), "the panel is the full-page main area");
   const head = panel.querySelector("[data-mindmap-panel-head]");
   assert.ok(head, "the panel has its head");
-  assert.match(head.className, /justify-center/, "…centred at the top");
+  assert.ok(head.querySelector("[data-mindmap-panel-back]"), "…and the way back");
   // Work is device-only: there is no MASTER collection to switch to, so the
   // head names the scope instead of offering a tab that leads nowhere.
   assert.match(head.textContent, /My mind maps/);
@@ -354,9 +349,11 @@ test("Work Mind Map Editor: headless home, ONE panel, read-first maps, the eye, 
         ONLY chrome (no header, no corner buttons, no options drawer). */
   const tray = $("[data-mindmap-read-tray]");
   assert.ok(tray, "read mode's bottom tray is up");
-  for (const hook of ["data-mindmap-read-library", "data-mindmap-read-new", "data-mindmap-read-edit", "data-mindmap-read-home"]) {
+  for (const hook of ["data-mindmap-read-library", "data-mindmap-read-new", "data-mindmap-read-edit"]) {
     assert.ok(tray.querySelector(`[${hook}]`), `${hook} in the tray`);
   }
+  // No home button any more (owner, 2026-10-17).
+  assert.equal(tray.querySelector("[data-mindmap-read-home]"), null, "no home button in the tray");
   assert.equal($("[data-course-mindmap-status]"), null, "no editing toolbar in read mode");
   assert.equal(
     $("[data-mindmap-open-left-panel], [data-mindmap-open-right-panel], [data-mindmap-editor-chrome], [data-mindmap-right-panel]"),
@@ -439,21 +436,19 @@ test("Work Mind Map Editor: headless home, ONE panel, read-first maps, the eye, 
   const mirror = window.localStorage.getItem("dc.mindMap.v1.work-device.workbench.personal-workspace.main");
   assert.ok(mirror && mirror.includes("Renamed work map"), "the rename persisted to the Work device mirror");
 
-  /* 8 — the strip the panel leaves visible closes it, and Home restores the
-        Work chrome + footer. */
-  await click($("[data-mindmap-panel-scrim]"), "the strip the panel leaves visible");
+  /* 8 — the scrim closes the panel, and Escape leaves the map: the page goes
+        back to the EMPTY canvas (there is no home button and no start screen
+        any more). */
+  await click($("[data-mindmap-panel-scrim]"), "the scrim");
   await settle(60);
-  assert.equal($("[data-mindmap-left-panel]"), null, "tapping the visible strip closes the panel");
-  await click($("[data-mindmap-read-home]"), "the tray's home button");
-  await settle(80);
-  assert.ok($("[data-course-mindmap-home]"), "back on the map home page");
-  assert.ok(workHeader(), "the Work header returns on the home page");
-  assert.equal(surface()?.getAttribute("data-work-immersive"), "false");
-  assert.equal(
-    immersiveReports().at(-1),
-    "immersive:secondary:mindmap:false",
-    "the slot reports non-immersive again — the Work footer navigation is restored",
-  );
+  assert.equal($("[data-mindmap-left-panel]"), null, "tapping the scrim closes the panel");
+  await act(async () => {
+    $("[data-course-mindmap-canvas]").dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await sleep(80);
+  });
+  assert.ok($("[data-mindmap-empty-hint]"), "back on the empty canvas page");
+  assert.equal(workHeader(), null, "the Work header stays away — the map page is the page");
+  assert.equal(surface()?.getAttribute("data-work-immersive"), "true");
 
   await mounted.unmount();
 });

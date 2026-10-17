@@ -119,7 +119,13 @@ test("MASTER / SELF controls live inside the header, in the defined area", () =>
   const control = read("src/course/MasterSelfControl.tsx");
   assert.match(control, /data-course-note-collection="master"/);
   assert.match(control, /data-course-note-collection="self"/);
-  assert.match(notesHead, /justify-center/, "the filter sits at the panel's top CENTRE");
+  // The filter is EXPANDED at the top of the panel (owner, 2026-10-17: "top
+  // control ko theek / expand karo") — it fills the row beside the back
+  // button, and it reads "Course library" / "My library".
+  assert.match(notesHead, /masterLabel="Course library"/);
+  assert.match(notesHead, /selfLabel="My library"/);
+  assert.match(notesHead, /expand/);
+  assert.doesNotMatch(notesHead, /justify-center/, "it is not a tiny centred pill any more");
   assert.match(headerSlice(read("src/course/CourseBrainPanel.tsx")), /data-brain-collection/);
   assert.match(headerSlice(read("src/course/ExperimentPanel.tsx")), /data-experiment-collection/);
   // The mind map is headless too ("use that same complete, exact UI design
@@ -132,7 +138,11 @@ test("MASTER / SELF controls live inside the header, in the defined area", () =>
   assert.match(mapHead, /<MasterSelfControl/);
   assert.match(mapHead, /feature="mindMap"/);
   assert.match(mapHead, /data-course-mindmap-collections/, "the collection switcher keeps its hook");
-  assert.match(mapHead, /justify-center/, "the filter sits at the panel's top CENTRE");
+  // The map's filter is expanded the very same way.
+  assert.match(mapHead, /masterLabel="Course library"/);
+  assert.match(mapHead, /selfLabel="My library"/);
+  assert.match(mapHead, /expand/);
+  assert.doesNotMatch(mapHead, /justify-center/, "it is not a tiny centred pill any more");
 });
 
 test("the Resource Library is PURE white — the page, its header and its body", () => {

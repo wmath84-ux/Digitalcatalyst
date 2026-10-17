@@ -47,7 +47,7 @@ test("Work Mind Maps show only personal device maps, with scoped theme and no Co
   assert.match(mindMapSurface, /useCourseMindMap\(\{[\s\S]*?storageOnly: true/);
   assert.match(mindMapSurface, /masterMaps=\{\[\]\}[\s\S]*?storageOnly[\s\S]*?themeOverride=\{theme\}/);
   assert.match(mindMapHook, /if \(scope\.storageOnly\) \{[\s\S]*?return;[\s\S]*?\}/);
-  assert.match(mindMapPanel, /storageOnly \|\| getCoursePanelSession\(\)\.mindMapView !== "canvas"/);
+  assert.match(mindMapPanel, /!storageOnly && getCoursePanelSession\(\)\.mindMapView === "canvas"/);
   assert.match(mindMapPanel, /if \(!storageOnly\) setMindMapSessionView/);
   assert.match(mindMapPanel, /const resumeCanvas = !storageOnly && getCoursePanelSession\(\)\.mindMapView === "canvas";/);
 });

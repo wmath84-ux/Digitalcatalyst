@@ -103,6 +103,12 @@ export interface CourseResourceLibraryProps {
   onSelectFile: (file: CourseFile) => void;
   /** Open a master note in the read-only viewer. */
   onOpenMasterNote: (note: MasterCourseNote) => void;
+  /**
+   * Open a COURSE note that is a file in the tree (and therefore not in the
+   * master projection) in the NOTES area. Owner, 2026-10-17: a course note
+   * always opens where the notes live — never in the lesson pane.
+   */
+  onOpenCourseNote?: (file: CourseFile, modulePath: string[]) => void;
   /** Open a mind map resource: the player focuses the owning module's map library. */
   onOpenMindMapResource: (file: CourseFile, modulePath: string[]) => void;
   /**
@@ -582,6 +588,7 @@ export default function CourseResourceLibrary({
   uid = null,
   onSelectFile,
   onOpenMasterNote,
+  onOpenCourseNote,
   onOpenMindMapResource,
   onOpenYouTube,
   personalEntry,
@@ -598,6 +605,15 @@ export default function CourseResourceLibrary({
    */
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
+
+  // The course notes in THIS library open in the notes area, where they are
+  // rendered by the note editor. That editor is a heavy lazy chunk, and
+  // loading it at the moment the learner taps a note is exactly the "the
+  // note takes a while to open" report — so the chunk is warmed HERE, while
+  // the learner is still browsing the library.
+  useEffect(() => {
+    void import("./NoteEditor").catch(() => undefined);
+  }, []);
   const [searchFormat, setSearchFormat] = useState<LibrarySearchFormat>("list");
   /** A late api key must not need a reload: the subscription re-renders this
    *  page, and every search then reads the key fresh. */
@@ -737,14 +753,21 @@ export default function CourseResourceLibrary({
     if (!resource || resource.locked) return;
 
     if (resource.kind === "note") {
+      // A COURSE NOTE always opens in the notes area (owner, 2026-10-17) —
+      // the same place the learner's own notes live. It used to fall through
+      // to `onSelectFile`, which opened it as a lesson file in the OTHER
+      // split area.
       if (resource.masterNote) onOpenMasterNote(resource.masterNote);
-      else if (resource.file) onSelectFile(resource.file);
+      else if (resource.file) {
+        if (onOpenCourseNote) onOpenCourseNote(resource.file, resource.modulePath);
+        else onSelectFile(resource.file);
+      }
     } else if (resource.kind === "mind-map" && resource.file) {
       onOpenMindMapResource(resource.file, resource.modulePath);
     } else if (resource.file) {
       onSelectFile(resource.file);
     }
-  }, [resourceById, personalEntry, onOpenMasterNote, onSelectFile, onOpenMindMapResource]);
+  }, [resourceById, personalEntry, onOpenMasterNote, onOpenCourseNote, onSelectFile, onOpenMindMapResource]);
 
   const activeValue = selectedFileId ? `file:${selectedFileId}` : null;
   const hasAnything = built.modulePaths.length > 0 || Boolean(personalEntry);

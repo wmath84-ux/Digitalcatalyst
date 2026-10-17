@@ -595,8 +595,10 @@ test("the status strip is one side-scrolling line (never wrapped, never clipped)
 });
 
 test("the toolbar stays hidden until a SELF map is explicitly unlocked", () => {
-  // The library is the home screen: no strip until a map is on the canvas.
-  assert.match(panel, /\{libraryOpen \|\| readOnlyCanvas \? null : \(/);
+  // The canvas is the page now: the strip (the editing toolbar) appears only
+  // while a map is on the canvas AND the canvas is in edit mode.
+  assert.match(panel, /\{readOnlyCanvas \? null : \(/);
+  assert.match(panel, /\{!readOnlyCanvas \|\| !readChromeVisible \? null : \(/);
 });
 
 test("the toolbar rides at the bottom of the sheet as the note editor's pill", () => {

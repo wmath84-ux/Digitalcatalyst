@@ -2268,16 +2268,40 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     return out;
   }, [modules, isMine, resolution.accessibleModuleIds, resolution.previewModuleIds, resolution.accessibleResourceIds]);
 
-  // Signal to open a specific master note in the NotesPanel. Each increment
-  // with a new id triggers the panel to switch to the master note viewer.
-  const [openMasterNoteSignal, setOpenMasterNoteSignal] = useState<{ id: string; count: number } | null>(null);
+  // Signal to open a specific course note in the NotesPanel. Each increment
+  // with a new id triggers the panel to switch to the note viewer. The NOTE
+  // travels with the signal, so a course note opens in the notes area right
+  // away — no lookup, no waiting for the master list, no blank frame.
+  const [openMasterNoteSignal, setOpenMasterNoteSignal] = useState<{ id: string; count: number; note?: MasterCourseNote } | null>(null);
 
   const handleOpenMasterNoteFromLibrary = useCallback((note: MasterCourseNote) => {
-    // Switch to the Notes tab and signal the panel to open this master note.
+    // Switch to the Notes tab and signal the panel to open this course note.
     setDockTab("notes");
-    setOpenMasterNoteSignal({ id: note.id, count: Date.now() });
+    setOpenMasterNoteSignal({ id: note.id, count: Date.now(), note });
     splitDeckRef.current?.activateStudy();
   }, []);
+
+  /**
+   * A course note that is a FILE in the tree (not in the master projection)
+   * opens in the NOTES area as well — the same place the learner's own notes
+   * live. Owner, 2026-10-17: it used to open as a lesson file, in the other
+   * split area.
+   */
+  const handleOpenCourseNoteFromLibrary = useCallback((file: CourseFile, modulePath: string[]) => {
+    const courseId = String(product.id || file.courseId || "");
+    const note: MasterCourseNote = {
+      id: `master:${courseId}:${file.id}`,
+      resourceId: String(file.id),
+      courseId,
+      moduleId: String(file.moduleId || ""),
+      title: String(file.name || "Untitled course note"),
+      bodyHtml: String(file.noteHtml || ""),
+      modulePath: Array.isArray(modulePath) ? modulePath : [],
+      sortOrder: Number.isFinite(Number(file.sortOrder)) ? Number(file.sortOrder) : 0,
+      source: "master",
+    };
+    handleOpenMasterNoteFromLibrary(note);
+  }, [product.id, handleOpenMasterNoteFromLibrary]);
 
   const handleOpenMindMapResourceFromLibrary = useCallback((file: CourseFile, _modulePath: string[]) => {
     // Switch to the Mind Map tab on the module that owns this map — the
@@ -2381,6 +2405,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       uid={user?.id ?? null}
       onSelectFile={selectFile}
       onOpenMasterNote={handleOpenMasterNoteFromLibrary}
+      onOpenCourseNote={handleOpenCourseNoteFromLibrary}
       onOpenMindMapResource={handleOpenMindMapResourceFromLibrary}
       onOpenYouTube={openYouTubeSearchResult}
       personalEntry={libraryPersonalEntry}

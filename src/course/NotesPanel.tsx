@@ -17,7 +17,7 @@
 //     opens on a long press (or a secondary click / the keyboard menu key), and
 //     Rename turns that row's own label into an input.
 //   · THE WRITING PAGE — the note itself, in READ mode or EDIT mode:
-//       read mode's bottom pill:  library(→panel) · prev · next | new · edit | home
+//       read mode's bottom pill:  library(→panel) · prev · next | new · edit
 //       edit mode's bottom tray: EYE + the sliding tool tray
 //     No top corner buttons at all. A note opened from the library ALWAYS lands
 //     in read mode first (double tap, Enter/F2 or the pencil switches to
@@ -49,7 +49,7 @@ import { useDoubleTapToEdit } from "./useDoubleTapToEdit";
 import { Component, Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import "./study-light-surfaces.css";
 import "./notesLibrary.css";
-import { BookOpen, ChevronLeft, ChevronRight, Eye, FileText, House, Library, NotebookPen, Pencil, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, FileText, Library, NotebookPen, Pencil, Plus } from "lucide-react";
 import "katex/dist/katex.min.css";
 import type { CourseModule, CoursePlayerNote, MasterCourseNote } from "../types/course";
 import type { PersonalCourseModule } from "../types/personalCourse";
@@ -120,7 +120,7 @@ interface NotesPanelProps {
    * masterNotes), the panel opens that master note in its read-only viewer.
    * The count field ensures re-tapping the same note re-opens it.
    */
-  openMasterNoteSignal?: { id: string; count: number } | null;
+  openMasterNoteSignal?: { id: string; count: number; note?: MasterCourseNote } | null;
   /** The signed-in learner — scopes the remembered MASTER/SELF preference. */
   uid?: string | null;
   /** Hide course collections and keep this feature entirely on the device. */
@@ -279,10 +279,12 @@ function NoteStatus({
 function MasterNoteViewer({
   note,
   onClose,
+  onOpenLibrary,
   theme,
 }: {
   note: MasterCourseNote;
   onClose: () => void;
+  onOpenLibrary: () => void;
   theme: CoursePlayerTheme;
 }) {
   const dark = theme === "dark";
@@ -298,9 +300,21 @@ function MasterNoteViewer({
           className={`pointer-events-auto grid h-9 w-9 place-items-center rounded-full shadow-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${
             dark ? "bg-slate-900/90 text-slate-200 hover:bg-slate-800" : "bg-white/95 text-slate-600 hover:bg-slate-100"
           }`}
-          aria-label="Back to the note library"
-          title="Back to the note library"
+          aria-label="Back to the notes page"
+          title="Back to the notes page"
           data-course-master-note-back
+        >
+          <ChevronLeft size={18} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          onClick={onOpenLibrary}
+          className={`pointer-events-auto grid h-9 w-9 place-items-center rounded-full shadow-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${
+            dark ? "bg-slate-900/90 text-slate-200 hover:bg-slate-800" : "bg-white/95 text-slate-600 hover:bg-slate-100"
+          }`}
+          aria-label="Note library"
+          title="Note library"
+          data-course-master-note-library
         >
           <Library size={18} aria-hidden="true" />
         </button>
@@ -321,6 +335,35 @@ function MasterNoteViewer({
             dataAttribute="data-course-master-note-input"
           />
         </Suspense>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The blank page's own words (owner, 2026-10-17): the notes page opens on a
+ * blank "New note" — the heading above, the hint under it. In EDIT mode the
+ * same two words are the editor's PLACEHOLDERS, so the page reads the same
+ * before and after the first tap.
+ */
+export const BLANK_NOTE_TITLE = "New note";
+export const BLANK_NOTE_BODY = "Start writing from here…";
+
+/**
+ * The blank "New note" page — the notes page's DEFAULT state (owner,
+ * 2026-10-17). It is a viewer page: the heading and the hint are real text,
+ * because the editor's own placeholders are only drawn while the editor is
+ * editable. In EDIT mode the very same two words are the editor's
+ * placeholders, so the page reads the same before and after the first tap.
+ */
+function BlankNotePage({ theme }: { theme: CoursePlayerTheme }) {
+  return (
+    <div className="dc-note-blank" data-note-blank-page data-notes-theme={theme}>
+      <div className="dc-note-blank-scroll">
+        <div className="dc-note-blank-sheet">
+          <h1 className="dc-note-blank-title" data-note-blank-title>{BLANK_NOTE_TITLE}</h1>
+          <p className="dc-note-blank-body" data-note-blank-body>{BLANK_NOTE_BODY}</p>
+        </div>
       </div>
     </div>
   );
@@ -369,11 +412,16 @@ export default function NotesPanel({
   const noteThemeCtl = useCourseTheme("notes", uid, "light");
   const noteTheme = themeOverride ?? noteThemeCtl.theme;
   const darkNote = noteTheme === "dark";
-  const [viewingMasterNoteId, setViewingMasterNoteId] = useState<string | null>(null);
-  const viewingMasterNote = viewingMasterNoteId
-    ? masterNotes.find((note) => note.id === viewingMasterNoteId) || null
-    : null;
-  const [composing, setComposing] = useState(sessionNotes.view === "compose");
+  // The course note (the teacher's) that is open right now. It is carried by
+  // the signal, so a note that is not in the MASTER list yet (a note file
+  // opened straight from the Course Library) opens in the SAME notes area
+  // without waiting for anything.
+  const [viewingMasterNote, setViewingMasterNote] = useState<MasterCourseNote | null>(null);
+  // The page OPENS on the blank "New note" (owner, 2026-10-17): there is no
+  // start screen any more. A session that was left on a real note restores
+  // that note; anything else (a fresh visit, an untouched empty state) shows
+  // the same blank page again — a new note is NEVER created on its own.
+  const [composing, setComposing] = useState(!restoreEdit);
   const [draft, setDraft] = useState(sessionNotes.view === "compose" ? sessionNotes.draft : "");
   const [draftTitle, setDraftTitle] = useState(
     sessionNotes.view === "compose" ? sessionNotes.title : "",
@@ -387,6 +435,11 @@ export default function NotesPanel({
   // the pencil (or a double tap on the page) flips the SAME document to
   // editable, and the tray's black Read capsule flips it back.
   const [selfReadOnly, setSelfReadOnly] = useState(true);
+  // READ or EDIT — a property of the PAGE. The blank "New note" and a saved
+  // note are BOTH viewer pages until the pencil (or a double tap on the page)
+  // says otherwise, so the bottom tray — with the library button — is on
+  // screen the moment the notes page opens.
+  const readView = selfReadOnly;
   // The ONE side panel: the note library. There is no second drawer and no
   // header button anywhere that opens this one — the home page's two library
   // buttons and the read pill's library button are its only ways in.
@@ -504,14 +557,19 @@ export default function NotesPanel({
     timersRef.current.max = window.setTimeout(() => { saveNowRef.current(); }, AUTOSAVE_MAX_WAIT_MS);
   }, [clearAutosaveTimers]);
 
-  /** Leave the writing page for the notes home — after committing the draft. */
+  /**
+   * Leave the writing page for the BLANK page — after committing the draft.
+   * There is no home screen any more: the blank "New note" IS the page the
+   * notes tab opens on, so this is simply "close the note, show the blank
+   * one". Nothing is deleted: the note that was open stays in the library.
+   */
   const goHome = useCallback(() => {
     setReadChromeVisible(true);
     saveNowRef.current();
     discardingRef.current = true;
     clearAutosaveTimers();
     setLibraryOpen(false);
-    setComposing(false);
+    setComposing(true);
     setEditingId(null);
     editingIdRef.current = null;
     setDraft("");
@@ -521,6 +579,15 @@ export default function NotesPanel({
     setSelfReadOnly(true);
     addBlockedRef.current = false;
     savedHtmlRef.current = "";
+    // The editor itself is re-seeded EMPTY: without this the page would come
+    // back carrying the note that was just closed, and the next word would
+    // save THAT note again.
+    composeCount.current += 1;
+    setSeed({ key: `compose:${composeCount.current}`, title: "", body: "" });
+    latestDraftRef.current = { title: "", bodyHtml: "" };
+    setEditorEmpty(true);
+    setDirty(false);
+    setTooLong(false);
   }, [clearAutosaveTimers]);
 
   /**
@@ -558,7 +625,7 @@ export default function NotesPanel({
     setSelfReadOnly(true);
     editorRef.current?.setReadOnly(true);
   }, [goHome]);
-  const editGesture = useDoubleTapToEdit(Boolean(editingId && selfReadOnly), enterEditMode);
+  const editGesture = useDoubleTapToEdit(readView, enterEditMode);
   useEffect(() => {
     if (selfReadOnly || !focusAfterEditRef.current) return;
     focusAfterEditRef.current = false;
@@ -589,7 +656,9 @@ export default function NotesPanel({
     setEditDraft("");
     setEditTitle("");
     setComposing(true);
-    setSelfReadOnly(false);
+    // The blank page is a VIEWER page (owner, 2026-10-17): the pencil or a
+    // double tap turns it into the editor.
+    setSelfReadOnly(true);
     setDraft("");
     setDraftTitle("");
     setSeed({ key: `compose:${composeCount.current}`, title: "", body: "" });
@@ -649,7 +718,7 @@ export default function NotesPanel({
    * teacher's: it opens in the read-only viewer below and can never be written,
    * so it is never edit mode either.
    */
-  const notesEditMode = editorOpen && !viewingMasterNote && !(Boolean(editingId) && selfReadOnly);
+  const notesEditMode = editorOpen && !viewingMasterNote && !readView;
 
   // Keep the session in sync on every render so the current view + draft are
   // immediately available to the next mount (tab switch) and to the player's
@@ -699,10 +768,14 @@ export default function NotesPanel({
   // and opens the viewer immediately.
   useEffect(() => {
     if (!openMasterNoteSignal) return;
-    const note = masterNotes.find((n) => n.id === openMasterNoteSignal.id);
+    // The signal carries the note itself, so a Course-Library note opens in
+    // the SAME notes area straight away — no waiting for the master list, no
+    // second lookup, no blank frame.
+    const note = openMasterNoteSignal.note
+      || masterNotes.find((n) => n.id === openMasterNoteSignal.id);
     if (note) {
       setActiveCollection("master");
-      setViewingMasterNoteId(note.id);
+      setViewingMasterNote(note);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openMasterNoteSignal?.count]);
@@ -855,9 +928,9 @@ export default function NotesPanel({
   );
   // Opening a note from elsewhere (the Modules library, a signal) reveals its branch.
   useEffect(() => {
-    if (viewingMasterNoteId) masterOpen.reveal(ancestorSectionValues(masterTree, `master:${viewingMasterNoteId}`));
+    if (viewingMasterNote) masterOpen.reveal(ancestorSectionValues(masterTree, `master:${viewingMasterNote.id}`));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewingMasterNoteId]);
+  }, [viewingMasterNote]);
   useEffect(() => {
     if (editingId) selfOpen.reveal(ancestorSectionValues(selfTree, `note:${editingId}`));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -881,14 +954,27 @@ export default function NotesPanel({
         onClick={closeLibrary}
       />
       <aside
-        className={`absolute inset-y-0 left-0 z-40 flex w-[calc(100%-2.5rem)] flex-col border-r shadow-2xl ${
+        className={`absolute inset-0 z-40 flex flex-col shadow-2xl ${
           darkNote ? "border-slate-800 bg-slate-950 text-slate-100" : "border-slate-200 bg-white text-slate-900"
         }`}
         aria-label="Note library"
         data-note-library-panel
         data-note-left-panel
       >
-        <div className={`flex h-14 shrink-0 items-center justify-center px-3 ${darkNote ? "border-b border-slate-800" : "border-b border-slate-100"}`} data-note-library-head>
+        <div className={`flex h-14 shrink-0 items-center gap-2 px-2 ${darkNote ? "border-b border-slate-800" : "border-b border-slate-100"}`} data-note-library-head>
+          {/* The panel IS the main area now, so it carries the one way back. */}
+          <button
+            type="button"
+            className={`grid h-9 w-9 shrink-0 place-items-center rounded-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${
+              darkNote ? "text-slate-300 hover:bg-slate-800" : "text-slate-500 hover:bg-slate-100"
+            }`}
+            aria-label="Back to the notes page"
+            title="Back to the notes page"
+            data-note-library-back
+            onClick={closeLibrary}
+          >
+            <ChevronLeft size={18} aria-hidden="true" />
+          </button>
           {storageOnly ? (
             <span className="text-sm font-black tracking-wide">My notes</span>
           ) : (
@@ -899,6 +985,9 @@ export default function NotesPanel({
               selfCount={noteCount}
               ariaLabel="Note collection"
               feature="notes"
+              masterLabel="Course library"
+              selfLabel="My library"
+              expand
             />
           )}
         </div>
@@ -911,7 +1000,7 @@ export default function NotesPanel({
                 onToggle={masterOpen.toggle}
                 onSelect={(value) => {
                   const note = masterNotes.find((entry) => `master:${entry.id}` === value);
-                  if (note) { setViewingMasterNoteId(note.id); setLibraryOpen(false); }
+                  if (note) { setViewingMasterNote(note); setLibraryOpen(false); }
                 }}
                 ariaLabel="Master course notes"
                 fullWidth
@@ -1021,7 +1110,8 @@ export default function NotesPanel({
       <MasterNoteViewer
         note={viewingMasterNote}
         theme={noteTheme}
-        onClose={() => { setViewingMasterNoteId(null); openLibrary("master"); }}
+        onClose={() => { setViewingMasterNote(null); }}
+        onOpenLibrary={() => openLibrary("master")}
       />
     );
   }
@@ -1035,7 +1125,8 @@ export default function NotesPanel({
     const editing = Boolean(editingId);
     const value = editing ? editDraft : draft;
     const titleValue = editing ? editTitle : draftTitle;
-    const readView = editing && selfReadOnly;
+    // The blank "New note" is a VIEWER page: the two words are real text.
+    const blankPage = readView && !editing;
     // Previous / next SELF note for the read-mode bottom navigation.
     const editingIndex = editingId ? notes.findIndex((note) => note.id === editingId) : -1;
     const prevNote = editingIndex > 0 ? notes[editingIndex - 1] : null;
@@ -1094,6 +1185,7 @@ export default function NotesPanel({
             />
           ) : null}
           <div className="relative min-h-0 flex-1">
+            {blankPage ? <BlankNotePage theme={noteTheme} /> : (
             <EditorBoundary
               onFail={() => setLegacyFallback(true)}
               fallback={
@@ -1128,6 +1220,10 @@ export default function NotesPanel({
                   autoFocus={readView ? false : (editing || seed.title || seed.body ? "body" : "title")}
                   ariaLabel={editing ? (readView ? "View note" : "Edit note") : "New note"}
                   dataAttribute={editing ? "data-course-note-edit-input" : "data-course-notes-input"}
+                  // The blank note's own words are its placeholders, so the
+                  // page says the same thing before and after the first tap.
+                  titlePlaceholder={editing ? undefined : BLANK_NOTE_TITLE}
+                  bodyPlaceholder={editing ? undefined : BLANK_NOTE_BODY}
                   onDraftChange={handleDraftChange}
                   onEmptyChange={setEditorEmpty}
                   onDirtyChange={setDirty}
@@ -1139,12 +1235,15 @@ export default function NotesPanel({
                 />
               </Suspense>
             </EditorBoundary>
+            )}
           </div>
         </div>
 
         {/* Read mode's bottom navigation: library (opens the panel) · previous ·
-            next | new · edit | home. The 3-dot drawer button is gone — the
-            library panel is the only panel there is, and this is its way in. */}
+            next | new · edit. There is NO home button (owner, 2026-10-17):
+            there is no home screen to go back to — the blank "New note" IS
+            the page. The library panel is the only panel there is, and the
+            library button is its way in. */}
         {readView && readChromeVisible ? (
           <div className="pointer-events-none absolute inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 flex justify-center px-4" data-note-read-tray>
             <nav
@@ -1174,9 +1273,6 @@ export default function NotesPanel({
               </button>
               <button type="button" className={pillButtonClass} aria-label="Edit note" title="Edit note" data-note-read-edit onClick={enterEditMode}>
                 <Pencil size={16} aria-hidden="true" />
-              </button>
-              <button type="button" className={pillButtonClass} aria-label="Notes home" title="Notes home" data-note-read-home onClick={goHome}>
-                <House size={16} aria-hidden="true" />
               </button>
             </nav>
           </div>
@@ -1208,66 +1304,26 @@ export default function NotesPanel({
     );
   }
 
-  // ── Home ───────────────────────────────────────────────────────────────
-  // A clean, headerless page: three centred buttons and nothing else. (The
-  // visible strip beside the library panel is the touch way out; Escape closes
-  // the panel here exactly as it does over a note.)
+  // ── There is no home screen ────────────────────────────────────────────
+  // The notes page IS the writing page (owner, 2026-10-17): it opens on the
+  // blank "New note" and the library is opened from the bottom toolbar's
+  // library button. This branch is the safety net for the (unreachable) frame
+  // where neither a note nor the composer is open — the blank page, still.
   return (
     <div
       className="relative flex h-full flex-col overflow-hidden"
       data-course-notes-panel
-      data-course-notes-mode="home"
-      data-course-notes-home
+      data-course-notes-mode="blank"
       data-notes-theme={noteTheme}
       onKeyDown={(event) => { if (event.key === "Escape" && libraryOpen) closeLibrary(); }}
     >
-      <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-4">
-        <div className="flex w-full max-w-[22rem] flex-col gap-2.5" data-notes-home-actions>
-          <button
-            type="button"
-            className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-slate-900 text-base font-black text-white shadow-lg shadow-slate-950/25 transition hover:bg-slate-800 active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
-            data-notes-home-new
-            data-course-notes-add
-            aria-label="Add note"
-            title="New note"
-            onClick={openComposer}
-          >
-            <Plus size={19} strokeWidth={2.6} aria-hidden="true" /> New note
-          </button>
-          <button
-            type="button"
-            className={`flex h-14 items-center justify-between gap-2 rounded-2xl px-4 text-base font-bold transition active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400 ${
-              darkNote ? "bg-slate-900/70 text-slate-100 ring-1 ring-slate-700 hover:bg-slate-900" : "bg-white text-slate-800 ring-1 ring-slate-200 hover:bg-slate-50"
-            }`}
-            data-notes-home-library
-            onClick={() => openLibrary("self")}
-          >
-            <span className="flex min-w-0 items-center gap-2">
-              <Library size={18} aria-hidden="true" /> My Library
-            </span>
-            <span className={`shrink-0 text-xs font-black tabular-nums ${darkNote ? "text-slate-400" : "text-slate-500"}`}>{noteCount}</span>
-          </button>
-          <button
-            type="button"
-            className={`flex h-14 items-center justify-between gap-2 rounded-2xl px-4 text-base font-bold transition active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400 ${
-              darkNote ? "bg-slate-900/70 text-slate-100 ring-1 ring-slate-700 hover:bg-slate-900" : "bg-white text-slate-800 ring-1 ring-slate-200 hover:bg-slate-50"
-            }`}
-            data-notes-home-course
-            onClick={() => openLibrary("master")}
-          >
-            <span className="flex min-w-0 items-center gap-2">
-              <BookOpen size={18} aria-hidden="true" /> Course Library
-            </span>
-            <span className={`shrink-0 text-xs font-black tabular-nums ${darkNote ? "text-slate-400" : "text-slate-500"}`}>{masterCount}</span>
-          </button>
-        </div>
-      </div>
-
+      <BlankNotePage theme={noteTheme} />
       {libraryOpen ? libraryPanel : null}
       {deleteDialog}
     </div>
   );
 }
+
 
 /** Kept exported for the tables that read a note's plain text. */
 export { notePreview, noteCardTitle };

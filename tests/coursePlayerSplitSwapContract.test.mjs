@@ -41,8 +41,14 @@ test("the lower pane's split-file host is gone with it", () => {
   assert.equal(/splitPane/.test(OVERLAY), false);
 });
 
-test("a single press still opens the file in the upper area", () => {
-  assert.match(read("src/course/CourseResourceLibrary.tsx"), /else if \(resource\.file\) onSelectFile\(resource\.file\);/);
+test("a course note opens in the NOTES area — never in the upper (lesson) area", () => {
+  // Owner, 2026-10-17: a course note opens where the notes live. It used to
+  // fall through to `onSelectFile`, which opened it as a lesson file in the
+  // OTHER split area.
+  const library = read("src/course/CourseResourceLibrary.tsx");
+  assert.match(library, /if \(resource\.masterNote\) onOpenMasterNote\(resource\.masterNote\);/);
+  assert.match(library, /if \(onOpenCourseNote\) onOpenCourseNote\(resource\.file, resource\.modulePath\);/);
+  assert.doesNotMatch(library, /else if \(resource\.file\) onSelectFile\(resource\.file\);/);
 });
 
 /* ── the divider's switch ────────────────────────────────────────────────── */

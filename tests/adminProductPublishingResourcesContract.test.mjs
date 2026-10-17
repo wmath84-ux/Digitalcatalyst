@@ -117,7 +117,7 @@ test("learners see gated Master notes in a separate read-only collection while S
   assert.match(notesPanel, /MASTER/);
   assert.match(notesPanel, /SELF/);
   assert.match(notesPanel, /useState<"master" \| "self">\(\(\) =>[\s\S]*?"master"/);
-  assert.match(notesPanel, /onSelect=\{\(value\) => \{[\s\S]*?setViewingMasterNoteId\(note\.id\)/);
+  assert.match(notesPanel, /onSelect=\{\(value\) => \{[\s\S]*?setViewingMasterNote\(note\)/);
   assert.match(notesPanel, /readOnly/);
   // Self notes are still written by the same three calls. Saving is automatic
   // now, so a NEW note takes its id from onAdd and every later write updates

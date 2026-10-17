@@ -4,16 +4,18 @@
 // Note Editor — the same real NotesPanel + NoteEditor (BlockNote) the player
 // mounts, driven here inside the real WorkPageSurface in jsdom:
 //
-//   1. the Work notes tab opens on the headless HOME page (New note ·
-//      My Library · Course Library) and keeps Work's own header there;
-//   2. My Library opens the ONE side panel — nearly a page wide, MASTER / SELF
-//      top-centre, exactly one button at the bottom (New note), rows with NO
-//      pencil / trash buttons;
+//   1. the Work notes tab opens on the BLANK "New note" (there is no start
+//      screen any more) and drops Work's own header — the notes page is the
+//      page;
+//   2. the bottom tray's library button opens the ONE panel — the full-page
+//      main area, its way back in the head, exactly one button at the bottom
+//      (New note), rows with NO pencil / trash buttons;
 //   3. a row opens its note in READ mode first, and that drops the Work header
 //      (headless) and reports the slot immersive — the signal that hides the
 //      shared Work footer navigation;
-//   4. read mode's bottom pill carries library · prev · next | new · edit |
-//      home (the 3-dot drawer button is gone); Edit flips the SAME document to
+//   4. read mode's bottom pill carries library · prev · next | new · edit
+//      (the home button and the 3-dot drawer button are gone); Edit flips the
+//      SAME document to
 //      editable and the editing pill takes the bottom — the EYE tile pinned at
 //      its front, in the same design as every tool beside it, and the tools in
 //      their own sliding tray;
@@ -22,8 +24,8 @@
 //   6. a long press on a row opens Rename / Delete, and Rename turns that
 //      row's own name into an input that writes through Work's onEdit;
 //   7. the eye tile returns to the read view; ONE tap on the page hides read
-//      mode's bottom tray and the next tap brings it back; Home returns to the
-//      notes home page, where the Work header and footer come back.
+//      mode's bottom tray and the next tap brings it back; Escape leaves the
+//      note and the blank "New note" page is shown again.
 //
 // The toolbar's full tool set/geometry and the keyboard rules are pinned by
 // tests/coursePlayerNoteToolbarCaretRuntime.test.mjs and
@@ -307,32 +309,40 @@ test("Work Note Editor: headless pages, ONE library panel, read-first notes, aut
   const mounted = await fixture.mountWorkNotes();
   await settle(80);
 
-  /* Home: the headless page with its three centred buttons. Work's own header
-     stays (the page is not immersive yet) and the footer is reported visible. */
-  assert.ok(workHeader(), "the Work header is present on the notes home");
-  assert.equal(panel()?.getAttribute("data-course-notes-mode"), "home");
-  assert.equal(surface()?.getAttribute("data-work-immersive"), "false");
+  /* The page opens on the blank "New note" — there is NO start screen any more
+     (owner, 2026-10-17). The Work header goes with it: the notes page IS the
+     page, so the slot reports immersive. */
+  assert.equal(workHeader(), null, "the Work header is gone — the notes page is the page");
+  assert.equal(panel()?.getAttribute("data-course-notes-mode"), "compose");
+  assert.equal(surface()?.getAttribute("data-work-immersive"), "true");
   assert.equal($("[data-course-page-header]"), null, "no notes page header anywhere");
-  for (const hook of ["[data-notes-home-new]", "[data-notes-home-library]", "[data-notes-home-course]"]) {
-    assert.ok($(hook), `${hook} is one of the home page's three buttons`);
-  }
+  assert.equal($("[data-course-notes-home]"), null, "no start screen any more");
+  assert.ok($("[data-note-blank-page]"), "the page opens on the blank 'New note'");
+  assert.equal($("[data-note-blank-title]")?.textContent, "New note");
+  assert.equal($("[data-note-blank-body]")?.textContent, "Start writing from here…");
+  // The bottom tray is on screen, and its library button is the ONLY way into
+  // the ONE panel.
+  assert.ok($("[data-note-read-nav]"), "the blank page wears the bottom tray");
+  assert.ok($("[data-note-read-library]"), "…and the library button lives in it");
 
-  /* The library IS the one side panel: nearly a page wide, MASTER / SELF at its
-     top centre, ONE button at the bottom, and no pencil / trash on the rows. */
-  await click($("[data-notes-home-library]"), "My Library");
+  /* The library IS the one panel, and it is the FULL-PAGE main area. Its head
+     carries the way back and (where both collections exist) the EXPANDED
+     "Course library" / "My library" control; ONE button at the bottom, and no
+     pencil / trash on the rows. */
+  await click($("[data-note-read-library]"), "the tray's library button");
   await settle(60);
   const library = $("[data-note-library-panel]");
-  assert.ok(library, "the library opens as the ONE side panel");
+  assert.ok(library, "the library opens as the ONE panel");
   const head = library.querySelector("[data-note-library-head]");
   assert.ok(head, "the panel's head is present");
-  assert.match(head.className, /justify-center/, "and the filter sits at the TOP CENTRE");
   // Work Mode is device-only: it has no MASTER collection, so its head names
   // the collection instead of offering a tab that could not go anywhere. The
   // shared MASTER / SELF control heads this same panel wherever both
   // collections exist (the Course Player — pinned by coursePageHeaderContract).
   assert.match(head.textContent, /My notes/);
   assert.equal(head.querySelector("[data-master-self-control]"), null, "no dead MASTER tab in a device-only scope");
-  assert.equal(head.querySelector("button"), null, "the head carries no button at all");
+  assert.equal(head.querySelectorAll("button").length, 1, "the head carries exactly one button — the way back");
+  assert.ok(head.querySelector("[data-note-library-back]"), "…and it is the back button");
   const footButtons = library.querySelectorAll("[data-note-library-foot] button");
   assert.equal(footButtons.length, 1, "the panel's foot carries exactly one button");
   assert.ok(footButtons[0].hasAttribute("data-note-panel-new"), "…and it is New note");
@@ -367,9 +377,12 @@ test("Work Note Editor: headless pages, ONE library panel, read-first notes, aut
   /* 4 — read mode's bottom navigation. */
   const readNav = $("[data-note-read-nav]");
   assert.ok(readNav, "read mode's bottom navigation");
-  for (const hook of ["data-note-read-library", "data-note-read-prev", "data-note-read-next", "data-note-read-new", "data-note-read-edit", "data-note-read-home"]) {
+  for (const hook of ["data-note-read-library", "data-note-read-prev", "data-note-read-next", "data-note-read-new", "data-note-read-edit"]) {
     assert.ok(readNav.querySelector(`[${hook}]`), `${hook} in the read navigation`);
   }
+  // There is NO home button any more (owner, 2026-10-17): the blank "New
+  // note" IS the page, and the library is one tap away.
+  assert.equal(readNav.querySelector("[data-note-read-home]"), null, "no home button in the read navigation");
   assert.equal($("[data-note-read-more]"), null, "the 3-dot drawer button is gone");
   assert.equal($("[data-note-dock]"), null, "no editing toolbar in read mode");
 
@@ -491,30 +504,28 @@ test("Work Note Editor: headless pages, ONE library panel, read-first notes, aut
   await settle(40);
   assert.equal($("[data-note-left-panel]"), null, "the side panel closes");
 
-  /* 7 — home: the Work header + footer restore. */
-  await click($("[data-note-read-home]"), "the read pill's Home button");
-  await settle(60);
-  assert.equal(panel()?.getAttribute("data-course-notes-mode"), "home");
-  assert.ok(workHeader(), "the Work header returns on the notes home");
-  assert.equal(surface()?.getAttribute("data-work-immersive"), "false");
-  assert.equal(
-    immersiveReports().at(-1),
-    "immersive:secondary:notes:false",
-    "the slot reports non-immersive again — the Work footer navigation is restored",
-  );
-
-  /* 8 — New note opens the simple page: still headless, and leaving an empty
-        one behind returns to the home page (there is nothing to store). */
-  await click($("[data-notes-home-new]"), "New note");
-  await settle(140);
+  /* 7 — Escape leaves the note: the page goes back to the BLANK "New note"
+        (there is no home screen and no home button any more). */
+  await act(async () => {
+    panel()?.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await sleep(60);
+  });
   assert.equal(panel()?.getAttribute("data-course-notes-mode"), "compose");
-  assert.equal(workHeader(), null, "no Work header over the composer");
+  assert.ok($("[data-note-blank-page]"), "the blank page is back");
+  assert.equal(surface()?.getAttribute("data-work-immersive"), "true", "the notes page stays the page");
+
+  /* 8 — the pencil turns the blank page into the editor, and leaving an empty
+        one behind comes back to the very same blank page (there is nothing to
+        store, and nothing is created on the way). */
+  await click($("[data-note-read-edit]"), "the read pill's pencil");
+  await settle(140);
+  assert.equal(panel()?.getAttribute("data-note-view-mode"), "edit");
   const leaveNew = $("[data-note-edit-read]") || $("[data-note-edit-read-float]");
-  assert.ok(leaveNew, "the composer carries the same way back to the read view");
+  assert.ok(leaveNew, "the editor carries the same way back to the read view");
   await click(leaveNew, "Read on an empty new note");
   await settle(80);
-  assert.equal(panel()?.getAttribute("data-course-notes-mode"), "home", "an empty new note leaves nothing behind");
-  assert.ok(workHeader(), "the Work header returns on the notes home");
+  assert.equal(panel()?.getAttribute("data-course-notes-mode"), "compose", "an empty new note leaves nothing behind");
+  assert.ok($("[data-note-blank-page]"), "…and the same blank page is shown again");
 
   await mounted.unmount();
 });
