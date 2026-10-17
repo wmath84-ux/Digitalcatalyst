@@ -57,12 +57,73 @@ Google search ko **do** cheezein chahiye — isliye uska card do input rakhta ha
    page par **Search Engine ID** copy karein (ye `cx` value hai).
 3. [Credentials](https://console.cloud.google.com/apis/credentials) →
    **Create credentials → API key** → copy. Restriction: **API** →
-   *Custom Search API*, **Application** → *Websites* → app ka origin.
+   *Custom Search API*. **Application restriction me kuch bhi chuno —
+   `None`, `Websites`, ya `IP addresses` — search chalti rahegi**, kyunki
+   browser wali request refuse hone par app wahi query apne server ke
+   through bhejti hai (niche §3.1). Website restriction rakhna behtar hai
+   (key leak hone par koi doosra use nahi kar sakta), par zaroori nahi.
 
 ### Owner ke liye
 
 `VITE_GOOGLE_SEARCH_API_KEY` aur `VITE_GOOGLE_SEARCH_CX` **khali** rakho →
 har user apni configuration use karega, school ka bill zero.
+
+Chaaho to **server-side** school ki key bhi set kar sakte ho (browser bundle me
+ye value kabhi nahi jaati):
+
+| Variable | Kya hai |
+|----------|---------|
+| `GOOGLE_SEARCH_API_KEY` | school ki Custom Search key — `/api/google-search` is se chalta hai |
+| `GOOGLE_SEARCH_CX` | school ka Search Engine ID |
+
+In dono ke bina bhi server path chalta hai — tab wo **learner ki apni key ko
+POST body me le kar** Google tak pahunchata hai (yani restriction ka fix bina
+kisi env value ke bhi mil jaata hai). Ye values Vercel dashboard → Project →
+Settings → Environment Variables me daalo, aur `npm run dev` ke liye `.env` me
+(`.env.example` me section bana hua hai).
+
+---
+
+## 3.1 Server path (`/api/google-search`) — restriction ka permanent jawab
+
+**Problem:** browser se `googleapis.com` par seedhi request jaati hai, aur
+browser us par `Origin` + `Referer` **lagata hi hai** — APK me
+`https://localhost` (Android) / `capacitor://localhost` (iOS), PWA me
+`https://eduvora.shop`, dev me `http://localhost:5173`. Key ki "Website" restriction in me se ek ko hi
+pehchaanti hai, isliye baaki jagah `403 ipRefererBlocked`. Console me
+restriction badalna kaam karta tha, par **sirf us origin ke liye jo abhi chal
+raha hai** — aur app teen jagah chalti hai.
+
+**Fix:** `/api/google-search` — app ke apne server par ek chhota proxy. Server
+se jaane wali request par **na Origin hota hai, na Referer** → Google ke paas
+restrict karne ke liye kuch hi nahi → **key ki restriction koi bhi ho, request
+pass hoti hai**.
+
+```
+browser ──(Origin/Referer ke saath)──▶ googleapis.com   ✗ 403 ipRefererBlocked
+browser ──POST /api/google-search───▶ app ka server ──(koi header nahi)──▶ googleapis.com   ✓ 200
+```
+
+**Cascade (search simply chalti hai):**
+
+1. chuni hui configuration, **browser se seedha** (sabse sasta);
+2. wahi configuration, **apne server ke through** — restriction yahi todta hai;
+3. **doosri** configuration (school ki, ya learner ki) — dono paths par.
+
+Quota khatam ho to server hop **skip** hota hai (proxy quota nahi badha sakta)
+aur seedha handover chalta hai. Ek baar koi key browser me refuse ho gayi, to
+agli search **server se shuru** hoti hai (10 minute ki memory) — wahi 403 dobara
+nahi khareedte.
+
+**Suraksha:**
+
+* learner ki key **POST body** me jaati hai, query string me kabhi nahi (log /
+  cache me leak na ho);
+* key response me **wapas nahi** jaati; jawab `Cache-Control: no-store`;
+* school ki key **per-IP rate limit** par chalti hai (12 request + refill);
+  learner ki apni key par ye limit nahi — wo quota Google ka apna hai;
+* Google ka **asli status + reason + message** wapas aata hai, isliye page
+  andaaza nahi lagata ki 403 kis cheez ka tha.
 
 ---
 
@@ -198,12 +259,34 @@ Har failure ka apna message hai (sab "kuch nahin mila" nahi):
 | `invalid-key` | key galat hai |
 | `api-disabled` | project me API enable nahi |
 | `quota` | daily quota khatam |
-| `referrer` | website restriction mismatch |
+| `referrer` | key ki **website** restriction ne roka |
+| `ip-blocked` | key ki **IP** restriction ne roka |
+| `permission` | project/key par permission denied |
 | `invalid-cx` | Search Engine ID galat |
+| `proxy-unavailable` | server path is deployment par nahi hai |
 | `network` | internet nahi |
 
-Aur har message ke saath ek pointer: **Settings → YouTube search** (ya
-**Settings → Google search**) me key badlo.
+Har message ke saath **Google ka apna message** bhi dikhta hai (andaaza nahi),
+aur ek pointer: **Settings → YouTube search** (ya **Settings → Google search**)
+me key badlo.
+
+### 6.1 Settings → Google search → "Diagnose karo"
+
+Ek button jo dono paths ko **ek-ek chhoti request** se aazmata hai aur saaf
+batata hai kya chalu hai:
+
+```
+Abhi search is key se chalti hai: AIza…x9Kd · aapki · account slot · handover: master
+  Browser se seedha Google        ✗ referrer · 403 · 640ms
+  App ke server ke through        ✓ chalu · 310ms
+Verdict: Server path se search chalu hai — browser wali key restriction se
+         rukti hai, par request apne server ke through chali jaati hai.
+```
+
+Isme `keyFingerprint` bhi dikhta hai — jo sawab "maine to restriction hata di
+thi" ka asli jawab hai: **kaun si key actually chal rahi hai** (account slot /
+device slot / build-time constant). Diagnosis chalne par purani memory saaf ho
+jaati hai, aur verdict ke saath exact fix steps aate hain.
 
 ---
 
@@ -223,6 +306,11 @@ Aur har message ke saath ek pointer: **Settings → YouTube search** (ya
 | `src/course/CourseResourceLibrary.tsx` | search box me Google icon + Google page |
 | `src/course/MusicPanel.tsx` | YouTube search + do-step ka back |
 | `src/settings/SettingsPage.tsx` | dono configuration sections |
-| `vite.config.ts`, `index.html` | build-time constants |
+| `vite.config.ts`, `index.html` | build-time constants + dev server ka `/api/google-search` middleware |
+| `api/_lib/googleSearchProxy.ts` | server proxy: Google URL, classifier, per-IP limiter, `handleGoogleSearch` |
+| `api/referral-leaderboard.ts` | route dispatcher (`google-search` shared function par chalta hai) |
+| `vercel.json` | `/api/google-search` ka rewrite |
+| `scripts/check-google-search.mjs` | terminal se dono paths ka test (`npm run check:google-search`) |
+| `tests/googleSearchProxy.test.mjs` | server proxy ka pura contract |
 | `tests/coursePlayerGoogleSearch.test.mjs` | Google search ka pura contract |
 | `tests/coursePlayerMusicSearch.test.mjs` | YouTube key ka pura contract |

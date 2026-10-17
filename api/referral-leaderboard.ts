@@ -4,6 +4,7 @@ import { adminDb, errorResponse, type VercelRequest, type VercelResponse } from 
 import { referralCodeForUid, runReferralRepairOnce } from "./_lib/referrals.js";
 import { handleEmbedProxy } from "./_lib/embedProxy.js";
 import { handleYouTubeTranscript } from "./_lib/youtubeTranscript.js";
+import { handleGoogleSearch } from "./_lib/googleSearchProxy.js";
 import { handleRevisionGenerate } from "./_lib/revisionGenerate.js";
 import { handleRevisionData } from "./_lib/revisionData.js";
 import { handleMyDay } from "./_lib/myDay.js";
@@ -145,6 +146,7 @@ const SHARED_ROUTES = [
   "course-access",
   "embed-proxy",
   "youtube-transcript",
+  "google-search",
 ] as const;
 
 type SharedRoute = (typeof SHARED_ROUTES)[number];
@@ -183,6 +185,9 @@ const ROUTE_LABEL: Record<SharedRoute, string> = {
   "course-access": "course access verification",
   "embed-proxy": "the embed proxy",
   "youtube-transcript": "the Course Player transcript",
+  // The Course Player's Google search, sent from the server so a browser
+  // Origin/Referer can never trip the API key's website restriction again.
+  "google-search": "the Course Player Google search",
 };
 
 const jsonBody = (res: VercelResponse, status: number, body: unknown) => res.status(status).json(body);
@@ -295,6 +300,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // BEFORE the embed-proxy's `?url=` branch so a transcript request that
   // carries a full watch URL is never mistaken for an embed.
   if (route === "youtube-transcript") return handleYouTubeTranscript(req, res);
+  // Course Player → Google search, proxied. `/api/google-search` rewrites here
+  // (vercel.json). POST carries the learner's own key in the BODY; GET uses the
+  // deployment's own server-side key. Either way the request that reaches
+  // Google comes from this function, with no Origin and no Referer — which is
+  // exactly why an HTTP-referrer restriction on the key can no longer break
+  // the search on the APK / PWA / a preview domain.
+  if (route === "google-search") {
+    if (req.method === "POST" && (!req.body || typeof req.body !== "object")) {
+      req.body = await resolveRequestBody(req);
+    }
+    return handleGoogleSearch(req, res);
+  }
   if (route === "account/preferences") return handleAccountPreferences(req, res);
   if (route === "public-profile") return handlePublicProfile(req, res);
   if (matchesApiRoute(reqWithUrl, "manifest")) {

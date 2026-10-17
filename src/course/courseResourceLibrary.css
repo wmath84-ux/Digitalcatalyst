@@ -367,6 +367,38 @@
   text-underline-offset: 2px;
 }
 
+/* The refusal's own evidence: Google's message, the key that was used, and
+   every path that was tried. A 403 has half a dozen causes and the wrong
+   guess sends the learner off to fix something that was never broken. */
+.library-search-empty > p {
+  margin: 0;
+}
+
+.library-search-empty__detail {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px dashed rgb(15 23 42 / 0.12);
+  font-size: 10.8px;
+  font-weight: 500;
+  line-height: 1.55;
+  color: rgb(15 23 42 / 0.5);
+  word-break: break-word;
+}
+
+.library-search-empty__detail code {
+  padding: 0 3px;
+  border-radius: 5px;
+  background: rgb(15 23 42 / 0.06);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.4px;
+  color: rgb(15 23 42 / 0.75);
+}
+
+.library-search-empty__detail strong {
+  font-weight: 800;
+  color: rgb(15 23 42 / 0.72);
+}
+
 /* The GOOGLE mark, INSIDE the search box on its right: one tap opens the
    web search — the third answer this box gives (the course, YouTube, the
    open web). */

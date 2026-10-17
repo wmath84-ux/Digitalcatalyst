@@ -60,7 +60,12 @@ import {
   youTubeSearchUrl,
 } from "./musicSearch";
 import type { MusicTrack } from "./musicLibrary";
-import { requestYouTubeSeek, subscribeYouTubeProgress } from "./youtubePlayerBus";
+import {
+  requestYouTubeCaptionTracks,
+  requestYouTubeSeek,
+  subscribeYouTubeProgress,
+  type YouTubeCaptionTrack,
+} from "./youtubePlayerBus";
 import {
   activeTranscriptIndex,
   forgetTranscript,
@@ -69,6 +74,7 @@ import {
   TranscriptRequestError,
   transcriptTimestamp,
   youTubeVideoIdForFile,
+  type TranscriptAttempt,
   type TranscriptClientErrorCode,
   type TranscriptData,
 } from "./youtubeTranscript";
@@ -119,30 +125,82 @@ const copyToClipboard = async (text: string): Promise<boolean> => {
   }
 };
 
+/** Which layer names mean what, in words a learner can act on. */
+const ATTEMPT_LABEL: Array<[RegExp, string]> = [
+  [/^server$/, "App ka server (Vercel)"],
+  [/^innertube:/, "YouTube player API"],
+  [/^caption-download/, "Caption track download"],
+  [/^watch-page$/, "YouTube watch page"],
+  [/^get_transcript$/, "YouTube transcript panel"],
+  [/^timedtext-list$/, "Legacy timedtext list"],
+  [/^browser:innertube:/, "Aapke browser se YouTube player API"],
+  [/^browser:get_transcript$/, "Aapke browser se YouTube transcript panel"],
+  [/^browser:timedtext-list$/, "Aapke browser se timedtext list"],
+  [/^browser:caption-download/, "Aapke browser se caption download"],
+  [/^browser$/, "Aapka browser"],
+];
+
+const attemptLabel = (source: string): string => {
+  for (const [pattern, label] of ATTEMPT_LABEL) {
+    if (pattern.test(source)) return label;
+  }
+  return source;
+};
+
 function ErrorState({
   message,
   code,
   watchUrl,
   onRetry,
+  attempts,
+  confirmedTracks,
 }: {
   message: string;
   code?: string;
   watchUrl: string;
   onRetry: () => void;
+  /** What every layer answered — the evidence behind this message. */
+  attempts?: TranscriptAttempt[];
+  /** The video's OWN player says these caption tracks exist. */
+  confirmedTracks?: YouTubeCaptionTrack[] | null;
 }) {
   const isRateLimited = code === "too_many_requests";
   const isNoCaptions = code === "no_captions";
+  // The embedded player is YouTube's own iframe in the learner's session: when
+  // IT lists caption tracks, the video is not caption-less — our network is the
+  // problem. Saying the opposite is what made this page untrustworthy.
+  const captionsExist = Boolean(confirmedTracks?.length);
+  const trackWords = (confirmedTracks || [])
+    .map((track) => track.displayName || track.languageCode)
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(", ");
+  const trail = (attempts || []).filter((attempt) => attempt && attempt.source);
   return (
     <div className="course-transcript__state" data-course-transcript-error role="alert" data-course-transcript-error-code={code || ""}>
       <span className="course-transcript__state-icon course-transcript__state-icon--warn">
         <AlertTriangle size={24} aria-hidden="true" />
       </span>
       <p className="course-transcript__state-eyebrow">Transcript unavailable</p>
-      <h3 className="course-transcript__state-title">
-        {isRateLimited ? "YouTube is limiting requests right now" : isNoCaptions ? "No captions for this video" : "We couldn't read this video's captions"}
+      <h3 className="course-transcript__state-title" data-course-transcript-error-title>
+        {captionsExist
+          ? "Captions hain — lekin abhi download nahi ho pa rahe"
+          : isRateLimited
+            ? "YouTube is limiting requests right now"
+            : isNoCaptions
+              ? "No captions for this video"
+              : "We couldn't read this video's captions"}
       </h3>
-      <p className="course-transcript__state-copy">{message}</p>
-      {isRateLimited ? (
+      {captionsExist ? (
+        <p className="course-transcript__state-copy" data-course-transcript-confirmed>
+          Is video ke player me captions maujood hain{trackWords ? ` (${trackWords})` : ""} — yaani transcript hai,
+          bas YouTube ne hamare network se caption file dene se mana kar diya. Ek-do minute me “Try again” dabaiye;
+          zyada tar cases me agla attempt chal jaata hai.
+        </p>
+      ) : (
+        <p className="course-transcript__state-copy">{message}</p>
+      )}
+      {isRateLimited && !captionsExist ? (
         <p className="course-transcript__state-copy course-transcript__state-copy--hint">
           This happens when many transcript requests come from the same network. Waiting a minute and retrying usually works. You can also open the video on YouTube and use its own transcript button (⋯ → Show transcript).
         </p>
@@ -157,6 +215,24 @@ function ErrorState({
           </a>
         ) : null}
       </div>
+      {trail.length ? (
+        <details className="course-transcript__attempts" data-course-transcript-attempts>
+          <summary>Details — kya try hua ({trail.length})</summary>
+          <ul>
+            {trail.map((attempt, index) => (
+              <li key={`${attempt.source}-${index}`} data-course-transcript-attempt={attempt.source}>
+                <span className="course-transcript__attempt-source">{attemptLabel(attempt.source)}</span>
+                <span className="course-transcript__attempt-note">
+                  {attempt.blocked ? "YouTube ne rok diya (bot check / 429)" : ""}
+                  {attempt.answered ? `${attempt.tracks ? `${attempt.tracks} caption track` : "jawab mila, caption track nahi"}` : ""}
+                  {attempt.playability ? ` · ${attempt.playability}` : ""}
+                  {attempt.note ? `${attempt.blocked || attempt.answered ? " · " : ""}${attempt.note}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </div>
   );
 }
@@ -393,6 +469,10 @@ export default function TranscriptPanel({
   const [phase, setPhase] = useState<LoadPhase>("idle");
   const [data, setData] = useState<TranscriptData | null>(null);
   const [error, setError] = useState<{ code: TranscriptClientErrorCode; message: string } | null>(null);
+  /** What every layer answered on the way to that error. */
+  const [attempts, setAttempts] = useState<TranscriptAttempt[]>([]);
+  /** The video's OWN player listing its caption tracks — proof they exist. */
+  const [confirmedTracks, setConfirmedTracks] = useState<YouTubeCaptionTrack[] | null>(null);
   const [clock, setClock] = useState({ position: 0, duration: 0 });
   const [copied, setCopied] = useState(false);
   const [follow, setFollow] = useState(true);
@@ -422,10 +502,12 @@ export default function TranscriptPanel({
     const controller = new AbortController();
     setPhase("loading");
     setError(null);
+    setConfirmedTracks(null);
     setData((current) => (current && current.videoId === videoId ? current : null));
     loadYouTubeTranscript(videoId, language, controller.signal)
       .then((transcript) => {
         if (controller.signal.aborted) return;
+        setAttempts(transcript.attempts || []);
         setData(transcript);
         setPhase("ready");
       })
@@ -433,6 +515,7 @@ export default function TranscriptPanel({
         if (controller.signal.aborted) return;
         if (caught instanceof TranscriptRequestError && caught.code === "aborted") return;
         const code: TranscriptClientErrorCode = caught instanceof TranscriptRequestError ? caught.code : "fetch_failed";
+        setAttempts(caught instanceof TranscriptRequestError ? caught.attempts || [] : []);
         setError({
           code,
           message: caught instanceof Error && caught.message && caught.message !== code
@@ -443,6 +526,25 @@ export default function TranscriptPanel({
       });
     return () => controller.abort();
   }, [videoId, language, reloadNonce]);
+
+  // ── The second opinion the learner can trust ────────────────────────────
+  // A failed fetch asks the video's own embedded player which caption tracks
+  // YouTube offered it. If the player lists tracks, the video is NOT
+  // caption-less — our network is — and the page says exactly that instead of
+  // telling the learner their video has no transcript.
+  useEffect(() => {
+    if (!videoId || phase !== "error" || !error) return;
+    const worthAsking = ["no_captions", "no_transcript", "too_many_requests", "fetch_failed", "service_unavailable"].includes(error.code);
+    if (!worthAsking) return undefined;
+    let cancelled = false;
+    void requestYouTubeCaptionTracks(videoId).then((tracks) => {
+      if (cancelled || !tracks) return;
+      setConfirmedTracks(tracks);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [videoId, phase, error]);
 
   // ── The player's clock (once a second while it is the active file) ────
   useEffect(() => {
@@ -600,6 +702,8 @@ export default function TranscriptPanel({
               code={error?.code}
               watchUrl={watchUrl}
               onRetry={retry}
+              attempts={attempts}
+              confirmedTracks={confirmedTracks}
             />
           </div>
         ) : !data || phase === "loading" ? (

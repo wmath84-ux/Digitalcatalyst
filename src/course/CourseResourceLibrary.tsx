@@ -1260,20 +1260,41 @@ export default function CourseResourceLibrary({
                       </div>
                     )
                   ) : (
-                    <p className="library-search-empty" data-library-google-no-hits>
-                      {googleOutcome?.error
-                        ? `${googleOutcome.message} Settings → Google search me apni configuration badal do.`
-                        : `Google par kuch nahin mila “${googleSearch.query}” ke liye.`}{" "}
-                      <a
-                        href={googleSearchUrl(googleSearch.query)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        data-library-google-external
-                        className="library-search-empty__link"
-                      >
-                        Google par khud search karo <ExternalLink size={12} aria-hidden="true" />
-                      </a>
-                    </p>
+                    <div className="library-search-empty" data-library-google-no-hits>
+                      <p>
+                        {googleOutcome?.error
+                          ? `${googleOutcome.message} Settings → Google search me apni configuration badal do.`
+                          : `Google par kuch nahin mila “${googleSearch.query}” ke liye.`}{" "}
+                        <a
+                          href={googleSearchUrl(googleSearch.query)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          data-library-google-external
+                          className="library-search-empty__link"
+                        >
+                          Google par khud search karo <ExternalLink size={12} aria-hidden="true" />
+                        </a>
+                      </p>
+                      {/* The evidence. A 403 has half a dozen causes, and the
+                          wrong guess sends the learner off to edit a key
+                          restriction that was never the problem — so Google's
+                          own words, the key that was used and every path that
+                          was tried are all shown here. */}
+                      {googleOutcome?.error ? (
+                        <p
+                          className="library-search-empty__detail"
+                          data-library-google-error-detail
+                          data-library-google-error-code={googleOutcome.error}
+                        >
+                          {googleOutcome.googleMessage
+                            ? <>Google ka apna message{googleOutcome.googleStatus ? ` (HTTP ${googleOutcome.googleStatus}${googleOutcome.googleReason ? ` · ${googleOutcome.googleReason}` : ""})` : ""}: “{googleOutcome.googleMessage}”</>
+                            : null}
+                          {googleOutcome.keyFingerprint ? <> Key: <code>{googleOutcome.keyFingerprint}</code>.</> : null}
+                          {googleOutcome.attempts?.length ? <> Try hua: {googleOutcome.attempts.join(" → ")}.</> : null}
+                          {" "}Exact wajah aur uska fix: Settings → Google search → <strong>“Diagnose karo”</strong>.
+                        </p>
+                      ) : null}
+                    </div>
                   )}
 
                   {/* Google's own pager — the API serves ten a page, and at

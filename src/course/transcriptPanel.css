@@ -717,6 +717,80 @@
   line-height: 1.55;
 }
 
+/* ── The failure's own evidence ──────────────────────────────────────────
+   "No captions" and "YouTube throttled us" look identical to a learner, and
+   the wrong one sends them off to fix a video that was never broken. So the
+   error state can open up and show which layer said what: the server's
+   InnerTube clients, the watch page, the transcript panel, and this browser's
+   own second opinion. Collapsed by default — it is evidence, not decoration. */
+
+.course-transcript__attempts {
+  margin-top: 12px;
+  width: min(520px, 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(248, 250, 252, 0.9);
+  text-align: left;
+}
+
+.course-transcript__attempts > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 8px 11px;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.course-transcript__attempts > summary::-webkit-details-marker {
+  display: none;
+}
+
+.course-transcript__attempts > summary::before {
+  content: "›";
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform 160ms ease;
+  color: #94a3b8;
+}
+
+.course-transcript__attempts[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.course-transcript__attempts ul {
+  margin: 0;
+  padding: 0 11px 10px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.course-transcript__attempts li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  padding-top: 5px;
+  border-top: 1px dashed rgba(15, 23, 42, 0.09);
+}
+
+.course-transcript__attempt-source {
+  color: #0f172a;
+  font-size: 10.8px;
+  font-weight: 800;
+}
+
+.course-transcript__attempt-note {
+  color: #64748b;
+  font-size: 10.6px;
+  font-weight: 500;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
 /* ── The video bar above the lines ──────────────────────────────────────── */
 
 .course-transcript__now {
